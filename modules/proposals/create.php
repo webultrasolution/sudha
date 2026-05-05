@@ -47,16 +47,20 @@ $sites = $pdo->query($sitesQuery)->fetchAll();
                             <th>PHOTOS</th>
                             <th>LOCATION</th>
                             <th>SIZE</th>
+                            <th>SQFT</th>
+                            <th>MONTHLY / DAILY</th>
                             <th>TYPE</th>
-                            <th>CARD RATE</th>
                             <th style="width: 140px;">SALE RATE (₹)</th>
-                            <th>AVAILABLE FROM</th>
+                            <th>MARKUP (%)</th>
                             <th>STATUS</th>
                             <th style="width: 140px;">TOTAL</th>
                         </tr>
                     </thead>
                 <tbody id="asset-body">
-                    <?php $sno = 1; foreach ($sites as $s): ?>
+                    <?php $sno = 1; foreach ($sites as $s): 
+                        $sqft = $s['width'] * $s['height'];
+                        $dailyRate = $s['card_rate'] / 30;
+                    ?>
                     <tr class="site-row" 
                         id="row-<?php echo $s['id']; ?>"
                         data-id="<?php echo $s['id']; ?>" 
@@ -64,7 +68,7 @@ $sites = $pdo->query($sitesQuery)->fetchAll();
                         data-rate="<?php echo $s['card_rate']; ?>" 
                         data-prate="<?php echo $s['purchase_rate']; ?>" 
                         data-owner="<?php echo $s['owner_type']; ?>"
-                        data-sqft="<?php echo $s['sqft']; ?>">
+                        data-sqft="<?php echo $sqft; ?>">
                         <td class="sno-cell"><?php echo $sno++; ?></td>
                         <td><input type="checkbox" class="asset-chk" onclick="toggleSite('<?php echo $s['id']; ?>')"></td>
                         <td><span class="badge-media"><?php echo strtoupper($s['type']); ?></span></td>
@@ -78,15 +82,19 @@ $sites = $pdo->query($sitesQuery)->fetchAll();
                         </td>
                         <td style="font-size: 0.8rem; max-width: 200px;"><?php echo $s['location']; ?></td>
                         <td><?php echo $s['width']; ?>' x <?php echo $s['height']; ?>'</td>
+                        <td style="font-weight: 700;"><?php echo number_format($sqft); ?></td>
+                        <td>
+                            <div style="font-size: 0.85rem; font-weight: 700;">₹<?php echo number_format($s['card_rate']); ?></div>
+                            <div style="font-size: 0.7rem; color: #94a3b8;">₹<?php echo number_format($dailyRate, 2); ?> / day</div>
+                        </td>
                         <td><span class="badge-<?php echo strtolower($s['owner_type']); ?>"><?php echo $s['owner_type']; ?></span></td>
-                        <td>₹<?php echo number_format($s['card_rate']); ?></td>
                         <td>
                             <input type="number" class="p-input sale-rate-input" 
                                    value="<?php echo $s['card_rate']; ?>" 
                                    oninput="updateSitePrice('<?php echo $s['id']; ?>', this.value)"
                                    disabled>
                         </td>
-                        <td><?php echo date('d M y', strtotime($s['available_from'])); ?></td>
+                        <td class="markup-cell" style="font-weight: 800; color: #64748b;">-</td>
                         <td><span class="status-available">Available</span></td>
                         <td class="total-cell" style="font-weight: 700; color: var(--primary);">₹0</td>
                     </tr>
@@ -182,10 +190,23 @@ $sites = $pdo->query($sitesQuery)->fetchAll();
                     <span>Display Cost:</span>
                     <span id="sum-display-btm">₹0</span>
                 </div>
-                <div class="stat-row">
-                    <span>Tax (18%):</span>
-                    <span id="sum-tax-btm">₹0</span>
+                
+                <div style="border-top: 1px dashed #e2e8f0; padding-top: 1rem; margin-top: 1rem;">
+                    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 0.75rem;">
+                        <span style="font-size: 0.8rem; font-weight: 700; color: var(--secondary);">TAX TYPE</span>
+                        <select id="tax-type" class="p-input" onchange="recalcAll()" style="width: 140px; height: 32px; font-size: 0.75rem; padding: 0 0.5rem; border-radius: 8px;">
+                            <option value="igst">IGST (18%)</option>
+                            <option value="cgst_sgst">CGST/SGST (9%+9%)</option>
+                        </select>
+                    </div>
+                    <div id="tax-breakdown">
+                        <div class="stat-row">
+                            <span>GST (18%):</span>
+                            <span id="sum-tax-btm">₹0</span>
+                        </div>
+                    </div>
                 </div>
+
                 <div class="grand-total" style="border-top: 2px solid #e2e8f0; padding-top: 1rem; margin-top: 1rem; color: var(--primary); font-weight: 900;">
                     <div style="font-size: 0.7rem; color: var(--secondary); margin-bottom: 0.2rem;">GRAND TOTAL</div>
                     <div id="sum-grand-btm" style="font-size: 2rem;">₹0</div>
@@ -522,14 +543,17 @@ function updateSitePrice(id, val) {
 function recalcAll() {
     const print = parseFloat(document.getElementById('print_cost').value) || 0;
     const mount = parseFloat(document.getElementById('mount_cost').value) || 0;
+    const taxType = document.getElementById('tax-type').value;
 
     let totalDisplay = 0;
 
     selectedSites.forEach((site) => {
         const row = document.getElementById('row-' + site.id);
         const currentTotal = site.saleRate;
+        
+        // Margin Analysis: (Sale - Purchase) / Purchase * 100
         const markupVal = site.saleRate - site.purchaseRate;
-        const markupPct = ((markupVal / site.purchaseRate) * 100).toFixed(1);
+        const markupPct = site.purchaseRate > 0 ? ((markupVal / site.purchaseRate) * 100).toFixed(1) : '0';
 
         totalDisplay += currentTotal;
         
@@ -537,21 +561,37 @@ function recalcAll() {
         if(row) {
             row.querySelector('.total-cell').innerText = '₹' + currentTotal.toLocaleString();
             row.querySelector('.markup-cell').innerText = markupPct + '%';
+            
+            // Color markup based on performance
+            const markupEl = row.querySelector('.markup-cell');
+            if (markupPct > 20) markupEl.style.color = '#059669';
+            else if (markupPct > 0) markupEl.style.color = '#1d4ed8';
+            else markupEl.style.color = '#dc2626';
         }
     });
 
     const subtotal = totalDisplay + print + mount;
-    const tax = subtotal * 0.18;
-    const grand = subtotal + tax;
+    const totalTax = subtotal * 0.18;
+    const grand = subtotal + totalTax;
 
-    // Update Summary Panel (Bottom)
-    const displayEl = document.getElementById('sum-display-btm');
-    const taxEl = document.getElementById('sum-tax-btm');
-    const grandEl = document.getElementById('sum-grand-btm');
+    // Update Summary Panel
+    document.getElementById('sum-display-btm').innerText = '₹' + totalDisplay.toLocaleString();
+    
+    // Tax Breakdown Logic
+    const taxContainer = document.getElementById('tax-breakdown');
+    if (taxType === 'cgst_sgst') {
+        const halfTax = totalTax / 2;
+        taxContainer.innerHTML = `
+            <div class="stat-row"><span>CGST (9%):</span><span>₹${halfTax.toLocaleString()}</span></div>
+            <div class="stat-row"><span>SGST (9%):</span><span>₹${halfTax.toLocaleString()}</span></div>
+        `;
+    } else {
+        taxContainer.innerHTML = `
+            <div class="stat-row"><span>IGST (18%):</span><span>₹${totalTax.toLocaleString()}</span></div>
+        `;
+    }
 
-    if(displayEl) displayEl.innerText = '₹' + totalDisplay.toLocaleString();
-    if(taxEl) taxEl.innerText = '₹' + tax.toLocaleString();
-    if(grandEl) grandEl.innerText = '₹' + grand.toLocaleString();
+    document.getElementById('sum-grand-btm').innerText = '₹' + grand.toLocaleString();
 }
 
 function filterSites() {

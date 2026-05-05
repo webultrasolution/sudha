@@ -13,10 +13,19 @@ $campaigns = $pdo->query("
 ?>
 
 <div class="card">
-    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1.5rem;">
-        <h2 style="font-size: 1.25rem;">Active & History Campaigns</h2>
-        <div class="search-box">
-            <input type="text" placeholder="Search Project ID or Client..." class="p-input">
+    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 2rem;">
+        <div>
+            <h2 style="font-size: 1.5rem; font-weight: 800; color: var(--primary);">Campaign Management</h2>
+            <p style="font-size: 0.85rem; color: var(--secondary); margin-top: 0.25rem;">Monitor and manage all active outdoor advertising campaigns.</p>
+        </div>
+        <div style="display: flex; gap: 1rem; align-items: center;">
+            <div class="search-box" style="position: relative;">
+                <i class="fas fa-search" style="position: absolute; left: 1rem; top: 50%; transform: translateY(-50%); color: #94a3b8;"></i>
+                <input type="text" placeholder="Search Project ID or Client..." class="p-input" style="padding-left: 2.5rem; width: 300px;">
+            </div>
+            <a href="../proposals/create.php" class="btn btn-primary" style="display: flex; align-items: center; gap: 0.5rem; padding: 0.75rem 1.5rem; border-radius: 12px; font-weight: 700;">
+                <i class="fas fa-plus-circle"></i> Create New Campaign
+            </a>
         </div>
     </div>
 
@@ -56,11 +65,21 @@ $campaigns = $pdo->query("
 </div>
 
 <style>
-.status-badge { padding: 0.25rem 0.5rem; border-radius: 4px; font-size: 0.65rem; font-weight: 800; }
-.status-badge.running { background: #dcfce7; color: #166534; }
-.status-badge.planned { background: #e0f2fe; color: #0369a1; }
-.status-badge.completed { background: #f1f5f9; color: #475569; }
-.p-input { padding: 0.5rem; border: 1px solid #cbd5e1; border-radius: 6px; width: 250px; }
+.table { width: 100%; border-collapse: separate; border-spacing: 0; }
+.table th { background: #f8fafc; padding: 1.25rem 1rem; font-size: 0.75rem; text-transform: uppercase; letter-spacing: 0.1em; color: #64748b; font-weight: 800; border-bottom: 2px solid #f1f5f9; text-align: left; }
+.table td { padding: 1.25rem 1rem; vertical-align: middle; border-bottom: 1px solid #f1f5f9; font-size: 0.95rem; color: #334155; }
+.table tr:hover td { background: #fcfcfc; }
+
+.status-badge { padding: 0.35rem 0.75rem; border-radius: 50px; font-size: 0.7rem; font-weight: 800; text-transform: uppercase; letter-spacing: 0.05em; display: inline-flex; align-items: center; gap: 0.35rem; }
+.status-badge.running { background: #ecfdf5; color: #059669; border: 1px solid #d1fae5; }
+.status-badge.planned { background: #eff6ff; color: #1d4ed8; border: 1px solid #dbeafe; }
+.status-badge.completed { background: #f8fafc; color: #64748b; border: 1px solid #e2e8f0; }
+
+.btn-icon { width: 36px; height: 36px; display: inline-flex; align-items: center; justify-content: center; border-radius: 8px; background: #f1f5f9; color: #64748b; transition: all 0.2s; border: none; cursor: pointer; text-decoration: none; margin-right: 0.5rem; }
+.btn-icon:hover { background: var(--primary); color: white; transform: translateY(-1px); }
+
+.p-input { height: 42px; border: 1px solid #e2e8f0; border-radius: 10px; font-family: inherit; font-size: 0.9rem; transition: all 0.2s; }
+.p-input:focus { border-color: var(--primary); outline: none; box-shadow: 0 0 0 3px rgba(13, 148, 136, 0.1); }
 </style>
 
 <?php include_once __DIR__ . '/../../includes/footer.php'; ?>
