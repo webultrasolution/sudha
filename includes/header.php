@@ -25,72 +25,86 @@ checkAuth();
         <ul class="nav-menu">
             <li class="nav-item">
                 <a href="<?php echo BASE_URL; ?>index.php" class="nav-link <?php echo $activePage == 'dashboard' ? 'active' : ''; ?>">
-                    <i class="fas fa-th-large"></i> Dashboard
+                    <i class="fas fa-th-large"></i> <span>Dashboard</span>
                 </a>
             </li>
-            <li class="nav-item">
-                <a href="<?php echo BASE_URL; ?>modules/partners/clients.php" class="nav-link <?php echo $activePage == 'clients' ? 'active' : ''; ?>">
-                    <i class="fas fa-building"></i> Company/Client
+
+            <!-- Master Data Submenu -->
+            <li class="nav-item has-submenu">
+                <a href="#" class="nav-link submenu-toggle <?php echo in_array($activePage, ['clients', 'sites', 'vendors']) ? 'active submenu-open' : ''; ?>">
+                    <i class="fas fa-database"></i> <span>Master Data</span> <i class="fas fa-chevron-down toggle-icon" style="margin-left: auto; font-size: 0.8rem;"></i>
                 </a>
+                <ul class="submenu" style="<?php echo in_array($activePage, ['clients', 'sites', 'vendors']) ? 'display: block;' : 'display: none;'; ?>">
+                    <li><a href="<?php echo BASE_URL; ?>modules/partners/clients.php" class="<?php echo $activePage == 'clients' ? 'active-sub' : ''; ?>"><i class="fas fa-building"></i> Company/Client</a></li>
+                    <li><a href="<?php echo BASE_URL; ?>modules/inventory/sites.php" class="<?php echo $activePage == 'sites' ? 'active-sub' : ''; ?>"><i class="fas fa-map-marked-alt"></i> Site/Location</a></li>
+                    <li><a href="<?php echo BASE_URL; ?>modules/partners/vendors.php" class="<?php echo $activePage == 'vendors' ? 'active-sub' : ''; ?>"><i class="fas fa-truck-loading"></i> Vendors</a></li>
+                </ul>
             </li>
-                
-            <li class="nav-item">
-                <a href="<?php echo BASE_URL; ?>modules/inventory/sites.php" class="nav-link <?php echo $activePage == 'sites' ? 'active' : ''; ?>">
-                    <i class="fas fa-map-marked-alt"></i> Site/Location
+
+            <!-- Operations & Sales Submenu -->
+            <li class="nav-item has-submenu">
+                <a href="#" class="nav-link submenu-toggle <?php echo in_array($activePage, ['proposals', 'bookings', 'campaigns']) ? 'active submenu-open' : ''; ?>">
+                    <i class="fas fa-briefcase"></i> <span>Operations & Sales</span> <i class="fas fa-chevron-down toggle-icon" style="margin-left: auto; font-size: 0.8rem;"></i>
                 </a>
+                <ul class="submenu" style="<?php echo in_array($activePage, ['proposals', 'bookings', 'campaigns']) ? 'display: block;' : 'display: none;'; ?>">
+                    <li><a href="<?php echo BASE_URL; ?>modules/proposals/proposals.php" class="<?php echo $activePage == 'proposals' ? 'active-sub' : ''; ?>"><i class="fas fa-file-contract"></i> Sales / Proposals</a></li>
+                    <li><a href="<?php echo BASE_URL; ?>modules/operations/bookings.php" class="<?php echo $activePage == 'bookings' ? 'active-sub' : ''; ?>"><i class="fas fa-calendar-check"></i> Bookings</a></li>
+                    <li><a href="<?php echo BASE_URL; ?>modules/operations/campaigns.php" class="<?php echo $activePage == 'campaigns' ? 'active-sub' : ''; ?>"><i class="fas fa-bullhorn"></i> Campaign List</a></li>
+                </ul>
             </li>
-            <li class="nav-item">
-                <a href="<?php echo BASE_URL; ?>modules/proposals/proposals.php" class="nav-link <?php echo $activePage == 'proposals' ? 'active' : ''; ?>">
-                    <i class="fas fa-file-contract"></i> Sales / Proposals
+
+            <!-- Financials Submenu -->
+            <li class="nav-item has-submenu">
+                <a href="#" class="nav-link submenu-toggle <?php echo in_array($activePage, ['invoices', 'payments']) ? 'active submenu-open' : ''; ?>">
+                    <i class="fas fa-wallet"></i> <span>Financials</span> <i class="fas fa-chevron-down toggle-icon" style="margin-left: auto; font-size: 0.8rem;"></i>
                 </a>
+                <ul class="submenu" style="<?php echo in_array($activePage, ['invoices', 'payments']) ? 'display: block;' : 'display: none;'; ?>">
+                    <li><a href="<?php echo BASE_URL; ?>modules/financials/invoices.php" class="<?php echo $activePage == 'invoices' ? 'active-sub' : ''; ?>"><i class="fas fa-file-invoice-dollar"></i> Invoices</a></li>
+                    <li><a href="<?php echo BASE_URL; ?>modules/financials/payments.php" class="<?php echo $activePage == 'payments' ? 'active-sub' : ''; ?>"><i class="fas fa-money-bill-wave"></i> Payments</a></li>
+                </ul>
             </li>
-               <li class="nav-item">
-                <a href="<?php echo BASE_URL; ?>modules/operations/bookings.php" class="nav-link <?php echo $activePage == 'bookings' ? 'active' : ''; ?>">
-                    <i class="fas fa-calendar-check"></i> Bookings
+            
+            <!-- Tools & Insights Submenu -->
+            <li class="nav-item has-submenu">
+                <a href="#" class="nav-link submenu-toggle <?php echo in_array($activePage, ['reports', 'resources', 'photofactory']) ? 'active submenu-open' : ''; ?>">
+                    <i class="fas fa-chart-line"></i> <span>Tools & Insights</span> <i class="fas fa-chevron-down toggle-icon" style="margin-left: auto; font-size: 0.8rem;"></i>
                 </a>
+                <ul class="submenu" style="<?php echo in_array($activePage, ['reports', 'resources', 'photofactory']) ? 'display: block;' : 'display: none;'; ?>">
+                    <li><a href="<?php echo BASE_URL; ?>modules/reports/reports.php" class="<?php echo $activePage == 'reports' ? 'active-sub' : ''; ?>"><i class="fas fa-chart-pie"></i> Reports</a></li>
+                    <li><a href="<?php echo BASE_URL; ?>modules/admin/resources.php" class="<?php echo $activePage == 'resources' ? 'active-sub' : ''; ?>"><i class="fas fa-tools"></i> Resources</a></li>
+                    <li><a href="<?php echo BASE_URL; ?>modules/inventory/photofactory.php" class="<?php echo $activePage == 'photofactory' ? 'active-sub' : ''; ?>"><i class="fas fa-images"></i> Photofactory</a></li>
+                </ul>
             </li>
-                 <li class="nav-item">
-                <a href="<?php echo BASE_URL; ?>modules/partners/vendors.php" class="nav-link <?php echo $activePage == 'vendors' ? 'active' : ''; ?>">
-                    <i class="fas fa-truck-loading"></i> Vendors
-                </a>
-            </li>
-                 <li class="nav-item">
-                <a href="<?php echo BASE_URL; ?>modules/operations/campaigns.php" class="nav-link <?php echo $activePage == 'campaigns' ? 'active' : ''; ?>">
-                    <i class="fas fa-bullhorn"></i> Campaign List
-                </a>
-            </li>
-            <li class="nav-item">
-                <a href="<?php echo BASE_URL; ?>modules/financials/invoices.php" class="nav-link <?php echo $activePage == 'invoices' ? 'active' : ''; ?>">
-                    <i class="fas fa-file-invoice-dollar"></i> Invoices
-                </a>
-            </li>
-            <li class="nav-item">
-                <a href="<?php echo BASE_URL; ?>modules/financials/payments.php" class="nav-link <?php echo $activePage == 'payments' ? 'active' : ''; ?>">
-                    <i class="fas fa-money-bill-wave"></i> Payments
-                </a>
-            </li>
-       
-            <li class="nav-item">
-                <a href="<?php echo BASE_URL; ?>modules/reports/reports.php" class="nav-link <?php echo $activePage == 'reports' ? 'active' : ''; ?>">
-                    <i class="fas fa-chart-pie"></i> Reports
-                </a>
-            </li>
-            <li class="nav-item">
-                <a href="<?php echo BASE_URL; ?>modules/admin/resources.php" class="nav-link <?php echo $activePage == 'resources' ? 'active' : ''; ?>">
-                    <i class="fas fa-tools"></i> Resources
-                </a>
-            </li>
-            <li class="nav-item">
-                <a href="<?php echo BASE_URL; ?>modules/inventory/photofactory.php" class="nav-link <?php echo $activePage == 'photofactory' ? 'active' : ''; ?>">
-                    <i class="fas fa-images"></i> Photofactory
-                </a>
-            </li>
+
             <li class="nav-item" style="margin-top: auto;">
-                <a href="<?php echo BASE_URL; ?>logout.php" class="nav-link">
-                    <i class="fas fa-sign-out-alt"></i> Logout
+                <a href="<?php echo BASE_URL; ?>logout.php" class="nav-link" style="color: #ef4444;">
+                    <i class="fas fa-sign-out-alt"></i> <span>Logout</span>
                 </a>
             </li>
         </ul>
+        
+        <script>
+            document.addEventListener('DOMContentLoaded', function() {
+                const toggles = document.querySelectorAll('.submenu-toggle');
+                toggles.forEach(toggle => {
+                    toggle.addEventListener('click', function(e) {
+                        e.preventDefault();
+                        const submenu = this.nextElementSibling;
+                        const icon = this.querySelector('.toggle-icon');
+                        
+                        if (submenu.style.display === 'block') {
+                            submenu.style.display = 'none';
+                            icon.style.transform = 'rotate(0deg)';
+                            this.classList.remove('submenu-open');
+                        } else {
+                            submenu.style.display = 'block';
+                            icon.style.transform = 'rotate(180deg)';
+                            this.classList.add('submenu-open');
+                        }
+                    });
+                });
+            });
+        </script>
     </div>
     <?php endif; ?>
     
