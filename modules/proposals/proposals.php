@@ -73,7 +73,11 @@ $proposals = $proposals->fetchAll();
                 foreach ($proposals as $p): ?>
                 <tr>
                     <td><?php echo $sn++; ?></td>
-                    <td><strong><?php echo $p['proposal_number'] ?: '#PR-' . str_pad($p['id'], 5, '0', STR_PAD_LEFT); ?></strong></td>
+                    <td>
+                        <a href="view.php?id=<?php echo $p['id']; ?>" style="color: var(--primary); text-decoration: none; transition: opacity 0.2s;" onmouseover="this.style.opacity='0.8'" onmouseout="this.style.opacity='1'">
+                            <strong><?php echo $p['proposal_number'] ?: '#PR-' . str_pad($p['id'], 5, '0', STR_PAD_LEFT); ?></strong>
+                        </a>
+                    </td>
                     <td><?php echo $p['client_name']; ?></td>
                     <td style="font-size: 0.875rem;">
                         <?php echo date('d M Y', strtotime($p['start_date'])); ?> to <br>
@@ -86,7 +90,15 @@ $proposals = $proposals->fetchAll();
                         </span>
                     </td>
                     <td>
-                        <a href="view.php?id=<?php echo $p['id']; ?>" class="btn-icon" title="View"><i class="fas fa-eye"></i></a>
+                        <div class="dropdown" style="display: inline-block; margin-right: 0.5rem;">
+                            <button class="btn-icon" style="color: var(--primary);" title="Export"><i class="fas fa-download"></i></button>
+                            <div class="dropdown-content" style="right: 0; min-width: 160px;">
+                                <a href="#"><i class="fas fa-file-pdf" style="color: #ef4444; width: 18px;"></i> PDF Proposal</a>
+                                <a href="#"><i class="fas fa-file-excel" style="color: #10b981; width: 18px;"></i> Excel Rate Sheet</a>
+                                <a href="#"><i class="fas fa-file-powerpoint" style="color: #f97316; width: 18px;"></i> PPT Presentation</a>
+                            </div>
+                        </div>
+                        <a href="view.php?id=<?php echo $p['id']; ?>" class="btn-icon" title="View Workspace"><i class="fas fa-external-link-alt"></i></a>
                         <button class="btn-icon" style="color: var(--danger);" onclick="deleteProposal(<?php echo $p['id']; ?>)"><i class="fas fa-trash"></i></button>
                     </td>
                 </tr>
@@ -103,8 +115,16 @@ $proposals = $proposals->fetchAll();
 .status-sent { background: #e0f2fe; color: #0369a1; }
 .status-confirmed { background: #dcfce7; color: #166534; }
 .status-cancelled { background: #fee2e2; color: #991b1b; }
-.btn-icon { color: var(--secondary); background: none; border: none; cursor: pointer; text-decoration: none; margin-right: 0.5rem; transition: color 0.2s; }
+.btn-icon { color: var(--secondary); background: none; border: none; cursor: pointer; text-decoration: none; margin-right: 0.25rem; transition: color 0.2s; padding: 0.25rem; display: inline-flex; align-items: center; justify-content: center; }
 .btn-icon:hover { color: var(--primary); }
+
+/* Dropdown styling */
+.dropdown { position: relative; display: inline-block; }
+.dropdown-content { display: none; position: absolute; right: 0; background-color: white; min-width: 180px; box-shadow: 0 10px 25px -5px rgba(0,0,0,0.1); border-radius: 12px; z-index: 50; border: 1px solid #f1f5f9; overflow: hidden; padding: 0.5rem; text-align: left; }
+.dropdown-content a { color: #334155; padding: 0.6rem 0.8rem; text-decoration: none; display: flex; align-items: center; gap: 0.5rem; font-size: 0.85rem; font-weight: 600; border-radius: 6px; transition: all 0.2s; }
+.dropdown-content a:hover { background: #f8fafc; color: var(--primary); transform: translateX(2px); }
+.dropdown:hover .dropdown-content { display: block; animation: slideDown 0.2s ease-out forwards; }
+@keyframes slideDown { from { opacity: 0; transform: translateY(-5px); } to { opacity: 1; transform: translateY(0); } }
 </style>
 
 <script>
