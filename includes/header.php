@@ -1,0 +1,105 @@
+<?php
+include_once __DIR__ . '/../config/db.php';
+include_once __DIR__ . '/functions.php';
+checkAuth();
+?>
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title><?php echo isset($pageTitle) ? $pageTitle . ' | ' . APP_NAME : APP_NAME; ?></title>
+    <link rel="stylesheet" href="<?php echo BASE_URL; ?>assets/css/style.css">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
+    <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
+</head>
+<body>
+    <div class="sidebar">
+        <div class="sidebar-brand">
+            <img src="<?php echo BASE_URL; ?>assets/img/LOGO.png" alt="Easy Outdoor" style="max-width: 100%; height: auto; padding: 10px;">
+        </div>
+        <ul class="nav-menu">
+            <li class="nav-item">
+                <a href="<?php echo BASE_URL; ?>index.php" class="nav-link <?php echo $activePage == 'dashboard' ? 'active' : ''; ?>">
+                    <i class="fas fa-th-large"></i> Dashboard
+                </a>
+            </li>
+            <li class="nav-item">
+                <a href="<?php echo BASE_URL; ?>modules/partners/clients.php" class="nav-link <?php echo $activePage == 'clients' ? 'active' : ''; ?>">
+                    <i class="fas fa-building"></i> Company/Client
+                </a>
+            </li>
+                
+            <li class="nav-item">
+                <a href="<?php echo BASE_URL; ?>modules/inventory/sites.php" class="nav-link <?php echo $activePage == 'sites' ? 'active' : ''; ?>">
+                    <i class="fas fa-map-marked-alt"></i> Site/Location
+                </a>
+            </li>
+            <li class="nav-item">
+                <a href="<?php echo BASE_URL; ?>modules/proposals/proposals.php" class="nav-link <?php echo $activePage == 'proposals' ? 'active' : ''; ?>">
+                    <i class="fas fa-file-contract"></i> Sales / Proposals
+                </a>
+            </li>
+               <li class="nav-item">
+                <a href="<?php echo BASE_URL; ?>modules/operations/bookings.php" class="nav-link <?php echo $activePage == 'bookings' ? 'active' : ''; ?>">
+                    <i class="fas fa-calendar-check"></i> Bookings
+                </a>
+            </li>
+                 <li class="nav-item">
+                <a href="<?php echo BASE_URL; ?>modules/partners/vendors.php" class="nav-link <?php echo $activePage == 'vendors' ? 'active' : ''; ?>">
+                    <i class="fas fa-truck-loading"></i> Vendors
+                </a>
+            </li>
+                 <li class="nav-item">
+                <a href="<?php echo BASE_URL; ?>modules/operations/campaigns.php" class="nav-link <?php echo $activePage == 'campaigns' ? 'active' : ''; ?>">
+                    <i class="fas fa-bullhorn"></i> Campaign List
+                </a>
+            </li>
+            <li class="nav-item">
+                <a href="<?php echo BASE_URL; ?>modules/financials/invoices.php" class="nav-link <?php echo $activePage == 'invoices' ? 'active' : ''; ?>">
+                    <i class="fas fa-file-invoice-dollar"></i> Invoices
+                </a>
+            </li>
+            <li class="nav-item">
+                <a href="<?php echo BASE_URL; ?>modules/financials/payments.php" class="nav-link <?php echo $activePage == 'payments' ? 'active' : ''; ?>">
+                    <i class="fas fa-money-bill-wave"></i> Payments
+                </a>
+            </li>
+       
+            <li class="nav-item">
+                <a href="<?php echo BASE_URL; ?>modules/reports/reports.php" class="nav-link <?php echo $activePage == 'reports' ? 'active' : ''; ?>">
+                    <i class="fas fa-chart-pie"></i> Reports
+                </a>
+            </li>
+            <li class="nav-item">
+                <a href="<?php echo BASE_URL; ?>modules/admin/resources.php" class="nav-link <?php echo $activePage == 'resources' ? 'active' : ''; ?>">
+                    <i class="fas fa-tools"></i> Resources
+                </a>
+            </li>
+            <li class="nav-item">
+                <a href="<?php echo BASE_URL; ?>modules/inventory/photofactory.php" class="nav-link <?php echo $activePage == 'photofactory' ? 'active' : ''; ?>">
+                    <i class="fas fa-images"></i> Photofactory
+                </a>
+            </li>
+            <li class="nav-item" style="margin-top: auto;">
+                <a href="<?php echo BASE_URL; ?>logout.php" class="nav-link">
+                    <i class="fas fa-sign-out-alt"></i> Logout
+                </a>
+            </li>
+        </ul>
+    </div>
+    <div class="main-content">
+        <div class="header">
+            <div style="display: flex; align-items: center; gap: 1rem;">
+                <button class="menu-toggle" onclick="toggleSidebar()">
+                    <i class="fas fa-bars"></i>
+                </button>
+                <h1><?php echo isset($pageTitle) ? $pageTitle : 'Dashboard'; ?></h1>
+            </div>
+            <div class="user-info">
+                <span>Welcome, <?php echo $_SESSION['user_name'] ?? 'Guest'; ?></span>
+            </div>
+        </div>
