@@ -4,9 +4,12 @@ $pageTitle = 'Plan Detail Workspace';
 include_once __DIR__ . '/../../config/db.php';
 include_once __DIR__ . '/../../includes/functions.php';
 
+// Load Core Libraries (SweetAlert, FontAwesome, CSS) without the sidebar
+$hideSidebar = true;
+include_once __DIR__ . '/../../includes/header.php';
+
 // Prevent timezone warnings
 date_default_timezone_set('Asia/Kolkata');
-
 
 $id = isset($_GET['id']) ? intval($_GET['id']) : 0;
 
@@ -89,7 +92,7 @@ $taMarkupPct = ($taCost > 0) ? ($taMarkup / $taCost) * 100 : 0;
         </div>
         <?php if ($p['status'] != 'confirmed'): ?>
             <button class="btn" onclick="confirmProposal(<?php echo $id; ?>)" style="background: linear-gradient(135deg, #10b981 0%, #059669 100%); border: none; color: white; padding: 0.75rem 1.5rem; border-radius: 10px; font-weight: 800; font-size: 0.9rem; cursor: pointer; display: flex; align-items: center; gap: 0.5rem; transition: all 0.2s; box-shadow: 0 4px 6px -1px rgba(16, 185, 129, 0.3);" onmouseover="this.style.transform='translateY(-1px)'; this.style.boxShadow='0 10px 15px -3px rgba(16, 185, 129, 0.4)';" onmouseout="this.style.transform='none'; this.style.boxShadow='0 4px 6px -1px rgba(16, 185, 129, 0.3)';">
-                <i class="fas fa-check-double"></i> Convert to Campaign
+                <i class="fas fa-check-double"></i> Convert to Booking
             </button>
         <?php endif; ?>
     </div>
@@ -185,6 +188,7 @@ $taMarkupPct = ($taCost > 0) ? ($taMarkup / $taCost) * 100 : 0;
     <table class="table" style="font-size: 0.75rem; white-space: nowrap;">
         <thead style="background: #f8fafc;">
             <tr>
+                <th style="width: 30px;"><input type="checkbox" id="selectAll" checked style="cursor: pointer;"></th>
                 <th>Sr</th>
                 <th>Type</th>
                 <th>Media</th>
@@ -206,6 +210,7 @@ $taMarkupPct = ($taCost > 0) ? ($taMarkup / $taCost) * 100 : 0;
         <tbody>
             <?php $sr=1; foreach ($items as $item): ?>
             <tr>
+                <td><input type="checkbox" class="item-checkbox" value="<?php echo $item['id']; ?>" checked style="cursor: pointer;"></td>
                 <td><?php echo $sr++; ?></td>
                 <td><span class="badge-type"><?php echo $item['owner_type']; ?></span></td>
                 <td style="font-weight: 600; color: #475569;"><?php echo strtoupper($item['media_type']); ?></td>
@@ -296,27 +301,64 @@ function updateItem(itemId, field, val) {
 }
 
 function confirmProposal(id) {
+    try {
+        const checkedItems = Array.from(document.querySelectorAll('.item-checkbox:checked')).map(cb => cb.value);
+        
+        if (checkedItems.length === 0) {
+            Swal.fire('Warning', 'Please select at least one site to convert to a booking.', 'warning');
+            return;
+        }
+
     Swal.fire({
         title: 'Confirm & Convert?',
-        text: "This will finalize the plan and generate active campaign bookings.",
+        text: `This will convert the ${checkedItems.length} selected sites into an active booking.`,
         icon: 'question',
         showCancelButton: true,
         confirmButtonColor: '#10b981',
-        confirmButtonText: 'Yes, Convert to Campaign'
+        confirmButtonText: 'Yes, Convert to Booking'
     }).then((result) => {
         if (result.isConfirmed) {
             fetch('../../ajax/confirm_booking.php', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ proposal_id: id })
+                body: JSON.stringify({ proposal_id: id, item_ids: checkedItems })
             }).then(r => r.json()).then(res => {
                 if(res.success) {
-                    Swal.fire('Confirmed!', 'Campaign is now live.', 'success').then(() => location.href='../operations/campaigns.php');
+                    Swal.fire('Confirmed!', 'Booking is now live.', 'success').then(() => location.href='../operations/bookings.php');
+                } else {
+                    Swal.fire('Error', res.message || 'Failed to convert proposal.', 'error');
                 }
+            }).catch((err) => {
+                Swal.fire('Error', 'Server error occurred: ' + err, 'error');
             });
         }
     });
+    } catch (e) {
+        alert("JavaScript Error: " + e);
+        console.error(e);
+    }
 }
+
+document.addEventListener('DOMContentLoaded', () => {
+    const selectAll = document.getElementById('selectAll');
+    const itemCheckboxes = document.querySelectorAll('.item-checkbox');
+    
+    if(selectAll) {
+        selectAll.addEventListener('change', (e) => {
+            itemCheckboxes.forEach(cb => cb.checked = e.target.checked);
+        });
+    }
+    
+    itemCheckboxes.forEach(cb => {
+        cb.addEventListener('change', () => {
+            if(document.querySelectorAll('.item-checkbox:checked').length === itemCheckboxes.length) {
+                selectAll.checked = true;
+            } else {
+                selectAll.checked = false;
+            }
+        });
+    });
+});
 </script>
 
 <?php include_once __DIR__ . '/../../includes/footer.php'; ?>

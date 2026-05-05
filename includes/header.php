@@ -43,13 +43,12 @@ checkAuth();
 
             <!-- Operations & Sales Submenu -->
             <li class="nav-item has-submenu">
-                <a href="#" class="nav-link submenu-toggle <?php echo in_array($activePage, ['proposals', 'bookings', 'campaigns']) ? 'active submenu-open' : ''; ?>">
+                <a href="#" class="nav-link submenu-toggle <?php echo in_array($activePage, ['proposals', 'bookings']) ? 'active submenu-open' : ''; ?>">
                     <i class="fas fa-briefcase"></i> <span>Operations & Sales</span> <i class="fas fa-chevron-down toggle-icon" style="margin-left: auto; font-size: 0.8rem;"></i>
                 </a>
-                <ul class="submenu" style="<?php echo in_array($activePage, ['proposals', 'bookings', 'campaigns']) ? 'display: block;' : 'display: none;'; ?>">
+                <ul class="submenu" style="<?php echo in_array($activePage, ['proposals', 'bookings']) ? 'display: block;' : 'display: none;'; ?>">
                     <li><a href="<?php echo BASE_URL; ?>modules/proposals/proposals.php" class="<?php echo $activePage == 'proposals' ? 'active-sub' : ''; ?>"><i class="fas fa-file-contract"></i> Sales / Proposals</a></li>
                     <li><a href="<?php echo BASE_URL; ?>modules/operations/bookings.php" class="<?php echo $activePage == 'bookings' ? 'active-sub' : ''; ?>"><i class="fas fa-calendar-check"></i> Bookings</a></li>
-                    <li><a href="<?php echo BASE_URL; ?>modules/operations/campaigns.php" class="<?php echo $activePage == 'campaigns' ? 'active-sub' : ''; ?>"><i class="fas fa-bullhorn"></i> Campaign List</a></li>
                 </ul>
             </li>
 

@@ -23,6 +23,12 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         $stmtP->execute([$proposalId]);
         $proposal = $stmtP->fetch();
 
+        $itemIds = $data['item_ids'] ?? [];
+        if (empty($itemIds)) {
+            echo json_encode(['success' => false, 'message' => 'No items selected for campaign conversion.']);
+            exit;
+        }
+
         // 1. Update Proposal Status
         $stmt = $pdo->prepare("UPDATE proposals SET status = 'confirmed' WHERE id = ?");
         $stmt->execute([$proposalId]);
@@ -32,32 +38,12 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         $stmtBooking->execute([$proposalId]);
         $bookingId = $pdo->lastInsertId();
 
-        // 3. Create Campaign (As per CRS flow)
-        $projId = 'P' . str_pad($bookingId, 5, '0', STR_PAD_LEFT);
-        $stmtCamp = $pdo->prepare("
-            INSERT INTO campaigns (project_id, booking_id, client_id, employee_id, display_name, from_date, to_date, days, sqft, amount, status) 
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'running')
-        ");
+        // 3. Create Operations (Mounting Tasks) ONLY for selected items
+        $placeholders = implode(',', array_fill(0, count($itemIds), '?'));
+        $params = array_merge($itemIds, [$proposalId]);
         
-        $diff = strtotime($proposal['end_date']) - strtotime($proposal['start_date']);
-        $days = round($diff / (60 * 60 * 24));
-
-        $stmtCamp->execute([
-            $projId,
-            $bookingId,
-            $proposal['client_id'],
-            $_SESSION['user_id'],
-            'Campaign for ' . $proposal['proposal_number'],
-            $proposal['start_date'],
-            $proposal['end_date'],
-            $days,
-            $proposal['total_sqft'],
-            $proposal['grand_total']
-        ]);
-
-        // 4. Create Operations (Mounting Tasks)
-        $stmtItems = $pdo->prepare("SELECT site_id FROM proposal_items WHERE proposal_id = ?");
-        $stmtItems->execute([$proposalId]);
+        $stmtItems = $pdo->prepare("SELECT site_id FROM proposal_items WHERE id IN ($placeholders) AND proposal_id = ?");
+        $stmtItems->execute($params);
         $items = $stmtItems->fetchAll();
 
         $stmtOps = $pdo->prepare("INSERT INTO operations (booking_id, site_id, status) VALUES (?, ?, 'pending')");
@@ -65,7 +51,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             $stmtOps->execute([$bookingId, $item['site_id']]);
         }
 
-        logActivity('confirmed a booking and started campaign', 'campaigns', $pdo->lastInsertId(), "Project ID: $projId");
+        logActivity('converted proposal to booking', 'bookings', $bookingId, "Booking ID: $bookingId");
 
         $pdo->commit();
         echo json_encode(['success' => true]);
