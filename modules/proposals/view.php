@@ -76,17 +76,21 @@ $taMarkupPct = ($taCost > 0) ? ($taMarkup / $taCost) * 100 : 0;
     </div>
     <div style="display: flex; gap: 1rem; align-items: center;">
         <div class="dropdown">
-            <button class="btn btn-secondary" style="background: white; border: 1px solid #e2e8f0; color: #475569;"><i class="fas fa-download"></i> Export <i class="fas fa-caret-down"></i></button>
+            <button class="btn" style="background: white; border: 1px solid #e2e8f0; color: #475569; padding: 0.75rem 1.25rem; border-radius: 10px; font-weight: 700; font-size: 0.9rem; cursor: pointer; display: flex; align-items: center; gap: 0.5rem; transition: all 0.2s; box-shadow: 0 2px 4px rgba(0,0,0,0.02);" onmouseover="this.style.borderColor='#cbd5e1'; this.style.boxShadow='0 4px 6px -1px rgba(0,0,0,0.05)';" onmouseout="this.style.borderColor='#e2e8f0'; this.style.boxShadow='0 2px 4px rgba(0,0,0,0.02)';">
+                <i class="fas fa-download"></i> Export <i class="fas fa-caret-down" style="margin-left: 0.25rem; opacity: 0.7;"></i>
+            </button>
             <div class="dropdown-content">
-                <a href="#"><i class="fas fa-file-pdf" style="color: #ef4444;"></i> PDF Proposal</a>
-                <a href="#"><i class="fas fa-file-excel" style="color: #10b981;"></i> Excel Rate Sheet</a>
-                <a href="#"><i class="fas fa-file-powerpoint" style="color: #f97316;"></i> PPT Presentation</a>
+                <a href="#"><i class="fas fa-file-pdf" style="color: #ef4444; width: 20px;"></i> PDF Proposal</a>
+                <a href="#"><i class="fas fa-file-excel" style="color: #10b981; width: 20px;"></i> Excel Rate Sheet</a>
+                <a href="#"><i class="fas fa-file-powerpoint" style="color: #f97316; width: 20px;"></i> PPT Presentation</a>
                 <div style="border-top: 1px solid #f1f5f9; margin: 0.5rem 0;"></div>
-                <a href="#"><i class="fas fa-link" style="color: #3b82f6;"></i> Public Link</a>
+                <a href="#"><i class="fas fa-link" style="color: #3b82f6; width: 20px;"></i> Public Link</a>
             </div>
         </div>
         <?php if ($p['status'] != 'confirmed'): ?>
-            <button class="btn btn-primary" onclick="confirmProposal(<?php echo $id; ?>)" style="background: #10b981; border-color: #10b981; box-shadow: 0 4px 6px -1px rgba(16, 185, 129, 0.2);"><i class="fas fa-check-double"></i> Convert to Campaign</button>
+            <button class="btn" onclick="confirmProposal(<?php echo $id; ?>)" style="background: linear-gradient(135deg, #10b981 0%, #059669 100%); border: none; color: white; padding: 0.75rem 1.5rem; border-radius: 10px; font-weight: 800; font-size: 0.9rem; cursor: pointer; display: flex; align-items: center; gap: 0.5rem; transition: all 0.2s; box-shadow: 0 4px 6px -1px rgba(16, 185, 129, 0.3);" onmouseover="this.style.transform='translateY(-1px)'; this.style.boxShadow='0 10px 15px -3px rgba(16, 185, 129, 0.4)';" onmouseout="this.style.transform='none'; this.style.boxShadow='0 4px 6px -1px rgba(16, 185, 129, 0.3)';">
+                <i class="fas fa-check-double"></i> Convert to Campaign
+            </button>
         <?php endif; ?>
     </div>
 </div>
@@ -263,10 +267,15 @@ $taMarkupPct = ($taCost > 0) ? ($taMarkup / $taCost) * 100 : 0;
 
 /* Dropdown */
 .dropdown { position: relative; display: inline-block; }
-.dropdown-content { display: none; position: absolute; right: 0; background-color: white; min-width: 200px; box-shadow: 0 10px 25px -5px rgba(0,0,0,0.1); border-radius: 12px; z-index: 10; border: 1px solid #f1f5f9; overflow: hidden; top: calc(100% + 0.5rem); }
-.dropdown-content a { color: #475569; padding: 0.85rem 1.25rem; text-decoration: none; display: flex; align-items: center; gap: 0.75rem; font-size: 0.9rem; font-weight: 600; transition: background 0.2s; }
-.dropdown-content a:hover { background: #f8fafc; color: var(--primary); }
-.dropdown:hover .dropdown-content { display: block; }
+.dropdown-content { display: none; position: absolute; right: 0; background-color: white; min-width: 220px; box-shadow: 0 20px 25px -5px rgba(0,0,0,0.1), 0 10px 10px -5px rgba(0,0,0,0.04); border-radius: 12px; z-index: 50; border: 1px solid #f1f5f9; overflow: hidden; top: calc(100% + 0.5rem); padding: 0.5rem; }
+.dropdown-content a { color: #334155; padding: 0.75rem 1rem; text-decoration: none; display: flex; align-items: center; gap: 0.75rem; font-size: 0.9rem; font-weight: 600; border-radius: 8px; transition: all 0.2s; }
+.dropdown-content a:hover { background: #f8fafc; color: var(--primary); transform: translateX(2px); }
+.dropdown:hover .dropdown-content { display: block; animation: slideDown 0.2s ease-out forwards; }
+
+@keyframes slideDown {
+    from { opacity: 0; transform: translateY(-10px); }
+    to { opacity: 1; transform: translateY(0); }
+}
 </style>
 
 <script>
