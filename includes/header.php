@@ -17,6 +17,7 @@ checkAuth();
     <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
 </head>
 <body>
+    <?php if (!isset($hideSidebar) || !$hideSidebar): ?>
     <div class="sidebar">
         <div class="sidebar-brand">
             <img src="<?php echo BASE_URL; ?>assets/img/LOGO.png" alt="Easy Outdoor" style="max-width: 100%; height: auto; padding: 10px;">
@@ -91,12 +92,20 @@ checkAuth();
             </li>
         </ul>
     </div>
-    <div class="main-content">
+    <?php endif; ?>
+    
+    <div class="main-content" style="<?php echo (isset($hideSidebar) && $hideSidebar) ? 'margin-left: 0; padding: 1.5rem;' : ''; ?>">
         <div class="header">
             <div style="display: flex; align-items: center; gap: 1rem;">
+                <?php if (!isset($hideSidebar) || !$hideSidebar): ?>
                 <button class="menu-toggle" onclick="toggleSidebar()">
                     <i class="fas fa-bars"></i>
                 </button>
+                <?php else: ?>
+                <a href="<?php echo BASE_URL; ?>modules/proposals/proposals.php" class="btn btn-secondary" style="border: none; background: #e2e8f0; border-radius: 8px; width: 40px; height: 40px; display: flex; align-items: center; justify-content: center; color: #475569; text-decoration: none;">
+                    <i class="fas fa-arrow-left"></i>
+                </a>
+                <?php endif; ?>
                 <h1><?php echo isset($pageTitle) ? $pageTitle : 'Dashboard'; ?></h1>
             </div>
             <div class="user-info">

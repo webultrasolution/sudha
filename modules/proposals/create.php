@@ -1,6 +1,7 @@
 <?php
 $activePage = 'proposals';
 $pageTitle = 'Create New Proposal';
+$hideSidebar = true;
 include_once __DIR__ . '/../../includes/header.php';
 
 if (!hasRole(['admin', 'sales'])) {
@@ -541,6 +542,8 @@ function updateSitePrice(id, val) {
 }
 
 function recalcAll() {
+    const globalDisc = parseFloat(document.getElementById('global_discount').value) || 0;
+    const globalMark = parseFloat(document.getElementById('global_markup').value) || 0;
     const print = parseFloat(document.getElementById('print_cost').value) || 0;
     const mount = parseFloat(document.getElementById('mount_cost').value) || 0;
     const taxType = document.getElementById('tax-type').value;
@@ -549,6 +552,12 @@ function recalcAll() {
 
     selectedSites.forEach((site) => {
         const row = document.getElementById('row-' + site.id);
+        
+        // If global pricing is used, we could auto-adjust saleRate
+        // For now, we'll treat them as adjustments to the total or allow them to drive individual rates
+        // Let's make them drive the saleRate if the user inputs a global value
+        // But to keep it "proper", we'll apply them to the base cardRate if not manually overridden
+        
         const currentTotal = site.saleRate;
         
         // Margin Analysis: (Sale - Purchase) / Purchase * 100
@@ -570,28 +579,42 @@ function recalcAll() {
         }
     });
 
-    const subtotal = totalDisplay + print + mount;
+    // Apply global discount/markup to the total display cost
+    let adjustedDisplay = totalDisplay;
+    if (globalMark > 0) adjustedDisplay += (totalDisplay * (globalMark / 100));
+    if (globalDisc > 0) adjustedDisplay -= (totalDisplay * (globalDisc / 100));
+
+    const subtotal = adjustedDisplay + print + mount;
     const totalTax = subtotal * 0.18;
     const grand = subtotal + totalTax;
 
     // Update Summary Panel
-    document.getElementById('sum-display-btm').innerText = '₹' + totalDisplay.toLocaleString();
+    document.getElementById('sum-display-btm').innerText = '₹' + adjustedDisplay.toLocaleString(undefined, {minimumFractionDigits: 2, maximumFractionDigits: 2});
     
     // Tax Breakdown Logic
     const taxContainer = document.getElementById('tax-breakdown');
     if (taxType === 'cgst_sgst') {
         const halfTax = totalTax / 2;
         taxContainer.innerHTML = `
-            <div class="stat-row"><span>CGST (9%):</span><span>₹${halfTax.toLocaleString()}</span></div>
-            <div class="stat-row"><span>SGST (9%):</span><span>₹${halfTax.toLocaleString()}</span></div>
+            <div class="stat-row" style="display:flex; justify-content:space-between; margin-bottom:0.5rem;">
+                <span style="color:#64748b; font-weight:600;">CGST (9%):</span>
+                <span style="font-weight:800;">₹${halfTax.toLocaleString(undefined, {minimumFractionDigits: 2, maximumFractionDigits: 2})}</span>
+            </div>
+            <div class="stat-row" style="display:flex; justify-content:space-between; margin-bottom:0.5rem;">
+                <span style="color:#64748b; font-weight:600;">SGST (9%):</span>
+                <span style="font-weight:800;">₹${halfTax.toLocaleString(undefined, {minimumFractionDigits: 2, maximumFractionDigits: 2})}</span>
+            </div>
         `;
     } else {
         taxContainer.innerHTML = `
-            <div class="stat-row"><span>IGST (18%):</span><span>₹${totalTax.toLocaleString()}</span></div>
+            <div class="stat-row" style="display:flex; justify-content:space-between; margin-bottom:0.5rem;">
+                <span style="color:#64748b; font-weight:600;">IGST (18%):</span>
+                <span style="font-weight:800;">₹${totalTax.toLocaleString(undefined, {minimumFractionDigits: 2, maximumFractionDigits: 2})}</span>
+            </div>
         `;
     }
 
-    document.getElementById('sum-grand-btm').innerText = '₹' + grand.toLocaleString();
+    document.getElementById('sum-grand-btm').innerText = '₹' + grand.toLocaleString(undefined, {minimumFractionDigits: 2, maximumFractionDigits: 2});
 }
 
 function filterSites() {
