@@ -11,7 +11,14 @@ if (!hasRole(['admin', 'sales'])) {
 
 // Fetch Data
 $clients = $pdo->query("SELECT id, name FROM partners WHERE type = 'client' ORDER BY name ASC")->fetchAll();
-$sites = $pdo->query("SELECT id, site_code, name, type, card_rate, purchase_rate, owner_type, sqft, city, location FROM sites WHERE status = 'available' ORDER BY site_code ASC")->fetchAll();
+$sitesQuery = "
+    SELECT 
+        s.*, 
+        (SELECT filename FROM site_images WHERE site_id = s.id LIMIT 1) as thumbnail 
+    FROM sites s 
+    WHERE s.status = 'available' 
+    ORDER BY s.site_code ASC";
+$sites = $pdo->query($sitesQuery)->fetchAll();
 ?>
 
 <div class="proposal-full-wrapper">
@@ -29,23 +36,27 @@ $sites = $pdo->query("SELECT id, site_code, name, type, card_rate, purchase_rate
             </div>
         </div>
 
-        <div class="site-list-container" style="max-height: 500px;">
-            <table class="crs-table selection-table">
-                <thead>
-                    <tr>
-                        <th style="width: 40px;"></th>
-                        <th>Site Code</th>
-                        <th>City / Location</th>
-                        <th>Size</th>
-                        <th>Type</th>
-                        <th>Card Rate</th>
-                        <th style="width: 140px;">Sale Rate (₹)</th>
-                        <th style="width: 120px;">Markup</th>
-                        <th style="width: 140px;">Total</th>
-                    </tr>
-                </thead>
-                <tbody>
-                    <?php foreach ($sites as $s): ?>
+        <div class="site-list-container" style="max-height: 600px; overflow-y: auto;">
+            <table class="crs-table selection-table" id="asset-table">
+                    <thead>
+                        <tr>
+                            <th style="width: 50px;">S.NO</th>
+                            <th style="width: 40px;">SELECT</th>
+                            <th>MEDIA</th>
+                            <th>CITY</th>
+                            <th>PHOTOS</th>
+                            <th>LOCATION</th>
+                            <th>SIZE</th>
+                            <th>TYPE</th>
+                            <th>CARD RATE</th>
+                            <th style="width: 140px;">SALE RATE (₹)</th>
+                            <th>AVAILABLE FROM</th>
+                            <th>STATUS</th>
+                            <th style="width: 140px;">TOTAL</th>
+                        </tr>
+                    </thead>
+                <tbody id="asset-body">
+                    <?php $sno = 1; foreach ($sites as $s): ?>
                     <tr class="site-row" 
                         id="row-<?php echo $s['id']; ?>"
                         data-id="<?php echo $s['id']; ?>" 
@@ -54,13 +65,19 @@ $sites = $pdo->query("SELECT id, site_code, name, type, card_rate, purchase_rate
                         data-prate="<?php echo $s['purchase_rate']; ?>" 
                         data-owner="<?php echo $s['owner_type']; ?>"
                         data-sqft="<?php echo $s['sqft']; ?>">
+                        <td class="sno-cell"><?php echo $sno++; ?></td>
                         <td><input type="checkbox" class="asset-chk" onclick="toggleSite('<?php echo $s['id']; ?>')"></td>
-                        <td><strong><?php echo $s['site_code']; ?></strong></td>
+                        <td><span class="badge-media"><?php echo strtoupper($s['type']); ?></span></td>
+                        <td><strong><?php echo $s['city']; ?></strong></td>
                         <td>
-                            <div style="font-weight: 600;"><?php echo $s['city']; ?></div>
-                            <div style="font-size: 0.7rem; color: var(--secondary);"><?php echo $s['location']; ?></div>
+                            <?php if ($s['thumbnail']): ?>
+                                <img src="../../uploads/sites/<?php echo $s['thumbnail']; ?>" class="site-thumb" onclick="window.open(this.src)">
+                            <?php else: ?>
+                                <span class="no-img">No Image</span>
+                            <?php endif; ?>
                         </td>
-                        <td><?php echo $s['sqft']; ?> SQFT</td>
+                        <td style="font-size: 0.8rem; max-width: 200px;"><?php echo $s['location']; ?></td>
+                        <td><?php echo $s['width']; ?>' x <?php echo $s['height']; ?>'</td>
                         <td><span class="badge-<?php echo strtolower($s['owner_type']); ?>"><?php echo $s['owner_type']; ?></span></td>
                         <td>₹<?php echo number_format($s['card_rate']); ?></td>
                         <td>
@@ -69,12 +86,31 @@ $sites = $pdo->query("SELECT id, site_code, name, type, card_rate, purchase_rate
                                    oninput="updateSitePrice('<?php echo $s['id']; ?>', this.value)"
                                    disabled>
                         </td>
-                        <td class="markup-cell">-</td>
-                        <td class="total-cell" style="font-weight: 700;">₹0</td>
+                        <td><?php echo date('d M y', strtotime($s['available_from'])); ?></td>
+                        <td><span class="status-available">Available</span></td>
+                        <td class="total-cell" style="font-weight: 700; color: var(--primary);">₹0</td>
                     </tr>
                     <?php endforeach; ?>
                 </tbody>
             </table>
+        </div>
+
+        <!-- Pagination Controls -->
+        <div class="pagination-wrap">
+            <div class="pg-info">
+                Showing <span id="pg-start">1</span> to <span id="pg-end">10</span> of <span id="pg-total"><?php echo count($sites); ?></span> sites
+            </div>
+            <div class="pg-controls" id="pg-numbers">
+                <!-- JS will populate -->
+            </div>
+            <div class="pg-size">
+                <select id="pg-limit" onchange="changePageSize()" class="p-input" style="width: 100px; height: 38px; font-size: 0.8rem;">
+                    <option value="10">10 / page</option>
+                    <option value="25">25 / page</option>
+                    <option value="50">50 / page</option>
+                    <option value="100">100 / page</option>
+                </select>
+            </div>
         </div>
     </div>
 
@@ -269,8 +305,25 @@ $sites = $pdo->query("SELECT id, site_code, name, type, card_rate, purchase_rate
 .grand-total { border-top: 2px solid #e2e8f0; padding-top: 1.5rem; margin-top: 1rem; }
 
 /* Badges */
+.badge-media { background: #eff6ff; color: #1e40af; padding: 0.25rem 0.6rem; border-radius: 6px; font-size: 0.7rem; font-weight: 800; border: 1px solid #dbeafe; }
 .badge-ha { background: #dcfce7; color: #166534; padding: 0.35rem 0.75rem; border-radius: 8px; font-size: 0.75rem; font-weight: 800; }
 .badge-ta { background: #fef9c3; color: #854d0e; padding: 0.35rem 0.75rem; border-radius: 8px; font-size: 0.75rem; font-weight: 800; }
+
+.status-available { background: #ecfdf5; color: #059669; padding: 0.25rem 0.75rem; border-radius: 50px; font-size: 0.75rem; font-weight: 800; border: 1px solid #d1fae5; }
+.site-thumb { width: 60px; height: 40px; border-radius: 6px; object-fit: cover; cursor: zoom-in; border: 1px solid #e2e8f0; }
+.no-img { font-size: 0.7rem; color: #94a3b8; font-style: italic; }
+
+.sno-cell { font-weight: 800; color: #94a3b8; text-align: center; font-size: 0.85rem; }
+
+/* Pagination Styles */
+.pagination-wrap { display: flex; justify-content: space-between; align-items: center; padding: 1.5rem 2rem; background: #fafafa; border-top: 1px solid #f1f5f9; border-radius: 0 0 20px 20px; }
+.pg-info { font-size: 0.85rem; color: #64748b; font-weight: 600; }
+.pg-controls { display: flex; gap: 0.4rem; align-items: center; }
+.pg-btn { min-width: 38px; height: 38px; border: 1px solid #e2e8f0; background: white; border-radius: 10px; cursor: pointer; font-weight: 700; font-size: 0.85rem; transition: all 0.2s; color: #475569; display: flex; align-items: center; justify-content: center; }
+.pg-btn:hover:not(:disabled) { border-color: var(--primary); color: var(--primary); background: #f0fdfa; transform: translateY(-1px); }
+.pg-btn.active { background: var(--primary); color: white; border-color: var(--primary); box-shadow: 0 4px 12px rgba(13, 148, 136, 0.2); }
+.pg-btn:disabled { opacity: 0.4; cursor: not-allowed; background: #f8fafc; }
+.pg-dots { color: #94a3b8; font-weight: 800; padding: 0 0.5rem; }
 
 /* Responsive */
 @media (max-width: 1400px) {
@@ -296,6 +349,97 @@ $sites = $pdo->query("SELECT id, site_code, name, type, card_rate, purchase_rate
 
 <script>
 let selectedSites = [];
+let currentPage = 1;
+let pageSize = 10;
+
+function renderPagination() {
+    const allRows = Array.from(document.querySelectorAll('#asset-body tr.site-row'));
+    const activeRows = allRows.filter(row => !row.classList.contains('search-hidden'));
+    
+    const total = activeRows.length;
+    const start = (currentPage - 1) * pageSize;
+    const end = Math.min(start + pageSize, total);
+    
+    // Hide everything first
+    allRows.forEach(row => row.style.display = 'none');
+
+    // Update S.No for all active rows (sequential 1 to N)
+    activeRows.forEach((row, index) => {
+        const snoCell = row.querySelector('.sno-cell');
+        if(snoCell) snoCell.innerText = index + 1;
+    });
+
+    // Show only current page slice
+    const visibleRows = activeRows.slice(start, end);
+    visibleRows.forEach(row => row.style.display = '');
+
+    // Update info
+    document.getElementById('pg-start').innerText = total === 0 ? 0 : start + 1;
+    document.getElementById('pg-end').innerText = end;
+    document.getElementById('pg-total').innerText = total;
+
+    updatePgControls(total);
+}
+
+function updatePgControls(total) {
+    const totalPages = Math.ceil(total / pageSize);
+    const container = document.getElementById('pg-numbers');
+    container.innerHTML = '';
+
+    if (totalPages <= 1) return;
+
+    const createBtn = (content, disabled, active, onClick) => {
+        const btn = document.createElement('button');
+        btn.className = 'pg-btn' + (active ? ' active' : '');
+        btn.innerHTML = content;
+        btn.disabled = disabled;
+        if (!disabled) btn.onclick = onClick;
+        return btn;
+    };
+
+    // First & Prev
+    container.appendChild(createBtn('<i class="fas fa-angle-double-left"></i>', currentPage === 1, false, () => { currentPage = 1; renderPagination(); }));
+    container.appendChild(createBtn('<i class="fas fa-angle-left"></i>', currentPage === 1, false, () => { currentPage--; renderPagination(); }));
+
+    // Page Numbers
+    let startPage = Math.max(1, currentPage - 2);
+    let endPage = Math.min(totalPages, startPage + 4);
+    if (endPage - startPage < 4) startPage = Math.max(1, endPage - 4);
+
+    if (startPage > 1) {
+        container.appendChild(createBtn('1', false, false, () => { currentPage = 1; renderPagination(); }));
+        if (startPage > 2) {
+            const dots = document.createElement('span');
+            dots.className = 'pg-dots';
+            dots.innerText = '...';
+            container.appendChild(dots);
+        }
+    }
+
+    for (let i = startPage; i <= endPage; i++) {
+        container.appendChild(createBtn(i, false, i === currentPage, () => { currentPage = i; renderPagination(); }));
+    }
+
+    if (endPage < totalPages) {
+        if (endPage < totalPages - 1) {
+            const dots = document.createElement('span');
+            dots.className = 'pg-dots';
+            dots.innerText = '...';
+            container.appendChild(dots);
+        }
+        container.appendChild(createBtn(totalPages, false, false, () => { currentPage = totalPages; renderPagination(); }));
+    }
+
+    // Next & Last
+    container.appendChild(createBtn('<i class="fas fa-angle-right"></i>', currentPage === totalPages, false, () => { currentPage++; renderPagination(); }));
+    container.appendChild(createBtn('<i class="fas fa-angle-double-right"></i>', currentPage === totalPages, false, () => { currentPage = totalPages; renderPagination(); }));
+}
+
+function changePageSize() {
+    pageSize = parseInt(document.getElementById('pg-limit').value);
+    currentPage = 1;
+    renderPagination();
+}
 
 function openClientModal() { document.getElementById('clientModal').style.display = 'flex'; }
 function closeClientModal() { document.getElementById('clientModal').style.display = 'none'; }
@@ -412,10 +556,26 @@ function recalcAll() {
 
 function filterSites() {
     const q = document.getElementById('site-search').value.toLowerCase();
-    document.querySelectorAll('.site-row').forEach(el => {
-        el.style.display = el.innerText.toLowerCase().includes(q) ? '' : 'none';
+    const rows = document.querySelectorAll('#asset-body tr.site-row');
+    
+    rows.forEach(row => {
+        const text = row.innerText.toLowerCase();
+        if (text.includes(q)) {
+            row.classList.remove('search-hidden');
+            row.style.display = ''; // Reset for pagination to handle
+        } else {
+            row.classList.add('search-hidden');
+            row.style.display = 'none';
+        }
     });
+
+    currentPage = 1;
+    renderPagination();
 }
+
+document.addEventListener('DOMContentLoaded', () => {
+    renderPagination();
+});
 
 function saveProposal() {
     const clientId = document.getElementById('client_id').value;
