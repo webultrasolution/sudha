@@ -102,6 +102,7 @@ $counts = [
     'Unipole' => $pdo->query("SELECT COUNT(*) FROM sites WHERE type='Unipole'")->fetchColumn(),
     'Gantry' => $pdo->query("SELECT COUNT(*) FROM sites WHERE type='Gantry'")->fetchColumn(),
     'BQS' => $pdo->query("SELECT COUNT(*) FROM sites WHERE type='BQS'")->fetchColumn(),
+    'DCP' => $pdo->query("SELECT COUNT(*) FROM sites WHERE type='DCP'")->fetchColumn(),
 ];
 
 // Fetch Sites
@@ -118,6 +119,7 @@ $vendors = $pdo->query("SELECT id, name FROM partners WHERE type = 'vendor' ORDE
     <a href="?media=Unipole" class="tab <?php echo $mediaFilter == 'Unipole' ? 'active' : ''; ?>">Unipole (<?php echo $counts['Unipole']; ?>)</a>
     <a href="?media=Gantry" class="tab <?php echo $mediaFilter == 'Gantry' ? 'active' : ''; ?>">Gantry (<?php echo $counts['Gantry']; ?>)</a>
     <a href="?media=BQS" class="tab <?php echo $mediaFilter == 'BQS' ? 'active' : ''; ?>">BQS (<?php echo $counts['BQS']; ?>)</a>
+    <a href="?media=DCP" class="tab <?php echo $mediaFilter == 'DCP' ? 'active' : ''; ?>">DCP (<?php echo $counts['DCP']; ?>)</a>
 </div>
 
 <div class="card">
@@ -170,7 +172,7 @@ $vendors = $pdo->query("SELECT id, name FROM partners WHERE type = 'vendor' ORDE
                     $img = $imgs->fetch();
                     if($img):
                     ?>
-                        <img src="../../uploads/sites/<?php echo $img['filename']; ?>" style="width: 45px; height: 32px; object-fit: cover; border-radius: 6px; cursor: pointer; border: 1px solid #e2e8f0;" onclick="viewPhotos(<?php echo $s['id']; ?>, '<?php echo $s['light_type']; ?>')">
+                        <img src="../../uploads/sites/<?php echo $img['filename']; ?>" style="width: 100px; height: 65px; object-fit: cover; border-radius: 8px; cursor: pointer; border: 1px solid #e2e8f0; box-shadow: 0 2px 4px rgba(0,0,0,0.1);" onclick="viewPhotos(<?php echo $s['id']; ?>, '<?php echo $s['light_type']; ?>')">
                     <?php else: ?>
                         <small style="color: #cbd5e1;">No Img</small>
                     <?php endif; ?>
@@ -209,6 +211,10 @@ $vendors = $pdo->query("SELECT id, name FROM partners WHERE type = 'vendor' ORDE
             <input type="hidden" name="id" id="siteId">
             <div style="display: grid; grid-template-columns: repeat(3, 1fr); gap: 1rem; margin-top: 1rem;">
                 <div class="form-group">
+                    <label>City</label>
+                    <input type="text" name="city" id="f_city" required>
+                </div>
+                <div class="form-group">
                     <label>Media Type</label>
                     <select name="type" id="f_type" required>
                         <option value="">Select Type</option>
@@ -216,6 +222,7 @@ $vendors = $pdo->query("SELECT id, name FROM partners WHERE type = 'vendor' ORDE
                         <option value="Unipole">Unipole</option>
                         <option value="Gantry">Gantry</option>
                         <option value="BQS">Bus Shelter (BQS)</option>
+                        <option value="DCP">Digital City Panel (DCP)</option>
                         <option value="LED Screen">LED Screen</option>
                     </select>
                 </div>
@@ -247,10 +254,7 @@ $vendors = $pdo->query("SELECT id, name FROM partners WHERE type = 'vendor' ORDE
                     <label>Location Landmark</label>
                     <input type="text" name="location" id="f_location" required>
                 </div>
-                <div class="form-group">
-                    <label>City</label>
-                    <input type="text" name="city" id="f_city" required>
-                </div>
+                <!-- City moved to top -->
                 
                 <div class="form-group">
                     <label>Width (ft)</label>
@@ -294,11 +298,19 @@ $vendors = $pdo->query("SELECT id, name FROM partners WHERE type = 'vendor' ORDE
                     <label>Cost to Company (₹)</label>
                     <input type="number" step="1" name="purchase_rate" id="f_purchase" required min="0">
                 </div>
-                <div class="form-group" style="grid-column: span 3; background: #f8fafc; padding: 1rem; border-radius: 8px; border: 1px dashed #cbd5e1;">
+                <div class="form-group" style="grid-column: span 3;">
                     <label><i class="fas fa-images"></i> Site Photos (Multi-upload)</label>
-                    <input type="file" name="site_images[]" multiple accept="image/*" class="p-input" style="border: none; padding: 0.5rem 0;">
-                    <small style="color: #64748b;">Upload multiple site photos, maps, or availability screenshots.</small>
-                    <div id="existing-images" style="display: flex; gap: 0.5rem; margin-top: 0.5rem;"></div>
+                    <div id="drop-zone" class="drop-zone" onclick="document.getElementById('file-input').click()">
+                        <div class="drop-zone-content">
+                            <i class="fas fa-cloud-upload-alt" style="font-size: 2rem; color: var(--primary); margin-bottom: 0.5rem;"></i>
+                            <p>Drag & Drop images here or <span>click to browse</span></p>
+                            <small>Supports: JPG, PNG, WEBP (Max 5MB each)</small>
+                        </div>
+                        <input type="file" name="site_images[]" id="file-input" multiple accept="image/*" style="display: none;" onchange="handleFiles(this.files)">
+                    </div>
+                    <div id="preview-container" class="preview-grid"></div>
+                    <div id="existing-images-label" style="display: none; margin-top: 1rem; font-size: 0.75rem; font-weight: 700; color: #64748b; text-transform: uppercase;">Existing Images</div>
+                    <div id="existing-images" class="preview-grid"></div>
                 </div>
             </div>
             <div style="margin-top: 1.5rem; text-align: right;">
@@ -328,6 +340,7 @@ $vendors = $pdo->query("SELECT id, name FROM partners WHERE type = 'vendor' ORDE
 .media-badge.hoarding { background: #dcfce7; color: #166534; }
 .media-badge.unipole { background: #e0f2fe; color: #0369a1; }
 .media-badge.bqs { background: #fef9c3; color: #854d0e; }
+.media-badge.dcp { background: #fdf2f8; color: #9d174d; }
 .id-badge { background: #f1f5f9; padding: 0.2rem 0.4rem; border-radius: 4px; font-family: monospace; font-weight: 700; color: #475569; }
 .status-pill.available { background: #dcfce7; color: #166534; padding: 0.2rem 0.5rem; border-radius: 9999px; font-size: 0.75rem; }
 .status-pill.booked { background: #fee2e2; color: #991b1b; padding: 0.2rem 0.5rem; border-radius: 9999px; font-size: 0.75rem; }
@@ -351,6 +364,58 @@ $vendors = $pdo->query("SELECT id, name FROM partners WHERE type = 'vendor' ORDE
 .lb-close { position: absolute; top: 40px; right: 40px; color: rgba(255,255,255,0.5); font-size: 2.5rem; cursor: pointer; z-index: 3002; transition: all 0.3s; line-height: 1; }
 .lb-close:hover { color: white; transform: rotate(90deg); }
 .lb-counter { position: absolute; bottom: 40px; color: white; font-weight: 600; letter-spacing: 2px; background: rgba(255,255,255,0.1); padding: 8px 20px; border-radius: 30px; font-size: 0.875rem; border: 1px solid rgba(255,255,255,0.1); }
+.drop-zone {
+    border: 2px dashed #cbd5e1;
+    border-radius: 12px;
+    padding: 2rem;
+    text-align: center;
+    background: #f8fafc;
+    cursor: pointer;
+    transition: all 0.3s;
+    position: relative;
+}
+.drop-zone:hover, .drop-zone.dragover {
+    border-color: var(--primary);
+    background: rgba(13, 148, 136, 0.05);
+}
+.drop-zone-content p { font-size: 0.9rem; font-weight: 600; color: #475569; margin: 0.5rem 0; }
+.drop-zone-content p span { color: var(--primary); text-decoration: underline; }
+.drop-zone-content small { color: #94a3b8; font-size: 0.75rem; }
+
+.preview-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(80px, 1fr));
+    gap: 0.75rem;
+    margin-top: 1rem;
+}
+.preview-item {
+    position: relative;
+    aspect-ratio: 1;
+    border-radius: 8px;
+    overflow: hidden;
+    border: 1px solid #e2e8f0;
+}
+.preview-item img {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+}
+.remove-preview {
+    position: absolute;
+    top: 4px;
+    right: 4px;
+    background: rgba(239, 68, 68, 0.9);
+    color: white;
+    width: 20px;
+    height: 20px;
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 0.7rem;
+    cursor: pointer;
+    border: none;
+}
 </style>
 
 <script>
@@ -382,23 +447,23 @@ function viewPhotos(siteId, lightType) {
             Swal.fire('Info', 'No photos available for this site.', 'info');
             return;
         }
-        lbImages = imgs;
-        openLightbox(0);
+        openLightbox(imgs, 0);
     });
 }
 
-function openLightbox(index) {
+function openLightbox(images, index) {
     const slider = document.getElementById('lbSlider');
-    slider.innerHTML = lbImages.map(img => `
+    lbImages = images; // Update global for nav
+    slider.innerHTML = images.map(img => `
         <div class="lb-slide">
-            <img src="../../uploads/sites/${img.filename}" alt="Site Photo">
+            <img src="${img.src || '../../uploads/sites/' + img.filename}" alt="Site Photo">
         </div>
     `).join('');
     
     currentLbIndex = index;
     updateLightbox();
     document.getElementById('lbOverlay').style.display = 'flex';
-    document.body.style.overflow = 'hidden'; // Prevent scrolling
+    document.body.style.overflow = 'hidden';
 }
 
 function closeLightbox() {
@@ -440,6 +505,60 @@ document.addEventListener('keydown', (e) => {
     }
 });
 
+// Drop Zone Logic
+const dropZone = document.getElementById('drop-zone');
+if(dropZone) {
+    ['dragenter', 'dragover', 'dragleave', 'drop'].forEach(eventName => {
+        dropZone.addEventListener(eventName, preventDefaults, false);
+    });
+
+    function preventDefaults(e) {
+        e.preventDefault();
+        e.stopPropagation();
+    }
+
+    ['dragenter', 'dragover'].forEach(eventName => {
+        dropZone.addEventListener(eventName, () => dropZone.classList.add('dragover'), false);
+    });
+
+    ['dragleave', 'drop'].forEach(eventName => {
+        dropZone.addEventListener(eventName, () => dropZone.classList.remove('dragover'), false);
+    });
+
+    dropZone.addEventListener('drop', (e) => {
+        const dt = e.dataTransfer;
+        const files = dt.files;
+        document.getElementById('file-input').files = files; // Note: limited to last drop if not merged
+        handleFiles(files);
+    }, false);
+}
+
+function handleFiles(files) {
+    const container = document.getElementById('preview-container');
+    container.innerHTML = '';
+    const fileArray = [...files];
+    const previewImages = [];
+
+    fileArray.forEach((file, idx) => {
+        if (!file.type.startsWith('image/')) return;
+        const reader = new FileReader();
+        reader.onload = (e) => {
+            const src = e.target.result;
+            previewImages.push({ src });
+            const div = document.createElement('div');
+            div.className = 'preview-item';
+            div.innerHTML = `
+                <img src="${src}" onclick="openLightbox(handleFiles.currentPreviews, ${previewImages.length - 1})" style="cursor:zoom-in;">
+                <button type="button" class="remove-preview" onclick="this.parentElement.remove()">×</button>
+            `;
+            container.appendChild(div);
+            handleFiles.currentPreviews = previewImages;
+        };
+        reader.readAsDataURL(file);
+    });
+}
+handleFiles.currentPreviews = [];
+
 function editSite(site) {
     const form = document.getElementById('siteForm');
     if(form) form.classList.remove('was-validated');
@@ -462,24 +581,60 @@ function editSite(site) {
     document.getElementById('f_card').value = site.card_rate;
     document.getElementById('f_purchase').value = site.purchase_rate;
     
+    // Clear dynamic previews
+    document.getElementById('preview-container').innerHTML = '';
+
     // Load Existing Image Thumbnails
     fetch(`../../ajax/get_site_images.php?id=${site.id}`)
     .then(r => r.json())
     .then(imgs => {
-        let html = imgs.map(i => `<div style="position:relative;"><img src="../../uploads/sites/${i.filename}" style="width:50px; height:40px; object-fit:cover; border-radius:4px;"><i class="fas fa-times-circle" style="position:absolute; top:-5px; right:-5px; color:red; cursor:pointer;" onclick="deleteImage(${i.id})"></i></div>`).join('');
-        document.getElementById('existing-images').innerHTML = html;
+        const label = document.getElementById('existing-images-label');
+        if(imgs.length > 0) {
+            label.style.display = 'block';
+            let html = imgs.map((i, idx) => `
+                <div class="preview-item" id="img-item-${i.id}">
+                    <img src="../../uploads/sites/${i.filename}" onclick="openLightbox(editSite.currentImages, ${idx})" style="cursor:zoom-in;">
+                    <button type="button" class="remove-preview" onclick="deleteImage(${i.id})">×</button>
+                </div>
+            `).join('');
+            document.getElementById('existing-images').innerHTML = html;
+            editSite.currentImages = imgs;
+        } else {
+            label.style.display = 'none';
+            document.getElementById('existing-images').innerHTML = '';
+            editSite.currentImages = [];
+        }
     });
 
     toggleVendor();
     document.getElementById('siteModal').style.display = 'block';
 }
+
 function deleteImage(imgId) {
-    if(!confirm('Delete this image?')) return;
-    fetch(`../../ajax/delete_site_image.php?id=${imgId}`).then(() => {
-        Swal.fire('Deleted', 'Image removed.', 'success');
-        // Refresh thumbnail list
+    Swal.fire({
+        title: 'Delete Image?',
+        text: "This image will be permanently removed.",
+        icon: 'warning',
+        showCancelButton: true,
+        confirmButtonColor: '#ef4444',
+        confirmButtonText: 'Yes, delete it'
+    }).then((result) => {
+        if (result.isConfirmed) {
+            fetch(`../../ajax/delete_site_image.php?id=${imgId}`)
+            .then(r => r.json())
+            .then(res => {
+                if(res.success) {
+                    document.getElementById(`img-item-${imgId}`).remove();
+                    // If no images left, hide label
+                    if(document.getElementById('existing-images').children.length === 0) {
+                        document.getElementById('existing-images-label').style.display = 'none';
+                    }
+                }
+            });
+        }
     });
 }
+
 function deleteSite(e, id) {
     if(e) e.preventDefault();
     Swal.fire({

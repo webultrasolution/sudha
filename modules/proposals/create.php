@@ -11,7 +11,7 @@ if (!hasRole(['admin', 'sales'])) {
 }
 
 // Fetch Data
-$clients = $pdo->query("SELECT id, name FROM partners WHERE type = 'client' ORDER BY name ASC")->fetchAll();
+$clients = $pdo->query("SELECT id, name, city FROM partners WHERE type = 'client' ORDER BY name ASC")->fetchAll();
 $sitesQuery = "
     SELECT 
         s.*, 
@@ -60,7 +60,7 @@ $sites = $pdo->query($sitesQuery)->fetchAll();
                 <select id="client_id" class="p-input" style="height: 38px;">
                     <option value="">-- Choose Client --</option>
                     <?php foreach ($clients as $c): ?>
-                        <option value="<?php echo $c['id']; ?>"><?php echo $c['name']; ?></option>
+                        <option value="<?php echo $c['id']; ?>"><?php echo $c['name']; ?> <?php echo $c['city'] ? "({$c['city']})" : ""; ?></option>
                     <?php endforeach; ?>
                 </select>
             </div>
@@ -113,12 +113,10 @@ $sites = $pdo->query($sitesQuery)->fetchAll();
                                 <th style="width: 40px;">#</th>
                                 <th style="width: 40px;"><i class="far fa-check-square"></i></th>
                                 <th>ASSET DETAILS</th>
-                                <th>CITY / CODE</th>
                                 <th>PREVIEW</th>
                                 <th>DIMENSIONS</th>
                                 <th>PRICING (MONTHLY)</th>
                                 <th>SALE RATE (₹)</th>
-                                <th>MARGIN</th>
                                 <th style="width: 140px; text-align: right;">TOTAL</th>
                             </tr>
                         </thead>
@@ -140,12 +138,8 @@ $sites = $pdo->query($sitesQuery)->fetchAll();
                             <td>
                                 <div style="font-weight: 700; color: #334155; margin-bottom: 2px; white-space: normal; line-height: 1.4;"><?php echo $s['location']; ?></div>
                                 <div style="font-size: 0.7rem; color: #94a3b8; text-transform: uppercase; font-weight: 600;">
-                                    <?php echo $s['type']; ?> • <?php echo $s['light_type']; ?> • <span class="badge-<?php echo strtolower($s['owner_type']); ?>"><?php echo $s['owner_type']; ?></span>
+                                    <span style="color: var(--primary);"><?php echo $s['city']; ?></span> • <?php echo $s['type']; ?> • <?php echo $s['light_type']; ?> • <span class="badge-<?php echo strtolower($s['owner_type']); ?>"><?php echo $s['owner_type']; ?></span>
                                 </div>
-                            </td>
-                            <td>
-                                <div style="font-weight: 700; color: #1e293b;"><?php echo $s['city']; ?></div>
-                                <div style="font-size: 0.7rem; color: #94a3b8; font-weight: 600;"><?php echo $s['site_code']; ?></div>
                             </td>
                             <td>
                                 <?php if ($s['thumbnail']): ?>
@@ -168,7 +162,6 @@ $sites = $pdo->query($sitesQuery)->fetchAll();
                                        oninput="updateSitePrice('<?php echo $s['id']; ?>', this.value)"
                                        disabled style="width: 110px; height: 32px; font-size: 0.85rem;">
                             </td>
-                            <td class="markup-cell" style="font-weight: 800; color: #64748b;">-</td>
                             <td class="total-cell" style="font-weight: 800; color: var(--primary); text-align: right; font-size: 1rem;">₹0</td>
                         </tr>
                         <?php endforeach; ?>
@@ -203,21 +196,21 @@ $sites = $pdo->query($sitesQuery)->fetchAll();
                 <div class="form-grid">
                     <div class="form-group">
                         <label>Discount (%)</label>
-                        <input type="number" id="global_discount" value="0" class="p-input" oninput="recalcAll()" style="height: 38px;">
+                        <input type="number" id="global_discount" value="0" class="p-input" oninput="recalcAll()" style="height: 34px;">
                     </div>
                     <div class="form-group">
                         <label>Markup (%)</label>
-                        <input type="number" id="global_markup" value="0" class="p-input" oninput="recalcAll()" style="height: 38px;">
+                        <input type="number" id="global_markup" value="0" class="p-input" oninput="recalcAll()" style="height: 34px;">
                     </div>
                 </div>
                 <div class="form-grid" style="margin-top: 1rem;">
                     <div class="form-group">
                         <label>Printing (₹)</label>
-                        <input type="number" id="print_cost" value="0" class="p-input" oninput="recalcAll()" style="height: 38px;">
+                        <input type="number" id="print_cost" value="0" class="p-input" oninput="recalcAll()" style="height: 34px;">
                     </div>
                     <div class="form-group">
                         <label>Mounting (₹)</label>
-                        <input type="number" id="mount_cost" value="0" class="p-input" oninput="recalcAll()" style="height: 38px;">
+                        <input type="number" id="mount_cost" value="0" class="p-input" oninput="recalcAll()" style="height: 34px;">
                     </div>
                 </div>
             </div>
@@ -237,8 +230,8 @@ $sites = $pdo->query($sitesQuery)->fetchAll();
                     
                     <div style="border-top: 1px dashed #e2e8f0; padding-top: 1rem; margin-top: 1rem;">
                         <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 0.75rem;">
-                            <span style="font-size: 0.8rem; font-weight: 700; color: var(--secondary);">TAX TYPE</span>
-                            <select id="tax-type" class="p-input" onchange="recalcAll()" style="width: 140px; height: 32px; font-size: 0.75rem; padding: 0 0.5rem; border-radius: 8px;">
+                            <span style="font-size: 0.75rem; font-weight: 700; color: var(--secondary);">TAX TYPE</span>
+                            <select id="tax-type" class="p-input" onchange="recalcAll()" style="width: 140px; height: 28px; font-size: 0.7rem; padding: 0 0.4rem; border-radius: 6px;">
                                 <option value="igst">IGST (18%)</option>
                                 <option value="cgst_sgst">CGST/SGST (9%+9%)</option>
                             </select>
@@ -251,12 +244,12 @@ $sites = $pdo->query($sitesQuery)->fetchAll();
                         </div>
                     </div>
 
-                    <div class="grand-total" style="border-top: 2px solid #e2e8f0; padding-top: 1rem; margin-top: 1rem; color: var(--primary); font-weight: 900;">
-                        <div style="font-size: 0.7rem; color: var(--secondary); margin-bottom: 0.2rem;">GRAND TOTAL</div>
-                        <div id="sum-grand-btm" style="font-size: 2rem;">₹0</div>
+                    <div class="grand-total" style="border-top: 2px solid #e2e8f0; padding-top: 0.75rem; margin-top: 0.5rem; color: var(--primary); font-weight: 900;">
+                        <div style="font-size: 0.65rem; color: var(--secondary); margin-bottom: 0.1rem;">GRAND TOTAL</div>
+                        <div id="sum-grand-btm" style="font-size: 1.5rem;">₹0</div>
                     </div>
                 </div>
-                <button class="btn btn-primary" onclick="saveProposal()" style="width: 100%; margin-top: 1rem; height: 44px; border-radius: 10px; font-weight: 800; font-size: 0.9rem;">
+                <button class="btn btn-primary" onclick="saveProposal()" style="width: 100%; margin-top: 0.75rem; height: 40px; border-radius: 8px; font-weight: 800; font-size: 0.85rem;">
                     GENERATE PROPOSAL
                 </button>
             </div>
@@ -271,9 +264,15 @@ $sites = $pdo->query($sitesQuery)->fetchAll();
             <button class="close-modal" onclick="closeClientModal()">&times;</button>
         </div>
         <div class="modal-body">
-            <div class="form-group" style="margin-bottom: 1rem;">
-                <label>Company Name</label>
-                <input type="text" id="new_client_name" class="p-input">
+            <div class="form-grid" style="margin-bottom: 1rem;">
+                <div class="form-group">
+                    <label>City</label>
+                    <input type="text" id="new_client_city" class="p-input">
+                </div>
+                <div class="form-group">
+                    <label>Company Name</label>
+                    <input type="text" id="new_client_name" class="p-input">
+                </div>
             </div>
             <div class="form-group" style="margin-bottom: 1rem;">
                 <label>Contact Person</label>
@@ -288,6 +287,10 @@ $sites = $pdo->query($sitesQuery)->fetchAll();
                     <label>Email</label>
                     <input type="email" id="new_client_email" class="p-input">
                 </div>
+            </div>
+            <div class="form-group" style="margin-top: 1rem;">
+                <label>Address / Location</label>
+                <input type="text" id="new_client_address" class="p-input">
             </div>
         </div>
         <div class="modal-footer">
@@ -323,8 +326,8 @@ $sites = $pdo->query($sitesQuery)->fetchAll();
 /* Panel Styling */
 .p-panel { 
     background: white; 
-    border-radius: 16px; 
-    padding: 1.25rem; 
+    border-radius: 12px; 
+    padding: 1rem; 
     border: 1px solid #e2e8f0; 
     box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.05), 0 2px 4px -1px rgba(0, 0, 0, 0.03);
     display: flex;
@@ -333,24 +336,24 @@ $sites = $pdo->query($sitesQuery)->fetchAll();
 
 .p-header { 
     font-weight: 800; 
-    font-size: 1.1rem; 
+    font-size: 0.95rem; 
     color: var(--primary); 
-    margin-bottom: 1.25rem; 
+    margin-bottom: 1rem; 
     border-bottom: 2px solid #f1f5f9; 
-    padding-bottom: 0.75rem; 
+    padding-bottom: 0.5rem; 
     display: flex; 
     justify-content: space-between; 
     align-items: center; 
 }
 
 /* Form Elements */
-.form-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 1.25rem; }
-.form-group { margin-bottom: 1.25rem; }
-.form-group label { display: block; font-size: 0.8rem; font-weight: 800; color: var(--secondary); margin-bottom: 0.6rem; text-transform: uppercase; letter-spacing: 0.025em; }
+.form-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 0.75rem; }
+.form-group { margin-bottom: 0.75rem; }
+.form-group label { display: block; font-size: 0.75rem; font-weight: 800; color: var(--secondary); margin-bottom: 0.4rem; text-transform: uppercase; letter-spacing: 0.025em; }
 
 .p-input { 
-    width: 100%; padding: 0.6rem 0.75rem; border: 1px solid #e2e8f0; border-radius: 8px; 
-    font-family: inherit; font-size: 0.9rem; font-weight: 600; transition: all 0.2s ease; 
+    width: 100%; padding: 0.5rem 0.6rem; border: 1px solid #e2e8f0; border-radius: 6px; 
+    font-family: inherit; font-size: 0.85rem; font-weight: 600; transition: all 0.2s ease; 
     background: #fcfcfc;
 }
 .p-input:focus { border-color: var(--primary); box-shadow: 0 0 0 3px rgba(13, 148, 136, 0.1); outline: none; background: white; }
@@ -376,9 +379,9 @@ $sites = $pdo->query($sitesQuery)->fetchAll();
 }
 
 /* Summary Items */
-.stat-row { display: flex; justify-content: space-between; margin-bottom: 1rem; font-size: 1rem; font-weight: 700; color: #475569; }
+.stat-row { display: flex; justify-content: space-between; margin-bottom: 0.5rem; font-size: 0.85rem; font-weight: 700; color: #475569; }
 .summary-box { background: linear-gradient(to bottom right, #ffffff, #f8fafc); }
-.grand-total { border-top: 2px solid #e2e8f0; padding-top: 1.5rem; margin-top: 1rem; }
+.grand-total { border-top: 2px solid #e2e8f0; padding-top: 1rem; margin-top: 0.5rem; }
 
 /* Badges */
 .badge-media { background: #eff6ff; color: #1e40af; padding: 0.25rem 0.6rem; border-radius: 6px; font-size: 0.7rem; font-weight: 800; border: 1px solid #dbeafe; }
@@ -386,7 +389,7 @@ $sites = $pdo->query($sitesQuery)->fetchAll();
 .badge-ta { background: #fef9c3; color: #854d0e; padding: 0.35rem 0.75rem; border-radius: 8px; font-size: 0.75rem; font-weight: 800; }
 
 .status-available { background: #ecfdf5; color: #059669; padding: 0.25rem 0.75rem; border-radius: 50px; font-size: 0.75rem; font-weight: 800; border: 1px solid #d1fae5; }
-.site-thumb { width: 60px; height: 40px; border-radius: 6px; object-fit: cover; cursor: zoom-in; border: 1px solid #e2e8f0; }
+.site-thumb { width: 140px; height: 90px; border-radius: 8px; object-fit: cover; cursor: zoom-in; border: 1px solid #e2e8f0; box-shadow: 0 2px 4px rgba(0,0,0,0.1); }
 .no-img { font-size: 0.7rem; color: #94a3b8; font-style: italic; }
 
 .sno-cell { font-weight: 800; color: #94a3b8; text-align: center; font-size: 0.85rem; }
@@ -525,13 +528,15 @@ function submitQuickClient() {
     const contact = document.getElementById('new_client_contact').value;
     const phone = document.getElementById('new_client_phone').value;
     const email = document.getElementById('new_client_email').value;
+    const city = document.getElementById('new_client_city').value;
+    const address = document.getElementById('new_client_address').value;
 
     if (!name) {
         Swal.fire('Error', 'Company Name is required', 'error');
         return;
     }
 
-    const data = { type: 'client', name, contact, phone, email };
+    const data = { type: 'client', name, contact, phone, email, city, address };
 
     fetch('../../ajax/quick_save_partner.php', {
         method: 'POST',
@@ -623,13 +628,6 @@ function recalcAll() {
         // Update row visual
         if(row) {
             row.querySelector('.total-cell').innerText = '₹' + currentTotal.toLocaleString();
-            row.querySelector('.markup-cell').innerText = markupPct + '%';
-            
-            // Color markup based on performance
-            const markupEl = row.querySelector('.markup-cell');
-            if (markupPct > 20) markupEl.style.color = '#059669';
-            else if (markupPct > 0) markupEl.style.color = '#1d4ed8';
-            else markupEl.style.color = '#dc2626';
         }
     });
 

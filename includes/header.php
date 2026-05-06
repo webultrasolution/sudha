@@ -20,7 +20,7 @@ checkAuth();
     <?php if (!isset($hideSidebar) || !$hideSidebar): ?>
     <div class="sidebar">
         <div class="sidebar-brand">
-            <img src="<?php echo BASE_URL; ?>assets/img/LOGO.png" alt="Easy Outdoor" style="max-width: 100%; height: auto; padding: 10px;">
+            <img src="<?php echo BASE_URL; ?>assets/img/LOGO.png" alt="Easy Outdoor" class="sidebar-logo">
         </div>
         <ul class="nav-menu">
             <li class="nav-item">

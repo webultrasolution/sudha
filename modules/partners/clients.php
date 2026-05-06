@@ -12,18 +12,19 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action'])) {
     $city = clean($_POST['city']);
     $state = clean($_POST['state']);
     $gstin = clean($_POST['gstin']);
+    $additional_gst = clean($_POST['additional_gst'] ?? '');
     $pan = clean($_POST['pan']);
     $billing_address = clean($_POST['billing_address']);
-    $status = clean($_POST['status'] ?? 'active');
+    $business_type = clean($_POST['business_type'] ?? '');
 
     if ($_POST['action'] === 'add') {
-        $stmt = $pdo->prepare("INSERT INTO partners (name, contact_person, phone, email, address, city, state, gstin, pan, billing_address, status, type) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'client')");
-        $stmt->execute([$name, $contact, $phone, $email, $address, $city, $state, $gstin, $pan, $billing_address, $status]);
+        $stmt = $pdo->prepare("INSERT INTO partners (name, business_type, contact_person, phone, email, address, city, state, gstin, additional_gst, pan, billing_address, status, type) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'client')");
+        $stmt->execute([$name, $business_type, $contact, $phone, $email, $address, $city, $state, $gstin, $additional_gst, $pan, $billing_address, $status]);
         header("Location: clients.php?msg=added"); exit;
     } elseif ($_POST['action'] === 'edit') {
         $id = intval($_POST['id']);
-        $stmt = $pdo->prepare("UPDATE partners SET name=?, contact_person=?, phone=?, email=?, address=?, city=?, state=?, gstin=?, pan=?, billing_address=?, status=? WHERE id=?");
-        $stmt->execute([$name, $contact, $phone, $email, $address, $city, $state, $gstin, $pan, $billing_address, $status, $id]);
+        $stmt = $pdo->prepare("UPDATE partners SET name=?, business_type=?, contact_person=?, phone=?, email=?, address=?, city=?, state=?, gstin=?, additional_gst=?, pan=?, billing_address=?, status=? WHERE id=?");
+        $stmt->execute([$name, $business_type, $contact, $phone, $email, $address, $city, $state, $gstin, $additional_gst, $pan, $billing_address, $status, $id]);
         header("Location: clients.php?msg=updated"); exit;
     } elseif ($_POST['action'] === 'delete') {
         header('Content-Type: application/json');
@@ -102,6 +103,7 @@ $indian_states = ["Andhra Pradesh", "Arunachal Pradesh", "Assam", "Bihar", "Chha
                 <td>
                     <a href="client_view.php?id=<?php echo $c['id']; ?>" style="text-decoration: none;">
                         <div style="font-weight: 700; color: var(--primary);"><?php echo $c['name']; ?></div>
+                        <div style="font-size: 0.7rem; color: #64748b; font-weight: 700; margin-bottom: 2px;"><?php echo $c['business_type'] ?: 'N/A'; ?></div>
                         <div style="font-size: 0.7rem; color: #94a3b8; font-weight: 600;">ID: CL-<?php echo str_pad($c['id'], 4, '0', STR_PAD_LEFT); ?></div>
                     </a>
                 </td>
@@ -145,9 +147,25 @@ $indian_states = ["Andhra Pradesh", "Arunachal Pradesh", "Assam", "Bihar", "Chha
             <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 2rem;">
                 <div>
                     <div class="form-group"><label>Company Name</label><input type="text" name="name" id="f_name" required></div>
-                    <div class="form-group"><label>Contact Person</label><input type="text" name="contact_person" id="f_contact" required></div>
-                    <div class="form-group"><label>Phone</label><input type="text" name="phone" id="f_phone" required></div>
-                    <div class="form-group"><label>Email</label><input type="email" name="email" id="f_email" required></div>
+                    <div class="form-group">
+                        <label>Business Type</label>
+                        <select name="business_type" id="f_business_type" onchange="showTypeHelp(this.value)">
+                            <option value="">Select Type</option>
+                            <option value="Proprietorship">Proprietorship (Single Owner)</option>
+                            <option value="Partnership Firm">Partnership Firm (Multiple Owners)</option>
+                            <option value="Private Limited">Private Limited (Pvt. Ltd.)</option>
+                            <option value="Public Limited">Public Limited (Public Investment)</option>
+                            <option value="LLP">LLP (Limited Liability Partnership)</option>
+                            <option value="Group of Companies">Group of Companies (Multiple GSTs)</option>
+                            <option value="Individual">Individual (Freelancer/Personal)</option>
+                            <option value="Trust/NGO">Trust/NGO (Non-Profit)</option>
+                            <option value="Government Body">Government Body (Dept/Authority)</option>
+                        </select>
+                        <div id="type-help" style="font-size: 0.7rem; color: #64748b; margin-top: 0.3rem; font-style: italic;"></div>
+                    </div>
+                    <div class="form-group"><label>Contact Person</label><input type="text" name="contact_person" id="f_contact"></div>
+                    <div class="form-group"><label>Phone</label><input type="text" name="phone" id="f_phone"></div>
+                    <div class="form-group"><label>Email</label><input type="email" name="email" id="f_email"></div>
                     <div class="form-group"><label>Address</label><textarea name="address" id="f_address" rows="3" required></textarea></div>
                 </div>
                 <div>
@@ -163,8 +181,12 @@ $indian_states = ["Andhra Pradesh", "Arunachal Pradesh", "Assam", "Bihar", "Chha
                             </select>
                         </div>
                     </div>
-                    <div class="form-group"><label>GSTIN</label><input type="text" name="gstin" id="f_gstin"></div>
-                    <div class="form-group"><label>PAN</label><input type="text" name="pan" id="f_pan"></div>
+                    <div class="form-group"><label id="f_gstin_label">Primary GSTIN</label><input type="text" name="gstin" id="f_gstin"></div>
+                    <div id="additional_gst_container" style="display: none;" class="form-group">
+                        <label>Additional GSTINs (Branch/State-wise)</label>
+                        <textarea name="additional_gst" id="f_additional_gst" rows="2" placeholder="Enter multiple GSTs separated by comma..."></textarea>
+                    </div>
+                    <div class="form-group"><label id="f_pan_label">PAN</label><input type="text" name="pan" id="f_pan"></div>
                     <div class="form-group"><label>Status</label>
                         <select name="status" id="f_status">
                             <option value="active">Active</option>
@@ -206,6 +228,7 @@ function editClient(c) {
     document.getElementById('formAction').value = 'edit';
     document.getElementById('clientId').value = c.id;
     document.getElementById('f_name').value = c.name;
+    document.getElementById('f_business_type').value = c.business_type || '';
     document.getElementById('f_contact').value = c.contact_person;
     document.getElementById('f_phone').value = c.phone;
     document.getElementById('f_email').value = c.email;
@@ -214,9 +237,50 @@ function editClient(c) {
     document.getElementById('f_state').value = c.state;
     document.getElementById('f_gstin').value = c.gstin;
     document.getElementById('f_pan').value = c.pan;
+    document.getElementById('f_additional_gst').value = c.additional_gst || '';
     document.getElementById('f_billing').value = c.billing_address;
     document.getElementById('f_status').value = c.status || 'active';
+    showTypeHelp(c.business_type || '');
     document.getElementById('clientModal').style.display = 'block';
+}
+
+function showTypeHelp(val) {
+    const help = document.getElementById('type-help');
+    const gstLabel = document.querySelector('label[for="f_gstin"]') || { innerText: '' };
+    const panLabel = document.querySelector('label[for="f_pan"]') || { innerText: '' };
+    
+    const tips = {
+        'Proprietorship': 'Single owner business, common for small shops.',
+        'Partnership Firm': '2+ partners, common for small family businesses.',
+        'Private Limited': 'Registered company (Pvt Ltd), most common for startups.',
+        'Public Limited': 'Large company listed on stock market.',
+        'LLP': 'Partnership with limited liability, common for professional firms.',
+        'Individual': 'Personal account or freelancer.',
+        'Trust/NGO': 'Non-profit organization for charity or education.',
+        'Government Body': 'Govt department, municipal corp, or authority.'
+    };
+
+    // Dynamic Labeling logic
+    if (val === 'Individual') {
+        document.getElementById('f_gstin_label').innerText = 'GSTIN (Optional)';
+        document.getElementById('f_pan_label').innerText = 'Personal PAN';
+    } else if (val === 'Proprietorship') {
+        document.getElementById('f_gstin_label').innerText = 'GSTIN (If Registered)';
+        document.getElementById('f_pan_label').innerText = 'Owner PAN';
+    } else {
+        document.getElementById('f_gstin_label').innerText = 'GSTIN';
+        document.getElementById('f_pan_label').innerText = 'Company PAN';
+    }
+
+    help.innerText = tips[val] || '';
+
+    // Show/Hide Additional GST for Groups or Large Companies
+    const addGst = document.getElementById('additional_gst_container');
+    if (val === 'Group of Companies' || val === 'Public Limited' || val === 'Private Limited') {
+        addGst.style.display = 'block';
+    } else {
+        addGst.style.display = 'none';
+    }
 }
 
 function deleteClient(id) {
