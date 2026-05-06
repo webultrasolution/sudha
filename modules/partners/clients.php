@@ -86,40 +86,45 @@ $indian_states = ["Andhra Pradesh", "Arunachal Pradesh", "Assam", "Bihar", "Chha
     <table class="table">
         <thead>
             <tr>
-                <th>Company Name</th>
-                <th>Contact Person</th>
-                <th>GSTIN / PAN</th>
+            <tr>
+                <th>Client Details</th>
+                <th>Primary Contact</th>
+                <th>Tax Credentials</th>
                 <th>Location</th>
                 <th>Status</th>
-                <th>Actions</th>
+                <th style="text-align: right;">Actions</th>
+            </tr>
             </tr>
         </thead>
         <tbody>
             <?php foreach ($clients as $c): ?>
             <tr style="<?php echo $c['status'] == 'inactive' ? 'opacity: 0.6;' : ''; ?>">
                 <td>
-                    <a href="client_view.php?id=<?php echo $c['id']; ?>" style="text-decoration: none; color: inherit;">
-                        <strong><?php echo $c['name']; ?></strong>
-                        <i class="fas fa-external-link-alt" style="font-size: 0.7rem; color: var(--primary); margin-left: 0.3rem;"></i>
+                    <a href="client_view.php?id=<?php echo $c['id']; ?>" style="text-decoration: none;">
+                        <div style="font-weight: 700; color: var(--primary);"><?php echo $c['name']; ?></div>
+                        <div style="font-size: 0.7rem; color: #94a3b8; font-weight: 600;">ID: CL-<?php echo str_pad($c['id'], 4, '0', STR_PAD_LEFT); ?></div>
                     </a>
                 </td>
                 <td>
-                    <div><?php echo $c['contact_person']; ?></div>
-                    <div style="font-size: 0.75rem; color: var(--secondary);"><?php echo $c['phone']; ?></div>
+                    <div style="font-weight: 600; color: #334155;"><?php echo $c['contact_person']; ?></div>
+                    <div style="font-size: 0.75rem; color: #94a3b8;"><?php echo $c['phone']; ?></div>
                 </td>
                 <td>
-                    <div style="font-family: monospace; font-size: 0.8rem;">G: <?php echo $c['gstin']; ?></div>
-                    <div style="font-family: monospace; font-size: 0.8rem;">P: <?php echo $c['pan']; ?></div>
+                    <div style="font-family: monospace; font-size: 0.8rem; color: #475569;">GST: <strong><?php echo $c['gstin'] ?: 'N/A'; ?></strong></div>
+                    <div style="font-family: monospace; font-size: 0.8rem; color: #475569;">PAN: <strong><?php echo $c['pan'] ?: 'N/A'; ?></strong></div>
                 </td>
-                <td><?php echo $c['city']; ?>, <?php echo $c['state']; ?></td>
                 <td>
-                    <span class="badge" style="background: <?php echo $c['status'] == 'active' ? '#dcfce7' : '#f1f5f9'; ?>; color: <?php echo $c['status'] == 'active' ? '#166534' : '#475569'; ?>; padding: 0.25rem 0.5rem; border-radius: 4px; font-size: 0.7rem; font-weight: 700;">
+                    <div style="font-weight: 600; color: #475569;"><?php echo $c['city']; ?></div>
+                    <div style="font-size: 0.7rem; color: #94a3b8;"><?php echo $c['state']; ?></div>
+                </td>
+                <td>
+                    <span class="status-pill <?php echo $c['status']; ?>" style="padding: 0.25rem 0.625rem; border-radius: 9999px; font-size: 0.7rem; font-weight: 700; background: <?php echo $c['status'] == 'active' ? '#dcfce7' : '#f1f5f9'; ?>; color: <?php echo $c['status'] == 'active' ? '#166534' : '#475569'; ?>;">
                         <?php echo strtoupper($c['status']); ?>
                     </span>
                 </td>
-                <td>
-                    <button class="btn-icon" onclick="editClient(<?php echo htmlspecialchars(json_encode($c)); ?>)"><i class="fas fa-edit"></i></button>
-                    <button class="btn-icon" style="color: var(--danger);" onclick="deleteClient(<?php echo $c['id']; ?>)"><i class="fas fa-trash"></i></button>
+                <td style="text-align: right;">
+                    <button class="btn-icon" onclick="editClient(<?php echo htmlspecialchars(json_encode($c)); ?>)" style="color: var(--primary);"><i class="fas fa-edit"></i></button>
+                    <button class="btn-icon" style="color: #ef4444;" onclick="deleteClient(<?php echo $c['id']; ?>)"><i class="fas fa-trash"></i></button>
                 </td>
             </tr>
             <?php endforeach; ?>

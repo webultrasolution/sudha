@@ -3,16 +3,29 @@ $activePage = 'bookings';
 $pageTitle = 'Operations / Mounting Tracker';
 include_once __DIR__ . '/../../includes/header.php';
 
+// Filter by Booking ID if provided
+$bookingId = isset($_GET['booking_id']) ? intval($_GET['booking_id']) : null;
+$where = "";
+$params = [];
+
+if ($bookingId) {
+    $where = "WHERE op.booking_id = ?";
+    $params[] = $bookingId;
+}
+
 // Fetch Operations (Site-wise execution)
-$ops = $pdo->query("
+$stmt = $pdo->prepare("
     SELECT op.*, s.name as site_name, s.site_code, s.location, s.type as site_type, p.name as client_name, b.id as booking_id
     FROM operations op
     JOIN sites s ON op.site_id = s.id
     JOIN bookings b ON op.booking_id = b.id
     JOIN proposals prop ON b.proposal_id = prop.id
     JOIN partners p ON prop.client_id = p.id
+    $where
     ORDER BY op.id DESC
-")->fetchAll();
+");
+$stmt->execute($params);
+$ops = $stmt->fetchAll();
 
 // Fetch Mounters (Staff with operations/field role - using 'operations' role for now)
 $mounters = $pdo->query("SELECT id, full_name FROM users WHERE role = 'operations' OR role = 'admin' ORDER BY full_name ASC")->fetchAll();
@@ -29,47 +42,62 @@ $mounters = $pdo->query("SELECT id, full_name FROM users WHERE role = 'operation
     <table class="table">
         <thead>
             <tr>
-                <th>Site Code</th>
-                <th>Site Name & Location</th>
-                <th>Client</th>
-                <th>Planned Date</th>
-                <th>Assigned To</th>
+                <th style="width: 40px;">#</th>
+                <th>Asset / Location</th>
+                <th>Client Details</th>
+                <th>Execution Date</th>
+                <th>Field Personnel</th>
                 <th>Status</th>
-                <th>Actions</th>
+                <th style="text-align: right;">Actions</th>
             </tr>
         </thead>
         <tbody>
-            <?php foreach ($ops as $op): ?>
+            <?php $sn=1; foreach ($ops as $op): ?>
             <tr>
-                <td><strong><?php echo $op['site_code']; ?></strong></td>
+                <td><?php echo $sn++; ?></td>
                 <td>
-                    <div><?php echo $op['site_name']; ?></div>
-                    <div style="font-size: 0.75rem; color: var(--secondary);"><?php echo $op['location']; ?></div>
-                </td>
-                <td><?php echo $op['client_name']; ?></td>
-                <td><?php echo $op['mounting_date'] ? date('d M Y', strtotime($op['mounting_date'])) : 'Not Set'; ?></td>
-                <td>
-                    <select class="p-input" style="width: 150px; font-size: 0.8rem; padding: 0.25rem;" onchange="assignMounter(<?php echo $op['id']; ?>, this.value)">
-                        <option value="">Unassigned</option>
-                        <?php foreach ($mounters as $m): ?>
-                            <option value="<?php echo $m['id']; ?>" <?php echo $op['assigned_mounter_id'] == $m['id'] ? 'selected' : ''; ?>>
-                                <?php echo $m['full_name']; ?>
-                            </option>
-                        <?php endforeach; ?>
-                    </select>
+                    <div style="font-weight: 700; color: #1e293b;"><?php echo $op['site_name']; ?></div>
+                    <div style="font-size: 0.7rem; color: #94a3b8; font-weight: 600; text-transform: uppercase;">
+                        Code: <?php echo $op['site_code']; ?> • <?php echo $op['location']; ?>
+                    </div>
                 </td>
                 <td>
-                    <span class="status-pill status-<?php echo $op['status']; ?>">
+                    <div style="font-weight: 600; color: #334155;"><?php echo $op['client_name']; ?></div>
+                    <div style="font-size: 0.7rem; color: #94a3b8;">Booking: #BK-<?php echo str_pad($op['booking_id'], 4, '0', STR_PAD_LEFT); ?></div>
+                </td>
+                <td>
+                    <div style="font-weight: 700; color: #475569; font-size: 0.85rem;">
+                        <i class="far fa-calendar-alt" style="margin-right: 0.3rem;"></i>
+                        <?php echo $op['mounting_date'] ? date('d M Y', strtotime($op['mounting_date'])) : '<span style="color: #ef4444;">Not Scheduled</span>'; ?>
+                    </div>
+                </td>
+                <td>
+                    <div style="display: flex; align-items: center; gap: 0.5rem;">
+                        <select class="p-input" style="width: 160px; height: 32px; font-size: 0.8rem; padding: 0 0.5rem; border-radius: 6px;" onchange="assignMounter(<?php echo $op['id']; ?>, this.value)">
+                            <option value="">Unassigned</option>
+                            <?php foreach ($mounters as $m): ?>
+                                <option value="<?php echo $m['id']; ?>" <?php echo $op['assigned_mounter_id'] == $m['id'] ? 'selected' : ''; ?>>
+                                    <?php echo $m['full_name']; ?>
+                                </option>
+                            <?php endforeach; ?>
+                        </select>
+                        <?php if ($op['assigned_mounter_id']): ?>
+                            <i class="fas fa-user-check" style="color: #10b981;"></i>
+                        <?php endif; ?>
+                    </div>
+                </td>
+                <td>
+                    <span class="status-pill status-<?php echo $op['status']; ?>" style="padding: 0.25rem 0.625rem; border-radius: 9999px; font-size: 0.7rem; font-weight: 700; text-transform: uppercase;">
                         <?php echo ucfirst($op['status']); ?>
                     </span>
                 </td>
-                <td style="white-space: nowrap;">
+                <td style="text-align: right; white-space: nowrap;">
                     <?php if ($op['status'] !== 'completed'): ?>
-                        <button class="btn btn-primary" style="padding: 0.25rem 0.5rem; font-size: 0.75rem;" onclick="markCompleted(<?php echo $op['id']; ?>)">
+                        <button class="btn btn-primary" style="padding: 0.35rem 0.75rem; font-size: 0.75rem; border-radius: 6px;" onclick="markCompleted(<?php echo $op['id']; ?>)">
                             <i class="fas fa-check"></i> Complete
                         </button>
                     <?php endif; ?>
-                    <button class="btn" style="padding: 0.25rem 0.5rem; font-size: 0.75rem; border: 1px solid #ddd;" onclick="uploadPhoto(<?php echo $op['id']; ?>)">
+                    <button class="btn-icon" style="color: #64748b; margin-left: 0.5rem;" onclick="uploadPhoto(<?php echo $op['id']; ?>)" title="Upload Proof">
                         <i class="fas fa-camera"></i>
                     </button>
                 </td>

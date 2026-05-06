@@ -42,14 +42,12 @@ $invoices = $invoices->fetchAll();
         <thead>
             <tr>
                 <th style="width: 40px;">#</th>
-                <th>Invoice #</th>
-                <th>Booking #</th>
-                <th>Client</th>
-                <th>Subtotal</th>
-                <th>GST</th>
-                <th>Total</th>
+                <th>Invoice Details</th>
+                <th>Client / Booking</th>
+                <th>Subtotal / Tax</th>
+                <th>Total Amount</th>
                 <th>Status</th>
-                <th>Actions</th>
+                <th style="text-align: right;">Actions</th>
             </tr>
         </thead>
         <tbody>
@@ -62,22 +60,28 @@ $invoices = $invoices->fetchAll();
                 $sn = $offset + 1;
                 foreach ($invoices as $i): ?>
                 <tr>
-                    <td><?php echo $sn++; ?></td>
-                    <td><strong><?php echo $i['invoice_number']; ?></strong></td>
-                    <td>#BK-<?php echo str_pad($i['booking_id'], 4, '0', STR_PAD_LEFT); ?></td>
-                    <td><?php echo $i['client_name']; ?></td>
-                    <td><?php echo formatCurrency($i['sub_total']); ?></td>
-                    <td><?php echo formatCurrency($i['cgst'] + $i['sgst'] + $i['igst']); ?></td>
-                    <td><strong><?php echo formatCurrency($i['total_amount']); ?></strong></td>
                     <td>
-                        <span class="pay-status pay-<?php echo $i['payment_status']; ?>">
+                        <div style="font-weight: 700; color: var(--primary);"><?php echo $i['invoice_number']; ?></div>
+                        <div style="font-size: 0.7rem; color: #94a3b8; font-weight: 600;"><?php echo date('d M Y', strtotime($i['created_at'] ?? date('Y-m-d'))); ?></div>
+                    </td>
+                    <td>
+                        <div style="font-weight: 600; color: #334155;"><?php echo $i['client_name']; ?></div>
+                        <div style="font-size: 0.7rem; color: #94a3b8;">Booking: #BK-<?php echo str_pad($i['booking_id'], 4, '0', STR_PAD_LEFT); ?></div>
+                    </td>
+                    <td>
+                        <div style="font-size: 0.85rem; color: #475569;">Sub: <?php echo formatCurrency($i['sub_total']); ?></div>
+                        <div style="font-size: 0.7rem; color: #94a3b8;">GST (18%): <?php echo formatCurrency($i['cgst'] + $i['sgst'] + $i['igst']); ?></div>
+                    </td>
+                    <td><strong style="font-size: 1rem; color: #1e293b;"><?php echo formatCurrency($i['total_amount']); ?></strong></td>
+                    <td>
+                        <span class="pay-status pay-<?php echo $i['payment_status']; ?>" style="padding: 0.25rem 0.6rem; border-radius: 9999px; font-size: 0.65rem; font-weight: 800;">
                             <?php echo str_replace('_', ' ', ucfirst($i['payment_status'])); ?>
                         </span>
                     </td>
-                    <td>
-                        <a href="invoice_view.php?id=<?php echo $i['id']; ?>" class="btn-icon" title="View"><i class="fas fa-eye"></i></a>
-                        <button class="btn-icon" title="Download PDF"><i class="fas fa-download"></i></button>
-                        <button class="btn-icon" title="Email"><i class="fas fa-envelope"></i></button>
+                    <td style="text-align: right;">
+                        <a href="invoice_view.php?id=<?php echo $i['id']; ?>" class="btn-icon" title="View" style="color: #64748b;"><i class="fas fa-eye"></i></a>
+                        <button class="btn-icon" title="Download PDF" style="color: #64748b;"><i class="fas fa-download"></i></button>
+                        <button class="btn-icon" title="Email" style="color: var(--primary);"><i class="fas fa-envelope"></i></button>
                     </td>
                 </tr>
                 <?php endforeach; ?>

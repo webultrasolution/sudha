@@ -54,18 +54,18 @@ $proposals = $proposals->fetchAll();
         <thead>
             <tr>
                 <th style="width: 40px;">#</th>
-                <th>Proposal #</th>
+                <th>Campaign Details</th>
                 <th>Client</th>
                 <th>Duration</th>
-                <th>Grand Total</th>
+                <th>Total Value</th>
                 <th>Status</th>
-                <th>Actions</th>
+                <th style="text-align: right;">Actions</th>
             </tr>
         </thead>
         <tbody>
             <?php if (empty($proposals)): ?>
                 <tr>
-                    <td colspan="7" style="text-align: center; color: var(--secondary); padding: 2rem;">No proposals found. Start by creating one!</td>
+                    <td colspan="8" style="text-align: center; color: var(--secondary); padding: 2rem;">No proposals found. Start by creating one!</td>
                 </tr>
             <?php else: ?>
                 <?php 
@@ -74,14 +74,18 @@ $proposals = $proposals->fetchAll();
                 <tr>
                     <td><?php echo $sn++; ?></td>
                     <td>
-                        <a href="view.php?id=<?php echo $p['id']; ?>" style="color: var(--primary); text-decoration: none; transition: opacity 0.2s;" onmouseover="this.style.opacity='0.8'" onmouseout="this.style.opacity='1'">
-                            <strong><?php echo $p['proposal_number'] ?: '#PR-' . str_pad($p['id'], 5, '0', STR_PAD_LEFT); ?></strong>
+                        <a href="view.php?id=<?php echo $p['id']; ?>" style="text-decoration: none;">
+                            <div style="font-weight: 700; color: var(--primary);"><?php echo htmlspecialchars($p['campaign_name']); ?></div>
+                            <div style="font-size: 0.7rem; color: #94a3b8; font-weight: 600;">#<?php echo $p['proposal_number']; ?></div>
                         </a>
                     </td>
-                    <td><?php echo $p['client_name']; ?></td>
-                    <td style="font-size: 0.875rem;">
-                        <?php echo date('d M Y', strtotime($p['start_date'])); ?> to <br>
-                        <?php echo date('d M Y', strtotime($p['end_date'])); ?>
+                    <td>
+                        <div style="font-weight: 600; color: #334155;"><?php echo $p['client_name']; ?></div>
+                        <div style="font-size: 0.7rem; color: #94a3b8;">Creator: <?php echo $p['creator']; ?></div>
+                    </td>
+                    <td style="font-size: 0.8rem; color: #475569;">
+                        <strong><?php echo date('d M', strtotime($p['start_date'])); ?></strong> to 
+                        <strong><?php echo date('d M Y', strtotime($p['end_date'])); ?></strong>
                     </td>
                     <td><strong><?php echo formatCurrency($p['grand_total']); ?></strong></td>
                     <td>
@@ -89,17 +93,17 @@ $proposals = $proposals->fetchAll();
                             <?php echo ucfirst($p['status']); ?>
                         </span>
                     </td>
-                    <td>
+                    <td style="text-align: right;">
                         <div class="dropdown" style="display: inline-block; margin-right: 0.5rem;">
                             <button class="btn-icon" style="color: var(--primary);" title="Export"><i class="fas fa-download"></i></button>
                             <div class="dropdown-content" style="right: 0; min-width: 160px;">
-                                <a href="#"><i class="fas fa-file-pdf" style="color: #ef4444; width: 18px;"></i> PDF Proposal</a>
-                                <a href="#"><i class="fas fa-file-excel" style="color: #10b981; width: 18px;"></i> Excel Rate Sheet</a>
-                                <a href="#"><i class="fas fa-file-powerpoint" style="color: #f97316; width: 18px;"></i> PPT Presentation</a>
+                                <a href="export_pdf.php?id=<?php echo $p['id']; ?>" target="_blank"><i class="fas fa-file-pdf" style="color: #ef4444; width: 18px;"></i> PDF Proposal</a>
+                                <a href="export_excel.php?id=<?php echo $p['id']; ?>"><i class="fas fa-file-excel" style="color: #10b981; width: 18px;"></i> Excel Rate Sheet</a>
+                                <a href="export_ppt.php?id=<?php echo $p['id']; ?>"><i class="fas fa-file-powerpoint" style="color: #f97316; width: 18px;"></i> PPT Presentation</a>
                             </div>
                         </div>
-                        <a href="view.php?id=<?php echo $p['id']; ?>" class="btn-icon" title="View Workspace"><i class="fas fa-external-link-alt"></i></a>
-                        <button class="btn-icon" style="color: var(--danger);" onclick="deleteProposal(<?php echo $p['id']; ?>)"><i class="fas fa-trash"></i></button>
+                        <a href="view.php?id=<?php echo $p['id']; ?>" class="btn-icon" title="View Workspace" style="color: #64748b;"><i class="fas fa-external-link-alt"></i></a>
+                        <button class="btn-icon" style="color: #ef4444;" onclick="deleteProposal(<?php echo $p['id']; ?>)"><i class="fas fa-trash"></i></button>
                     </td>
                 </tr>
                 <?php endforeach; ?>

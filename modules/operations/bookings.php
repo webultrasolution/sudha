@@ -60,7 +60,11 @@ $bookings = $pdo->query("
             <?php else: ?>
                 <?php foreach ($bookings as $b): ?>
                 <tr>
-                    <td><strong>#BK-<?php echo str_pad($b['id'], 4, '0', STR_PAD_LEFT); ?></strong></td>
+                    <td>
+                        <a href="../proposals/view.php?id=<?php echo $b['proposal_id']; ?>" style="text-decoration: none; color: inherit; transition: color 0.2s;" onmouseover="this.style.color='var(--primary)';" onmouseout="this.style.color='inherit';">
+                            <strong>#BK-<?php echo str_pad($b['id'], 4, '0', STR_PAD_LEFT); ?></strong>
+                        </a>
+                    </td>
                     <td><?php echo $b['proposal_number'] ?: 'PR-'.$b['proposal_id']; ?></td>
                     <td><?php echo $b['client_name']; ?></td>
                     <td style="font-size: 0.875rem;">

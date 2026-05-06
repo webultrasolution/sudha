@@ -68,7 +68,10 @@ $taMarkupPct = ($taCost > 0) ? ($taMarkup / $taCost) * 100 : 0;
 <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 2rem;">
     <div>
         <div style="display: flex; align-items: center; gap: 1rem; margin-bottom: 0.5rem;">
-            <h1 style="font-size: 1.75rem; font-weight: 800; color: #0f172a; margin: 0;"><?php echo $p['proposal_number']; ?></h1>
+            <h1 style="font-size: 1.75rem; font-weight: 800; color: #0f172a; margin: 0;"><?php echo htmlspecialchars($p['campaign_name']); ?></h1>
+            <span style="background: #f1f5f9; color: #475569; padding: 0.25rem 0.75rem; border-radius: 8px; font-size: 0.75rem; font-weight: 700;">
+                <?php echo $p['proposal_number']; ?>
+            </span>
             <span style="background: #e0e7ff; color: #4338ca; padding: 0.25rem 0.75rem; border-radius: 50px; font-size: 0.75rem; font-weight: 800; text-transform: uppercase;">
                 <?php echo strtoupper($p['status']); ?>
             </span>
@@ -83,9 +86,9 @@ $taMarkupPct = ($taCost > 0) ? ($taMarkup / $taCost) * 100 : 0;
                 <i class="fas fa-download"></i> Export <i class="fas fa-caret-down" style="margin-left: 0.25rem; opacity: 0.7;"></i>
             </button>
             <div class="dropdown-content">
-                <a href="#"><i class="fas fa-file-pdf" style="color: #ef4444; width: 20px;"></i> PDF Proposal</a>
-                <a href="#"><i class="fas fa-file-excel" style="color: #10b981; width: 20px;"></i> Excel Rate Sheet</a>
-                <a href="#"><i class="fas fa-file-powerpoint" style="color: #f97316; width: 20px;"></i> PPT Presentation</a>
+                <a href="export_pdf.php?id=<?php echo $id; ?>" target="_blank"><i class="fas fa-file-pdf" style="color: #ef4444; width: 20px;"></i> PDF Proposal</a>
+                <a href="export_excel.php?id=<?php echo $id; ?>"><i class="fas fa-file-excel" style="color: #10b981; width: 20px;"></i> Excel Rate Sheet</a>
+                <a href="export_ppt.php?id=<?php echo $id; ?>"><i class="fas fa-file-powerpoint" style="color: #f97316; width: 20px;"></i> PPT Presentation</a>
                 <div style="border-top: 1px solid #f1f5f9; margin: 0.5rem 0;"></div>
                 <a href="#"><i class="fas fa-link" style="color: #3b82f6; width: 20px;"></i> Public Link</a>
             </div>
@@ -189,47 +192,48 @@ $taMarkupPct = ($taCost > 0) ? ($taMarkup / $taCost) * 100 : 0;
         <thead style="background: #f8fafc;">
             <tr>
                 <th style="width: 30px;"><input type="checkbox" id="selectAll" checked style="cursor: pointer;"></th>
-                <th>Sr</th>
-                <th>Type</th>
-                <th>Media</th>
-                <th>ID</th>
-                <th>City</th>
-                <th>Location</th>
-                <th>Size</th>
-                <th>SQFT</th>
-                <th>Light</th>
-                <th>Status</th>
-                <th>Available</th>
+                <th>Asset Details</th>
+                <th>City / Code</th>
+                <th>Dimensions</th>
+                <th>Availability</th>
                 <th>Start Date</th>
-                <th>Card Rate</th>
-                <th>Monthly Cost</th>
-                <th>Total Cost</th>
-                <th>Actions</th>
+                <th>Monthly Rate</th>
+                <th style="text-align: right;">Total Amount</th>
+                <th style="width: 50px; text-align: right;">Actions</th>
             </tr>
         </thead>
         <tbody>
             <?php $sr=1; foreach ($items as $item): ?>
             <tr>
                 <td><input type="checkbox" class="item-checkbox" value="<?php echo $item['id']; ?>" checked style="cursor: pointer;"></td>
-                <td><?php echo $sr++; ?></td>
-                <td><span class="badge-type"><?php echo $item['owner_type']; ?></span></td>
-                <td style="font-weight: 600; color: #475569;"><?php echo strtoupper($item['media_type']); ?></td>
-                <td><code style="background: #f1f5f9; padding: 0.2rem 0.4rem; border-radius: 4px; color: #64748b;"><?php echo $item['site_code']; ?></code></td>
-                <td><strong><?php echo $item['city']; ?></strong></td>
-                <td style="max-width: 150px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 0.8rem;"><?php echo $item['location']; ?></td>
-                <td><?php echo $item['width']; ?>'x<?php echo $item['height']; ?>'</td>
-                <td style="font-weight: 700;"><?php echo number_format($item['width']*$item['height']); ?></td>
-                <td><?php echo $item['light_type']; ?></td>
-                <td><span class="status-dot online"></span> <span style="font-weight: 600; font-size: 0.75rem; color: #10b981;">Active</span></td>
-                <td><?php echo $item['available_from'] ? date('d M', strtotime($item['available_from'])) : '<span style="color:#94a3b8;">N/A</span>'; ?></td>
-                <td><input type="date" value="<?php echo htmlspecialchars($item['start_date'] ?? ''); ?>" class="t-date"></td>
-                <td style="font-weight: 600; color: #64748b;"><?php echo formatCurrency($item['site_card_rate']); ?></td>
                 <td>
-                    <input type="number" class="t-input" value="<?php echo $item['sale_rate']; ?>" onchange="updateItem(<?php echo $item['id']; ?>, 'sale_rate', this.value)">
+                    <div style="font-weight: 700; color: #334155; margin-bottom: 2px; white-space: normal; line-height: 1.4;"><?php echo $item['location']; ?></div>
+                    <div style="font-size: 0.7rem; color: #94a3b8; text-transform: uppercase; font-weight: 600;">
+                        <?php echo $item['media_type']; ?> • <?php echo $item['light_type']; ?> • <span class="badge-type"><?php echo $item['owner_type']; ?></span>
+                    </div>
                 </td>
-                <td style="font-weight: 800; color: #0f172a; font-size: 0.9rem;"><?php echo formatCurrency($item['amount']); ?></td>
-                <td style="text-align: center;">
-                    <button class="btn-icon" style="background: #fee2e2; color: #ef4444; border: none; padding: 0.4rem 0.6rem; border-radius: 6px; cursor: pointer; transition: all 0.2s;" onmouseover="this.style.background='#fecaca'" onmouseout="this.style.background='#fee2e2'"><i class="fas fa-trash-alt"></i></button>
+                <td>
+                    <div style="font-weight: 700; color: #1e293b;"><?php echo $item['city']; ?></div>
+                    <div style="font-size: 0.7rem; color: #94a3b8; font-weight: 600;"><?php echo $item['site_code']; ?></div>
+                </td>
+                <td>
+                    <div style="font-weight: 700; color: #475569;"><?php echo $item['width']; ?>' x <?php echo $item['height']; ?>'</div>
+                    <div style="font-size: 0.7rem; color: #94a3b8;"><?php echo number_format($item['width']*$item['height']); ?> SQFT</div>
+                </td>
+                <td>
+                    <div style="display: flex; align-items: center; gap: 0.5rem;">
+                        <span class="status-dot online"></span>
+                        <span style="font-weight: 700; color: #10b981;"><?php echo $item['available_from'] ? date('d M', strtotime($item['available_from'])) : 'Live'; ?></span>
+                    </div>
+                </td>
+                <td><input type="date" value="<?php echo htmlspecialchars($item['start_date'] ?? ''); ?>" class="t-date" style="height: 32px;"></td>
+                <td>
+                    <div style="font-size: 0.7rem; color: #94a3b8; margin-bottom: 2px;">Card: <?php echo formatCurrency($item['site_card_rate']); ?></div>
+                    <input type="number" class="t-input" value="<?php echo $item['sale_rate']; ?>" onchange="updateItem(<?php echo $item['id']; ?>, 'sale_rate', this.value)" style="height: 32px; width: 100px;">
+                </td>
+                <td style="font-weight: 800; color: var(--primary); text-align: right; font-size: 1rem;"><?php echo formatCurrency($item['amount']); ?></td>
+                <td style="text-align: right;">
+                    <button class="btn-icon" style="color: #ef4444; cursor: pointer; border: none; background: transparent; font-size: 1rem;"><i class="fas fa-trash-alt"></i></button>
                 </td>
             </tr>
             <?php endforeach; ?>

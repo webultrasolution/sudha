@@ -7,7 +7,7 @@ $id = isset($_GET['id']) ? intval($_GET['id']) : 0;
 
 // Fetch Invoice
 $stmt = $pdo->prepare("
-    SELECT i.*, b.id as booking_id, c.name as client_name, c.email as client_email, c.phone as client_phone, c.address as client_address, p.proposal_number, p.start_date, p.end_date
+    SELECT i.*, b.id as booking_id, c.name as client_name, c.email as client_email, c.phone as client_phone, c.address as client_address, c.gstin as client_gstin, p.proposal_number, p.start_date, p.end_date
     FROM invoices i
     JOIN bookings b ON i.booking_id = b.id
     JOIN proposals p ON b.proposal_id = p.id
@@ -51,19 +51,28 @@ $items = $stmtItems->fetchAll();
     </div>
 </div>
 
-<div style="display: grid; grid-template-columns: 1fr 1fr; gap: 1.5rem; margin-bottom: 2rem;">
+<div style="display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 1.5rem; margin-bottom: 2rem;">
     <div class="card">
-        <h3 style="font-size: 1rem; margin-bottom: 1rem; border-bottom: 1px solid #eee; padding-bottom: 0.5rem;">Billed To</h3>
-        <div style="line-height: 1.6;">
-            <strong><?php echo $invoice['client_name']; ?></strong><br>
-            <?php echo $invoice['client_address']; ?><br>
-            <i class="fas fa-phone"></i> <?php echo $invoice['client_phone']; ?><br>
-            <i class="fas fa-envelope"></i> <?php echo $invoice['client_email']; ?>
+        <h3 style="font-size: 0.75rem; text-transform: uppercase; letter-spacing: 0.05em; color: #94a3b8; margin-bottom: 1rem; border-bottom: 1px solid #f1f5f9; padding-bottom: 0.5rem;">From: Easy Outdoor</h3>
+        <div style="line-height: 1.6; font-size: 0.9rem;">
+            <strong style="color: var(--primary);"><?php echo COMPANY_NAME; ?></strong><br>
+            <?php echo COMPANY_ADDRESS; ?><br>
+            <?php echo COMPANY_CITY; ?><br>
+            <strong style="color: #475569;">GSTIN: <?php echo COMPANY_GSTIN; ?></strong>
         </div>
     </div>
     <div class="card">
-        <h3 style="font-size: 1rem; margin-bottom: 1rem; border-bottom: 1px solid #eee; padding-bottom: 0.5rem;">Invoice Summary</h3>
-        <div style="line-height: 1.6;">
+        <h3 style="font-size: 0.75rem; text-transform: uppercase; letter-spacing: 0.05em; color: #94a3b8; margin-bottom: 1rem; border-bottom: 1px solid #f1f5f9; padding-bottom: 0.5rem;">Billed To</h3>
+        <div style="line-height: 1.6; font-size: 0.9rem;">
+            <strong style="color: #1e293b;"><?php echo $invoice['client_name']; ?></strong><br>
+            <?php echo $invoice['client_address']; ?><br>
+            <i class="fas fa-phone" style="font-size: 0.75rem; color: #94a3b8;"></i> <?php echo $invoice['client_phone']; ?><br>
+            <strong style="color: #475569;">GSTIN: <?php echo $invoice['client_gstin'] ?: 'N/A'; ?></strong>
+        </div>
+    </div>
+    <div class="card">
+        <h3 style="font-size: 0.75rem; text-transform: uppercase; letter-spacing: 0.05em; color: #94a3b8; margin-bottom: 1rem; border-bottom: 1px solid #f1f5f9; padding-bottom: 0.5rem;">Document Info</h3>
+        <div style="line-height: 1.6; font-size: 0.9rem;">
             <strong>Booking Ref:</strong> #BK-<?php echo str_pad($invoice['booking_id'], 4, '0', STR_PAD_LEFT); ?><br>
             <strong>Proposal:</strong> <?php echo $invoice['proposal_number']; ?><br>
             <strong>Date:</strong> <?php echo date('d M Y', strtotime($invoice['created_at'])); ?><br>

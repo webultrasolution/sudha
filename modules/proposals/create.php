@@ -23,110 +23,32 @@ $sites = $pdo->query($sitesQuery)->fetchAll();
 ?>
 
 <div class="proposal-full-wrapper">
-    <!-- Top: Full Width Asset Selection -->
-    <div class="p-panel" id="asset-plan-panel" style="margin-bottom: 2rem;">
-        <div class="p-header" style="display: flex; justify-content: space-between; align-items: center;">
-            <div style="display: flex; align-items: center; gap: 1rem;">
-                <span>Asset Selection & Plan Pricing</span>
+    <!-- WIZARD HEADER -->
+    <div class="wizard-header" style="max-width: 600px; margin: 0 auto 1.5rem auto; display: flex; align-items: center; justify-content: space-between; position: relative;">
+        <!-- Connecting Line -->
+        <div style="position: absolute; top: 22.5px; left: 10%; right: 10%; height: 4px; background: #e2e8f0; z-index: 1; transform: translateY(-50%); border-radius: 4px;"></div>
+        <div id="wizard-progress-line" style="position: absolute; top: 22.5px; left: 10%; width: 0%; height: 4px; background: var(--primary); z-index: 1; transform: translateY(-50%); transition: width 0.4s ease; border-radius: 4px;"></div>
+        
+        <!-- Step 1 -->
+        <div id="step-tab-1" class="wizard-step active" style="position: relative; z-index: 2; display: flex; flex-direction: column; align-items: center; gap: 0.75rem; background: #f8fafc; padding: 0 1rem;">
+            <div class="step-circle" style="width: 45px; height: 45px; border-radius: 50%; background: var(--primary); color: white; display: flex; align-items: center; justify-content: center; font-weight: 800; font-size: 1.25rem; border: 4px solid #f8fafc; box-shadow: 0 0 0 3px var(--primary); transition: all 0.4s cubic-bezier(0.4, 0, 0.2, 1);">
+                1
             </div>
-            <div style="display: flex; gap: 1rem; align-items: center;">
-                <div class="selection-stats">Selected: <span id="selected-count">0</span> sites</div>
-                <div class="asset-search-bar">
-                    <input type="text" placeholder="Search site, location or city..." id="site-search" class="p-input" onkeyup="filterSites()" style="width: 300px; height: 42px;">
-                </div>
-            </div>
+            <span class="step-label" style="font-weight: 800; color: var(--primary); font-size: 0.85rem; text-transform: uppercase; letter-spacing: 0.05em; transition: all 0.3s;">Client & Details</span>
         </div>
 
-        <div class="site-list-container" style="max-height: 600px; overflow-y: auto;">
-            <table class="crs-table selection-table" id="asset-table">
-                    <thead>
-                        <tr>
-                            <th style="width: 50px;">S.NO</th>
-                            <th style="width: 40px;">SELECT</th>
-                            <th>MEDIA</th>
-                            <th>CITY</th>
-                            <th>PHOTOS</th>
-                            <th>LOCATION</th>
-                            <th>SIZE</th>
-                            <th>SQFT</th>
-                            <th>MONTHLY / DAILY</th>
-                            <th>TYPE</th>
-                            <th style="width: 140px;">SALE RATE (₹)</th>
-                            <th>MARKUP (%)</th>
-                            <th>STATUS</th>
-                            <th style="width: 140px;">TOTAL</th>
-                        </tr>
-                    </thead>
-                <tbody id="asset-body">
-                    <?php $sno = 1; foreach ($sites as $s): 
-                        $sqft = $s['width'] * $s['height'];
-                        $dailyRate = $s['card_rate'] / 30;
-                    ?>
-                    <tr class="site-row" 
-                        id="row-<?php echo $s['id']; ?>"
-                        data-id="<?php echo $s['id']; ?>" 
-                        data-name="<?php echo $s['name']; ?>" 
-                        data-rate="<?php echo $s['card_rate']; ?>" 
-                        data-prate="<?php echo $s['purchase_rate']; ?>" 
-                        data-owner="<?php echo $s['owner_type']; ?>"
-                        data-sqft="<?php echo $sqft; ?>">
-                        <td class="sno-cell"><?php echo $sno++; ?></td>
-                        <td><input type="checkbox" class="asset-chk" onclick="toggleSite('<?php echo $s['id']; ?>')"></td>
-                        <td><span class="badge-media"><?php echo strtoupper($s['type']); ?></span></td>
-                        <td><strong><?php echo $s['city']; ?></strong></td>
-                        <td>
-                            <?php if ($s['thumbnail']): ?>
-                                <img src="../../uploads/sites/<?php echo $s['thumbnail']; ?>" class="site-thumb" onclick="window.open(this.src)">
-                            <?php else: ?>
-                                <span class="no-img">No Image</span>
-                            <?php endif; ?>
-                        </td>
-                        <td style="font-size: 0.8rem; max-width: 200px;"><?php echo $s['location']; ?></td>
-                        <td><?php echo $s['width']; ?>' x <?php echo $s['height']; ?>'</td>
-                        <td style="font-weight: 700;"><?php echo number_format($sqft); ?></td>
-                        <td>
-                            <div style="font-size: 0.85rem; font-weight: 700;">₹<?php echo number_format($s['card_rate']); ?></div>
-                            <div style="font-size: 0.7rem; color: #94a3b8;">₹<?php echo number_format($dailyRate, 2); ?> / day</div>
-                        </td>
-                        <td><span class="badge-<?php echo strtolower($s['owner_type']); ?>"><?php echo $s['owner_type']; ?></span></td>
-                        <td>
-                            <input type="number" class="p-input sale-rate-input" 
-                                   value="<?php echo $s['card_rate']; ?>" 
-                                   oninput="updateSitePrice('<?php echo $s['id']; ?>', this.value)"
-                                   disabled>
-                        </td>
-                        <td class="markup-cell" style="font-weight: 800; color: #64748b;">-</td>
-                        <td><span class="status-available">Available</span></td>
-                        <td class="total-cell" style="font-weight: 700; color: var(--primary);">₹0</td>
-                    </tr>
-                    <?php endforeach; ?>
-                </tbody>
-            </table>
-        </div>
-
-        <!-- Pagination Controls -->
-        <div class="pagination-wrap">
-            <div class="pg-info">
-                Showing <span id="pg-start">1</span> to <span id="pg-end">10</span> of <span id="pg-total"><?php echo count($sites); ?></span> sites
+        <!-- Step 2 -->
+        <div id="step-tab-2" class="wizard-step" style="position: relative; z-index: 2; display: flex; flex-direction: column; align-items: center; gap: 0.75rem; background: #f8fafc; padding: 0 1rem;">
+            <div class="step-circle" style="width: 45px; height: 45px; border-radius: 50%; background: white; color: #94a3b8; display: flex; align-items: center; justify-content: center; font-weight: 800; font-size: 1.25rem; border: 4px solid #f8fafc; box-shadow: 0 0 0 3px #e2e8f0; transition: all 0.4s cubic-bezier(0.4, 0, 0.2, 1);">
+                2
             </div>
-            <div class="pg-controls" id="pg-numbers">
-                <!-- JS will populate -->
-            </div>
-            <div class="pg-size">
-                <select id="pg-limit" onchange="changePageSize()" class="p-input" style="width: 100px; height: 38px; font-size: 0.8rem;">
-                    <option value="10">10 / page</option>
-                    <option value="25">25 / page</option>
-                    <option value="50">50 / page</option>
-                    <option value="100">100 / page</option>
-                </select>
-            </div>
+            <span class="step-label" style="font-weight: 700; color: #94a3b8; font-size: 0.85rem; text-transform: uppercase; letter-spacing: 0.05em; transition: all 0.3s;">Assets & Pricing</span>
         </div>
     </div>
 
-    <!-- Bottom: Configuration Grid -->
-    <div class="proposal-bottom-grid">
-        <!-- Client & Duration -->
-        <div class="p-panel">
+    <!-- STEP 1 -->
+    <div id="step-1">
+        <div class="p-panel" style="max-width: 600px; margin: 0 auto;">
             <div class="p-header"> Client & Duration</div>
             <div class="form-group">
                 <label style="display: flex; justify-content: space-between; align-items: center;">
@@ -135,7 +57,7 @@ $sites = $pdo->query($sitesQuery)->fetchAll();
                         <i class="fas fa-plus-circle"></i> New Client
                     </button>
                 </label>
-                <select id="client_id" class="p-input" style="height: 48px;">
+                <select id="client_id" class="p-input" style="height: 38px;">
                     <option value="">-- Choose Client --</option>
                     <?php foreach ($clients as $c): ?>
                         <option value="<?php echo $c['id']; ?>"><?php echo $c['name']; ?></option>
@@ -145,77 +67,199 @@ $sites = $pdo->query($sitesQuery)->fetchAll();
             <div class="form-grid">
                 <div class="form-group">
                     <label>Start Date</label>
-                    <input type="date" id="start_date" class="p-input" style="height: 48px;">
+                    <input type="date" id="start_date" class="p-input" style="height: 38px;">
                 </div>
                 <div class="form-group">
                     <label>End Date</label>
-                    <input type="date" id="end_date" class="p-input" style="height: 48px;">
+                    <input type="date" id="end_date" class="p-input" style="height: 38px;">
                 </div>
             </div>
+            <div class="form-group">
+                <label>Campaign Name</label>
+                <input type="text" id="campaign_name" class="p-input" placeholder="Enter campaign name (e.g. Summer Sale 2024)" style="height: 38px;">
+            </div>
+            <button class="btn btn-primary" onclick="goToStep2()" style="width: 100%; margin-top: 1.5rem; height: 44px; border-radius: 10px; font-weight: 800; font-size: 0.9rem;">
+                Next Step: Select Assets <i class="fas fa-arrow-right" style="margin-left: 0.5rem;"></i>
+            </button>
+        </div>
+    </div>
+
+    <!-- STEP 2 -->
+    <div id="step-2" style="display: none;">
+        <div style="margin-bottom: 1rem;">
+            <button class="btn btn-secondary" onclick="goToStep1()" style="background: white; border: 1px solid #e2e8f0; padding: 0.5rem 1rem; border-radius: 8px; font-weight: 700; cursor: pointer; color: #475569;">
+                <i class="fas fa-arrow-left"></i> Back to Details
+            </button>
         </div>
 
-        <!-- Pricing Controls -->
-        <div class="p-panel">
-            <div class="p-header"> Pricing & Costs</div>
-            <div class="form-grid">
-                <div class="form-group">
-                    <label>Discount (%)</label>
-                    <input type="number" id="global_discount" value="0" class="p-input" oninput="recalcAll()" style="height: 48px;">
+        <!-- Top: Full Width Asset Selection -->
+        <div class="p-panel" id="asset-plan-panel" style="margin-bottom: 2rem;">
+            <div class="p-header" style="display: flex; justify-content: space-between; align-items: center;">
+                <div style="display: flex; align-items: center; gap: 1rem;">
+                    <span>Asset Selection & Plan Pricing</span>
                 </div>
-                <div class="form-group">
-                    <label>Markup (%)</label>
-                    <input type="number" id="global_markup" value="0" class="p-input" oninput="recalcAll()" style="height: 48px;">
-                </div>
-            </div>
-            <div class="form-grid" style="margin-top: 1rem;">
-                <div class="form-group">
-                    <label>Printing (₹)</label>
-                    <input type="number" id="print_cost" value="0" class="p-input" oninput="recalcAll()" style="height: 48px;">
-                </div>
-                <div class="form-group">
-                    <label>Mounting (₹)</label>
-                    <input type="number" id="mount_cost" value="0" class="p-input" oninput="recalcAll()" style="height: 48px;">
-                </div>
-            </div>
-        </div>
-
-        <!-- Final Summary -->
-        <div class="p-panel summary-box" style="background: #f8fafc; display: flex; flex-direction: column;">
-            <div class="p-header"> Summary</div>
-            <div style="flex: 1;">
-                <div class="stat-row">
-                    <span>Sites Selected:</span>
-                    <span id="selected-count-btm" style="font-weight: 800;">0</span>
-                </div>
-                <div class="stat-row">
-                    <span>Display Cost:</span>
-                    <span id="sum-display-btm">₹0</span>
-                </div>
-                
-                <div style="border-top: 1px dashed #e2e8f0; padding-top: 1rem; margin-top: 1rem;">
-                    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 0.75rem;">
-                        <span style="font-size: 0.8rem; font-weight: 700; color: var(--secondary);">TAX TYPE</span>
-                        <select id="tax-type" class="p-input" onchange="recalcAll()" style="width: 140px; height: 32px; font-size: 0.75rem; padding: 0 0.5rem; border-radius: 8px;">
-                            <option value="igst">IGST (18%)</option>
-                            <option value="cgst_sgst">CGST/SGST (9%+9%)</option>
-                        </select>
+                <div style="display: flex; gap: 1rem; align-items: center;">
+                    <div class="selection-stats">Selected: <span id="selected-count">0</span> sites</div>
+                    <div class="asset-search-bar">
+                        <input type="text" placeholder="Search site, location or city..." id="site-search" class="p-input" onkeyup="filterSites()" style="width: 300px; height: 42px;">
                     </div>
-                    <div id="tax-breakdown">
-                        <div class="stat-row">
-                            <span>GST (18%):</span>
-                            <span id="sum-tax-btm">₹0</span>
+                </div>
+            </div>
+
+            <div class="site-list-container" style="max-height: 600px; overflow-y: auto;">
+                <table class="crs-table selection-table" id="asset-table">
+                        <thead>
+                            <tr>
+                                <th style="width: 40px;">#</th>
+                                <th style="width: 40px;"><i class="far fa-check-square"></i></th>
+                                <th>ASSET DETAILS</th>
+                                <th>CITY / CODE</th>
+                                <th>PREVIEW</th>
+                                <th>DIMENSIONS</th>
+                                <th>PRICING (MONTHLY)</th>
+                                <th>SALE RATE (₹)</th>
+                                <th>MARGIN</th>
+                                <th style="width: 140px; text-align: right;">TOTAL</th>
+                            </tr>
+                        </thead>
+                    <tbody id="asset-body">
+                        <?php $sno = 1; foreach ($sites as $s): 
+                            $sqft = $s['width'] * $s['height'];
+                            $dailyRate = $s['card_rate'] / 30;
+                        ?>
+                        <tr class="site-row" 
+                            id="row-<?php echo $s['id']; ?>"
+                            data-id="<?php echo $s['id']; ?>" 
+                            data-name="<?php echo $s['name']; ?>" 
+                            data-rate="<?php echo $s['card_rate']; ?>" 
+                            data-prate="<?php echo $s['purchase_rate']; ?>" 
+                            data-owner="<?php echo $s['owner_type']; ?>"
+                            data-sqft="<?php echo $sqft; ?>">
+                            <td class="sno-cell"><?php echo $sno++; ?></td>
+                            <td><input type="checkbox" class="asset-chk" onclick="toggleSite('<?php echo $s['id']; ?>')"></td>
+                            <td>
+                                <div style="font-weight: 700; color: #334155; margin-bottom: 2px; white-space: normal; line-height: 1.4;"><?php echo $s['location']; ?></div>
+                                <div style="font-size: 0.7rem; color: #94a3b8; text-transform: uppercase; font-weight: 600;">
+                                    <?php echo $s['type']; ?> • <?php echo $s['light_type']; ?> • <span class="badge-<?php echo strtolower($s['owner_type']); ?>"><?php echo $s['owner_type']; ?></span>
+                                </div>
+                            </td>
+                            <td>
+                                <div style="font-weight: 700; color: #1e293b;"><?php echo $s['city']; ?></div>
+                                <div style="font-size: 0.7rem; color: #94a3b8; font-weight: 600;"><?php echo $s['site_code']; ?></div>
+                            </td>
+                            <td>
+                                <?php if ($s['thumbnail']): ?>
+                                    <img src="../../uploads/sites/<?php echo $s['thumbnail']; ?>" class="site-thumb" onclick="window.open(this.src)">
+                                <?php else: ?>
+                                    <span class="no-img">No Image</span>
+                                <?php endif; ?>
+                            </td>
+                            <td>
+                                <div style="font-weight: 700; color: #475569;"><?php echo $s['width']; ?>' x <?php echo $s['height']; ?>'</div>
+                                <div style="font-size: 0.7rem; color: #94a3b8;"><?php echo number_format($sqft); ?> SQFT</div>
+                            </td>
+                            <td>
+                                <div style="font-size: 0.85rem; font-weight: 700; color: #1e293b;">₹<?php echo number_format($s['card_rate']); ?></div>
+                                <div style="font-size: 0.7rem; color: #94a3b8;">₹<?php echo number_format($dailyRate, 2); ?> / day</div>
+                            </td>
+                            <td>
+                                <input type="number" class="p-input sale-rate-input" 
+                                       value="<?php echo $s['card_rate']; ?>" 
+                                       oninput="updateSitePrice('<?php echo $s['id']; ?>', this.value)"
+                                       disabled style="width: 110px; height: 32px; font-size: 0.85rem;">
+                            </td>
+                            <td class="markup-cell" style="font-weight: 800; color: #64748b;">-</td>
+                            <td class="total-cell" style="font-weight: 800; color: var(--primary); text-align: right; font-size: 1rem;">₹0</td>
+                        </tr>
+                        <?php endforeach; ?>
+                    </tbody>
+                </table>
+            </div>
+
+            <!-- Pagination Controls -->
+            <div class="pagination-wrap">
+                <div class="pg-info">
+                    Showing <span id="pg-start">1</span> to <span id="pg-end">10</span> of <span id="pg-total"><?php echo count($sites); ?></span> sites
+                </div>
+                <div class="pg-controls" id="pg-numbers">
+                    <!-- JS will populate -->
+                </div>
+                <div class="pg-size">
+                    <select id="pg-limit" onchange="changePageSize()" class="p-input" style="width: 100px; height: 38px; font-size: 0.8rem;">
+                        <option value="10">10 / page</option>
+                        <option value="25">25 / page</option>
+                        <option value="50">50 / page</option>
+                        <option value="100">100 / page</option>
+                    </select>
+                </div>
+            </div>
+        </div>
+
+        <!-- Bottom: Configuration Grid -->
+        <div class="proposal-bottom-grid" style="grid-template-columns: 1fr 1fr;">
+            <!-- Pricing Controls -->
+            <div class="p-panel">
+                <div class="p-header"> Pricing & Costs</div>
+                <div class="form-grid">
+                    <div class="form-group">
+                        <label>Discount (%)</label>
+                        <input type="number" id="global_discount" value="0" class="p-input" oninput="recalcAll()" style="height: 38px;">
+                    </div>
+                    <div class="form-group">
+                        <label>Markup (%)</label>
+                        <input type="number" id="global_markup" value="0" class="p-input" oninput="recalcAll()" style="height: 38px;">
+                    </div>
+                </div>
+                <div class="form-grid" style="margin-top: 1rem;">
+                    <div class="form-group">
+                        <label>Printing (₹)</label>
+                        <input type="number" id="print_cost" value="0" class="p-input" oninput="recalcAll()" style="height: 38px;">
+                    </div>
+                    <div class="form-group">
+                        <label>Mounting (₹)</label>
+                        <input type="number" id="mount_cost" value="0" class="p-input" oninput="recalcAll()" style="height: 38px;">
+                    </div>
+                </div>
+            </div>
+
+            <!-- Final Summary -->
+            <div class="p-panel summary-box" style="background: #f8fafc; display: flex; flex-direction: column;">
+                <div class="p-header"> Summary</div>
+                <div style="flex: 1;">
+                    <div class="stat-row">
+                        <span>Sites Selected:</span>
+                        <span id="selected-count-btm" style="font-weight: 800;">0</span>
+                    </div>
+                    <div class="stat-row">
+                        <span>Display Cost:</span>
+                        <span id="sum-display-btm">₹0</span>
+                    </div>
+                    
+                    <div style="border-top: 1px dashed #e2e8f0; padding-top: 1rem; margin-top: 1rem;">
+                        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 0.75rem;">
+                            <span style="font-size: 0.8rem; font-weight: 700; color: var(--secondary);">TAX TYPE</span>
+                            <select id="tax-type" class="p-input" onchange="recalcAll()" style="width: 140px; height: 32px; font-size: 0.75rem; padding: 0 0.5rem; border-radius: 8px;">
+                                <option value="igst">IGST (18%)</option>
+                                <option value="cgst_sgst">CGST/SGST (9%+9%)</option>
+                            </select>
+                        </div>
+                        <div id="tax-breakdown">
+                            <div class="stat-row">
+                                <span>GST (18%):</span>
+                                <span id="sum-tax-btm">₹0</span>
+                            </div>
                         </div>
                     </div>
-                </div>
 
-                <div class="grand-total" style="border-top: 2px solid #e2e8f0; padding-top: 1rem; margin-top: 1rem; color: var(--primary); font-weight: 900;">
-                    <div style="font-size: 0.7rem; color: var(--secondary); margin-bottom: 0.2rem;">GRAND TOTAL</div>
-                    <div id="sum-grand-btm" style="font-size: 2rem;">₹0</div>
+                    <div class="grand-total" style="border-top: 2px solid #e2e8f0; padding-top: 1rem; margin-top: 1rem; color: var(--primary); font-weight: 900;">
+                        <div style="font-size: 0.7rem; color: var(--secondary); margin-bottom: 0.2rem;">GRAND TOTAL</div>
+                        <div id="sum-grand-btm" style="font-size: 2rem;">₹0</div>
+                    </div>
                 </div>
+                <button class="btn btn-primary" onclick="saveProposal()" style="width: 100%; margin-top: 1rem; height: 44px; border-radius: 10px; font-weight: 800; font-size: 0.9rem;">
+                    GENERATE PROPOSAL
+                </button>
             </div>
-            <button class="btn btn-primary" onclick="saveProposal()" style="width: 100%; margin-top: 1rem; height: 50px; border-radius: 12px; font-weight: 800; font-size: 1rem;">
-                GENERATE PROPOSAL
-            </button>
         </div>
     </div>
 </div>
@@ -279,8 +323,8 @@ $sites = $pdo->query($sitesQuery)->fetchAll();
 /* Panel Styling */
 .p-panel { 
     background: white; 
-    border-radius: 20px; 
-    padding: 2rem; 
+    border-radius: 16px; 
+    padding: 1.25rem; 
     border: 1px solid #e2e8f0; 
     box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.05), 0 2px 4px -1px rgba(0, 0, 0, 0.03);
     display: flex;
@@ -289,11 +333,11 @@ $sites = $pdo->query($sitesQuery)->fetchAll();
 
 .p-header { 
     font-weight: 800; 
-    font-size: 1.25rem; 
+    font-size: 1.1rem; 
     color: var(--primary); 
-    margin-bottom: 2rem; 
+    margin-bottom: 1.25rem; 
     border-bottom: 2px solid #f1f5f9; 
-    padding-bottom: 1.25rem; 
+    padding-bottom: 0.75rem; 
     display: flex; 
     justify-content: space-between; 
     align-items: center; 
@@ -305,21 +349,31 @@ $sites = $pdo->query($sitesQuery)->fetchAll();
 .form-group label { display: block; font-size: 0.8rem; font-weight: 800; color: var(--secondary); margin-bottom: 0.6rem; text-transform: uppercase; letter-spacing: 0.025em; }
 
 .p-input { 
-    width: 100%; padding: 0.875rem; border: 1px solid #e2e8f0; border-radius: 12px; 
-    font-family: inherit; font-size: 1rem; font-weight: 600; transition: all 0.2s ease; 
+    width: 100%; padding: 0.6rem 0.75rem; border: 1px solid #e2e8f0; border-radius: 8px; 
+    font-family: inherit; font-size: 0.9rem; font-weight: 600; transition: all 0.2s ease; 
     background: #fcfcfc;
 }
-.p-input:focus { border-color: var(--primary); box-shadow: 0 0 0 4px rgba(13, 148, 136, 0.1); outline: none; background: white; }
+.p-input:focus { border-color: var(--primary); box-shadow: 0 0 0 3px rgba(13, 148, 136, 0.1); outline: none; background: white; }
 
 /* Table Styling */
-.site-list-container { overflow-x: auto; border: 1px solid #f1f5f9; border-radius: 16px; background: white; }
+.site-list-container { overflow-x: auto; border: 1px solid rgba(0,0,0,0.05); border-radius: 12px; background: white; }
 .crs-table { width: 100%; border-collapse: collapse; }
-.crs-table th { background: #f8fafc; padding: 1.25rem 1rem; font-size: 0.75rem; text-transform: uppercase; letter-spacing: 0.1em; color: #64748b; font-weight: 800; border-bottom: 2px solid #f1f5f9; text-align: left; }
-.crs-table td { padding: 1.25rem 1rem; vertical-align: middle; border-bottom: 1px solid #f1f5f9; }
+.crs-table th { background: transparent; padding: 1rem; font-size: 0.75rem; text-transform: uppercase; letter-spacing: 0.05em; color: #475569; font-weight: 800; border-bottom: 1px solid #f1f5f9; text-align: left; }
+.crs-table td { padding: 1rem; vertical-align: middle; border-bottom: 1px solid #f8fafc; color: #64748b; font-size: 0.85rem; }
 
-.site-row { transition: background 0.2s; }
-.site-row:hover { background: #fafafa; }
+.site-row { transition: all 0.2s; }
+.site-row:hover { background: #f8fafc; }
 .site-row.selected { background: #f0fdfa !important; }
+.site-row.selected td { color: var(--primary); }
+
+.asset-chk {
+    width: 18px;
+    height: 18px;
+    border-radius: 4px;
+    border: 2px solid #e2e8f0;
+    cursor: pointer;
+    accent-color: var(--primary);
+}
 
 /* Summary Items */
 .stat-row { display: flex; justify-content: space-between; margin-bottom: 1rem; font-size: 1rem; font-weight: 700; color: #475569; }
@@ -644,12 +698,13 @@ function saveProposal() {
     const clientId = document.getElementById('client_id').value;
     const start = document.getElementById('start_date').value;
     const end = document.getElementById('end_date').value;
+    const campaignName = document.getElementById('campaign_name').value;
     
-    if (!clientId || !start || !end || selectedSites.length === 0) {
+    if (!clientId || !start || !end || !campaignName || selectedSites.length === 0) {
         Swal.fire({
             icon: 'warning',
             title: 'Missing Information',
-            text: 'Please select a client, set the dates, and select at least one asset.',
+            text: 'Please select a client, set the dates, enter campaign name, and select at least one asset.',
             confirmButtonColor: 'var(--primary)'
         });
         return;
@@ -659,6 +714,7 @@ function saveProposal() {
         clientId,
         startDate: start,
         endDate: end,
+        campaignName,
         printCost: parseFloat(document.getElementById('print_cost').value) || 0,
         mountCost: parseFloat(document.getElementById('mount_cost').value) || 0,
         selectedSites
@@ -678,6 +734,65 @@ function saveProposal() {
             Swal.fire('Error', res.message, 'error');
         }
     });
+}
+
+function goToStep2() {
+    const clientId = document.getElementById('client_id').value;
+    const start = document.getElementById('start_date').value;
+    const end = document.getElementById('end_date').value;
+    
+    if (!clientId || !start || !end) {
+        Swal.fire({
+            icon: 'warning',
+            title: 'Missing Details',
+            text: 'Please select a client and set both start and end dates before proceeding.',
+            confirmButtonColor: 'var(--primary)'
+        });
+        return;
+    }
+    
+    document.getElementById('step-1').style.display = 'none';
+    document.getElementById('step-2').style.display = 'block';
+    
+    // Step 1 styling -> Completed
+    const c1 = document.querySelector('#step-tab-1 .step-circle');
+    c1.innerHTML = '<i class="fas fa-check"></i>';
+    c1.style.background = 'var(--primary)';
+    c1.style.color = 'white';
+    c1.style.boxShadow = '0 0 0 3px var(--primary)';
+    
+    // Step 2 styling -> Active
+    const c2 = document.querySelector('#step-tab-2 .step-circle');
+    c2.style.background = 'var(--primary)';
+    c2.style.color = 'white';
+    c2.style.boxShadow = '0 0 0 3px var(--primary)';
+    
+    document.querySelector('#step-tab-2 .step-label').style.color = 'var(--primary)';
+    document.querySelector('#step-tab-2 .step-label').style.fontWeight = '800';
+    
+    // Progress Line
+    document.getElementById('wizard-progress-line').style.width = '100%';
+}
+
+function goToStep1() {
+    document.getElementById('step-2').style.display = 'none';
+    document.getElementById('step-1').style.display = 'block';
+    
+    // Step 1 styling -> Active
+    const c1 = document.querySelector('#step-tab-1 .step-circle');
+    c1.innerHTML = '1';
+    
+    // Step 2 styling -> Inactive
+    const c2 = document.querySelector('#step-tab-2 .step-circle');
+    c2.style.background = 'white';
+    c2.style.color = '#94a3b8';
+    c2.style.boxShadow = '0 0 0 3px #e2e8f0';
+    
+    document.querySelector('#step-tab-2 .step-label').style.color = '#94a3b8';
+    document.querySelector('#step-tab-2 .step-label').style.fontWeight = '700';
+    
+    // Progress Line
+    document.getElementById('wizard-progress-line').style.width = '0%';
 }
 </script>
 

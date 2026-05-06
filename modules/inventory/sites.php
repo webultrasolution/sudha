@@ -134,24 +134,35 @@ $vendors = $pdo->query("SELECT id, name FROM partners WHERE type = 'vendor' ORDE
     <table class="table">
         <thead>
             <tr>
-                <th>Media</th>
-                <th>City</th>
-                <th>Photos</th>
-                <th>Location</th>
-                <th>Size</th>
-                <th>Type</th>
-                <th>Card Rate</th>
-                <th>Sale Rate</th>
-                <th>Available From</th>
+            <tr>
+                <th style="width: 40px;">#</th>
+                <th>Asset Details</th>
+                <th>City / Code</th>
+                <th>Preview</th>
+                <th>Dimensions</th>
+                <th>Pricing</th>
+                <th>Availability</th>
                 <th>Status</th>
-                <th>Actions</th>
+                <th style="text-align: right;">Actions</th>
+            </tr>
             </tr>
         </thead>
         <tbody>
-            <?php foreach ($sites as $s): ?>
+            <?php $sn=1; foreach ($sites as $s): ?>
             <tr>
-                <td><span class="media-badge <?php echo strtolower($s['type']); ?>"><?php echo $s['type']; ?></span></td>
-                <td><strong><?php echo $s['city']; ?></strong></td>
+                <td><?php echo $sn++; ?></td>
+                <td>
+                    <div style="font-weight: 700; color: #334155; margin-bottom: 2px;"><?php echo $s['location']; ?></div>
+                    <div style="font-size: 0.7rem; color: #94a3b8; text-transform: uppercase; font-weight: 600;">
+                        <span class="media-badge <?php echo strtolower($s['type']); ?>"><?php echo $s['type']; ?></span> • 
+                        <?php echo $s['light_type']; ?> • 
+                        <span style="color: var(--primary);"><?php echo $s['owner_type']; ?></span>
+                    </div>
+                </td>
+                <td>
+                    <div style="font-weight: 700; color: #1e293b;"><?php echo $s['city']; ?></div>
+                    <div style="font-size: 0.7rem; color: #94a3b8; font-weight: 600;"><?php echo $s['site_code']; ?></div>
+                </td>
                 <td>
                     <?php 
                     $imgs = $pdo->prepare("SELECT filename FROM site_images WHERE site_id = ? LIMIT 1");
@@ -159,21 +170,26 @@ $vendors = $pdo->query("SELECT id, name FROM partners WHERE type = 'vendor' ORDE
                     $img = $imgs->fetch();
                     if($img):
                     ?>
-                        <img src="../../uploads/sites/<?php echo $img['filename']; ?>" style="width: 40px; height: 30px; object-fit: cover; border-radius: 4px; cursor: pointer;" onclick="viewPhotos(<?php echo $s['id']; ?>, '<?php echo $s['light_type']; ?>')">
+                        <img src="../../uploads/sites/<?php echo $img['filename']; ?>" style="width: 45px; height: 32px; object-fit: cover; border-radius: 6px; cursor: pointer; border: 1px solid #e2e8f0;" onclick="viewPhotos(<?php echo $s['id']; ?>, '<?php echo $s['light_type']; ?>')">
                     <?php else: ?>
-                        <small style="color: #94a3b8;">No Image</small>
+                        <small style="color: #cbd5e1;">No Img</small>
                     <?php endif; ?>
                 </td>
-                <td style="max-width: 200px; font-size: 0.85rem;"><?php echo $s['location']; ?></td>
-                <td><?php echo $s['width'] . "' x " . $s['height'] . "'"; ?></td>
-                <td><?php echo $s['owner_type']; ?></td>
-                <td><?php echo formatCurrency($s['card_rate']); ?></td>
-                <td><?php echo formatCurrency($s['purchase_rate']); ?></td>
-                <td><?php echo date('d M y', strtotime($s['available_from'])); ?></td>
-                <td><span class="status-pill <?php echo $s['status']; ?>"><?php echo ucfirst($s['status']); ?></span></td>
                 <td>
-                    <button class="btn-icon" onclick="editSite(<?php echo htmlspecialchars(json_encode($s)); ?>)"><i class="fas fa-edit"></i></button>
-                    <button class="btn-icon" style="color: var(--danger);" onclick="deleteSite(event, <?php echo $s['id']; ?>)"><i class="fas fa-trash"></i></button>
+                    <div style="font-weight: 700; color: #475569;"><?php echo $s['width'] . "' x " . $s['height'] . "'"; ?></div>
+                    <div style="font-size: 0.7rem; color: #94a3b8;"><?php echo number_format($s['sqft']); ?> SQFT</div>
+                </td>
+                <td>
+                    <div style="font-weight: 700; color: #1e293b;"><?php echo formatCurrency($s['card_rate']); ?></div>
+                    <div style="font-size: 0.7rem; color: #94a3b8;">Cost: <?php echo formatCurrency($s['purchase_rate']); ?></div>
+                </td>
+                <td>
+                    <div style="font-weight: 600; color: #475569; font-size: 0.8rem;"><?php echo date('d M Y', strtotime($s['available_from'])); ?></div>
+                </td>
+                <td><span class="status-pill <?php echo $s['status']; ?>"><?php echo ucfirst($s['status']); ?></span></td>
+                <td style="text-align: right;">
+                    <button class="btn-icon" onclick="editSite(<?php echo htmlspecialchars(json_encode($s)); ?>)" style="color: var(--primary);"><i class="fas fa-edit"></i></button>
+                    <button class="btn-icon" style="color: #ef4444;" onclick="deleteSite(event, <?php echo $s['id']; ?>)"><i class="fas fa-trash"></i></button>
                 </td>
             </tr>
             <?php endforeach; ?>
