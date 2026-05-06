@@ -86,11 +86,14 @@ $taMarkupPct = ($taCost > 0) ? ($taMarkup / $taCost) * 100 : 0;
                 <i class="fas fa-download"></i> Export <i class="fas fa-caret-down" style="margin-left: 0.25rem; opacity: 0.7;"></i>
             </button>
             <div class="dropdown-content">
-                <a href="export_pdf.php?id=<?php echo $id; ?>" target="_blank"><i class="fas fa-file-pdf" style="color: #ef4444; width: 20px;"></i> PDF Proposal</a>
-                <a href="export_excel.php?id=<?php echo $id; ?>"><i class="fas fa-file-excel" style="color: #10b981; width: 20px;"></i> Excel Rate Sheet</a>
-                <a href="export_ppt.php?id=<?php echo $id; ?>"><i class="fas fa-file-powerpoint" style="color: #f97316; width: 20px;"></i> PPT Presentation</a>
-                <div style="border-top: 1px solid #f1f5f9; margin: 0.5rem 0;"></div>
-                <a href="#"><i class="fas fa-link" style="color: #3b82f6; width: 20px;"></i> Public Link</a>
+                <div style="font-size: 0.6rem; font-weight: 800; color: #94a3b8; padding: 0.5rem 0.8rem; text-transform: uppercase; letter-spacing: 0.05em;">Client Documents</div>
+                <a href="export_pdf.php?id=<?php echo $id; ?>" target="_blank"><i class="fas fa-file-pdf" style="color: #ef4444;"></i> PDF Proposal</a>
+                <a href="export_excel.php?id=<?php echo $id; ?>"><i class="fas fa-file-excel" style="color: #10b981;"></i> Excel Rate Sheet</a>
+                <a href="export_ppt.php?id=<?php echo $id; ?>"><i class="fas fa-file-powerpoint" style="color: #f97316;"></i> PPT Presentation</a>
+                <div style="height: 1px; background: #f1f5f9; margin: 0.25rem 0;"></div>
+                <div style="font-size: 0.6rem; font-weight: 800; color: #94a3b8; padding: 0.5rem 0.8rem; text-transform: uppercase; letter-spacing: 0.05em;">Visuals</div>
+                <a href="view.php?id=<?php echo $id; ?>&mode=presentation" target="_blank"><i class="fas fa-desktop" style="color: #6366f1;"></i> Presentation View</a>
+                <a href="download_photos.php?id=<?php echo $id; ?>"><i class="fas fa-images" style="color: #8b5cf6;"></i> Download Photos</a>
             </div>
         </div>
         <?php if ($p['status'] != 'confirmed'): ?>
@@ -275,16 +278,41 @@ $taMarkupPct = ($taCost > 0) ? ($taMarkup / $taCost) * 100 : 0;
 .t-input:focus, .t-date:focus { border-color: var(--primary); outline: none; box-shadow: 0 0 0 3px rgba(13, 148, 136, 0.1); }
 
 /* Dropdown */
-.dropdown { position: relative; display: inline-block; }
-.dropdown-content { display: none; position: absolute; right: 0; background-color: white; min-width: 220px; box-shadow: 0 20px 25px -5px rgba(0,0,0,0.1), 0 10px 10px -5px rgba(0,0,0,0.04); border-radius: 12px; z-index: 50; border: 1px solid #f1f5f9; overflow: hidden; top: calc(100% + 0.5rem); padding: 0.5rem; }
-.dropdown-content a { color: #334155; padding: 0.75rem 1rem; text-decoration: none; display: flex; align-items: center; gap: 0.75rem; font-size: 0.9rem; font-weight: 600; border-radius: 8px; transition: all 0.2s; }
-.dropdown-content a:hover { background: #f8fafc; color: var(--primary); transform: translateX(2px); }
-.dropdown:hover .dropdown-content { display: block; animation: slideDown 0.2s ease-out forwards; }
-
-@keyframes slideDown {
-    from { opacity: 0; transform: translateY(-10px); }
-    to { opacity: 1; transform: translateY(0); }
+/* Improved Dropdown styling */
+.dropdown { position: relative; }
+.dropdown-content { 
+    display: none; 
+    position: absolute; 
+    right: 0; 
+    top: 100%;
+    background-color: white; 
+    min-width: 200px; 
+    box-shadow: 0 10px 30px rgba(0,0,0,0.15); 
+    border-radius: 12px; 
+    z-index: 9999; 
+    border: 1px solid #e2e8f0; 
+    padding: 0.5rem; 
+    text-align: left; 
 }
+.dropdown-content a { 
+    color: #334155; 
+    padding: 0.7rem 0.9rem; 
+    text-decoration: none !important; 
+    display: flex; 
+    align-items: center; 
+    gap: 0.75rem; 
+    font-size: 0.85rem; 
+    font-weight: 600; 
+    border-radius: 8px; 
+    transition: all 0.2s; 
+}
+.dropdown-content i { font-size: 1rem; width: 20px; text-align: center; }
+.dropdown-content a:hover { background: #f0fdfa; color: var(--primary); }
+.dropdown:hover .dropdown-content { display: block; animation: slideIn 0.2s ease-out; }
+@keyframes slideIn { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
+
+/* Ensure page containers don't clip the dropdown */
+html, body { overflow-x: visible !important; }
 </style>
 
 <script>

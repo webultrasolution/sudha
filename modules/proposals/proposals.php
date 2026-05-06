@@ -53,13 +53,13 @@ $proposals = $proposals->fetchAll();
     <table class="table">
         <thead>
             <tr>
-                <th style="width: 40px;">#</th>
-                <th>Campaign Details</th>
-                <th>Client</th>
-                <th>Duration</th>
-                <th>Total Value</th>
-                <th>Status</th>
-                <th style="text-align: right;">Actions</th>
+                <th style="width: 60px;">#</th>
+                <th>CAMPAIGN & PROPOSAL</th>
+                <th>CLIENT / ACCOUNT</th>
+                <th>TENURE</th>
+                <th>VALUE (INCL. TAX)</th>
+                <th>STATUS</th>
+                <th style="text-align: right;">OPERATIONS</th>
             </tr>
         </thead>
         <tbody>
@@ -72,38 +72,52 @@ $proposals = $proposals->fetchAll();
                 $sn = $offset + 1;
                 foreach ($proposals as $p): ?>
                 <tr>
-                    <td><?php echo $sn++; ?></td>
+                    <td style="text-align: center; font-weight: 700; color: #94a3b8;"><?php echo $sn++; ?></td>
                     <td>
                         <a href="view.php?id=<?php echo $p['id']; ?>" style="text-decoration: none;">
-                            <div style="font-weight: 700; color: var(--primary);"><?php echo htmlspecialchars($p['campaign_name']); ?></div>
-                            <div style="font-size: 0.7rem; color: #94a3b8; font-weight: 600;">#<?php echo $p['proposal_number']; ?></div>
+                            <div style="font-weight: 800; color: var(--primary); font-size: 0.95rem; margin-bottom: 3px;"><?php echo htmlspecialchars($p['campaign_name']); ?></div>
+                            <div style="display: flex; gap: 0.5rem; align-items: center;">
+                                <span style="font-size: 0.65rem; background: #f1f5f9; color: #475569; padding: 2px 6px; border-radius: 4px; font-weight: 800;">#<?php echo $p['proposal_number']; ?></span>
+                                <span style="font-size: 0.65rem; color: #94a3b8; font-weight: 700;"><i class="far fa-clock"></i> <?php echo date('d M Y', strtotime($p['created_at'])); ?></span>
+                            </div>
                         </a>
                     </td>
                     <td>
-                        <div style="font-weight: 600; color: #334155;"><?php echo $p['client_name']; ?></div>
-                        <div style="font-size: 0.7rem; color: #94a3b8;">Creator: <?php echo $p['creator']; ?></div>
+                        <div style="font-weight: 700; color: #1e293b;"><?php echo $p['client_name']; ?></div>
+                        <div style="font-size: 0.7rem; color: #64748b; font-weight: 600;">Account: <?php echo $p['creator']; ?></div>
                     </td>
-                    <td style="font-size: 0.8rem; color: #475569;">
-                        <strong><?php echo date('d M', strtotime($p['start_date'])); ?></strong> to 
-                        <strong><?php echo date('d M Y', strtotime($p['end_date'])); ?></strong>
-                    </td>
-                    <td><strong><?php echo formatCurrency($p['grand_total']); ?></strong></td>
                     <td>
-                        <span class="status-pill status-<?php echo $p['status']; ?>">
-                            <?php echo ucfirst($p['status']); ?>
+                        <div style="font-weight: 700; color: #475569; font-size: 0.85rem;"><?php echo date('d M', strtotime($p['start_date'])); ?> - <?php echo date('d M', strtotime($p['end_date'])); ?></div>
+                        <div style="font-size: 0.7rem; color: #94a3b8; font-weight: 600;"><?php echo date('Y', strtotime($p['end_date'])); ?> • <?php 
+                            $diff = date_diff(date_create($p['start_date']), date_create($p['end_date']));
+                            echo $diff->format("%a days");
+                        ?></div>
+                    </td>
+                    <td>
+                        <div style="font-weight: 800; color: #0f172a; font-size: 0.95rem;">₹<?php echo number_format($p['grand_total'], 2); ?></div>
+                        <div style="font-size: 0.65rem; color: #94a3b8; font-weight: 700;">Base: ₹<?php echo number_format($p['total_amount'], 2); ?></div>
+                    </td>
+                    <td>
+                        <span class="status-pill status-<?php echo $p['status']; ?>" style="font-weight: 800; text-transform: uppercase; letter-spacing: 0.05em; font-size: 0.65rem;">
+                            <?php echo $p['status']; ?>
                         </span>
                     </td>
                     <td style="text-align: right;">
-                        <div class="dropdown" style="display: inline-block; margin-right: 0.5rem;">
-                            <button class="btn-icon" style="color: var(--primary);" title="Export"><i class="fas fa-download"></i></button>
-                            <div class="dropdown-content" style="right: 0; min-width: 160px;">
-                                <a href="export_pdf.php?id=<?php echo $p['id']; ?>" target="_blank"><i class="fas fa-file-pdf" style="color: #ef4444; width: 18px;"></i> PDF Proposal</a>
-                                <a href="export_excel.php?id=<?php echo $p['id']; ?>"><i class="fas fa-file-excel" style="color: #10b981; width: 18px;"></i> Excel Rate Sheet</a>
-                                <a href="export_ppt.php?id=<?php echo $p['id']; ?>"><i class="fas fa-file-powerpoint" style="color: #f97316; width: 18px;"></i> PPT Presentation</a>
+                        <div class="dropdown" style="display: inline-block;">
+                            <button class="btn-icon" style="color: var(--primary); background: #f0fdfa; border-radius: 8px; width: 32px; height: 32px;" title="Export Options"><i class="fas fa-file-export"></i></button>
+                            <div class="dropdown-content">
+                                <div style="font-size: 0.6rem; font-weight: 800; color: #94a3b8; padding: 0.5rem 0.8rem; text-transform: uppercase; letter-spacing: 0.05em;">Client Documents</div>
+                                <a href="export_pdf.php?id=<?php echo $p['id']; ?>" target="_blank"><i class="fas fa-file-pdf" style="color: #ef4444;"></i> PDF Proposal</a>
+                                <a href="export_excel.php?id=<?php echo $p['id']; ?>"><i class="fas fa-file-excel" style="color: #10b981;"></i> Excel Rate Sheet</a>
+                                <a href="export_ppt.php?id=<?php echo $p['id']; ?>"><i class="fas fa-file-powerpoint" style="color: #f97316;"></i> PPT Deck</a>
+                                <div style="height: 1px; background: #f1f5f9; margin: 0.25rem 0;"></div>
+                                <div style="font-size: 0.6rem; font-weight: 800; color: #94a3b8; padding: 0.5rem 0.8rem; text-transform: uppercase; letter-spacing: 0.05em;">Visuals</div>
+                                <a href="view.php?id=<?php echo $p['id']; ?>&mode=presentation" target="_blank"><i class="fas fa-desktop" style="color: #6366f1;"></i> Presentation View</a>
+                                <a href="download_photos.php?id=<?php echo $p['id']; ?>"><i class="fas fa-images" style="color: #8b5cf6;"></i> Download Photos</a>
                             </div>
                         </div>
-                        <a href="view.php?id=<?php echo $p['id']; ?>" class="btn-icon" title="View Workspace" style="color: #64748b;"><i class="fas fa-external-link-alt"></i></a>
-                        <button class="btn-icon" style="color: #ef4444;" onclick="deleteProposal(<?php echo $p['id']; ?>)"><i class="fas fa-trash"></i></button>
+                        <a href="view.php?id=<?php echo $p['id']; ?>" class="btn-icon" title="Workspace" style="background: #f8fafc; border-radius: 8px; width: 32px; height: 32px; color: #64748b;"><i class="fas fa-layer-group"></i></a>
+                        <button class="btn-icon" style="background: #fef2f2; border-radius: 8px; width: 32px; height: 32px; color: #ef4444;" onclick="deleteProposal(<?php echo $p['id']; ?>)"><i class="fas fa-trash"></i></button>
                     </td>
                 </tr>
                 <?php endforeach; ?>
@@ -122,13 +136,42 @@ $proposals = $proposals->fetchAll();
 .btn-icon { color: var(--secondary); background: none; border: none; cursor: pointer; text-decoration: none; margin-right: 0.25rem; transition: color 0.2s; padding: 0.25rem; display: inline-flex; align-items: center; justify-content: center; }
 .btn-icon:hover { color: var(--primary); }
 
-/* Dropdown styling */
-.dropdown { position: relative; display: inline-block; }
-.dropdown-content { display: none; position: absolute; right: 0; background-color: white; min-width: 180px; box-shadow: 0 10px 25px -5px rgba(0,0,0,0.1); border-radius: 12px; z-index: 50; border: 1px solid #f1f5f9; overflow: hidden; padding: 0.5rem; text-align: left; }
-.dropdown-content a { color: #334155; padding: 0.6rem 0.8rem; text-decoration: none; display: flex; align-items: center; gap: 0.5rem; font-size: 0.85rem; font-weight: 600; border-radius: 6px; transition: all 0.2s; }
-.dropdown-content a:hover { background: #f8fafc; color: var(--primary); transform: translateX(2px); }
-.dropdown:hover .dropdown-content { display: block; animation: slideDown 0.2s ease-out forwards; }
-@keyframes slideDown { from { opacity: 0; transform: translateY(-5px); } to { opacity: 1; transform: translateY(0); } }
+/* Improved Dropdown styling */
+.dropdown { position: relative; }
+.dropdown-content { 
+    display: none; 
+    position: absolute; 
+    right: 0; 
+    top: 100%;
+    background-color: white; 
+    min-width: 200px; 
+    box-shadow: 0 10px 30px rgba(0,0,0,0.15); 
+    border-radius: 12px; 
+    z-index: 9999; 
+    border: 1px solid #e2e8f0; 
+    padding: 0.5rem; 
+    text-align: left; 
+}
+.dropdown-content a { 
+    color: #334155; 
+    padding: 0.7rem 0.9rem; 
+    text-decoration: none !important; 
+    display: flex; 
+    align-items: center; 
+    gap: 0.75rem; 
+    font-size: 0.85rem; 
+    font-weight: 600; 
+    border-radius: 8px; 
+    transition: all 0.2s; 
+}
+.dropdown-content i { font-size: 1rem; width: 20px; text-align: center; }
+.dropdown-content a:hover { background: #f0fdfa; color: var(--primary); }
+.dropdown:hover .dropdown-content { display: block; animation: slideIn 0.2s ease-out; }
+@keyframes slideIn { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
+
+/* Fix table cell overflow */
+.table td { position: relative; overflow: visible !important; }
+.card { overflow: visible !important; }
 </style>
 
 <script>
