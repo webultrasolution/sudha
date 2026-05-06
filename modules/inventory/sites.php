@@ -421,6 +421,7 @@ $vendors = $pdo->query("SELECT id, name FROM partners WHERE type = 'vendor' ORDE
 <script>
 let currentLbIndex = 0;
 let lbImages = [];
+let pendingFiles = []; // Global to store all selected files for upload
 
 function doSearch() {
     const s = document.getElementById('site-search').value;
@@ -430,7 +431,10 @@ function openModal() {
     const form = document.getElementById('siteForm');
     form.reset(); 
     form.classList.remove('was-validated');
+    document.getElementById('preview-container').innerHTML = '';
     document.getElementById('existing-images').innerHTML = '';
+    pendingFiles = []; // Reset pending files
+    document.getElementById('file-input').value = '';
     document.getElementById('siteModal').style.display = 'block'; 
 }
 function closeModal() { document.getElementById('siteModal').style.display = 'none'; }
@@ -528,36 +532,52 @@ if(dropZone) {
     dropZone.addEventListener('drop', (e) => {
         const dt = e.dataTransfer;
         const files = dt.files;
-        document.getElementById('file-input').files = files; // Note: limited to last drop if not merged
         handleFiles(files);
     }, false);
 }
 
 function handleFiles(files) {
     const container = document.getElementById('preview-container');
-    container.innerHTML = '';
-    const fileArray = [...files];
-    const previewImages = [];
-
-    fileArray.forEach((file, idx) => {
+    const fileArray = Array.from(files);
+    
+    fileArray.forEach((file) => {
         if (!file.type.startsWith('image/')) return;
+        
+        // Add to global pending files
+        pendingFiles.push(file);
+        const currentIdx = pendingFiles.length - 1;
+
         const reader = new FileReader();
         reader.onload = (e) => {
-            const src = e.target.result;
-            previewImages.push({ src });
             const div = document.createElement('div');
             div.className = 'preview-item';
+            div.id = 'pending-img-' + currentIdx;
             div.innerHTML = `
-                <img src="${src}" onclick="openLightbox(handleFiles.currentPreviews, ${previewImages.length - 1})" style="cursor:zoom-in;">
-                <button type="button" class="remove-preview" onclick="this.parentElement.remove()">×</button>
+                <img src="${e.target.result}" style="cursor:zoom-in;">
+                <button type="button" class="remove-preview" onclick="removePendingFile(${currentIdx})">×</button>
             `;
             container.appendChild(div);
-            handleFiles.currentPreviews = previewImages;
         };
         reader.readAsDataURL(file);
     });
+    updateFileInput();
 }
-handleFiles.currentPreviews = [];
+
+function removePendingFile(index) {
+    // We don't splice to keep indices stable for existing previews, 
+    // but we can mark as null or use a better list management
+    pendingFiles[index] = null;
+    document.getElementById('pending-img-' + index).remove();
+    updateFileInput();
+}
+
+function updateFileInput() {
+    const dt = new DataTransfer();
+    pendingFiles.forEach(file => {
+        if (file) dt.items.add(file);
+    });
+    document.getElementById('file-input').files = dt.files;
+}
 
 function editSite(site) {
     const form = document.getElementById('siteForm');
@@ -583,6 +603,8 @@ function editSite(site) {
     
     // Clear dynamic previews
     document.getElementById('preview-container').innerHTML = '';
+    pendingFiles = []; // Reset pending files
+    document.getElementById('file-input').value = '';
 
     // Load Existing Image Thumbnails
     fetch(`../../ajax/get_site_images.php?id=${site.id}`)
