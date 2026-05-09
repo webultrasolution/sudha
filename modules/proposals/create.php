@@ -12,11 +12,14 @@ if (!hasRole(['admin', 'sales'])) {
 
 // Fetch Data
 $clients = $pdo->query("SELECT id, name, city, contact_person FROM partners WHERE type = 'client' ORDER BY name ASC")->fetchAll();
+$vendors = $pdo->query("SELECT id, name FROM partners WHERE type = 'vendor' ORDER BY name ASC")->fetchAll();
 $sitesQuery = "
     SELECT 
         s.*, 
+        p.name as vendor_name,
         (SELECT filename FROM site_images WHERE site_id = s.id LIMIT 1) as thumbnail 
     FROM sites s 
+    LEFT JOIN partners p ON s.vendor_id = p.id
     ORDER BY s.site_code ASC";
 $sites = $pdo->query($sitesQuery)->fetchAll();
 
@@ -89,11 +92,11 @@ $sizes = $pdo->query("SELECT DISTINCT CONCAT(width, 'x', height) as size FROM si
         <!-- Row 2: Dates -->
         <div class="form-grid" style="grid-template-columns: 1fr 1fr 1fr;">
             <div class="form-group">
-                <label>From Date <span style="color:red;">*</span></label>
+                <label>From Date</label>
                 <input type="date" id="start_date" class="p-input" style="height: 38px;" onchange="calculateEndDate()">
             </div>
             <div class="form-group">
-                <label>To Date <span style="color:red;">*</span></label>
+                <label>To Date</label>
                 <input type="date" id="end_date" class="p-input" style="height: 38px;" onchange="calculateTotalDays()">
             </div>
             <div class="form-group">
@@ -127,12 +130,21 @@ $sizes = $pdo->query("SELECT DISTINCT CONCAT(width, 'x', height) as size FROM si
                         <label><input type="radio" name="availability" value="all" onchange="filterSites()"> All Media</label>
                     </div>
                 </div>
+                <div id="vendor-filter-group" class="search-group" style="display: none; min-width: 200px;">
+                    <label style="font-size: 0.75rem; font-weight: 800; color: var(--secondary); margin-bottom: 0.75rem; display: block; text-transform: uppercase;">Select Vendor</label>
+                    <select id="filter-vendor" class="p-input" onchange="filterSites()" style="height: 38px;">
+                        <option value="">All Vendors</option>
+                        <?php foreach($vendors as $v): ?>
+                            <option value="<?php echo $v['id']; ?>"><?php echo $v['name']; ?></option>
+                        <?php endforeach; ?>
+                    </select>
+                </div>
             </div>
 
-            <!-- Mandatory Filters -->
+            <!-- Media Search Criteria -->
             <div style="display: grid; grid-template-columns: repeat(2, 1fr); gap: 1rem; margin-bottom: 1rem;">
                 <div class="form-group" style="margin-bottom: 0;">
-                    <label style="font-size: 0.7rem; font-weight: 800; color: var(--secondary); margin-bottom: 0.3rem; text-transform: uppercase;">Media Type <span style="color:red;">*</span></label>
+                    <label style="font-size: 0.7rem; font-weight: 800; color: var(--secondary); margin-bottom: 0.3rem; text-transform: uppercase;">Media Type</label>
                     <select id="media_type" class="p-input" onchange="filterSites()" style="height: 38px;">
                         <option value="">Select Media Type</option>
                         <option value="Hoarding">Hoarding</option>
@@ -144,7 +156,7 @@ $sizes = $pdo->query("SELECT DISTINCT CONCAT(width, 'x', height) as size FROM si
                     </select>
                 </div>
                 <div class="form-group" style="margin-bottom: 0;">
-                    <label style="font-size: 0.7rem; font-weight: 800; color: var(--secondary); margin-bottom: 0.3rem; text-transform: uppercase;">Light Type <span style="color:red;">*</span></label>
+                    <label style="font-size: 0.7rem; font-weight: 800; color: var(--secondary); margin-bottom: 0.3rem; text-transform: uppercase;">Light Type</label>
                     <select id="light_type" class="p-input" onchange="filterSites()" style="height: 38px;">
                         <option value="">Select Light Type</option>
                         <option value="FL">Frontlit (FL)</option>
@@ -222,7 +234,6 @@ $sizes = $pdo->query("SELECT DISTINCT CONCAT(width, 'x', height) as size FROM si
                         <th style="padding: 1.2rem 1rem;">SIZE</th>
                         <th style="padding: 1.2rem 1rem;">PRICING</th>
                         <th style="padding: 1.2rem 1rem;">OFFER RATE</th>
-                        <th style="padding: 1.2rem 1rem;">MARKUP</th>
                         <th style="padding: 1.2rem 1rem; text-align: right;">TOTAL</th>
                     </tr>
                 </thead>
@@ -246,6 +257,7 @@ $sizes = $pdo->query("SELECT DISTINCT CONCAT(width, 'x', height) as size FROM si
                         data-rate="<?php echo $s['card_rate']; ?>" 
                         data-prate="<?php echo $s['purchase_rate']; ?>" 
                         data-owner="<?php echo $s['owner_type']; ?>"
+                        data-vendor="<?php echo $s['vendor_id']; ?>"
                         data-width="<?php echo $s['width']; ?>"
                         data-height="<?php echo $s['height']; ?>"
                         data-size="<?php echo $s['width'] . 'x' . $s['height']; ?>"
@@ -299,11 +311,6 @@ $sizes = $pdo->query("SELECT DISTINCT CONCAT(width, 'x', height) as size FROM si
                                    style="width: 100px; height: 32px; font-size: 0.85rem; font-weight: 800; border-radius: 8px; border: 1px solid #e2e8f0; padding: 0 0.5rem; color: #1e293b;">
                         </td>
 
-                        <td style="padding: 1.5rem 1rem;">
-                            <div style="font-size: 0.65rem; color: #64748b; font-weight: 800; margin-bottom: 4px; text-transform: uppercase;">Markup</div>
-                            <div class="markup-cell" style="font-weight: 800; font-size: 0.85rem; color: #059669;">-</div>
-                        </td>
-
                         <td style="padding: 1.5rem 1rem; text-align: right;">
                             <div style="font-size: 0.65rem; color: #64748b; font-weight: 800; margin-bottom: 4px; text-transform: uppercase;">Total</div>
                             <div class="total-cell" style="font-weight: 900; color: var(--primary); font-size: 0.95rem;">₹0</div>
@@ -336,7 +343,7 @@ $sizes = $pdo->query("SELECT DISTINCT CONCAT(width, 'x', height) as size FROM si
         <div id="bucket-empty-msg" style="padding: 2rem; text-align: center; color: #94a3b8; font-weight: 700;">
             <i class="fas fa-info-circle" style="margin-right: 0.5rem;"></i> No assets selected yet.
         </div>
-        <div id="bucket-list" style="display: grid; grid-template-columns: repeat(auto-fill, minmax(300px, 1fr)); gap: 1rem; padding: 1.5rem;">
+        <div id="bucket-list" style="padding: 1.5rem;">
             <!-- Selected items will be injected here via JS -->
         </div>
     </div>
@@ -814,7 +821,6 @@ function updateBucketUI() {
                     <th style="padding: 1rem;">SIZE</th>
                     <th style="padding: 1rem;">PRICING</th>
                     <th style="padding: 1rem;">OFFER RATE</th>
-                    <th style="padding: 1rem;">MARKUP</th>
                     <th style="padding: 1rem; text-align: right;">TOTAL</th>
                 </tr>
             </thead>
@@ -855,9 +861,6 @@ function updateBucketUI() {
                 </td>
                 <td style="padding: 1rem;">
                     <div style="font-weight: 800; color: #1e293b; font-size: 0.85rem;">₹${site.saleRate.toLocaleString()}</div>
-                </td>
-                <td style="padding: 1rem;">
-                    <div style="font-weight: 800; font-size: 0.8rem; color: ${markupVal >= 0 ? '#059669' : '#ef4444'};">₹${markupVal.toLocaleString()}</div>
                 </td>
                 <td style="padding: 1rem; text-align: right;">
                     <div style="font-weight: 900; color: var(--primary); font-size: 0.9rem;">₹${site.saleRate.toLocaleString()}</div>
@@ -952,7 +955,17 @@ function filterSites() {
     const lightType = document.getElementById('light_type').value;
     const ownershipRadio = document.querySelector('input[name="ownership"]:checked').value;
     const availability = document.querySelector('input[name="availability"]:checked').value;
+    const vendorId = document.getElementById('filter-vendor').value;
     
+    // Show/Hide Vendor Dropdown based on ownership radio
+    const vendorGroup = document.getElementById('vendor-filter-group');
+    if (ownershipRadio === 'TA') {
+        vendorGroup.style.display = 'block';
+    } else {
+        vendorGroup.style.display = 'none';
+        document.getElementById('filter-vendor').value = ''; // Reset vendor if not TA
+    }
+
     const state = document.getElementById('filter-state').value;
     const city = document.getElementById('filter-city').value;
     const size = document.getElementById('filter-size').value;
@@ -969,6 +982,9 @@ function filterSites() {
         if (mediaType && row.dataset.type !== mediaType) show = false;
         if (lightType && row.dataset.illumination !== lightType) show = false;
         if (ownershipRadio !== 'all' && row.dataset.owner !== ownershipRadio) show = false;
+        
+        // Vendor Filter (only if TA selected)
+        if (ownershipRadio === 'TA' && vendorId && row.dataset.vendor !== vendorId) show = false;
         
         // Location & Size Filters
         if (state && row.dataset.state !== state) show = false;
@@ -1007,11 +1023,11 @@ function saveProposal() {
     const contactPerson = document.getElementById('contact_person').value;
     const lightType = document.getElementById('light_type').value;
     
-    if (!clientId || !start || !end || !campaignName || !mediaType || !lightType || selectedSites.length === 0) {
+    if (!clientId || !campaignName || selectedSites.length === 0) {
         Swal.fire({
             icon: 'warning',
             title: 'Missing Information',
-            text: 'Please fill all mandatory fields and select at least one asset.',
+            text: 'Please fill the mandatory fields (Client, Campaign Name) and select at least one asset.',
             confirmButtonColor: 'var(--primary)'
         });
         return;
@@ -1055,11 +1071,11 @@ function goToStep2() {
     const mediaType = document.getElementById('media_type').value;
     const lightType = document.getElementById('light_type').value;
     
-    if (!clientId || !start || !end || !mediaType || !lightType) {
+    if (!clientId || !campaignName) {
         Swal.fire({
             icon: 'warning',
             title: 'Missing Details',
-            text: 'Please fill all mandatory fields (Client, Dates, Media Type, Light Type) before proceeding to asset selection.',
+            text: 'Please enter a Campaign Name and select a Client before proceeding.',
             confirmButtonColor: 'var(--primary)'
         });
         return;
