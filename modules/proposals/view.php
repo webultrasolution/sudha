@@ -87,12 +87,13 @@ $taMarkupPct = ($taCost > 0) ? ($taMarkup / $taCost) * 100 : 0;
             </button>
             <div class="dropdown-content">
                 <div style="font-size: 0.6rem; font-weight: 800; color: #94a3b8; padding: 0.5rem 0.8rem; text-transform: uppercase; letter-spacing: 0.05em;">Client Documents</div>
-                <a href="export_pdf.php?id=<?php echo $id; ?>" target="_blank"><i class="fas fa-file-pdf" style="color: #ef4444;"></i> PDF Proposal</a>
+                <a href="export_pdf.php?id=<?php echo $id; ?>" target="_blank"><i class="fas fa-file-pdf" style="color: #ef4444;"></i> Visual Media Plan (PDF)</a>
                 <a href="export_excel.php?id=<?php echo $id; ?>"><i class="fas fa-file-excel" style="color: #10b981;"></i> Excel Rate Sheet</a>
                 <a href="export_ppt.php?id=<?php echo $id; ?>" target="_blank"><i class="fas fa-file-powerpoint" style="color: #f97316;"></i> PPT Deck / Presentation</a>
                 <div style="height: 1px; background: #f1f5f9; margin: 0.25rem 0;"></div>
                 <div style="font-size: 0.6rem; font-weight: 800; color: #94a3b8; padding: 0.5rem 0.8rem; text-transform: uppercase; letter-spacing: 0.05em;">Visuals</div>
-                <a href="export_ppt.php?id=<?php echo $id; ?>&mode=view" target="_blank"><i class="fas fa-desktop" style="color: #6366f1;"></i> Presentation View</a>
+                <a href="export_ppt.php?id=<?php echo $id; ?>&mode=view" target="_blank"><i class="fas fa-desktop" style="color: #6366f1;"></i> View Presentation</a>
+                <a href="javascript:void(0)" onclick="copyPublicLink('<?php echo BASE_URL; ?>modules/proposals/export_ppt.php?id=<?php echo $id; ?>')"><i class="fas fa-link" style="color: #6366f1;"></i> Copy Public Link</a>
                 <a href="download_photos.php?id=<?php echo $id; ?>"><i class="fas fa-images" style="color: #8b5cf6;"></i> Download Photos</a>
             </div>
         </div>
@@ -391,6 +392,22 @@ document.addEventListener('DOMContentLoaded', () => {
         });
     });
 });
+
+function copyPublicLink(url) {
+    navigator.clipboard.writeText(url).then(() => {
+        Swal.fire({
+            toast: true,
+            position: 'top-end',
+            icon: 'success',
+            title: 'Public link copied to clipboard!',
+            showConfirmButton: false,
+            timer: 2000,
+            timerProgressBar: true
+        });
+    }).catch(err => {
+        console.error('Failed to copy: ', err);
+    });
+}
 </script>
 
 <?php include_once __DIR__ . '/../../includes/footer.php'; ?>
