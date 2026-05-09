@@ -142,9 +142,9 @@ $vendors = $pdo->query("SELECT id, name FROM partners WHERE type = 'vendor' ORDE
             <tr>
                 <th style="width: 40px;">#</th>
                 <th>Preview</th>
-                <th>Asset Details</th>
                 <th>City / Code</th>
-                <th>Dimensions</th>
+                <th>Asset Details</th>
+                <th>Size</th>
                 <th>Pricing</th>
                 <th>Availability</th>
                 <th>Status</th>
@@ -167,6 +167,12 @@ $vendors = $pdo->query("SELECT id, name FROM partners WHERE type = 'vendor' ORDE
                         <small style="color: #cbd5e1;">No Img</small>
                     <?php endif; ?>
                 </td>
+                 <td>
+                    <div style="font-weight: 700; color: #1e293b;"><?php echo $s['city']; ?></div>
+                    <small style="color: #ef3417ff;"><?php echo $s['area'] ?? ''; ?></small>
+                    <div style="font-size: 0.7rem; color: #94a3b8; font-weight: 600;"><?php echo $s['site_code']; ?></div>
+                </td>
+             
                 <td>
                     <div style="font-weight: 700; color: #1e293b; margin-bottom: 2px;"><?php echo $s['name']; ?></div>
                     <div style="font-size: 0.75rem; color: #64748b; margin-bottom: 6px;"><?php echo $s['location']; ?></div>
@@ -176,10 +182,7 @@ $vendors = $pdo->query("SELECT id, name FROM partners WHERE type = 'vendor' ORDE
                         <span style="color: var(--primary);"><?php echo $s['owner_type']; ?></span>
                     </div>
                 </td>
-                <td>
-                    <div style="font-weight: 700; color: #1e293b;"><?php echo $s['city']; ?></div>
-                    <div style="font-size: 0.7rem; color: #94a3b8; font-weight: 600;"><?php echo $s['site_code']; ?></div>
-                </td>
+               
              
                 <td>
                     <div style="font-weight: 700; color: #475569;"><?php echo $s['width'] . "' x " . $s['height'] . "'"; ?></div>
