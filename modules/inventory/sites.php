@@ -9,6 +9,10 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action'])) {
         $name = clean($_POST['name']);
         $location = clean($_POST['location']);
         $city = clean($_POST['city']);
+        $district = clean($_POST['district'] ?? '');
+        $area = clean($_POST['area'] ?? '');
+        $latitude = !empty($_POST['latitude']) ? floatval($_POST['latitude']) : null;
+        $longitude = !empty($_POST['longitude']) ? floatval($_POST['longitude']) : null;
         $type = clean($_POST['type']);
         $width = floatval($_POST['width']);
         $height = floatval($_POST['height']);
@@ -23,8 +27,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action'])) {
 
         if ($_POST['action'] === 'add_site') {
             try {
-                $stmt = $pdo->prepare("INSERT INTO sites (site_code, name, location, city, type, width, height, facing, light_type, grade, owner_type, vendor_id, card_rate, purchase_rate, available_from) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)");
-                $stmt->execute([$code, $name, $location, $city, $type, $width, $height, $facing, $light_type, $grade, $owner_type, $vendor_id, $card_rate, $purchase_rate, $available_from]);
+                $stmt = $pdo->prepare("INSERT INTO sites (site_code, name, location, area, city, district, latitude, longitude, type, width, height, facing, light_type, grade, owner_type, vendor_id, card_rate, purchase_rate, available_from) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)");
+                $stmt->execute([$code, $name, $location, $area, $city, $district, $latitude, $longitude, $type, $width, $height, $facing, $light_type, $grade, $owner_type, $vendor_id, $card_rate, $purchase_rate, $available_from]);
                 $site_id = $pdo->lastInsertId();
                 
                 // Handle Multi-Image Upload
@@ -48,8 +52,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action'])) {
         } else {
             $id = intval($_POST['id']);
             try {
-                $stmt = $pdo->prepare("UPDATE sites SET site_code=?, name=?, location=?, city=?, type=?, width=?, height=?, facing=?, light_type=?, grade=?, owner_type=?, vendor_id=?, card_rate=?, purchase_rate=?, available_from=? WHERE id=?");
-                $stmt->execute([$code, $name, $location, $city, $type, $width, $height, $facing, $light_type, $grade, $owner_type, $vendor_id, $card_rate, $purchase_rate, $available_from, $id]);
+                $stmt = $pdo->prepare("UPDATE sites SET site_code=?, name=?, location=?, area=?, city=?, district=?, latitude=?, longitude=?, type=?, width=?, height=?, facing=?, light_type=?, grade=?, owner_type=?, vendor_id=?, card_rate=?, purchase_rate=?, available_from=? WHERE id=?");
+                $stmt->execute([$code, $name, $location, $area, $city, $district, $latitude, $longitude, $type, $width, $height, $facing, $light_type, $grade, $owner_type, $vendor_id, $card_rate, $purchase_rate, $available_from, $id]);
                 
                 // Handle Multi-Image Upload (New)
                 if (!empty($_FILES['site_images']['name'][0])) {
@@ -215,6 +219,15 @@ $vendors = $pdo->query("SELECT id, name FROM partners WHERE type = 'vendor' ORDE
                     <input type="text" name="city" id="f_city" required>
                 </div>
                 <div class="form-group">
+                    <label>District</label>
+                    <input type="text" name="district" id="f_district">
+                </div>
+                <div class="form-group">
+                    <label>Media ID / Code</label>
+                    <input type="text" name="site_code" id="f_code" required>
+                </div>
+
+                <div class="form-group">
                     <label>Media Type</label>
                     <select name="type" id="f_type" required>
                         <option value="">Select Type</option>
@@ -227,34 +240,38 @@ $vendors = $pdo->query("SELECT id, name FROM partners WHERE type = 'vendor' ORDE
                     </select>
                 </div>
                 <div class="form-group">
-                    <label>Media ID / Code</label>
-                    <input type="text" name="site_code" id="f_code" required>
-                </div>
-                <div class="form-group">
                     <label>Inventory Type</label>
                     <select name="owner_type" id="owner_toggle" onchange="toggleVendor()" required>
                         <option value="HA">Home Asset (HA)</option>
                         <option value="TA">Vendor Asset (TA)</option>
                     </select>
                 </div>
+                <div class="form-group">
+                    <label>Grade</label>
+                    <select name="grade" id="f_grade" required>
+                        <option value="A">Grade A</option>
+                        <option value="B">Grade B</option>
+                        <option value="C">Grade C</option>
+                    </select>
+                </div>
+
                 <div class="form-group" style="grid-column: span 2;">
                     <label>Site Name</label>
                     <input type="text" name="name" id="f_name" required>
                 </div>
-                <div class="form-group" id="vendor_select" style="display: none;">
-                    <label>Vendor</label>
-                    <select name="vendor_id" id="f_vendor">
-                        <option value="">Select Vendor</option>
-                        <?php foreach ($vendors as $v): ?>
-                            <option value="<?php echo $v['id']; ?>"><?php echo $v['name']; ?></option>
-                        <?php endforeach; ?>
-                    </select>
+                <div class="form-group">
+                    <label>Facing</label>
+                    <input type="text" name="facing" id="f_facing" required>
                 </div>
+
                 <div class="form-group" style="grid-column: span 2;">
                     <label>Location Landmark</label>
                     <input type="text" name="location" id="f_location" required>
                 </div>
-                <!-- City moved to top -->
+                <div class="form-group">
+                    <label>Area</label>
+                    <input type="text" name="area" id="f_area">
+                </div>
                 
                 <div class="form-group">
                     <label>Width (ft)</label>
@@ -272,24 +289,7 @@ $vendors = $pdo->query("SELECT id, name FROM partners WHERE type = 'vendor' ORDE
                         <option value="FL">Front-Lit (FL)</option>
                     </select>
                 </div>
-                
-                <div class="form-group">
-                    <label>Facing</label>
-                    <input type="text" name="facing" id="f_facing" required>
-                </div>
-                <div class="form-group">
-                    <label>Grade</label>
-                    <select name="grade" id="f_grade" required>
-                        <option value="A">Grade A</option>
-                        <option value="B">Grade B</option>
-                        <option value="C">Grade C</option>
-                    </select>
-                </div>
-                <div class="form-group">
-                    <label>Available From</label>
-                    <input type="date" name="available_from" id="f_avail" value="<?php echo date('Y-m-d'); ?>" required>
-                </div>
-                
+
                 <div class="form-group">
                     <label>Monthly Card Rate (₹)</label>
                     <input type="number" step="1" name="card_rate" id="f_card" required min="0">
@@ -297,6 +297,28 @@ $vendors = $pdo->query("SELECT id, name FROM partners WHERE type = 'vendor' ORDE
                 <div class="form-group">
                     <label>Cost to Company (₹)</label>
                     <input type="number" step="1" name="purchase_rate" id="f_purchase" required min="0">
+                </div>
+                <div class="form-group">
+                    <label>Available From</label>
+                    <input type="date" name="available_from" id="f_avail" value="<?php echo date('Y-m-d'); ?>" required>
+                </div>
+
+                <div class="form-group">
+                    <label>Latitude</label>
+                    <input type="number" step="0.00000001" name="latitude" id="f_lat" placeholder="e.g. 19.0760">
+                </div>
+                <div class="form-group">
+                    <label>Longitude</label>
+                    <input type="number" step="0.00000001" name="longitude" id="f_lng" placeholder="e.g. 72.8777">
+                </div>
+                <div class="form-group" id="vendor_select" style="display: none;">
+                    <label>Vendor</label>
+                    <select name="vendor_id" id="f_vendor">
+                        <option value="">Select Vendor</option>
+                        <?php foreach ($vendors as $v): ?>
+                            <option value="<?php echo $v['id']; ?>"><?php echo $v['name']; ?></option>
+                        <?php endforeach; ?>
+                    </select>
                 </div>
                 <div class="form-group" style="grid-column: span 3;">
                     <label><i class="fas fa-images"></i> Site Photos (Multi-upload)</label>
@@ -591,7 +613,11 @@ function editSite(site) {
     document.getElementById('f_name').value = site.name;
     document.getElementById('f_vendor').value = site.vendor_id || '';
     document.getElementById('f_location').value = site.location;
+    document.getElementById('f_area').value = site.area || '';
     document.getElementById('f_city').value = site.city;
+    document.getElementById('f_district').value = site.district || '';
+    document.getElementById('f_lat').value = site.latitude || '';
+    document.getElementById('f_lng').value = site.longitude || '';
     document.getElementById('w_input').value = site.width;
     document.getElementById('h_input').value = site.height;
     document.getElementById('f_light').value = site.light_type;
