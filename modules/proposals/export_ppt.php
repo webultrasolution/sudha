@@ -326,9 +326,9 @@ $slides_data = $items->fetchAll();
             }
         }
 
-        function downloadPPTX() {
-            // Show loading state if needed
-            const btn = event.currentTarget;
+        async function downloadPPTX() {
+            // Show loading state
+            const btn = document.querySelector('button[title="Download PPTX"]');
             const originalIcon = btn.innerHTML;
             btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i>';
             btn.disabled = true;
@@ -341,11 +341,16 @@ $slides_data = $items->fetchAll();
                 let intro = pptx.addSlide();
                 intro.background = { color: '0F172A' };
                 
-                // Add Logo (Assuming it's accessible via relative path from where the script runs in browser)
-                // Note: For absolute paths or cross-origin, you might need to convert to dataURL
-                intro.addImage({ path: '../../assets/img/LOGO.png', x: '35%', y: '15%', w: '30%', h: '15%', sizing: { type: 'contain' } });
+                // Add Logo
+                try {
+                    intro.addImage({ 
+                        path: '../../assets/img/LOGO.png', 
+                        x: '35%', y: '15%', w: '30%', h: '15%', 
+                        sizing: { type: 'contain' } 
+                    });
+                } catch (e) { console.warn("Logo not found for PPTX", e); }
                 
-                intro.addText(campaignName, { 
+                intro.addText(campaignName || "Media Plan", { 
                     x: 0, y: '40%', w: '100%', 
                     align: 'center', fontSize: 44, color: '0D9488', bold: true, fontFace: 'Arial' 
                 });
@@ -355,7 +360,7 @@ $slides_data = $items->fetchAll();
                     align: 'center', fontSize: 18, color: '94A3B8', fontFace: 'Arial' 
                 });
                 
-                intro.addText(clientName, { 
+                intro.addText(clientName || "Client", { 
                     x: 0, y: '62%', w: '100%', 
                     align: 'center', fontSize: 32, color: 'FFFFFF', bold: true, fontFace: 'Arial' 
                 });
@@ -366,12 +371,15 @@ $slides_data = $items->fetchAll();
                 });
 
                 // Asset Slides
-                slidesData.forEach(item => {
+                slidesData.forEach((item, idx) => {
                     let slide = pptx.addSlide();
                     
                     // Header Logo
-                    slide.addImage({ path: '../../assets/img/LOGO.png', x: 0.4, y: 0.2, w: 1.5, h: 0.5, sizing: { type: 'contain' } });
-                    slide.addText(campaignName, { x: '70%', y: 0.3, w: '25%', align: 'right', fontSize: 12, color: '64748B', bold: true });
+                    try {
+                        slide.addImage({ path: '../../assets/img/LOGO.png', x: 0.4, y: 0.2, w: 1.5, h: 0.5, sizing: { type: 'contain' } });
+                    } catch (e) {}
+                    
+                    slide.addText(campaignName || "", { x: '70%', y: 0.3, w: '25%', align: 'right', fontSize: 12, color: '64748B', bold: true, fontFace: 'Arial' });
 
                     // Image Area
                     if (item.image) {
@@ -381,13 +389,21 @@ $slides_data = $items->fetchAll();
                             sizing: { type: 'contain' } 
                         });
                     } else {
-                        slide.addText('NO IMAGE AVAILABLE', { x: 0, y: '40%', w: '100%', align: 'center', fontSize: 24, color: '94A3B8' });
+                        slide.addText('NO IMAGE AVAILABLE', { x: 0, y: '40%', w: '100%', align: 'center', fontSize: 24, color: '94A3B8', fontFace: 'Arial' });
                     }
 
                     // Caption - Matching the Bold Red Underlined style
-                    let dim = parseInt(item.width) + 'X' + parseInt(item.height);
-                    let rate = new Intl.NumberFormat().format(item.sale_rate);
-                    let caption = `${item.site_city} ${item.location}.${dim}. ${item.light_type} ( ${item.site_type} ) . Rs.${rate} PM`;
+                    const city = item.site_city || "";
+                    const loc = item.location || "";
+                    const type = item.site_type || "";
+                    const light = item.light_type || "";
+                    const w = parseInt(item.width) || 0;
+                    const h = parseInt(item.height) || 0;
+                    const rateVal = parseFloat(item.sale_rate) || 0;
+                    
+                    let dim = w + 'X' + h;
+                    let rateFormatted = new Intl.NumberFormat('en-IN').format(rateVal);
+                    let caption = `${city} ${loc}.${dim}. ${light} ( ${type} ) . Rs.${rateFormatted} PM`;
                     
                     slide.addText(caption, { 
                         x: 0, y: '85%', w: '100%', 
@@ -395,20 +411,26 @@ $slides_data = $items->fetchAll();
                         fontSize: 22, 
                         color: 'DC2626', 
                         bold: true,
-                        underline: { style: 'single', color: 'DC2626' },
+                        underline: true, // Simplified underline for better compatibility
                         fontFace: 'Arial'
                     });
                 });
 
-                pptx.writeFile({ fileName: `MediaPlan_${campaignName.replace(/[^a-z0-9]/gi, '_')}.pptx` })
+                const fileName = `MediaPlan_${(campaignName || "Export").replace(/[^a-z0-9]/gi, '_')}.pptx`;
+                pptx.writeFile({ fileName: fileName })
                     .then(() => {
+                        btn.innerHTML = originalIcon;
+                        btn.disabled = false;
+                    })
+                    .catch(err => {
+                        console.error("Write error:", err);
                         btn.innerHTML = originalIcon;
                         btn.disabled = false;
                     });
 
             } catch (err) {
-                console.error(err);
-                alert('Error generating PPTX. Please try again.');
+                console.error("PPTX Generation Error:", err);
+                alert('Error generating PPTX: ' + err.message);
                 btn.innerHTML = originalIcon;
                 btn.disabled = false;
             }
