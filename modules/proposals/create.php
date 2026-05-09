@@ -102,34 +102,20 @@ $genres = $pdo->query("SELECT DISTINCT genre FROM sites WHERE genre IS NOT NULL 
                 </div>
             </div>
 
-            <div style="display: flex; justify-content: flex-end; margin-top: 1.5rem;">
-                <button class="btn btn-primary" onclick="goToStep2()" style="width: 250px; height: 44px; border-radius: 10px; font-weight: 800; font-size: 0.9rem;">
-                    Next Step: Select Assets <i class="fas fa-arrow-right" style="margin-left: 0.5rem;"></i>
-                </button>
             </div>
         </div>
-    </div>
 
-    <!-- STEP 2 -->
-    <div id="step-2" style="display: none;">
-        <div style="margin-bottom: 1rem;">
-            <button class="btn btn-secondary" onclick="goToStep1()" style="background: white; border: 1px solid #e2e8f0; padding: 0.5rem 1rem; border-radius: 8px; font-weight: 700; cursor: pointer; color: #475569;">
-                <i class="fas fa-arrow-left"></i> Back to Details
-            </button>
-        </div>
-
-        <!-- Top: Full Width Asset Selection -->
-        <!-- Top: Media Search Panel -->
-        <div class="p-panel" style="margin-bottom: 1.5rem; border-left: 4px solid var(--primary);">
+        <!-- Media Search Section (Moved to Step 1) -->
+        <div class="p-panel" style="max-width: 1100px; margin: 1.5rem auto; border-left: 4px solid var(--primary);">
             <div style="font-size: 0.75rem; font-weight: 800; color: var(--primary); text-transform: uppercase; margin-bottom: 1rem; display: flex; align-items: center; gap: 0.5rem;">
-                <i class="fas fa-search"></i> Media Search
+                <i class="fas fa-search"></i> Media Search Criteria
             </div>
             
             <div class="media-search-grid">
                 <!-- Ownership & Availability -->
-                <div class="search-row" style="margin-bottom: 1rem; display: flex; gap: 3rem; align-items: flex-end;">
+                <div class="search-row" style="margin-bottom: 1.5rem; display: flex; gap: 3rem; align-items: flex-end;">
                     <div class="search-group">
-                        <label style="font-size: 0.75rem; font-weight: 800; color: var(--secondary); margin-bottom: 0.75rem; display: block; text-transform: uppercase;">Ownership</label>
+                        <label style="font-size: 0.75rem; font-weight: 800; color: var(--secondary); margin-bottom: 0.75rem; display: block; text-transform: uppercase;">Ownership Type</label>
                         <div class="radio-group">
                             <label><input type="radio" name="ownership" value="all" checked onchange="syncInventoryType(this.value); filterSites()"> All</label>
                             <label><input type="radio" name="ownership" value="HA" onchange="syncInventoryType(this.value); filterSites()"> Self (HA)</label>
@@ -139,16 +125,16 @@ $genres = $pdo->query("SELECT DISTINCT genre FROM sites WHERE genre IS NOT NULL 
                     <div class="search-group">
                         <label style="font-size: 0.75rem; font-weight: 800; color: var(--secondary); margin-bottom: 0.75rem; display: block; text-transform: uppercase;">Availability</label>
                         <div class="radio-group">
-                            <label><input type="radio" name="availability" value="available" checked onchange="filterSites()"> Available</label>
+                            <label><input type="radio" name="availability" value="available" checked onchange="filterSites()"> Available Only</label>
                             <label><input type="radio" name="availability" value="all" onchange="filterSites()"> All Media</label>
                         </div>
                     </div>
                 </div>
 
-                <!-- Main Filters -->
-                <div style="display: grid; grid-template-columns: repeat(4, 1fr); gap: 1rem;">
-                     <div class="form-group" style="margin-bottom: 0; min-width: 200px;">
-                        <label style="font-size: 0.7rem; font-weight: 800; color: var(--secondary); margin-bottom: 0.3rem;">MEDIA TYPE <span style="color:red;">*</span></label>
+                <!-- Mandatory & Location Filters -->
+                <div style="display: grid; grid-template-columns: repeat(3, 1fr); gap: 1rem; margin-bottom: 1rem;">
+                    <div class="form-group" style="margin-bottom: 0;">
+                        <label style="font-size: 0.7rem; font-weight: 800; color: var(--secondary); margin-bottom: 0.3rem; text-transform: uppercase;">Media Type <span style="color:red;">*</span></label>
                         <select id="media_type" class="p-input" onchange="filterSites()" style="height: 38px;">
                             <option value="">Select Media Type</option>
                             <option value="Hoarding">Hoarding</option>
@@ -159,44 +145,74 @@ $genres = $pdo->query("SELECT DISTINCT genre FROM sites WHERE genre IS NOT NULL 
                             <option value="LED Screen">LED Screen</option>
                         </select>
                     </div>
-                    <div class="form-group" style="margin-bottom: 0; min-width: 200px;">
-                        <label style="font-size: 0.7rem; font-weight: 800; color: var(--secondary); margin-bottom: 0.3rem;">INVENTORY TYPE <span style="color:red;">*</span></label>
+                    <div class="form-group" style="margin-bottom: 0;">
+                        <label style="font-size: 0.7rem; font-weight: 800; color: var(--secondary); margin-bottom: 0.3rem; text-transform: uppercase;">Inventory Type <span style="color:red;">*</span></label>
                         <select id="inventory_type" class="p-input" onchange="syncOwnershipRadios(this.value); filterSites()" style="height: 38px;">
                             <option value="">Select Inventory Type</option>
                             <option value="HA">Home Asset (HA)</option>
                             <option value="TA">Vendor Asset (TA)</option>
                         </select>
                     </div>
-             
-                    <select id="filter-state" class="p-input" onchange="filterSites()">
-                        <option value="">Select State</option>
-                        <?php foreach($states as $s): ?> <option value="<?php echo $s; ?>"><?php echo $s; ?></option> <?php endforeach; ?>
-                    </select>
-                    <select id="filter-city" class="p-input" onchange="filterSites()">
-                        <option value="">Select City</option>
-                        <?php foreach($cities as $c): ?> <option value="<?php echo $c; ?>"><?php echo $c; ?></option> <?php endforeach; ?>
-                    </select>
-                    <div class="search-input-wrap" style="grid-column: span 2;">
-                        <input type="text" id="site-search" class="p-input" placeholder="Search site name, code or location..." onkeyup="filterSites()">
+                    <div class="form-group" style="margin-bottom: 0;">
+                        <label style="font-size: 0.7rem; font-weight: 800; color: var(--secondary); margin-bottom: 0.3rem; text-transform: uppercase;">Light Type <span style="color:red;">*</span></label>
+                        <select id="light_type" class="p-input" onchange="filterSites()" style="height: 38px;">
+                            <option value="">Select Light Type</option>
+                            <option value="FL">Frontlit (FL)</option>
+                            <option value="BL">Backlit (BL)</option>
+                            <option value="NL">Non-Lit (NL)</option>
+                        </select>
                     </div>
-                    <button class="btn btn-primary" onclick="filterSites()" style="height: 38px;">
-                        <i class="fas fa-search"></i> Search
-                    </button>
                 </div>
+                <div style="display: grid; grid-template-columns: repeat(2, 1fr); gap: 1rem; margin-bottom: 1.5rem;">
+                    <div class="form-group" style="margin-bottom: 0;">
+                        <label style="font-size: 0.7rem; font-weight: 800; color: var(--secondary); margin-bottom: 0.3rem; text-transform: uppercase;">State</label>
+                        <select id="filter-state" class="p-input" onchange="filterSites()" style="height: 38px;">
+                            <option value="">Select State</option>
+                            <?php foreach($states as $s): ?> <option value="<?php echo $s; ?>"><?php echo $s; ?></option> <?php endforeach; ?>
+                        </select>
+                    </div>
+                    <div class="form-group" style="margin-bottom: 0;">
+                        <label style="font-size: 0.7rem; font-weight: 800; color: var(--secondary); margin-bottom: 0.3rem; text-transform: uppercase;">City</label>
+                        <select id="filter-city" class="p-input" onchange="filterSites()" style="height: 38px;">
+                            <option value="">Select City</option>
+                            <?php foreach($cities as $c): ?> <option value="<?php echo $c; ?>"><?php echo $c; ?></option> <?php endforeach; ?>
+                        </select>
+                    </div>
+                </div>
+
             </div>
         </div>
 
+        <!-- Single Next Step Button for Step 1 -->
+        <div style="display: flex; justify-content: flex-end; margin: 2rem 0;">
+            <button class="btn btn-primary" onclick="goToStep2()" style="width: 250px; height: 48px; border-radius: 12px; font-weight: 800; font-size: 0.95rem; box-shadow: 0 4px 15px rgba(0,0,0,0.1);">
+                Next Step: Select Assets <i class="fas fa-arrow-right" style="margin-left: 0.75rem;"></i>
+            </button>
+        </div>
+    </div>
+
+    <!-- STEP 2: Asset Selection & Pricing -->
+    <div id="step-2" style="display: none;">
+        <div style="margin-bottom: 1.5rem;">
+            <button class="btn btn-secondary" onclick="goToStep1()" style="background: white; border: 1px solid #e2e8f0; padding: 0.6rem 1.2rem; border-radius: 8px; font-weight: 700; cursor: pointer; color: #475569; display: flex; align-items: center; gap: 0.5rem;">
+                <i class="fas fa-arrow-left"></i> Back to Search
+            </button>
+        </div>
+
+        <!-- Asset Selection Table (Back to Step 2) -->
         <div class="p-panel" id="asset-plan-panel" style="margin-bottom: 2rem;">
             <div class="p-header" style="display: flex; justify-content: space-between; align-items: center;">
                 <div style="display: flex; align-items: center; gap: 1rem;">
-                    <span>Asset Selection & Plan Pricing</span>
+                    <span>Select Assets Based on Your Criteria</span>
                 </div>
                 <div style="display: flex; gap: 1rem; align-items: center;">
-                    <div class="selection-stats">Selected: <span id="selected-count">0</span> sites</div>
+                    <div class="selection-stats" style="background: var(--primary); color: white; padding: 0.3rem 0.8rem; border-radius: 6px; font-weight: 800; font-size: 0.75rem;">
+                        Selected: <span id="selected-count">0</span> sites
+                    </div>
                 </div>
             </div>
 
-            <div class="site-list-container" style="max-height: 600px; overflow-y: auto;">
+            <div class="site-list-container" style="max-height: 500px; overflow-y: auto;">
                 <table class="crs-table selection-table" id="asset-table">
                         <thead>
                             <tr>
@@ -205,15 +221,14 @@ $genres = $pdo->query("SELECT DISTINCT genre FROM sites WHERE genre IS NOT NULL 
                                 <th>ASSET DETAILS</th>
                                 <th>PREVIEW</th>
                                 <th>DIMENSIONS</th>
-                                <th>PRICING (MONTHLY)</th>
-                                <th>SALE RATE (₹)</th>
-                                <th style="width: 140px; text-align: right;">TOTAL</th>
+                                <th>PRICING</th>
+                                <th>SALE RATE</th>
+                                <th style="width: 120px; text-align: right;">TOTAL</th>
                             </tr>
                         </thead>
                     <tbody id="asset-body">
                         <?php $sno = 1; foreach ($sites as $s): 
                             $sqft = $s['width'] * $s['height'];
-                            $dailyRate = $s['card_rate'] / 30;
                         ?>
                         <tr class="site-row" 
                             id="row-<?php echo $s['id']; ?>"
@@ -224,7 +239,6 @@ $genres = $pdo->query("SELECT DISTINCT genre FROM sites WHERE genre IS NOT NULL 
                             data-city="<?php echo $s['city']; ?>"
                             data-state="<?php echo $s['state']; ?>"
                             data-type="<?php echo $s['type']; ?>"
-                            data-genre="<?php echo $s['genre']; ?>"
                             data-illumination="<?php echo $s['light_type']; ?>"
                             data-status="<?php echo $s['status']; ?>"
                             data-rate="<?php echo $s['card_rate']; ?>" 
@@ -234,55 +248,36 @@ $genres = $pdo->query("SELECT DISTINCT genre FROM sites WHERE genre IS NOT NULL 
                             <td class="sno-cell"><?php echo $sno++; ?></td>
                             <td><input type="checkbox" class="asset-chk" onclick="toggleSite('<?php echo $s['id']; ?>')"></td>
                             <td>
-                                <div style="font-weight: 700; color: #334155; margin-bottom: 2px; white-space: normal; line-height: 1.4;"><?php echo $s['location']; ?></div>
-                                <div style="font-size: 0.7rem; color: #94a3b8; text-transform: uppercase; font-weight: 600;">
-                                    <span style="color: var(--primary);"><?php echo $s['city']; ?></span> • <?php echo $s['type']; ?> • <?php echo $s['light_type']; ?> • <span class="badge-<?php echo strtolower($s['owner_type']); ?>"><?php echo $s['owner_type']; ?></span>
+                                <div style="font-weight: 700; color: #334155; margin-bottom: 2px;"><?php echo $s['location']; ?></div>
+                                <div style="font-size: 0.65rem; color: #94a3b8; text-transform: uppercase; font-weight: 700;">
+                                    <span style="color: var(--primary);"><?php echo $s['city']; ?></span> • <?php echo $s['type']; ?> • <span class="badge-<?php echo strtolower($s['owner_type']); ?>"><?php echo $s['owner_type']; ?></span>
                                 </div>
                             </td>
                             <td>
                                 <?php if ($s['thumbnail']): ?>
-                                    <img src="../../uploads/sites/<?php echo $s['thumbnail']; ?>" class="site-thumb" onclick="window.open(this.src)">
+                                    <img src="../../uploads/sites/<?php echo $s['thumbnail']; ?>" class="site-thumb" style="width: 80px; height: 50px;">
                                 <?php else: ?>
-                                    <span class="no-img">No Image</span>
+                                    <span class="no-img">No Img</span>
                                 <?php endif; ?>
                             </td>
-                            <td>
-                                <div style="font-weight: 700; color: #475569;"><?php echo $s['width']; ?>' x <?php echo $s['height']; ?>'</div>
-                                <div style="font-size: 0.7rem; color: #94a3b8;"><?php echo number_format($sqft); ?> SQFT</div>
-                            </td>
-                            <td>
-                                <div style="font-size: 0.85rem; font-weight: 700; color: #1e293b;">₹<?php echo number_format($s['card_rate']); ?></div>
-                                <div style="font-size: 0.7rem; color: #94a3b8;">₹<?php echo number_format($dailyRate, 2); ?> / day</div>
-                            </td>
+                            <td><div style="font-size: 0.8rem; font-weight: 700;"><?php echo $s['width']; ?>'x<?php echo $s['height']; ?>'</div></td>
+                            <td><div style="font-size: 0.8rem; font-weight: 700;">₹<?php echo number_format($s['card_rate']); ?></div></td>
                             <td>
                                 <input type="number" class="p-input sale-rate-input" 
                                        value="<?php echo $s['card_rate']; ?>" 
                                        oninput="updateSitePrice('<?php echo $s['id']; ?>', this.value)"
-                                       disabled style="width: 110px; height: 32px; font-size: 0.85rem;">
+                                       disabled style="width: 90px; height: 28px; font-size: 0.75rem; padding: 2px 5px;">
                             </td>
-                            <td class="total-cell" style="font-weight: 800; color: var(--primary); text-align: right; font-size: 1rem;">₹0</td>
+                            <td class="total-cell" style="font-weight: 800; color: var(--primary); text-align: right; font-size: 0.85rem;">₹0</td>
                         </tr>
                         <?php endforeach; ?>
                     </tbody>
                 </table>
             </div>
 
-            <!-- Pagination Controls -->
-            <div class="pagination-wrap">
-                <div class="pg-info">
-                    Showing <span id="pg-start">1</span> to <span id="pg-end">10</span> of <span id="pg-total"><?php echo count($sites); ?></span> sites
-                </div>
-                <div class="pg-controls" id="pg-numbers">
-                    <!-- JS will populate -->
-                </div>
-                <div class="pg-size">
-                    <select id="pg-limit" onchange="changePageSize()" class="p-input" style="width: 100px; height: 38px; font-size: 0.8rem;">
-                        <option value="10">10 / page</option>
-                        <option value="25">25 / page</option>
-                        <option value="50">50 / page</option>
-                        <option value="100">100 / page</option>
-                    </select>
-                </div>
+            <div class="pagination-wrap" style="padding: 1rem; display: flex; justify-content: space-between; align-items: center; background: #f8fafc; border-top: 1px solid #e2e8f0;">
+                <div class="pg-info" style="font-size: 0.75rem; font-weight: 700; color: #64748b;">Showing <span id="pg-total"><?php echo count($sites); ?></span> assets matching criteria</div>
+                <div class="pg-controls" id="pg-numbers"></div>
             </div>
         </div>
 
@@ -809,6 +804,7 @@ function filterSites() {
     const q = document.getElementById('site-search').value.toLowerCase();
     const mediaType = document.getElementById('media_type').value;
     const inventoryType = document.getElementById('inventory_type').value;
+    const lightType = document.getElementById('light_type').value;
     const ownershipRadio = document.querySelector('input[name="ownership"]:checked').value;
     const availability = document.querySelector('input[name="availability"]:checked').value;
     
@@ -828,6 +824,7 @@ function filterSites() {
         // Mandatory Filters & Radios
         if (mediaType && row.dataset.type !== mediaType) show = false;
         if (inventoryType && row.dataset.owner !== inventoryType) show = false;
+        if (lightType && row.dataset.illumination !== lightType) show = false;
         if (ownershipRadio !== 'all' && row.dataset.owner !== ownershipRadio) show = false;
         
         // Select Filters
@@ -882,11 +879,13 @@ function saveProposal() {
     const remark = document.getElementById('remark').value;
     const contactPerson = document.getElementById('contact_person').value;
     
-    if (!clientId || !start || !end || !campaignName || !mediaType || !inventoryType || selectedSites.length === 0) {
+    const lightType = document.getElementById('light_type').value;
+    
+    if (!clientId || !start || !end || !campaignName || !mediaType || !inventoryType || !lightType || selectedSites.length === 0) {
         Swal.fire({
             icon: 'warning',
             title: 'Missing Information',
-            text: 'Please select a client, set dates, enter campaign name, select media/inventory type, and select at least one asset.',
+            text: 'Please fill all mandatory fields (including Light Type) and select at least one asset.',
             confirmButtonColor: 'var(--primary)'
         });
         return;
@@ -899,6 +898,7 @@ function saveProposal() {
         campaignName,
         mediaType,
         inventoryType,
+        lightType,
         totalDays,
         remark,
         contactPerson,
@@ -927,12 +927,16 @@ function goToStep2() {
     const clientId = document.getElementById('client_id').value;
     const start = document.getElementById('start_date').value;
     const end = document.getElementById('end_date').value;
+    const mediaType = document.getElementById('media_type').value;
+    const inventoryType = document.getElementById('inventory_type').value;
     
-    if (!clientId || !start || !end) {
+    const lightType = document.getElementById('light_type').value;
+    
+    if (!clientId || !start || !end || !mediaType || !inventoryType || !lightType) {
         Swal.fire({
             icon: 'warning',
             title: 'Missing Details',
-            text: 'Please select a client and set both start and end dates before proceeding.',
+            text: 'Please fill all mandatory fields (Client, Dates, Media Type, Inventory Type, Light Type) before proceeding to asset selection.',
             confirmButtonColor: 'var(--primary)'
         });
         return;
@@ -940,6 +944,8 @@ function goToStep2() {
     
     document.getElementById('step-1').style.display = 'none';
     document.getElementById('step-2').style.display = 'block';
+    window.scrollTo(0, 0);
+    filterSites(); // Apply filters based on Step 1 criteria
     
     // Step 1 styling -> Completed
     const c1 = document.querySelector('#step-tab-1 .step-circle');
