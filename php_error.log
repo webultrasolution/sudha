@@ -2,3 +2,7 @@
 [09-May-2026 18:44:03 Europe/Berlin] PHP Warning:  Undefined array key "area" in D:\xampp\htdocs\easy-outdoor-crm\modules\inventory\sites.php on line 175
 [09-May-2026 18:44:03 Europe/Berlin] PHP Warning:  Undefined array key "area" in D:\xampp\htdocs\easy-outdoor-crm\modules\inventory\sites.php on line 175
 [09-May-2026 18:44:03 Europe/Berlin] PHP Warning:  Undefined array key "area" in D:\xampp\htdocs\easy-outdoor-crm\modules\inventory\sites.php on line 175
+[09-May-2026 22:39:30 Europe/Berlin] PHP Fatal error:  Uncaught Error: Call to undefined function parseFloat() in D:\xampp\htdocs\easy-outdoor-crm\modules\proposals\export_pdf.php:232
+Stack trace:
+#0 {main}
+  thrown in D:\xampp\htdocs\easy-outdoor-crm\modules\proposals\export_pdf.php on line 232
