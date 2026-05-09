@@ -298,8 +298,7 @@ $sizes = $pdo->query("SELECT DISTINCT CONCAT(width, 'x', height) as size FROM si
                         </td>
 
                         <td style="padding: 1.5rem 1rem;">
-                            <div style="font-weight: 800; color: #64748b; font-size: 0.8rem; margin-bottom: 4px;">CARD: ₹<?php echo number_format($s['card_rate']); ?></div>
-                            <div style="font-size: 0.7rem; color: #94a3b8; font-weight: 700;">Cost: ₹<?php echo number_format($s['purchase_rate']); ?></div>
+                            <div style="font-weight: 800; color: #64748b; font-size: 0.8rem;">CARD: ₹<?php echo number_format($s['card_rate']); ?></div>
                         </td>
 
                         <td style="padding: 1.5rem 1rem;">
@@ -856,8 +855,7 @@ function updateBucketUI() {
                     <div style="font-weight: 800; color: #1e293b; font-size: 0.85rem;">${site.sqft} SQFT</div>
                 </td>
                 <td style="padding: 1rem;">
-                    <div style="font-weight: 700; color: #64748b; font-size: 0.75rem;">C: ₹${site.cardRate.toLocaleString()}</div>
-                    <div style="font-size: 0.7rem; color: #94a3b8; font-weight: 700;">P: ₹${site.purchaseRate.toLocaleString()}</div>
+                    <div style="font-weight: 700; color: #64748b; font-size: 0.75rem;">₹${site.cardRate.toLocaleString()}</div>
                 </td>
                 <td style="padding: 1rem;">
                     <div style="font-weight: 800; color: #1e293b; font-size: 0.85rem;">₹${site.saleRate.toLocaleString()}</div>
