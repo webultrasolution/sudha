@@ -85,8 +85,9 @@ $genres = $pdo->query("SELECT DISTINCT genre FROM sites WHERE genre IS NOT NULL 
                 </div>
             </div>
 
-            <!-- Row 2: Dates & Total Days -->
-            <div class="form-grid" style="grid-template-columns: 1fr 1fr 1fr 0.6fr 1.4fr;">
+            <!-- Row 2: Remark & Dates -->
+            <div class="form-grid" style="grid-template-columns: 2fr 1fr 1fr 1fr;">
+              
                 <div class="form-group">
                     <label>From Date <span style="color:red;">*</span></label>
                     <input type="date" id="start_date" class="p-input" style="height: 38px;" onchange="calculateEndDate()">
@@ -96,16 +97,8 @@ $genres = $pdo->query("SELECT DISTINCT genre FROM sites WHERE genre IS NOT NULL 
                     <input type="date" id="end_date" class="p-input" style="height: 38px;" onchange="calculateTotalDays()">
                 </div>
                 <div class="form-group">
-                    <label>Delivery Date</label>
-                    <input type="date" id="delivery_date" class="p-input" style="height: 38px;">
-                </div>
-                <div class="form-group">
                     <label>Total Days</label>
                     <input type="number" id="total_days" class="p-input" placeholder="Days" style="height: 38px;" oninput="calculateEndDate()">
-                </div>
-                <div class="form-group">
-                    <label>Remark (Optional)</label>
-                    <input type="text" id="remark" class="p-input" placeholder="Any additional notes..." style="height: 38px;">
                 </div>
             </div>
 
@@ -134,15 +127,17 @@ $genres = $pdo->query("SELECT DISTINCT genre FROM sites WHERE genre IS NOT NULL 
             
             <div class="media-search-grid">
                 <!-- Ownership & Availability -->
-                <div class="search-row" style="margin-bottom: 1rem;">
+                <div class="search-row" style="margin-bottom: 1rem; display: flex; gap: 3rem; align-items: flex-end;">
                     <div class="search-group">
+                        <label style="font-size: 0.75rem; font-weight: 800; color: var(--secondary); margin-bottom: 0.75rem; display: block; text-transform: uppercase;">Ownership</label>
                         <div class="radio-group">
-                            <label><input type="radio" name="ownership" value="all" checked onchange="filterSites()"> Self / Vendor / Third Party</label>
-                            <label><input type="radio" name="ownership" value="HA" onchange="filterSites()"> Self</label>
-                            <label><input type="radio" name="ownership" value="TA" onchange="filterSites()"> Vendor</label>
+                            <label><input type="radio" name="ownership" value="all" checked onchange="syncInventoryType(this.value); filterSites()"> All</label>
+                            <label><input type="radio" name="ownership" value="HA" onchange="syncInventoryType(this.value); filterSites()"> Self (HA)</label>
+                            <label><input type="radio" name="ownership" value="TA" onchange="syncInventoryType(this.value); filterSites()"> Vendor (TA)</label>
                         </div>
                     </div>
-                    <div class="search-group" style="margin-left: 2rem;">
+                    <div class="search-group">
+                        <label style="font-size: 0.75rem; font-weight: 800; color: var(--secondary); margin-bottom: 0.75rem; display: block; text-transform: uppercase;">Availability</label>
                         <div class="radio-group">
                             <label><input type="radio" name="availability" value="available" checked onchange="filterSites()"> Available</label>
                             <label><input type="radio" name="availability" value="all" onchange="filterSites()"> All Media</label>
@@ -152,14 +147,27 @@ $genres = $pdo->query("SELECT DISTINCT genre FROM sites WHERE genre IS NOT NULL 
 
                 <!-- Main Filters -->
                 <div style="display: grid; grid-template-columns: repeat(4, 1fr); gap: 1rem;">
-                    <select id="filter-genre" class="p-input" onchange="filterSites()">
-                        <option value="">Select Genre</option>
-                        <?php foreach($genres as $g): ?> <option value="<?php echo $g; ?>"><?php echo $g; ?></option> <?php endforeach; ?>
-                    </select>
-                    <select id="filter-type" class="p-input" onchange="filterSites()">
-                        <option value="">Select Media Type</option>
-                        <?php foreach($mediaTypes as $t): ?> <option value="<?php echo $t; ?>"><?php echo $t; ?></option> <?php endforeach; ?>
-                    </select>
+                     <div class="form-group" style="margin-bottom: 0; min-width: 200px;">
+                        <label style="font-size: 0.7rem; font-weight: 800; color: var(--secondary); margin-bottom: 0.3rem;">MEDIA TYPE <span style="color:red;">*</span></label>
+                        <select id="media_type" class="p-input" onchange="filterSites()" style="height: 38px;">
+                            <option value="">Select Media Type</option>
+                            <option value="Hoarding">Hoarding</option>
+                            <option value="Unipole">Unipole</option>
+                            <option value="Gantry">Gantry</option>
+                            <option value="BQS">Bus Shelter (BQS)</option>
+                            <option value="DCP">Digital City Panel (DCP)</option>
+                            <option value="LED Screen">LED Screen</option>
+                        </select>
+                    </div>
+                    <div class="form-group" style="margin-bottom: 0; min-width: 200px;">
+                        <label style="font-size: 0.7rem; font-weight: 800; color: var(--secondary); margin-bottom: 0.3rem;">INVENTORY TYPE <span style="color:red;">*</span></label>
+                        <select id="inventory_type" class="p-input" onchange="syncOwnershipRadios(this.value); filterSites()" style="height: 38px;">
+                            <option value="">Select Inventory Type</option>
+                            <option value="HA">Home Asset (HA)</option>
+                            <option value="TA">Vendor Asset (TA)</option>
+                        </select>
+                    </div>
+             
                     <select id="filter-state" class="p-input" onchange="filterSites()">
                         <option value="">Select State</option>
                         <?php foreach($states as $s): ?> <option value="<?php echo $s; ?>"><?php echo $s; ?></option> <?php endforeach; ?>
@@ -167,10 +175,6 @@ $genres = $pdo->query("SELECT DISTINCT genre FROM sites WHERE genre IS NOT NULL 
                     <select id="filter-city" class="p-input" onchange="filterSites()">
                         <option value="">Select City</option>
                         <?php foreach($cities as $c): ?> <option value="<?php echo $c; ?>"><?php echo $c; ?></option> <?php endforeach; ?>
-                    </select>
-                    <select id="filter-illumination" class="p-input" onchange="filterSites()">
-                        <option value="">Select Illumination</option>
-                        <?php foreach($illuminations as $i): ?> <option value="<?php echo $i; ?>"><?php echo $i; ?></option> <?php endforeach; ?>
                     </select>
                     <div class="search-input-wrap" style="grid-column: span 2;">
                         <input type="text" id="site-search" class="p-input" placeholder="Search site name, code or location..." onkeyup="filterSites()">
@@ -803,11 +807,12 @@ function recalcAll() {
 
 function filterSites() {
     const q = document.getElementById('site-search').value.toLowerCase();
-    const ownership = document.querySelector('input[name="ownership"]:checked').value;
+    const mediaType = document.getElementById('media_type').value;
+    const inventoryType = document.getElementById('inventory_type').value;
+    const ownershipRadio = document.querySelector('input[name="ownership"]:checked').value;
     const availability = document.querySelector('input[name="availability"]:checked').value;
     
     const genre = document.getElementById('filter-genre').value;
-    const type = document.getElementById('filter-type').value;
     const state = document.getElementById('filter-state').value;
     const city = document.getElementById('filter-city').value;
     const illumination = document.getElementById('filter-illumination').value;
@@ -817,15 +822,16 @@ function filterSites() {
     rows.forEach(row => {
         let show = true;
         
-        // Ownership Filter
-        if (ownership !== 'all' && row.dataset.owner !== ownership) show = false;
-        
         // Availability Filter
         if (availability === 'available' && row.dataset.status !== 'available') show = false;
         
+        // Mandatory Filters & Radios
+        if (mediaType && row.dataset.type !== mediaType) show = false;
+        if (inventoryType && row.dataset.owner !== inventoryType) show = false;
+        if (ownershipRadio !== 'all' && row.dataset.owner !== ownershipRadio) show = false;
+        
         // Select Filters
         if (genre && row.dataset.genre !== genre) show = false;
-        if (type && row.dataset.type !== type) show = false;
         if (state && row.dataset.state !== state) show = false;
         if (city && row.dataset.city !== city) show = false;
         if (illumination && row.dataset.illumination !== illumination) show = false;
@@ -851,21 +857,36 @@ document.addEventListener('DOMContentLoaded', () => {
     renderPagination();
 });
 
+function syncInventoryType(val) {
+    const select = document.getElementById('inventory_type');
+    if (val === 'all') {
+        select.value = '';
+    } else {
+        select.value = val;
+    }
+}
+
+function syncOwnershipRadios(val) {
+    const radio = document.querySelector(`input[name="ownership"][value="${val || 'all'}"]`);
+    if (radio) radio.checked = true;
+}
+
 function saveProposal() {
     const clientId = document.getElementById('client_id').value;
     const start = document.getElementById('start_date').value;
     const end = document.getElementById('end_date').value;
     const campaignName = document.getElementById('campaign_name').value;
-    const deliveryDate = document.getElementById('delivery_date').value;
+    const mediaType = document.getElementById('media_type').value;
+    const inventoryType = document.getElementById('inventory_type').value;
     const totalDays = document.getElementById('total_days').value;
     const remark = document.getElementById('remark').value;
     const contactPerson = document.getElementById('contact_person').value;
     
-    if (!clientId || !start || !end || !campaignName || selectedSites.length === 0) {
+    if (!clientId || !start || !end || !campaignName || !mediaType || !inventoryType || selectedSites.length === 0) {
         Swal.fire({
             icon: 'warning',
             title: 'Missing Information',
-            text: 'Please select a client, set the dates, enter campaign name, and select at least one asset.',
+            text: 'Please select a client, set dates, enter campaign name, select media/inventory type, and select at least one asset.',
             confirmButtonColor: 'var(--primary)'
         });
         return;
@@ -876,7 +897,8 @@ function saveProposal() {
         startDate: start,
         endDate: end,
         campaignName,
-        deliveryDate,
+        mediaType,
+        inventoryType,
         totalDays,
         remark,
         contactPerson,
