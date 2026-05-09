@@ -140,36 +140,22 @@ $vendors = $pdo->query("SELECT id, name FROM partners WHERE type = 'vendor' ORDE
     <table class="table">
         <thead>
             <tr>
-            <tr>
                 <th style="width: 40px;">#</th>
+                <th>Preview</th>
                 <th>Asset Details</th>
                 <th>City / Code</th>
-                <th>Preview</th>
                 <th>Dimensions</th>
                 <th>Pricing</th>
                 <th>Availability</th>
                 <th>Status</th>
                 <th style="text-align: right;">Actions</th>
             </tr>
-            </tr>
         </thead>
         <tbody>
             <?php $sn=1; foreach ($sites as $s): ?>
             <tr>
                 <td><?php echo $sn++; ?></td>
-                <td>
-                    <div style="font-weight: 700; color: #334155; margin-bottom: 2px;"><?php echo $s['location']; ?></div>
-                    <div style="font-size: 0.7rem; color: #94a3b8; text-transform: uppercase; font-weight: 600;">
-                        <span class="media-badge <?php echo strtolower($s['type']); ?>"><?php echo $s['type']; ?></span> • 
-                        <?php echo $s['light_type']; ?> • 
-                        <span style="color: var(--primary);"><?php echo $s['owner_type']; ?></span>
-                    </div>
-                </td>
-                <td>
-                    <div style="font-weight: 700; color: #1e293b;"><?php echo $s['city']; ?></div>
-                    <div style="font-size: 0.7rem; color: #94a3b8; font-weight: 600;"><?php echo $s['site_code']; ?></div>
-                </td>
-                <td>
+                   <td>
                     <?php 
                     $imgs = $pdo->prepare("SELECT filename FROM site_images WHERE site_id = ? LIMIT 1");
                     $imgs->execute([$s['id']]);
@@ -181,6 +167,20 @@ $vendors = $pdo->query("SELECT id, name FROM partners WHERE type = 'vendor' ORDE
                         <small style="color: #cbd5e1;">No Img</small>
                     <?php endif; ?>
                 </td>
+                <td>
+                    <div style="font-weight: 700; color: #1e293b; margin-bottom: 2px;"><?php echo $s['name']; ?></div>
+                    <div style="font-size: 0.75rem; color: #64748b; margin-bottom: 6px;"><?php echo $s['location']; ?></div>
+                    <div style="font-size: 0.7rem; color: #94a3b8; text-transform: uppercase; font-weight: 600;">
+                        <span class="media-badge <?php echo strtolower($s['type']); ?>"><?php echo $s['type']; ?></span> • 
+                        <?php echo $s['light_type']; ?> • 
+                        <span style="color: var(--primary);"><?php echo $s['owner_type']; ?></span>
+                    </div>
+                </td>
+                <td>
+                    <div style="font-weight: 700; color: #1e293b;"><?php echo $s['city']; ?></div>
+                    <div style="font-size: 0.7rem; color: #94a3b8; font-weight: 600;"><?php echo $s['site_code']; ?></div>
+                </td>
+             
                 <td>
                     <div style="font-weight: 700; color: #475569;"><?php echo $s['width'] . "' x " . $s['height'] . "'"; ?></div>
                     <div style="font-size: 0.7rem; color: #94a3b8;"><?php echo number_format($s['sqft']); ?> SQFT</div>
@@ -256,7 +256,7 @@ $vendors = $pdo->query("SELECT id, name FROM partners WHERE type = 'vendor' ORDE
                 </div>
 
                 <div class="form-group" style="grid-column: span 2;">
-                    <label>Site Name</label>
+                    <label>Site Location</label>
                     <input type="text" name="name" id="f_name" required>
                 </div>
                 <div class="form-group">

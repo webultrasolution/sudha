@@ -74,7 +74,7 @@ $items = $items->fetchAll();
 
     <div class="header">
         <div class="logo-area">
-            <img src="../../assets/img/LOGO.png" style="height: 50px; width: auto;" alt="Easy Outdoor Logo">
+            <img src="../../assets/img/LOGO.png" style="height: 50px; width: auto;" alt="Sudha Creative Logo">
         </div>
         <div class="proposal-info">
             <h2>PROPOSAL</h2>
@@ -85,7 +85,7 @@ $items = $items->fetchAll();
 
     <div class="details-grid">
         <div class="detail-box">
-            <h3>From: Easy Outdoor</h3>
+            <h3>From: Sudha Creative</h3>
             <strong><?php echo COMPANY_NAME; ?></strong>
             <p><?php echo COMPANY_ADDRESS; ?></p>
             <p><?php echo COMPANY_CITY; ?></p>

@@ -26,7 +26,13 @@ $clientPos->execute([$id]);
 $clientPos = $clientPos->fetchAll();
 
 // Financial Summary (Invoiced vs Paid)
-$totalInvoiced = $pdo->prepare("SELECT SUM(total_amount) FROM invoices WHERE client_id = ?");
+$totalInvoiced = $pdo->prepare("
+    SELECT SUM(i.total_amount) 
+    FROM invoices i
+    JOIN bookings b ON i.booking_id = b.id
+    JOIN proposals p ON b.proposal_id = p.id
+    WHERE p.client_id = ?
+");
 $totalInvoiced->execute([$id]);
 $totalInvoiced = $totalInvoiced->fetchColumn() ?: 0;
 
@@ -182,7 +188,13 @@ $totalPaid = $totalPaid->fetchColumn() ?: 0;
                 <select id="booking_id" class="p-input" required>
                     <!-- Bookings for this client should be loaded here -->
                     <?php 
-                    $bookings = $pdo->prepare("SELECT id FROM bookings WHERE client_id = ? ORDER BY id DESC");
+                    $bookings = $pdo->prepare("
+                        SELECT b.id 
+                        FROM bookings b
+                        JOIN proposals p ON b.proposal_id = p.id
+                        WHERE p.client_id = ? 
+                        ORDER BY b.id DESC
+                    ");
                     $bookings->execute([$id]);
                     while($b = $bookings->fetch()) echo "<option value='{$b['id']}'>Booking #{$b['id']}</option>";
                     ?>

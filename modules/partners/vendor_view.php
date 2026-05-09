@@ -30,7 +30,7 @@ $payments = $pdo->prepare("SELECT SUM(amount) FROM payments WHERE entity_id = ? 
 $payments->execute([$id]);
 $totalPaid = $payments->fetchColumn() ?: 0;
 
-$totalPO = $pdo->prepare("SELECT SUM(grand_total) FROM purchase_orders WHERE vendor_id = ?");
+$totalPO = $pdo->prepare("SELECT SUM(total_amount) FROM purchase_orders WHERE vendor_id = ?");
 $totalPO->execute([$id]);
 $totalLiability = $totalPO->fetchColumn() ?: 0;
 ?>
@@ -133,7 +133,7 @@ $totalLiability = $totalPO->fetchColumn() ?: 0;
                         <tr>
                             <td><strong><?php echo $p['po_number']; ?></strong></td>
                             <td><?php echo date('d M Y', strtotime($p['created_at'])); ?></td>
-                            <td><?php echo formatCurrency($p['grand_total']); ?></td>
+                            <td><?php echo formatCurrency($p['total_amount']); ?></td>
                             <td><span class="status-pill status-<?php echo $p['status']; ?>"><?php echo ucfirst($p['status']); ?></span></td>
                             <td><a href="../financials/po_view.php?id=<?php echo $p['id']; ?>" class="btn-icon"><i class="fas fa-eye"></i></a></td>
                         </tr>

@@ -1,4 +1,4 @@
--- Easy Outdoor CRM - Database Migration Script
+-- Sudha Creative CRM - Database Migration Script
 -- Version: 1.0.0
 -- Description: Complete schema and seed data for initial setup
 

@@ -3,5 +3,5 @@ function toggleSidebar() {
 }
 
 document.addEventListener('DOMContentLoaded', function() {
-    console.log('Easy Outdoor CRM Loaded');
+    console.log('Sudha Creative CRM Loaded');
 });

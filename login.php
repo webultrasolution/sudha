@@ -34,7 +34,7 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Login | Easy Outdoor CRM</title>
+    <title>Login | Sudha Creative CRM</title>
     <link rel="stylesheet" href="assets/css/style.css">
     <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@400;500;600;700;800&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
@@ -42,7 +42,7 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
 <body class="login-page">
     <div class="login-box">
         <div class="login-header">
-            <img src="assets/img/LOGO.png" alt="Easy Outdoor" style="max-width: 180px; height: auto; margin-bottom: 1.5rem;">
+            <img src="assets/img/LOGO.png" alt="Sudha Creative" style="max-width: 180px; height: auto; margin-bottom: 1.5rem;">
             <p>OOH Management Workspace</p>
         </div>
         
@@ -77,7 +77,7 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
         </form>
         
         <div class="login-footer">
-            &copy; <?php echo date('Y'); ?> Easy Outdoor CRM. v2.0
+            &copy; <?php echo date('Y'); ?> Sudha Creative CRM. v2.0
         </div>
     </div>
 </body>

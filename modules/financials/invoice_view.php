@@ -53,7 +53,7 @@ $items = $stmtItems->fetchAll();
 
 <div style="display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 1.5rem; margin-bottom: 2rem;">
     <div class="card">
-        <h3 style="font-size: 0.75rem; text-transform: uppercase; letter-spacing: 0.05em; color: #94a3b8; margin-bottom: 1rem; border-bottom: 1px solid #f1f5f9; padding-bottom: 0.5rem;">From: Easy Outdoor</h3>
+        <h3 style="font-size: 0.75rem; text-transform: uppercase; letter-spacing: 0.05em; color: #94a3b8; margin-bottom: 1rem; border-bottom: 1px solid #f1f5f9; padding-bottom: 0.5rem;">From: Sudha Creative</h3>
         <div style="line-height: 1.6; font-size: 0.9rem;">
             <strong style="color: var(--primary);"><?php echo COMPANY_NAME; ?></strong><br>
             <?php echo COMPANY_ADDRESS; ?><br>

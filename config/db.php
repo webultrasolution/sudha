@@ -6,12 +6,12 @@ define('DB_USER', 'root');
 define('DB_PASS', '');
 
 // App Constants
-define('APP_NAME', 'Easy Outdoor CRM');
+define('APP_NAME', 'Sudha Creative CRM');
 define('BASE_URL', 'http://localhost/easy-outdoor-crm/');
 define('GST_RATE', 18); // Default GST percentage
 
 // Company Details
-define('COMPANY_NAME', 'Easy Outdoor Media');
+define('COMPANY_NAME', 'Sudha Creative Media');
 define('COMPANY_ADDRESS', '4th Floor, Skyline Plaza, Business District');
 define('COMPANY_CITY', 'Mumbai, Maharashtra - 400013');
 define('COMPANY_GSTIN', '27ABCDE1234F1Z1');

@@ -16,7 +16,7 @@ $proposal = $stmt->fetch();
 if (!$proposal) die("Proposal not found.");
 
 $items = $pdo->prepare("
-    SELECT pi.*, s.site_code, s.location, s.city as site_city, s.type as site_type, s.width, s.height
+    SELECT pi.*, s.site_code, s.name as site_name, s.location, s.city as site_city, s.type as site_type, s.width, s.height
     FROM proposal_items pi
     JOIN sites s ON pi.site_id = s.id
     WHERE pi.proposal_id = ?
@@ -41,16 +41,17 @@ echo "\xEF\xBB\xBF"; // UTF-8 BOM
 <body>
 <table border="1">
     <tr>
-        <th colspan="7" style="background-color: #0d9488; color: white; font-size: 16pt;">PROPOSAL: <?php echo $proposal['proposal_number']; ?></th>
+        <th colspan="8" style="background-color: #0d9488; color: white; font-size: 16pt;">PROPOSAL: <?php echo $proposal['proposal_number']; ?></th>
     </tr>
     <tr>
-        <th colspan="7">Campaign: <?php echo $proposal['campaign_name']; ?> | Client: <?php echo $proposal['client_name']; ?></th>
+        <th colspan="8">Campaign: <?php echo $proposal['campaign_name']; ?> | Client: <?php echo $proposal['client_name']; ?></th>
     </tr>
     <tr>
         <th>S.No</th>
         <th>Site Code</th>
         <th>Media Type</th>
-        <th>Location</th>
+        <th>Site Location</th>
+        <th>Landmark</th>
         <th>City</th>
         <th>Size</th>
         <th>Total Amount</th>
@@ -60,6 +61,7 @@ echo "\xEF\xBB\xBF"; // UTF-8 BOM
         <td><?php echo $sn++; ?></td>
         <td><?php echo $item['site_code']; ?></td>
         <td><?php echo $item['site_type']; ?></td>
+        <td><?php echo $item['site_name']; ?></td>
         <td><?php echo $item['location']; ?></td>
         <td><?php echo $item['site_city']; ?></td>
         <td><?php echo $item['width']; ?>' x <?php echo $item['height']; ?>'</td>
@@ -67,15 +69,15 @@ echo "\xEF\xBB\xBF"; // UTF-8 BOM
     </tr>
     <?php endforeach; ?>
     <tr>
-        <th colspan="6" align="right">Subtotal</th>
+        <th colspan="7" align="right">Subtotal</th>
         <th align="right"><?php echo $proposal['total_amount']; ?></th>
     </tr>
     <tr>
-        <th colspan="6" align="right">Tax (GST)</th>
+        <th colspan="7" align="right">Tax (GST)</th>
         <th align="right"><?php echo $proposal['tax_amount']; ?></th>
     </tr>
     <tr>
-        <th colspan="6" align="right" style="background-color: #f1f5f9;">Grand Total</th>
+        <th colspan="7" align="right" style="background-color: #f1f5f9;">Grand Total</th>
         <th align="right" style="background-color: #f1f5f9; font-weight: bold;"><?php echo $proposal['grand_total']; ?></th>
     </tr>
 </table>

@@ -79,7 +79,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 <h3 class="res-title" style="margin-top: 2rem;">Company Branding</h3>
                 <div class="form-group">
                     <label>Company Display Name</label>
-                    <input type="text" class="p-input" value="Easy Outdoor Advertising Pvt Ltd">
+                    <input type="text" class="p-input" value="Sudha Creative Advertising Pvt Ltd">
                 </div>
                 <button type="submit" class="btn btn-primary" style="margin-top: 1.5rem; width: 100%;">Save Global Configuration</button>
             </form>
