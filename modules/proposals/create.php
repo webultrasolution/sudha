@@ -26,6 +26,7 @@ $states = $pdo->query("SELECT DISTINCT state FROM sites WHERE state IS NOT NULL 
 $mediaTypes = $pdo->query("SELECT DISTINCT type FROM sites WHERE type IS NOT NULL AND type != '' ORDER BY type")->fetchAll(PDO::FETCH_COLUMN);
 $illuminations = $pdo->query("SELECT DISTINCT light_type FROM sites WHERE light_type IS NOT NULL AND light_type != '' ORDER BY light_type")->fetchAll(PDO::FETCH_COLUMN);
 $genres = $pdo->query("SELECT DISTINCT genre FROM sites WHERE genre IS NOT NULL AND genre != '' ORDER BY genre")->fetchAll(PDO::FETCH_COLUMN);
+$sizes = $pdo->query("SELECT DISTINCT CONCAT(width, 'x', height) as size FROM sites WHERE width IS NOT NULL AND height IS NOT NULL AND width != '' AND height != '' ORDER BY width, height")->fetchAll(PDO::FETCH_COLUMN);
 ?>
 
 <div class="proposal-full-wrapper">
@@ -52,302 +53,304 @@ $genres = $pdo->query("SELECT DISTINCT genre FROM sites WHERE genre IS NOT NULL 
         </div>
     </div>
 
-    <!-- STEP 1 -->
-    <div id="step-1">
-        <div class="p-panel" style="max-width: 1100px; margin: 0 auto;">
-            <div class="p-header"> Basic Details & Duration</div>
-            
-            <!-- Row 1: Campaign, Client, Contact -->
-            <div class="form-grid" style="grid-template-columns: 1fr 1fr 1fr; margin-bottom: 1rem;">
-                <div class="form-group">
-                    <label>Campaign Name <span style="color:red;">*</span></label>
-                    <input type="text" id="campaign_name" class="p-input" placeholder="Enter campaign name (e.g. Summer Sale 2024)" style="height: 38px;">
+<!-- STEP 1 -->
+<div id="step-1">
+    <div class="p-panel" style="max-width: 1100px; margin: 0 auto 1.5rem auto;">
+        <div class="p-header"> Basic Details & Duration</div>
+        
+        <!-- Row 1: Campaign, Client, Contact -->
+        <div class="form-grid" style="grid-template-columns: 1fr 1fr 1fr; margin-bottom: 1rem;">
+            <div class="form-group">
+                <label>Campaign Name <span style="color:red;">*</span></label>
+                <input type="text" id="campaign_name" class="p-input" placeholder="Enter campaign name (e.g. Summer Sale 2024)" style="height: 38px;">
+            </div>
+            <div class="form-group">
+                <label style="display: flex; justify-content: space-between; align-items: center;">
+                    <span>Company / Client <span style="color:red;">*</span></span>
+                    <button type="button" class="btn-text" onclick="openClientModal()" style="font-size: 0.7rem; color: var(--primary); background: none; border: none; cursor: pointer; padding: 0;">
+                        <i class="fas fa-plus-circle"></i> New
+                    </button>
+                </label>
+                <select id="client_id" class="p-input" style="height: 38px;" onchange="handleClientChange()">
+                    <option value="">-- Choose Client --</option>
+                    <?php foreach ($clients as $c): ?>
+                        <option value="<?php echo $c['id']; ?>" data-contact="<?php echo htmlspecialchars($c['contact_person'] ?? ''); ?>">
+                            <?php echo $c['name']; ?> <?php echo $c['city'] ? "({$c['city']})" : ""; ?>
+                        </option>
+                    <?php endforeach; ?>
+                </select>
+            </div>
+            <div class="form-group">
+                <label>Contact Person</label>
+                <input type="text" id="contact_person" class="p-input" placeholder="Contact person name" style="height: 38px;">
+            </div>
+        </div>
+
+        <!-- Row 2: Dates -->
+        <div class="form-grid" style="grid-template-columns: 1fr 1fr 1fr;">
+            <div class="form-group">
+                <label>From Date <span style="color:red;">*</span></label>
+                <input type="date" id="start_date" class="p-input" style="height: 38px;" onchange="calculateEndDate()">
+            </div>
+            <div class="form-group">
+                <label>To Date <span style="color:red;">*</span></label>
+                <input type="date" id="end_date" class="p-input" style="height: 38px;" onchange="calculateTotalDays()">
+            </div>
+            <div class="form-group">
+                <label>Total Days</label>
+                <input type="number" id="total_days" class="p-input" placeholder="Days" style="height: 38px;" oninput="calculateEndDate()">
+            </div>
+        </div>
+    </div>
+
+    <!-- Media Search Section (Inside Step 1) -->
+    <div class="p-panel" style="max-width: 1100px; margin: 1.5rem auto; border-left: 4px solid var(--primary);">
+        <div style="font-size: 0.75rem; font-weight: 800; color: var(--primary); text-transform: uppercase; margin-bottom: 1rem; display: flex; align-items: center; gap: 0.5rem;">
+            <i class="fas fa-search"></i> Media Search Criteria
+        </div>
+        
+        <div class="media-search-grid">
+            <!-- Ownership & Availability -->
+            <div class="search-row" style="margin-bottom: 1.5rem; display: flex; gap: 3rem; align-items: flex-end;">
+                <div class="search-group">
+                    <label style="font-size: 0.75rem; font-weight: 800; color: var(--secondary); margin-bottom: 0.75rem; display: block; text-transform: uppercase;">Ownership Type</label>
+                    <div class="radio-group">
+                        <label><input type="radio" name="ownership" value="all" checked onchange="filterSites()"> All</label>
+                        <label><input type="radio" name="ownership" value="HA" onchange="filterSites()"> Self (HA)</label>
+                        <label><input type="radio" name="ownership" value="TA" onchange="filterSites()"> Vendor (TA)</label>
+                    </div>
                 </div>
-                <div class="form-group">
-                    <label style="display: flex; justify-content: space-between; align-items: center;">
-                        <span>Company / Client <span style="color:red;">*</span></span>
-                        <button type="button" class="btn-text" onclick="openClientModal()" style="font-size: 0.7rem; color: var(--primary); background: none; border: none; cursor: pointer; padding: 0;">
-                            <i class="fas fa-plus-circle"></i> New
-                        </button>
-                    </label>
-                    <select id="client_id" class="p-input" style="height: 38px;" onchange="handleClientChange()">
-                        <option value="">-- Choose Client --</option>
-                        <?php foreach ($clients as $c): ?>
-                            <option value="<?php echo $c['id']; ?>" data-contact="<?php echo htmlspecialchars($c['contact_person'] ?? ''); ?>">
-                                <?php echo $c['name']; ?> <?php echo $c['city'] ? "({$c['city']})" : ""; ?>
-                            </option>
-                        <?php endforeach; ?>
+                <div class="search-group">
+                    <label style="font-size: 0.75rem; font-weight: 800; color: var(--secondary); margin-bottom: 0.75rem; display: block; text-transform: uppercase;">Availability</label>
+                    <div class="radio-group">
+                        <label><input type="radio" name="availability" value="available" checked onchange="filterSites()"> Available Only</label>
+                        <label><input type="radio" name="availability" value="all" onchange="filterSites()"> All Media</label>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Mandatory Filters -->
+            <div style="display: grid; grid-template-columns: repeat(2, 1fr); gap: 1rem; margin-bottom: 1rem;">
+                <div class="form-group" style="margin-bottom: 0;">
+                    <label style="font-size: 0.7rem; font-weight: 800; color: var(--secondary); margin-bottom: 0.3rem; text-transform: uppercase;">Media Type <span style="color:red;">*</span></label>
+                    <select id="media_type" class="p-input" onchange="filterSites()" style="height: 38px;">
+                        <option value="">Select Media Type</option>
+                        <option value="Hoarding">Hoarding</option>
+                        <option value="Unipole">Unipole</option>
+                        <option value="Gantry">Gantry</option>
+                        <option value="BQS">Bus Shelter (BQS)</option>
+                        <option value="DCP">Digital City Panel (DCP)</option>
+                        <option value="LED Screen">LED Screen</option>
                     </select>
                 </div>
-                <div class="form-group">
-                    <label>Contact Person</label>
-                    <input type="text" id="contact_person" class="p-input" placeholder="Contact person name" style="height: 38px;">
+                <div class="form-group" style="margin-bottom: 0;">
+                    <label style="font-size: 0.7rem; font-weight: 800; color: var(--secondary); margin-bottom: 0.3rem; text-transform: uppercase;">Light Type <span style="color:red;">*</span></label>
+                    <select id="light_type" class="p-input" onchange="filterSites()" style="height: 38px;">
+                        <option value="">Select Light Type</option>
+                        <option value="FL">Frontlit (FL)</option>
+                        <option value="BL">Backlit (BL)</option>
+                        <option value="NL">Non-Lit (NL)</option>
+                    </select>
                 </div>
             </div>
 
-            <!-- Row 2: Remark & Dates -->
-            <div class="form-grid" style="grid-template-columns: 2fr 1fr 1fr 1fr;">
-              
-                <div class="form-group">
-                    <label>From Date <span style="color:red;">*</span></label>
-                    <input type="date" id="start_date" class="p-input" style="height: 38px;" onchange="calculateEndDate()">
+            <!-- Location & Size Filters -->
+            <div style="display: grid; grid-template-columns: repeat(3, 1fr); gap: 1rem; margin-bottom: 1rem;">
+                <div class="form-group" style="margin-bottom: 0;">
+                    <label style="font-size: 0.7rem; font-weight: 800; color: var(--secondary); margin-bottom: 0.3rem; text-transform: uppercase;">State</label>
+                    <select id="filter-state" class="p-input" onchange="filterSites()" style="height: 38px;">
+                        <option value="">Select State</option>
+                        <?php foreach($states as $s): ?> <option value="<?php echo $s; ?>"><?php echo $s; ?></option> <?php endforeach; ?>
+                    </select>
                 </div>
-                <div class="form-group">
-                    <label>To Date <span style="color:red;">*</span></label>
-                    <input type="date" id="end_date" class="p-input" style="height: 38px;" onchange="calculateTotalDays()">
+                <div class="form-group" style="margin-bottom: 0;">
+                    <label style="font-size: 0.7rem; font-weight: 800; color: var(--secondary); margin-bottom: 0.3rem; text-transform: uppercase;">City</label>
+                    <select id="filter-city" class="p-input" onchange="filterSites()" style="height: 38px;">
+                        <option value="">Select City</option>
+                        <?php foreach($cities as $c): ?> <option value="<?php echo $c; ?>"><?php echo $c; ?></option> <?php endforeach; ?>
+                    </select>
                 </div>
-                <div class="form-group">
-                    <label>Total Days</label>
-                    <input type="number" id="total_days" class="p-input" placeholder="Days" style="height: 38px;" oninput="calculateEndDate()">
+                <div class="form-group" style="margin-bottom: 0;">
+                    <label style="font-size: 0.7rem; font-weight: 800; color: var(--secondary); margin-bottom: 0.3rem; text-transform: uppercase;">Size</label>
+                    <select id="filter-size" class="p-input" onchange="filterSites()" style="height: 38px;">
+                        <option value="">Select Size</option>
+                        <?php foreach($sizes as $sz): ?> <option value="<?php echo $sz; ?>"><?php echo $sz; ?></option> <?php endforeach; ?>
+                    </select>
                 </div>
             </div>
-
-            </div>
-        </div>
-
-        <!-- Media Search Section (Moved to Step 1) -->
-        <div class="p-panel" style="max-width: 1100px; margin: 1.5rem auto; border-left: 4px solid var(--primary);">
-            <div style="font-size: 0.75rem; font-weight: 800; color: var(--primary); text-transform: uppercase; margin-bottom: 1rem; display: flex; align-items: center; gap: 0.5rem;">
-                <i class="fas fa-search"></i> Media Search Criteria
-            </div>
-            
-            <div class="media-search-grid">
-                <!-- Ownership & Availability -->
-                <div class="search-row" style="margin-bottom: 1.5rem; display: flex; gap: 3rem; align-items: flex-end;">
-                    <div class="search-group">
-                        <label style="font-size: 0.75rem; font-weight: 800; color: var(--secondary); margin-bottom: 0.75rem; display: block; text-transform: uppercase;">Ownership Type</label>
-                        <div class="radio-group">
-                            <label><input type="radio" name="ownership" value="all" checked onchange="syncInventoryType(this.value); filterSites()"> All</label>
-                            <label><input type="radio" name="ownership" value="HA" onchange="syncInventoryType(this.value); filterSites()"> Self (HA)</label>
-                            <label><input type="radio" name="ownership" value="TA" onchange="syncInventoryType(this.value); filterSites()"> Vendor (TA)</label>
-                        </div>
-                    </div>
-                    <div class="search-group">
-                        <label style="font-size: 0.75rem; font-weight: 800; color: var(--secondary); margin-bottom: 0.75rem; display: block; text-transform: uppercase;">Availability</label>
-                        <div class="radio-group">
-                            <label><input type="radio" name="availability" value="available" checked onchange="filterSites()"> Available Only</label>
-                            <label><input type="radio" name="availability" value="all" onchange="filterSites()"> All Media</label>
-                        </div>
-                    </div>
-                </div>
-
-                <!-- Mandatory & Location Filters -->
-                <div style="display: grid; grid-template-columns: repeat(3, 1fr); gap: 1rem; margin-bottom: 1rem;">
-                    <div class="form-group" style="margin-bottom: 0;">
-                        <label style="font-size: 0.7rem; font-weight: 800; color: var(--secondary); margin-bottom: 0.3rem; text-transform: uppercase;">Media Type <span style="color:red;">*</span></label>
-                        <select id="media_type" class="p-input" onchange="filterSites()" style="height: 38px;">
-                            <option value="">Select Media Type</option>
-                            <option value="Hoarding">Hoarding</option>
-                            <option value="Unipole">Unipole</option>
-                            <option value="Gantry">Gantry</option>
-                            <option value="BQS">Bus Shelter (BQS)</option>
-                            <option value="DCP">Digital City Panel (DCP)</option>
-                            <option value="LED Screen">LED Screen</option>
-                        </select>
-                    </div>
-                    <div class="form-group" style="margin-bottom: 0;">
-                        <label style="font-size: 0.7rem; font-weight: 800; color: var(--secondary); margin-bottom: 0.3rem; text-transform: uppercase;">Inventory Type <span style="color:red;">*</span></label>
-                        <select id="inventory_type" class="p-input" onchange="syncOwnershipRadios(this.value); filterSites()" style="height: 38px;">
-                            <option value="">Select Inventory Type</option>
-                            <option value="HA">Home Asset (HA)</option>
-                            <option value="TA">Vendor Asset (TA)</option>
-                        </select>
-                    </div>
-                    <div class="form-group" style="margin-bottom: 0;">
-                        <label style="font-size: 0.7rem; font-weight: 800; color: var(--secondary); margin-bottom: 0.3rem; text-transform: uppercase;">Light Type <span style="color:red;">*</span></label>
-                        <select id="light_type" class="p-input" onchange="filterSites()" style="height: 38px;">
-                            <option value="">Select Light Type</option>
-                            <option value="FL">Frontlit (FL)</option>
-                            <option value="BL">Backlit (BL)</option>
-                            <option value="NL">Non-Lit (NL)</option>
-                        </select>
-                    </div>
-                </div>
-                <div style="display: grid; grid-template-columns: repeat(2, 1fr); gap: 1rem; margin-bottom: 1.5rem;">
-                    <div class="form-group" style="margin-bottom: 0;">
-                        <label style="font-size: 0.7rem; font-weight: 800; color: var(--secondary); margin-bottom: 0.3rem; text-transform: uppercase;">State</label>
-                        <select id="filter-state" class="p-input" onchange="filterSites()" style="height: 38px;">
-                            <option value="">Select State</option>
-                            <?php foreach($states as $s): ?> <option value="<?php echo $s; ?>"><?php echo $s; ?></option> <?php endforeach; ?>
-                        </select>
-                    </div>
-                    <div class="form-group" style="margin-bottom: 0;">
-                        <label style="font-size: 0.7rem; font-weight: 800; color: var(--secondary); margin-bottom: 0.3rem; text-transform: uppercase;">City</label>
-                        <select id="filter-city" class="p-input" onchange="filterSites()" style="height: 38px;">
-                            <option value="">Select City</option>
-                            <?php foreach($cities as $c): ?> <option value="<?php echo $c; ?>"><?php echo $c; ?></option> <?php endforeach; ?>
-                        </select>
-                    </div>
-                </div>
-
-            </div>
-        </div>
-
-        <!-- Single Next Step Button for Step 1 -->
-        <div style="display: flex; justify-content: flex-end; margin: 2rem 0;">
-            <button class="btn btn-primary" onclick="goToStep2()" style="width: 250px; height: 48px; border-radius: 12px; font-weight: 800; font-size: 0.95rem; box-shadow: 0 4px 15px rgba(0,0,0,0.1);">
-                Next Step: Select Assets <i class="fas fa-arrow-right" style="margin-left: 0.75rem;"></i>
-            </button>
         </div>
     </div>
 
-    <!-- STEP 2: Asset Selection & Pricing -->
-    <div id="step-2" style="display: none;">
-        <div style="margin-bottom: 1.5rem;">
-            <button class="btn btn-secondary" onclick="goToStep1()" style="background: white; border: 1px solid #e2e8f0; padding: 0.6rem 1.2rem; border-radius: 8px; font-weight: 700; cursor: pointer; color: #475569; display: flex; align-items: center; gap: 0.5rem;">
-                <i class="fas fa-arrow-left"></i> Back to Search
-            </button>
-        </div>
+    <!-- Single Next Step Button for Step 1 -->
+    <div style="display: flex; justify-content: flex-end; margin: 2rem auto; max-width: 1100px;">
+        <button class="btn btn-primary" onclick="goToStep2()" style="width: 250px; height: 48px; border-radius: 12px; font-weight: 800; font-size: 0.95rem; box-shadow: 0 4px 15px rgba(0,0,0,0.1);">
+            Next Step: Select Assets <i class="fas fa-arrow-right" style="margin-left: 0.75rem;"></i>
+        </button>
+    </div>
+</div>
 
-        <!-- Asset Selection Table (Back to Step 2) -->
-        <div class="p-panel" id="asset-plan-panel" style="margin-bottom: 2rem;">
-            <div class="p-header" style="display: flex; justify-content: space-between; align-items: center;">
-                <div style="display: flex; align-items: center; gap: 1rem;">
-                    <span>Select Assets Based on Your Criteria</span>
-                </div>
-                <div style="display: flex; gap: 1rem; align-items: center;">
-                    <div class="selection-stats" style="background: var(--primary); color: white; padding: 0.3rem 0.8rem; border-radius: 6px; font-weight: 800; font-size: 0.75rem;">
-                        Selected: <span id="selected-count">0</span> sites
-                    </div>
-                </div>
+<!-- STEP 2: Asset Selection & Pricing -->
+<div id="step-2" style="display: none;">
+    <div style="margin-bottom: 1.5rem;">
+        <button class="btn btn-secondary" onclick="goToStep1()" style="background: white; border: 1px solid #e2e8f0; padding: 0.6rem 1.2rem; border-radius: 8px; font-weight: 700; cursor: pointer; color: #475569; display: flex; align-items: center; gap: 0.5rem;">
+            <i class="fas fa-arrow-left"></i> Back to Search
+        </button>
+    </div>
+
+    <!-- Asset Selection Table -->
+    <div class="p-panel" id="asset-plan-panel" style="margin-bottom: 2rem;">
+        <div class="p-header" style="display: flex; justify-content: space-between; align-items: center;">
+            <div style="display: flex; align-items: center; gap: 1rem;">
+                <span>Select Assets Based on Your Criteria</span>
             </div>
-
-            <div class="site-list-container" style="max-height: 500px; overflow-y: auto;">
-                <table class="crs-table selection-table" id="asset-table">
-                        <thead>
-                            <tr>
-                                <th style="width: 40px;">#</th>
-                                <th style="width: 40px;"><i class="far fa-check-square"></i></th>
-                                <th>ASSET DETAILS</th>
-                                <th>PREVIEW</th>
-                                <th>DIMENSIONS</th>
-                                <th>PRICING</th>
-                                <th>SALE RATE</th>
-                                <th style="width: 120px; text-align: right;">TOTAL</th>
-                            </tr>
-                        </thead>
-                    <tbody id="asset-body">
-                        <?php $sno = 1; foreach ($sites as $s): 
-                            $sqft = $s['width'] * $s['height'];
-                        ?>
-                        <tr class="site-row" 
-                            id="row-<?php echo $s['id']; ?>"
-                            data-id="<?php echo $s['id']; ?>" 
-                            data-name="<?php echo $s['name']; ?>" 
-                            data-code="<?php echo $s['site_code']; ?>"
-                            data-location="<?php echo $s['location']; ?>"
-                            data-city="<?php echo $s['city']; ?>"
-                            data-state="<?php echo $s['state']; ?>"
-                            data-type="<?php echo $s['type']; ?>"
-                            data-illumination="<?php echo $s['light_type']; ?>"
-                            data-status="<?php echo $s['status']; ?>"
-                            data-rate="<?php echo $s['card_rate']; ?>" 
-                            data-prate="<?php echo $s['purchase_rate']; ?>" 
-                            data-owner="<?php echo $s['owner_type']; ?>"
-                            data-sqft="<?php echo $sqft; ?>">
-                            <td class="sno-cell"><?php echo $sno++; ?></td>
-                            <td><input type="checkbox" class="asset-chk" onclick="toggleSite('<?php echo $s['id']; ?>')"></td>
-                            <td>
-                                <div style="font-weight: 700; color: #334155; margin-bottom: 2px;"><?php echo $s['location']; ?></div>
-                                <div style="font-size: 0.65rem; color: #94a3b8; text-transform: uppercase; font-weight: 700;">
-                                    <span style="color: var(--primary);"><?php echo $s['city']; ?></span> • <?php echo $s['type']; ?> • <span class="badge-<?php echo strtolower($s['owner_type']); ?>"><?php echo $s['owner_type']; ?></span>
-                                </div>
-                            </td>
-                            <td>
-                                <?php if ($s['thumbnail']): ?>
-                                    <img src="../../uploads/sites/<?php echo $s['thumbnail']; ?>" class="site-thumb" style="width: 80px; height: 50px;">
-                                <?php else: ?>
-                                    <span class="no-img">No Img</span>
-                                <?php endif; ?>
-                            </td>
-                            <td><div style="font-size: 0.8rem; font-weight: 700;"><?php echo $s['width']; ?>'x<?php echo $s['height']; ?>'</div></td>
-                            <td><div style="font-size: 0.8rem; font-weight: 700;">₹<?php echo number_format($s['card_rate']); ?></div></td>
-                            <td>
-                                <input type="number" class="p-input sale-rate-input" 
-                                       value="<?php echo $s['card_rate']; ?>" 
-                                       oninput="updateSitePrice('<?php echo $s['id']; ?>', this.value)"
-                                       disabled style="width: 90px; height: 28px; font-size: 0.75rem; padding: 2px 5px;">
-                            </td>
-                            <td class="total-cell" style="font-weight: 800; color: var(--primary); text-align: right; font-size: 0.85rem;">₹0</td>
-                        </tr>
-                        <?php endforeach; ?>
-                    </tbody>
-                </table>
-            </div>
-
-            <div class="pagination-wrap" style="padding: 1rem; display: flex; justify-content: space-between; align-items: center; background: #f8fafc; border-top: 1px solid #e2e8f0;">
-                <div class="pg-info" style="font-size: 0.75rem; font-weight: 700; color: #64748b;">Showing <span id="pg-total"><?php echo count($sites); ?></span> assets matching criteria</div>
-                <div class="pg-controls" id="pg-numbers"></div>
+            <div style="display: flex; gap: 1rem; align-items: center;">
+                <div class="selection-stats" style="background: var(--primary); color: white; padding: 0.3rem 0.8rem; border-radius: 6px; font-weight: 800; font-size: 0.75rem;">
+                    Selected: <span id="selected-count">0</span> sites
+                </div>
             </div>
         </div>
 
-        <!-- Bottom: Configuration Grid -->
-        <div class="proposal-bottom-grid" style="grid-template-columns: 1fr 1fr;">
-            <!-- Pricing Controls -->
-            <div class="p-panel">
-                <div class="p-header"> Pricing & Costs</div>
-                <div class="form-grid">
-                    <div class="form-group">
-                        <label>Discount (%)</label>
-                        <input type="number" id="global_discount" value="0" class="p-input" oninput="recalcAll()" style="height: 34px;">
-                    </div>
-                    <div class="form-group">
-                        <label>Markup (%)</label>
-                        <input type="number" id="global_markup" value="0" class="p-input" oninput="recalcAll()" style="height: 34px;">
-                    </div>
-                </div>
-                <div class="form-grid" style="margin-top: 1rem;">
-                    <div class="form-group">
-                        <label>Printing (₹)</label>
-                        <input type="number" id="print_cost" value="0" class="p-input" oninput="recalcAll()" style="height: 34px;">
-                    </div>
-                    <div class="form-group">
-                        <label>Mounting (₹)</label>
-                        <input type="number" id="mount_cost" value="0" class="p-input" oninput="recalcAll()" style="height: 34px;">
-                    </div>
-                </div>
-            </div>
-
-            <!-- Final Summary -->
-            <div class="p-panel summary-box" style="background: #f8fafc; display: flex; flex-direction: column;">
-                <div class="p-header"> Summary</div>
-                <div style="flex: 1;">
-                    <div class="stat-row">
-                        <span>Sites Selected:</span>
-                        <span id="selected-count-btm" style="font-weight: 800;">0</span>
-                    </div>
-                    <div class="stat-row">
-                        <span>Display Cost:</span>
-                        <span id="sum-display-btm">₹0</span>
-                    </div>
-                    
-                    <div style="border-top: 1px dashed #e2e8f0; padding-top: 1rem; margin-top: 1rem;">
-                        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 0.75rem;">
-                            <span style="font-size: 0.75rem; font-weight: 700; color: var(--secondary);">TAX TYPE</span>
-                            <select id="tax-type" class="p-input" onchange="recalcAll()" style="width: 140px; height: 28px; font-size: 0.7rem; padding: 0 0.4rem; border-radius: 6px;">
-                                <option value="igst">IGST (18%)</option>
-                                <option value="cgst_sgst">CGST/SGST (9%+9%)</option>
-                            </select>
-                        </div>
-                        <div id="tax-breakdown">
-                            <div class="stat-row">
-                                <span>GST (18%):</span>
-                                <span id="sum-tax-btm">₹0</span>
+        <div class="site-list-container" style="max-height: 500px; overflow-y: auto;">
+            <table class="crs-table selection-table" id="asset-table">
+                <thead>
+                    <tr>
+                        <th style="width: 40px;">#</th>
+                        <th style="width: 40px;"><i class="far fa-check-square"></i></th>
+                        <th>ASSET DETAILS</th>
+                        <th>PREVIEW</th>
+                        <th>DIMENSIONS</th>
+                        <th>PRICING</th>
+                        <th>SALE RATE</th>
+                        <th style="width: 120px; text-align: right;">TOTAL</th>
+                    </tr>
+                </thead>
+                <tbody id="asset-body">
+                    <?php $sno = 1; foreach ($sites as $s): 
+                        $sqft = $s['width'] * $s['height'];
+                    ?>
+                    <tr class="site-row" 
+                        id="row-<?php echo $s['id']; ?>"
+                        data-id="<?php echo $s['id']; ?>" 
+                        data-name="<?php echo $s['name']; ?>" 
+                        data-code="<?php echo $s['site_code']; ?>"
+                        data-location="<?php echo $s['location']; ?>"
+                        data-city="<?php echo $s['city']; ?>"
+                        data-state="<?php echo $s['state']; ?>"
+                        data-type="<?php echo $s['type']; ?>"
+                        data-illumination="<?php echo $s['light_type']; ?>"
+                        data-status="<?php echo $s['status']; ?>"
+                        data-rate="<?php echo $s['card_rate']; ?>" 
+                        data-prate="<?php echo $s['purchase_rate']; ?>" 
+                        data-owner="<?php echo $s['owner_type']; ?>"
+                        data-width="<?php echo $s['width']; ?>"
+                        data-height="<?php echo $s['height']; ?>"
+                        data-size="<?php echo $s['width'] . 'x' . $s['height']; ?>"
+                        data-sqft="<?php echo $sqft; ?>">
+                        <td class="sno-cell"><?php echo $sno++; ?></td>
+                        <td><input type="checkbox" class="asset-chk" onclick="toggleSite('<?php echo $s['id']; ?>')"></td>
+                        <td>
+                            <div style="font-weight: 700; color: #334155; margin-bottom: 2px;"><?php echo $s['location']; ?></div>
+                            <div style="font-size: 0.65rem; color: #94a3b8; text-transform: uppercase; font-weight: 700;">
+                                <span style="color: var(--primary);"><?php echo $s['city']; ?></span> • <?php echo $s['type']; ?> • <span class="badge-<?php echo strtolower($s['owner_type']); ?>"><?php echo $s['owner_type']; ?></span>
                             </div>
-                        </div>
-                    </div>
+                        </td>
+                        <td>
+                            <?php if ($s['thumbnail']): ?>
+                                <img src="../../uploads/sites/<?php echo $s['thumbnail']; ?>" class="site-thumb" style="width: 80px; height: 50px;">
+                            <?php else: ?>
+                                <span class="no-img">No Img</span>
+                            <?php endif; ?>
+                        </td>
+                        <td><div style="font-size: 0.8rem; font-weight: 700;"><?php echo $s['width']; ?>'x<?php echo $s['height']; ?>'</div></td>
+                        <td><div style="font-size: 0.8rem; font-weight: 700;">₹<?php echo number_format($s['card_rate']); ?></div></td>
+                        <td>
+                            <input type="number" class="p-input sale-rate-input" 
+                                   value="<?php echo $s['card_rate']; ?>" 
+                                   oninput="updateSitePrice('<?php echo $s['id']; ?>', this.value)"
+                                   disabled style="width: 90px; height: 28px; font-size: 0.75rem; padding: 2px 5px;">
+                        </td>
+                        <td class="total-cell" style="font-weight: 800; color: var(--primary); text-align: right; font-size: 0.85rem;">₹0</td>
+                    </tr>
+                    <?php endforeach; ?>
+                </tbody>
+            </table>
+        </div>
 
-                    <div class="grand-total" style="border-top: 2px solid #e2e8f0; padding-top: 0.75rem; margin-top: 0.5rem; color: var(--primary); font-weight: 900;">
-                        <div style="font-size: 0.65rem; color: var(--secondary); margin-bottom: 0.1rem;">GRAND TOTAL</div>
-                        <div id="sum-grand-btm" style="font-size: 1.5rem;">₹0</div>
-                    </div>
-                </div>
-                <button class="btn btn-primary" onclick="saveProposal()" style="width: 100%; margin-top: 0.75rem; height: 40px; border-radius: 8px; font-weight: 800; font-size: 0.85rem;">
-                    GENERATE PROPOSAL
-                </button>
+        <div class="pagination-wrap" style="padding: 1rem; display: flex; justify-content: space-between; align-items: center; background: #f8fafc; border-top: 1px solid #e2e8f0;">
+            <div class="pg-info" style="font-size: 0.75rem; font-weight: 700; color: #64748b;">
+                Showing <span id="pg-start">1</span> to <span id="pg-end">10</span> of <span id="pg-total"><?php echo count($sites); ?></span> assets matching criteria
             </div>
+            <div class="pg-controls" id="pg-numbers"></div>
         </div>
     </div>
+
+    <!-- Bottom: Configuration Grid -->
+    <div class="proposal-bottom-grid" style="grid-template-columns: 1fr 1fr; display: grid; gap: 1.5rem;">
+        <!-- Pricing Controls -->
+        <div class="p-panel">
+            <div class="p-header"> Pricing & Costs</div>
+            <div class="form-grid">
+                <div class="form-group">
+                    <label>Discount (%)</label>
+                    <input type="number" id="global_discount" value="0" class="p-input" oninput="recalcAll()" style="height: 34px;">
+                </div>
+                <div class="form-group">
+                    <label>Markup (%)</label>
+                    <input type="number" id="global_markup" value="0" class="p-input" oninput="recalcAll()" style="height: 34px;">
+                </div>
+            </div>
+            <div class="form-grid" style="margin-top: 1rem;">
+                <div class="form-group">
+                    <label>Printing (₹)</label>
+                    <input type="number" id="print_cost" value="0" class="p-input" oninput="recalcAll()" style="height: 34px;">
+                </div>
+                <div class="form-group">
+                    <label>Mounting (₹)</label>
+                    <input type="number" id="mount_cost" value="0" class="p-input" oninput="recalcAll()" style="height: 34px;">
+                </div>
+            </div>
+        </div>
+
+        <!-- Final Summary -->
+        <div class="p-panel summary-box" style="background: #f8fafc; display: flex; flex-direction: column;">
+            <div class="p-header"> Summary</div>
+            <div style="flex: 1;">
+                <div class="stat-row">
+                    <span>Sites Selected:</span>
+                    <span id="selected-count-btm" style="font-weight: 800;">0</span>
+                </div>
+                <div class="stat-row">
+                    <span>Display Cost:</span>
+                    <span id="sum-display-btm">₹0</span>
+                </div>
+                
+                <div style="border-top: 1px dashed #e2e8f0; padding-top: 1rem; margin-top: 1rem;">
+                    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 0.75rem;">
+                        <span style="font-size: 0.75rem; font-weight: 700; color: var(--secondary);">TAX TYPE</span>
+                        <select id="tax-type" class="p-input" onchange="recalcAll()" style="width: 140px; height: 28px; font-size: 0.7rem; padding: 0 0.4rem; border-radius: 6px;">
+                            <option value="igst">IGST (18%)</option>
+                            <option value="cgst_sgst">CGST/SGST (9%+9%)</option>
+                        </select>
+                    </div>
+                    <div id="tax-breakdown">
+                        <div class="stat-row">
+                            <span>GST (18%):</span>
+                            <span id="sum-tax-btm">₹0</span>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="grand-total" style="border-top: 2px solid #e2e8f0; padding-top: 0.75rem; margin-top: 0.5rem; color: var(--primary); font-weight: 900;">
+                    <div style="font-size: 0.65rem; color: var(--secondary); margin-bottom: 0.1rem;">GRAND TOTAL</div>
+                    <div id="sum-grand-btm" style="font-size: 1.5rem;">₹0</div>
+                </div>
+            </div>
+            <button class="btn btn-primary" onclick="saveProposal()" style="width: 100%; margin-top: 0.75rem; height: 40px; border-radius: 8px; font-weight: 800; font-size: 0.85rem;">
+                GENERATE PROPOSAL
+            </button>
+        </div>
+    </div>
+</div>
 </div>
 
 <div id="clientModal" class="modal-overlay" style="display: none;">
@@ -801,17 +804,15 @@ function recalcAll() {
 }
 
 function filterSites() {
-    const q = document.getElementById('site-search').value.toLowerCase();
+    const q = document.getElementById('site-search') ? document.getElementById('site-search').value.toLowerCase() : '';
     const mediaType = document.getElementById('media_type').value;
-    const inventoryType = document.getElementById('inventory_type').value;
     const lightType = document.getElementById('light_type').value;
     const ownershipRadio = document.querySelector('input[name="ownership"]:checked').value;
     const availability = document.querySelector('input[name="availability"]:checked').value;
     
-    const genre = document.getElementById('filter-genre').value;
     const state = document.getElementById('filter-state').value;
     const city = document.getElementById('filter-city').value;
-    const illumination = document.getElementById('filter-illumination').value;
+    const size = document.getElementById('filter-size').value;
 
     const rows = document.querySelectorAll('#asset-body tr.site-row');
     
@@ -823,17 +824,15 @@ function filterSites() {
         
         // Mandatory Filters & Radios
         if (mediaType && row.dataset.type !== mediaType) show = false;
-        if (inventoryType && row.dataset.owner !== inventoryType) show = false;
         if (lightType && row.dataset.illumination !== lightType) show = false;
         if (ownershipRadio !== 'all' && row.dataset.owner !== ownershipRadio) show = false;
         
-        // Select Filters
-        if (genre && row.dataset.genre !== genre) show = false;
+        // Location & Size Filters
         if (state && row.dataset.state !== state) show = false;
         if (city && row.dataset.city !== city) show = false;
-        if (illumination && row.dataset.illumination !== illumination) show = false;
+        if (size && row.dataset.size !== size) show = false;
         
-        // Text Search
+        // Text Search (only if search field exists)
         if (q) {
             const rowText = (row.dataset.name + ' ' + row.dataset.code + ' ' + row.dataset.location + ' ' + row.dataset.city).toLowerCase();
             if (!rowText.includes(q)) show = false;
@@ -854,38 +853,22 @@ document.addEventListener('DOMContentLoaded', () => {
     renderPagination();
 });
 
-function syncInventoryType(val) {
-    const select = document.getElementById('inventory_type');
-    if (val === 'all') {
-        select.value = '';
-    } else {
-        select.value = val;
-    }
-}
-
-function syncOwnershipRadios(val) {
-    const radio = document.querySelector(`input[name="ownership"][value="${val || 'all'}"]`);
-    if (radio) radio.checked = true;
-}
-
 function saveProposal() {
     const clientId = document.getElementById('client_id').value;
     const start = document.getElementById('start_date').value;
     const end = document.getElementById('end_date').value;
     const campaignName = document.getElementById('campaign_name').value;
     const mediaType = document.getElementById('media_type').value;
-    const inventoryType = document.getElementById('inventory_type').value;
+    const ownership = document.querySelector('input[name="ownership"]:checked').value;
     const totalDays = document.getElementById('total_days').value;
-    const remark = document.getElementById('remark').value;
     const contactPerson = document.getElementById('contact_person').value;
-    
     const lightType = document.getElementById('light_type').value;
     
-    if (!clientId || !start || !end || !campaignName || !mediaType || !inventoryType || !lightType || selectedSites.length === 0) {
+    if (!clientId || !start || !end || !campaignName || !mediaType || !lightType || selectedSites.length === 0) {
         Swal.fire({
             icon: 'warning',
             title: 'Missing Information',
-            text: 'Please fill all mandatory fields (including Light Type) and select at least one asset.',
+            text: 'Please fill all mandatory fields and select at least one asset.',
             confirmButtonColor: 'var(--primary)'
         });
         return;
@@ -897,10 +880,9 @@ function saveProposal() {
         endDate: end,
         campaignName,
         mediaType,
-        inventoryType,
+        inventoryType: ownership, // Use ownership radio value
         lightType,
         totalDays,
-        remark,
         contactPerson,
         printCost: parseFloat(document.getElementById('print_cost').value) || 0,
         mountCost: parseFloat(document.getElementById('mount_cost').value) || 0,
@@ -928,15 +910,13 @@ function goToStep2() {
     const start = document.getElementById('start_date').value;
     const end = document.getElementById('end_date').value;
     const mediaType = document.getElementById('media_type').value;
-    const inventoryType = document.getElementById('inventory_type').value;
-    
     const lightType = document.getElementById('light_type').value;
     
-    if (!clientId || !start || !end || !mediaType || !inventoryType || !lightType) {
+    if (!clientId || !start || !end || !mediaType || !lightType) {
         Swal.fire({
             icon: 'warning',
             title: 'Missing Details',
-            text: 'Please fill all mandatory fields (Client, Dates, Media Type, Inventory Type, Light Type) before proceeding to asset selection.',
+            text: 'Please fill all mandatory fields (Client, Dates, Media Type, Light Type) before proceeding to asset selection.',
             confirmButtonColor: 'var(--primary)'
         });
         return;
