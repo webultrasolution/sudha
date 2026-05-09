@@ -210,26 +210,30 @@ $sizes = $pdo->query("SELECT DISTINCT CONCAT(width, 'x', height) as size FROM si
             </div>
         </div>
 
-        <div class="site-list-container" style="max-height: 500px; overflow-y: auto;">
-            <table class="crs-table selection-table" id="asset-table">
-                <thead>
-                    <tr>
-                        <th style="width: 40px;">#</th>
-                        <th style="width: 40px;"><i class="far fa-check-square"></i></th>
-                        <th>ASSET DETAILS</th>
-                        <th>PREVIEW</th>
-                        <th>DIMENSIONS</th>
-                        <th>PRICING</th>
-                        <th>SALE RATE</th>
-                        <th style="width: 120px; text-align: right;">TOTAL</th>
+        <div class="site-list-container" style="max-height: 550px; overflow-y: auto;">
+            <table class="crs-table selection-table" id="asset-table" style="width: 100%; border-collapse: separate; border-spacing: 0 0.5rem;">
+                <thead style="background: white; position: sticky; top: 0; z-index: 10;">
+                    <tr style="border-bottom: 2px solid #f1f5f9;">
+                        <th style="width: 40px; padding: 1.2rem 1rem;">#</th>
+                        <th style="width: 50px; padding: 1.2rem 1rem;"><i class="far fa-check-square"></i></th>
+                        <th style="width: 100px; padding: 1.2rem 1rem;">PREVIEW</th>
+                        <th style="padding: 1.2rem 1rem;">CITY / CODE</th>
+                        <th style="padding: 1.2rem 1rem;">ASSET DETAILS</th>
+                        <th style="padding: 1.2rem 1rem;">SIZE</th>
+                        <th style="padding: 1.2rem 1rem;">PRICING</th>
+                        <th style="padding: 1.2rem 1rem;">OFFER RATE</th>
+                        <th style="padding: 1.2rem 1rem;">MARKUP</th>
+                        <th style="padding: 1.2rem 1rem; text-align: right;">TOTAL</th>
                     </tr>
                 </thead>
                 <tbody id="asset-body">
                     <?php $sno = 1; foreach ($sites as $s): 
                         $sqft = $s['width'] * $s['height'];
+                        $availDate = date('d M Y'); // Dummy date for now
                     ?>
                     <tr class="site-row" 
                         id="row-<?php echo $s['id']; ?>"
+                        style="background: white; transition: all 0.2s;"
                         data-id="<?php echo $s['id']; ?>" 
                         data-name="<?php echo $s['name']; ?>" 
                         data-code="<?php echo $s['site_code']; ?>"
@@ -246,30 +250,64 @@ $sizes = $pdo->query("SELECT DISTINCT CONCAT(width, 'x', height) as size FROM si
                         data-height="<?php echo $s['height']; ?>"
                         data-size="<?php echo $s['width'] . 'x' . $s['height']; ?>"
                         data-sqft="<?php echo $sqft; ?>">
-                        <td class="sno-cell"><?php echo $sno++; ?></td>
-                        <td><input type="checkbox" class="asset-chk" onclick="toggleSite('<?php echo $s['id']; ?>')"></td>
-                        <td>
-                            <div style="font-weight: 700; color: #334155; margin-bottom: 2px;"><?php echo $s['location']; ?></div>
-                            <div style="font-size: 0.65rem; color: #94a3b8; text-transform: uppercase; font-weight: 700;">
-                                <span style="color: var(--primary);"><?php echo $s['city']; ?></span> • <?php echo $s['type']; ?> • <span class="badge-<?php echo strtolower($s['owner_type']); ?>"><?php echo $s['owner_type']; ?></span>
-                            </div>
+                        
+                        <td class="sno-cell" style="padding: 1.5rem 1rem; font-weight: 700; color: #64748b;"><?php echo $sno++; ?></td>
+                        
+                        <td style="padding: 1.5rem 1rem; text-align: center;">
+                            <input type="checkbox" class="asset-chk" onclick="toggleSite('<?php echo $s['id']; ?>')" style="width: 20px; height: 20px; border-radius: 6px; cursor: pointer; accent-color: var(--primary);">
                         </td>
-                        <td>
+
+                        <td style="padding: 1.5rem 1rem;">
                             <?php if ($s['thumbnail']): ?>
-                                <img src="../../uploads/sites/<?php echo $s['thumbnail']; ?>" class="site-thumb" style="width: 80px; height: 50px;">
+                                <img src="../../uploads/sites/<?php echo $s['thumbnail']; ?>" class="site-thumb" style="width: 100px; height: 65px; border-radius: 12px; object-fit: cover; border: 1px solid #e2e8f0; box-shadow: 0 4px 10px rgba(0,0,0,0.05);">
                             <?php else: ?>
-                                <span class="no-img">No Img</span>
+                                <div style="width: 100px; height: 65px; border-radius: 12px; background: #f8fafc; border: 1px dashed #e2e8f0; display: flex; align-items: center; justify-content: center; font-size: 0.7rem; color: #94a3b8; font-weight: 700;">No Img</div>
                             <?php endif; ?>
                         </td>
-                        <td><div style="font-size: 0.8rem; font-weight: 700;"><?php echo $s['width']; ?>'x<?php echo $s['height']; ?>'</div></td>
-                        <td><div style="font-size: 0.8rem; font-weight: 700;">₹<?php echo number_format($s['card_rate']); ?></div></td>
-                        <td>
+
+                        <td style="padding: 1.5rem 1rem;">
+                            <div style="font-weight: 800; color: #1e293b; font-size: 0.9rem; margin-bottom: 2px;"><?php echo $s['city']; ?></div>
+                            <div style="color: #f97316; font-size: 0.75rem; font-weight: 800; letter-spacing: 0.02em;"><?php echo $s['site_code']; ?></div>
+                        </td>
+
+                        <td style="padding: 1.5rem 1rem;">
+                            <div style="font-weight: 800; color: #1e293b; font-size: 0.9rem; margin-bottom: 4px;"><?php echo $s['location']; ?></div>
+                            <div style="font-size: 0.7rem; color: #64748b; font-weight: 700; margin-bottom: 0.75rem;">Near <?php echo $s['city']; ?></div>
+                            <div style="display: flex; gap: 0.4rem; align-items: center;">
+                                <span style="background: #ecfdf5; color: #059669; padding: 0.2rem 0.6rem; border-radius: 6px; font-size: 0.6rem; font-weight: 800; text-transform: uppercase;"><?php echo $s['type']; ?></span>
+                                <span style="background: #f1f5f9; color: #475569; padding: 0.2rem 0.6rem; border-radius: 6px; font-size: 0.6rem; font-weight: 800; text-transform: uppercase;"><?php echo $s['light_type']; ?></span>
+                                <span style="background: #f1f5f9; color: #475569; padding: 0.2rem 0.6rem; border-radius: 6px; font-size: 0.6rem; font-weight: 800; text-transform: uppercase;"><?php echo $s['owner_type']; ?></span>
+                            </div>
+                        </td>
+
+                        <td style="padding: 1.5rem 1rem;">
+                            <div style="font-weight: 800; color: #1e293b; font-size: 0.9rem; margin-bottom: 2px;"><?php echo $s['width']; ?>' x <?php echo $s['height']; ?>'</div>
+                            <div style="font-size: 0.75rem; color: #94a3b8; font-weight: 700;"><?php echo number_format($sqft); ?> SQFT</div>
+                        </td>
+
+                        <td style="padding: 1.5rem 1rem;">
+                            <div style="font-weight: 800; color: #64748b; font-size: 0.8rem; margin-bottom: 4px;">CARD: ₹<?php echo number_format($s['card_rate']); ?></div>
+                            <div style="font-size: 0.7rem; color: #94a3b8; font-weight: 700;">Cost: ₹<?php echo number_format($s['purchase_rate']); ?></div>
+                        </td>
+
+                        <td style="padding: 1.5rem 1rem;">
+                            <div style="font-size: 0.65rem; color: var(--primary); font-weight: 800; margin-bottom: 4px; text-transform: uppercase;">Offer Rate</div>
                             <input type="number" class="p-input sale-rate-input" 
                                    value="<?php echo $s['card_rate']; ?>" 
                                    oninput="updateSitePrice('<?php echo $s['id']; ?>', this.value)"
-                                   disabled style="width: 90px; height: 28px; font-size: 0.75rem; padding: 2px 5px;">
+                                   disabled
+                                   style="width: 100px; height: 32px; font-size: 0.85rem; font-weight: 800; border-radius: 8px; border: 1px solid #e2e8f0; padding: 0 0.5rem; color: #1e293b;">
                         </td>
-                        <td class="total-cell" style="font-weight: 800; color: var(--primary); text-align: right; font-size: 0.85rem;">₹0</td>
+
+                        <td style="padding: 1.5rem 1rem;">
+                            <div style="font-size: 0.65rem; color: #64748b; font-weight: 800; margin-bottom: 4px; text-transform: uppercase;">Markup</div>
+                            <div class="markup-cell" style="font-weight: 800; font-size: 0.85rem; color: #059669;">-</div>
+                        </td>
+
+                        <td style="padding: 1.5rem 1rem; text-align: right;">
+                            <div style="font-size: 0.65rem; color: #64748b; font-weight: 800; margin-bottom: 4px; text-transform: uppercase;">Total</div>
+                            <div class="total-cell" style="font-weight: 900; color: var(--primary); font-size: 0.95rem;">₹0</div>
+                        </td>
                     </tr>
                     <?php endforeach; ?>
                 </tbody>
@@ -745,15 +783,9 @@ function recalcAll() {
 
     selectedSites.forEach((site) => {
         const row = document.getElementById('row-' + site.id);
-        
-        // If global pricing is used, we could auto-adjust saleRate
-        // For now, we'll treat them as adjustments to the total or allow them to drive individual rates
-        // Let's make them drive the saleRate if the user inputs a global value
-        // But to keep it "proper", we'll apply them to the base cardRate if not manually overridden
-        
         const currentTotal = site.saleRate;
         
-        // Margin Analysis: (Sale - Purchase) / Purchase * 100
+        // Margin Analysis: (Sale - Purchase)
         const markupVal = site.saleRate - site.purchaseRate;
         const markupPct = site.purchaseRate > 0 ? ((markupVal / site.purchaseRate) * 100).toFixed(1) : '0';
 
@@ -762,6 +794,11 @@ function recalcAll() {
         // Update row visual
         if(row) {
             row.querySelector('.total-cell').innerText = '₹' + currentTotal.toLocaleString();
+            const markupCell = row.querySelector('.markup-cell');
+            if(markupCell) {
+                markupCell.innerText = '₹' + markupVal.toLocaleString() + ' (' + markupPct + '%)';
+                markupCell.style.color = markupVal >= 0 ? '#059669' : '#ef4444';
+            }
         }
     });
 
