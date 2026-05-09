@@ -1065,6 +1065,7 @@ function saveProposal() {
 }
 
 function goToStep2() {
+    const campaignName = document.getElementById('campaign_name').value;
     const clientId = document.getElementById('client_id').value;
     const start = document.getElementById('start_date').value;
     const end = document.getElementById('end_date').value;
