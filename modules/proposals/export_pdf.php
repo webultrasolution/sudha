@@ -20,6 +20,7 @@ if (!$proposal) {
     die("Proposal not found.");
 }
 
+// Fetch Items for the table
 $items = $pdo->prepare("
     SELECT pi.*, s.site_code, s.location, s.city as site_city, s.type as site_type, s.width, s.height, s.light_type
     FROM proposal_items pi
@@ -28,58 +29,116 @@ $items = $pdo->prepare("
 ");
 $items->execute([$id]);
 $items = $items->fetchAll();
+
+// Fetch All Images for the visual plan
+$images_stmt = $pdo->prepare("
+    SELECT pi.*, s.site_code, s.location, s.city as site_city, s.type as site_type, s.width, s.height, s.light_type,
+    si.filename as image
+    FROM proposal_items pi
+    JOIN sites s ON pi.site_id = s.id
+    JOIN site_images si ON s.id = si.site_id
+    WHERE pi.proposal_id = ?
+    ORDER BY pi.id ASC, si.is_primary DESC
+");
+$images_stmt->execute([$id]);
+$visual_data = $images_stmt->fetchAll();
 ?>
 <!DOCTYPE html>
 <html lang="en">
 <head>
     <meta charset="UTF-8">
     <title>Proposal - <?php echo $proposal['proposal_number']; ?></title>
-    <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;600;800&display=swap" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;600;800;900&display=swap" rel="stylesheet">
     <style>
-        :root { --primary: #0d9488; --dark: #0f172a; --slate: #64748b; }
+        :root { --primary: #0d9488; --accent: #dc2626; --dark: #0f172a; --slate: #64748b; }
         * { box-sizing: border-box; -webkit-print-color-adjust: exact; }
-        body { font-family: 'Outfit', sans-serif; color: var(--dark); margin: 0; padding: 40px; line-height: 1.5; font-size: 14px; }
+        body { font-family: 'Outfit', sans-serif; color: var(--dark); margin: 0; padding: 40px; line-height: 1.5; font-size: 14px; background: white; }
+        
+        .page-break { page-break-before: always; padding-top: 20px; }
+        
         .header { display: flex; justify-content: space-between; margin-bottom: 50px; border-bottom: 4px solid var(--primary); padding-bottom: 20px; }
-        .logo-area h1 { margin: 0; color: var(--primary); font-size: 28px; font-weight: 800; text-transform: uppercase; letter-spacing: 2px; }
-        .logo-area p { margin: 5px 0 0; color: var(--slate); font-weight: 600; }
+        .logo-area img { height: 60px; width: auto; }
         .proposal-info { text-align: right; }
-        .proposal-info h2 { margin: 0; font-size: 20px; color: var(--slate); }
-        .proposal-info p { margin: 5px 0 0; font-weight: 600; }
+        .proposal-info h2 { margin: 0; font-size: 24px; color: var(--primary); font-weight: 800; }
+        .proposal-info p { margin: 5px 0 0; font-weight: 600; color: var(--slate); }
 
         .details-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 40px; margin-bottom: 40px; }
         .detail-box h3 { font-size: 12px; text-transform: uppercase; color: var(--slate); margin-bottom: 10px; border-bottom: 1px solid #e2e8f0; padding-bottom: 5px; }
         .detail-box p { margin: 2px 0; font-weight: 500; }
-        .detail-box strong { color: var(--dark); font-weight: 700; font-size: 16px; }
+        .detail-box strong { color: var(--dark); font-weight: 800; font-size: 16px; }
 
         table { width: 100%; border-collapse: collapse; margin-bottom: 30px; }
         th { background: #f8fafc; padding: 12px 10px; text-align: left; font-size: 11px; text-transform: uppercase; color: var(--slate); border-bottom: 2px solid #e2e8f0; }
         td { padding: 15px 10px; border-bottom: 1px solid #f1f5f9; vertical-align: top; }
         
-        .total-section { margin-left: auto; width: 300px; }
+        .total-section { margin-left: auto; width: 300px; margin-top: 20px; }
         .total-row { display: flex; justify-content: space-between; padding: 10px 0; border-bottom: 1px solid #f1f5f9; }
-        .total-row.grand { border-bottom: none; color: var(--primary); font-size: 20px; font-weight: 800; margin-top: 10px; }
+        .total-row.grand { border-bottom: none; color: var(--primary); font-size: 22px; font-weight: 900; margin-top: 10px; }
+
+        /* Visual Plan Styling */
+        .visual-heading { 
+            background: var(--dark); 
+            color: white; 
+            padding: 15px 25px; 
+            font-size: 20px; 
+            font-weight: 800; 
+            text-transform: uppercase; 
+            letter-spacing: 2px;
+            margin: 40px 0;
+            border-radius: 4px;
+            text-align: center;
+        }
+        .asset-slide { margin-bottom: 60px; page-break-inside: avoid; }
+        .image-box { 
+            width: 100%; 
+            height: 500px; 
+            background: #f8fafc; 
+            border: 1px solid #e2e8f0; 
+            border-radius: 12px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            overflow: hidden;
+            box-shadow: 0 4px 12px rgba(0,0,0,0.05);
+        }
+        .image-box img { max-width: 100%; max-height: 100%; object-fit: contain; }
+        
+        .caption-box { 
+            padding: 25px 0; 
+            text-align: center; 
+        }
+        .caption-text { 
+            font-size: 24px; 
+            font-weight: 900; 
+            color: #dc2626; 
+            text-decoration: underline; 
+            text-underline-offset: 8px;
+            text-decoration-thickness: 3px;
+        }
 
         .footer { margin-top: 80px; font-size: 12px; color: var(--slate); border-top: 1px solid #e2e8f0; padding-top: 20px; text-align: center; }
         
         @media print {
             body { padding: 0; }
             .no-print { display: none; }
+            .asset-slide { page-break-after: always; margin-bottom: 0; padding: 40px; }
         }
     </style>
 </head>
 <body>
-    <div class="no-print" style="position: fixed; top: 20px; right: 20px; background: #fff; padding: 10px; border-radius: 8px; shadow: 0 4px 12px rgba(0,0,0,0.1); border: 1px solid #e2e8f0; z-index: 100;">
-        <button onclick="window.print()" style="background: var(--primary); color: #fff; border: none; padding: 8px 16px; border-radius: 6px; cursor: pointer; font-weight: 700;">Print to PDF</button>
+    <div class="no-print" style="position: fixed; top: 20px; right: 20px; background: #fff; padding: 10px; border-radius: 8px; box-shadow: 0 4px 12px rgba(0,0,0,0.1); border: 1px solid #e2e8f0; z-index: 100;">
+        <button onclick="window.print()" style="background: var(--primary); color: #fff; border: none; padding: 10px 20px; border-radius: 6px; cursor: pointer; font-weight: 800; font-family: inherit;">PRINT PROPOSAL</button>
     </div>
 
+    <!-- Cover Page Info -->
     <div class="header">
         <div class="logo-area">
-            <img src="../../assets/img/LOGO.png" style="height: 50px; width: auto;" alt="Sudha Creative Logo">
+            <img src="../../assets/img/LOGO.png" alt="Logo">
         </div>
         <div class="proposal-info">
             <h2>PROPOSAL</h2>
             <p>#<?php echo $proposal['proposal_number']; ?></p>
-            <p>Date: <?php echo date('d M Y', strtotime($proposal['created_at'])); ?></p>
+            <p><?php echo date('d F Y'); ?></p>
         </div>
     </div>
 
@@ -89,7 +148,7 @@ $items = $items->fetchAll();
             <strong><?php echo COMPANY_NAME; ?></strong>
             <p><?php echo COMPANY_ADDRESS; ?></p>
             <p><?php echo COMPANY_CITY; ?></p>
-            <p style="margin-top: 5px; font-weight: 700;">GSTIN: <?php echo COMPANY_GSTIN; ?></p>
+            <p style="margin-top: 8px; font-weight: 800; color: var(--primary);">GSTIN: <?php echo COMPANY_GSTIN; ?></p>
             <p>Ph: <?php echo COMPANY_PHONE; ?></p>
         </div>
         <div class="detail-box">
@@ -98,28 +157,21 @@ $items = $items->fetchAll();
             <p><?php echo $proposal['client_address']; ?></p>
             <p><?php echo $proposal['client_city']; ?></p>
             <?php if ($proposal['client_gstin']): ?>
-                <p style="margin-top: 5px; font-weight: 700;">GSTIN: <?php echo $proposal['client_gstin']; ?></p>
+                <p style="margin-top: 8px; font-weight: 800; color: var(--primary);">GSTIN: <?php echo $proposal['client_gstin']; ?></p>
             <?php endif; ?>
-            <p>Attn: <?php echo $proposal['contact_person'] ?? 'Proprietor'; ?></p>
+            <p>Attn: <?php echo $proposal['contact_person'] ?? 'Concerned Person'; ?></p>
         </div>
     </div>
 
-    <div class="details-grid" style="grid-template-columns: 1fr; margin-bottom: 20px;">
-        <div class="detail-box" style="background: #f8fafc; padding: 15px; border-radius: 8px; border: 1px solid #e2e8f0;">
-            <h3 style="border: none; margin-bottom: 5px;">Campaign Summary</h3>
-            <div style="display: flex; gap: 40px;">
-                <div>
-                    <span style="font-size: 11px; color: var(--slate); text-transform: uppercase;">Campaign Name</span>
-                    <div style="font-weight: 700; font-size: 16px;"><?php echo $proposal['campaign_name']; ?></div>
-                </div>
-                <div>
-                    <span style="font-size: 11px; color: var(--slate); text-transform: uppercase;">Duration</span>
-                    <div style="font-weight: 600;"><?php echo date('d M Y', strtotime($proposal['start_date'])); ?> - <?php echo date('d M Y', strtotime($proposal['end_date'])); ?></div>
-                </div>
-                <div style="margin-left: auto; text-align: right;">
-                    <span style="font-size: 11px; color: var(--slate); text-transform: uppercase;">Account Manager</span>
-                    <div style="font-weight: 600;"><?php echo $proposal['creator_name']; ?></div>
-                </div>
+    <div style="background: #f8fafc; padding: 25px; border-radius: 12px; border: 1px solid #e2e8f0; margin-bottom: 40px;">
+        <div style="display: flex; justify-content: space-between; align-items: center;">
+            <div>
+                <span style="font-size: 11px; color: var(--slate); text-transform: uppercase; font-weight: 800; letter-spacing: 1px;">Campaign Name</span>
+                <div style="font-weight: 900; font-size: 24px; color: var(--dark);"><?php echo $proposal['campaign_name']; ?></div>
+            </div>
+            <div style="text-align: right;">
+                <span style="font-size: 11px; color: var(--slate); text-transform: uppercase; font-weight: 800; letter-spacing: 1px;">Duration</span>
+                <div style="font-weight: 700; font-size: 18px;"><?php echo date('d M Y', strtotime($proposal['start_date'])); ?> - <?php echo date('d M Y', strtotime($proposal['end_date'])); ?></div>
             </div>
         </div>
     </div>
@@ -132,7 +184,7 @@ $items = $items->fetchAll();
                 <th>Location / City</th>
                 <th>Size</th>
                 <th>Days</th>
-                <th style="text-align: right;">Amount</th>
+                <th style="text-align: right;">Total (INR)</th>
             </tr>
         </thead>
         <tbody>
@@ -140,16 +192,16 @@ $items = $items->fetchAll();
             <tr>
                 <td><?php echo $sn++; ?></td>
                 <td>
-                    <div style="font-weight: 700; color: var(--dark);"><?php echo $item['site_type']; ?></div>
-                    <div style="font-size: 11px; color: var(--slate);">Code: <?php echo $item['site_code']; ?></div>
+                    <div style="font-weight: 800; color: var(--dark); font-size: 15px;"><?php echo $item['site_type']; ?></div>
+                    <div style="font-size: 11px; color: var(--slate); font-weight: 700;">CODE: <?php echo $item['site_code']; ?></div>
                 </td>
                 <td>
-                    <div style="font-weight: 600;"><?php echo $item['location']; ?></div>
-                    <div style="font-size: 11px; color: var(--slate);"><?php echo $item['site_city']; ?></div>
+                    <div style="font-weight: 700;"><?php echo $item['location']; ?></div>
+                    <div style="font-size: 11px; color: var(--slate); font-weight: 600;"><?php echo $item['site_city']; ?></div>
                 </td>
-                <td><?php echo $item['width']; ?>' x <?php echo $item['height']; ?>'</td>
-                <td><?php echo $item['days']; ?></td>
-                <td style="text-align: right; font-weight: 700;">₹<?php echo number_format($item['amount'], 2); ?></td>
+                <td style="font-weight: 600;"><?php echo (int)$item['width']; ?>' x <?php echo (int)$item['height']; ?>'</td>
+                <td style="font-weight: 600;"><?php echo $item['days']; ?></td>
+                <td style="text-align: right; font-weight: 800; color: var(--dark);">₹<?php echo number_format($item['amount'], 2); ?></td>
             </tr>
             <?php endforeach; ?>
         </tbody>
@@ -157,12 +209,12 @@ $items = $items->fetchAll();
 
     <div class="total-section">
         <div class="total-row">
-            <span>Subtotal</span>
-            <strong>₹<?php echo number_format($proposal['total_amount'], 2); ?></strong>
+            <span style="font-weight: 600; color: var(--slate);">Subtotal</span>
+            <strong style="font-size: 16px;">₹<?php echo number_format($proposal['total_amount'], 2); ?></strong>
         </div>
         <div class="total-row">
-            <span>Tax (GST)</span>
-            <strong>₹<?php echo number_format($proposal['tax_amount'], 2); ?></strong>
+            <span style="font-weight: 600; color: var(--slate);">Tax (GST 18%)</span>
+            <strong style="font-size: 16px;">₹<?php echo number_format($proposal['tax_amount'], 2); ?></strong>
         </div>
         <div class="total-row grand">
             <span>Grand Total</span>
@@ -170,15 +222,41 @@ $items = $items->fetchAll();
         </div>
     </div>
 
+    <!-- Visual Media Plan Section -->
+    <div class="page-break"></div>
+    <div class="visual-heading">Visual Media Plan & Site Details</div>
+
+    <?php 
+    foreach ($visual_data as $v): 
+        $dim = (int)$v['width'] . "X" . (int)$v['height'];
+        $rateVal = floatval($v['sale_rate']);
+        $rateFormatted = number_format($rateVal, 0, '.', '');
+        $caption = "{$v['site_city']} {$v['location']}.{$dim}. {$v['light_type']} ( {$v['site_type']} ) . Rs.{$rateFormatted} PM";
+    ?>
+    <div class="asset-slide">
+        <div style="margin-bottom: 20px; display: flex; justify-content: space-between; align-items: flex-end; border-bottom: 2px solid #f1f5f9; padding-bottom: 10px;">
+            <img src="../../assets/img/LOGO.png" style="height: 40px; width: auto;">
+            <div style="font-weight: 800; color: var(--slate); text-transform: uppercase; font-size: 12px;"><?php echo $proposal['campaign_name']; ?></div>
+        </div>
+        
+        <div class="image-box">
+            <?php if ($v['image']): ?>
+                <img src="../../uploads/sites/<?php echo $v['image']; ?>" alt="Site">
+            <?php else: ?>
+                <div style="color: #94a3b8; font-weight: 800; font-size: 20px;">NO IMAGE AVAILABLE</div>
+            <?php endif; ?>
+        </div>
+        
+        <div class="caption-box">
+            <div class="caption-text"><?php echo $caption; ?></div>
+        </div>
+    </div>
+    <?php endforeach; ?>
+
     <div class="footer">
         <p>This is a computer generated proposal. For any queries, please contact our support team.</p>
-        <p>Thank you for your business!</p>
+        <p>Thank you for choosing Sudha Creative!</p>
     </div>
 
-    <script>
-        window.onload = function() {
-            // setTimeout(() => { window.print(); }, 500);
-        }
-    </script>
 </body>
 </html>
