@@ -258,5 +258,10 @@ $visual_data = $images_stmt->fetchAll();
         <p>Thank you for choosing Sudha Creative!</p>
     </div>
 
+    <script>
+        window.onload = function() {
+            setTimeout(() => { window.print(); }, 800);
+        }
+    </script>
 </body>
 </html>
