@@ -465,7 +465,17 @@ function openModal() {
 function closeModal() { document.getElementById('siteModal').style.display = 'none'; }
 function toggleVendor() {
     const type = document.getElementById('owner_toggle').value;
-    document.getElementById('vendor_select').style.display = (type === 'TA') ? 'block' : 'none';
+    const vendorSelect = document.getElementById('vendor_select');
+    const vendorInput = document.getElementById('f_vendor');
+    
+    if (type === 'TA') {
+        vendorSelect.style.display = 'block';
+        vendorInput.required = true;
+    } else {
+        vendorSelect.style.display = 'none';
+        vendorInput.required = false;
+        vendorInput.value = '';
+    }
 }
 
 function viewPhotos(siteId, lightType) {
@@ -708,6 +718,19 @@ function deleteSite(e, id) {
         }
     });
 }
+// Notifications
+document.addEventListener('DOMContentLoaded', () => {
+    const urlParams = new URLSearchParams(window.location.search);
+    if (urlParams.has('msg')) {
+        const msg = urlParams.get('msg');
+        if (msg === 'added') Swal.fire('Success', 'Site added successfully!', 'success');
+        if (msg === 'updated') Swal.fire('Success', 'Site updated successfully!', 'success');
+        if (msg === 'deleted') Swal.fire('Success', 'Site deleted successfully!', 'success');
+    }
+    if (urlParams.has('error')) {
+        Swal.fire('Error', decodeURIComponent(urlParams.get('error')), 'error');
+    }
+});
 </script>
 
 <?php include_once __DIR__ . '/../../includes/footer.php'; ?>
