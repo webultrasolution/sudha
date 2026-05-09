@@ -1,6 +1,5 @@
 <?php
-include 'config/db.php';
-$stmt = $pdo->query("DESCRIBE sites");
-$cols = $stmt->fetchAll(PDO::FETCH_COLUMN);
-echo implode(", ", $cols);
+include_once __DIR__ . '/../config/db.php';
+$stmt = $pdo->query("DESC sites");
+print_r($stmt->fetchAll(PDO::FETCH_COLUMN));
 ?>

@@ -11,15 +11,21 @@ if (!hasRole(['admin', 'sales'])) {
 }
 
 // Fetch Data
-$clients = $pdo->query("SELECT id, name, city FROM partners WHERE type = 'client' ORDER BY name ASC")->fetchAll();
+$clients = $pdo->query("SELECT id, name, city, contact_person FROM partners WHERE type = 'client' ORDER BY name ASC")->fetchAll();
 $sitesQuery = "
     SELECT 
         s.*, 
         (SELECT filename FROM site_images WHERE site_id = s.id LIMIT 1) as thumbnail 
     FROM sites s 
-    WHERE s.status = 'available' 
     ORDER BY s.site_code ASC";
 $sites = $pdo->query($sitesQuery)->fetchAll();
+
+// Fetch filter values
+$cities = $pdo->query("SELECT DISTINCT city FROM sites WHERE city IS NOT NULL AND city != '' ORDER BY city")->fetchAll(PDO::FETCH_COLUMN);
+$states = $pdo->query("SELECT DISTINCT state FROM sites WHERE state IS NOT NULL AND state != '' ORDER BY state")->fetchAll(PDO::FETCH_COLUMN);
+$mediaTypes = $pdo->query("SELECT DISTINCT type FROM sites WHERE type IS NOT NULL AND type != '' ORDER BY type")->fetchAll(PDO::FETCH_COLUMN);
+$illuminations = $pdo->query("SELECT DISTINCT light_type FROM sites WHERE light_type IS NOT NULL AND light_type != '' ORDER BY light_type")->fetchAll(PDO::FETCH_COLUMN);
+$genres = $pdo->query("SELECT DISTINCT genre FROM sites WHERE genre IS NOT NULL AND genre != '' ORDER BY genre")->fetchAll(PDO::FETCH_COLUMN);
 ?>
 
 <div class="proposal-full-wrapper">
@@ -48,39 +54,66 @@ $sites = $pdo->query($sitesQuery)->fetchAll();
 
     <!-- STEP 1 -->
     <div id="step-1">
-        <div class="p-panel" style="max-width: 600px; margin: 0 auto;">
-            <div class="p-header"> Client & Duration</div>
-            <div class="form-group">
-                <label style="display: flex; justify-content: space-between; align-items: center;">
-                    Select Client
-                    <button type="button" class="btn-text" onclick="openClientModal()" style="font-size: 0.75rem; color: var(--primary); background: none; border: none; cursor: pointer; padding: 0;">
-                        <i class="fas fa-plus-circle"></i> New Client
-                    </button>
-                </label>
-                <select id="client_id" class="p-input" style="height: 38px;">
-                    <option value="">-- Choose Client --</option>
-                    <?php foreach ($clients as $c): ?>
-                        <option value="<?php echo $c['id']; ?>"><?php echo $c['name']; ?> <?php echo $c['city'] ? "({$c['city']})" : ""; ?></option>
-                    <?php endforeach; ?>
-                </select>
-            </div>
-            <div class="form-grid">
+        <div class="p-panel" style="max-width: 1100px; margin: 0 auto;">
+            <div class="p-header"> Basic Details & Duration</div>
+            
+            <!-- Row 1: Campaign, Client, Contact -->
+            <div class="form-grid" style="grid-template-columns: 1fr 1fr 1fr; margin-bottom: 1rem;">
                 <div class="form-group">
-                    <label>Start Date</label>
-                    <input type="date" id="start_date" class="p-input" style="height: 38px;">
+                    <label>Campaign Name <span style="color:red;">*</span></label>
+                    <input type="text" id="campaign_name" class="p-input" placeholder="Enter campaign name (e.g. Summer Sale 2024)" style="height: 38px;">
                 </div>
                 <div class="form-group">
-                    <label>End Date</label>
-                    <input type="date" id="end_date" class="p-input" style="height: 38px;">
+                    <label style="display: flex; justify-content: space-between; align-items: center;">
+                        <span>Company / Client <span style="color:red;">*</span></span>
+                        <button type="button" class="btn-text" onclick="openClientModal()" style="font-size: 0.7rem; color: var(--primary); background: none; border: none; cursor: pointer; padding: 0;">
+                            <i class="fas fa-plus-circle"></i> New
+                        </button>
+                    </label>
+                    <select id="client_id" class="p-input" style="height: 38px;" onchange="handleClientChange()">
+                        <option value="">-- Choose Client --</option>
+                        <?php foreach ($clients as $c): ?>
+                            <option value="<?php echo $c['id']; ?>" data-contact="<?php echo htmlspecialchars($c['contact_person'] ?? ''); ?>">
+                                <?php echo $c['name']; ?> <?php echo $c['city'] ? "({$c['city']})" : ""; ?>
+                            </option>
+                        <?php endforeach; ?>
+                    </select>
+                </div>
+                <div class="form-group">
+                    <label>Contact Person</label>
+                    <input type="text" id="contact_person" class="p-input" placeholder="Contact person name" style="height: 38px;">
                 </div>
             </div>
-            <div class="form-group">
-                <label>Campaign Name</label>
-                <input type="text" id="campaign_name" class="p-input" placeholder="Enter campaign name (e.g. Summer Sale 2024)" style="height: 38px;">
+
+            <!-- Row 2: Dates & Total Days -->
+            <div class="form-grid" style="grid-template-columns: 1fr 1fr 1fr 0.6fr 1.4fr;">
+                <div class="form-group">
+                    <label>From Date <span style="color:red;">*</span></label>
+                    <input type="date" id="start_date" class="p-input" style="height: 38px;" onchange="calculateEndDate()">
+                </div>
+                <div class="form-group">
+                    <label>To Date <span style="color:red;">*</span></label>
+                    <input type="date" id="end_date" class="p-input" style="height: 38px;" onchange="calculateTotalDays()">
+                </div>
+                <div class="form-group">
+                    <label>Delivery Date</label>
+                    <input type="date" id="delivery_date" class="p-input" style="height: 38px;">
+                </div>
+                <div class="form-group">
+                    <label>Total Days</label>
+                    <input type="number" id="total_days" class="p-input" placeholder="Days" style="height: 38px;" oninput="calculateEndDate()">
+                </div>
+                <div class="form-group">
+                    <label>Remark (Optional)</label>
+                    <input type="text" id="remark" class="p-input" placeholder="Any additional notes..." style="height: 38px;">
+                </div>
             </div>
-            <button class="btn btn-primary" onclick="goToStep2()" style="width: 100%; margin-top: 1.5rem; height: 44px; border-radius: 10px; font-weight: 800; font-size: 0.9rem;">
-                Next Step: Select Assets <i class="fas fa-arrow-right" style="margin-left: 0.5rem;"></i>
-            </button>
+
+            <div style="display: flex; justify-content: flex-end; margin-top: 1.5rem;">
+                <button class="btn btn-primary" onclick="goToStep2()" style="width: 250px; height: 44px; border-radius: 10px; font-weight: 800; font-size: 0.9rem;">
+                    Next Step: Select Assets <i class="fas fa-arrow-right" style="margin-left: 0.5rem;"></i>
+                </button>
+            </div>
         </div>
     </div>
 
@@ -93,6 +126,62 @@ $sites = $pdo->query($sitesQuery)->fetchAll();
         </div>
 
         <!-- Top: Full Width Asset Selection -->
+        <!-- Top: Media Search Panel -->
+        <div class="p-panel" style="margin-bottom: 1.5rem; border-left: 4px solid var(--primary);">
+            <div style="font-size: 0.75rem; font-weight: 800; color: var(--primary); text-transform: uppercase; margin-bottom: 1rem; display: flex; align-items: center; gap: 0.5rem;">
+                <i class="fas fa-search"></i> Media Search
+            </div>
+            
+            <div class="media-search-grid">
+                <!-- Ownership & Availability -->
+                <div class="search-row" style="margin-bottom: 1rem;">
+                    <div class="search-group">
+                        <div class="radio-group">
+                            <label><input type="radio" name="ownership" value="all" checked onchange="filterSites()"> Self / Vendor / Third Party</label>
+                            <label><input type="radio" name="ownership" value="HA" onchange="filterSites()"> Self</label>
+                            <label><input type="radio" name="ownership" value="TA" onchange="filterSites()"> Vendor</label>
+                        </div>
+                    </div>
+                    <div class="search-group" style="margin-left: 2rem;">
+                        <div class="radio-group">
+                            <label><input type="radio" name="availability" value="available" checked onchange="filterSites()"> Available</label>
+                            <label><input type="radio" name="availability" value="all" onchange="filterSites()"> All Media</label>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Main Filters -->
+                <div style="display: grid; grid-template-columns: repeat(4, 1fr); gap: 1rem;">
+                    <select id="filter-genre" class="p-input" onchange="filterSites()">
+                        <option value="">Select Genre</option>
+                        <?php foreach($genres as $g): ?> <option value="<?php echo $g; ?>"><?php echo $g; ?></option> <?php endforeach; ?>
+                    </select>
+                    <select id="filter-type" class="p-input" onchange="filterSites()">
+                        <option value="">Select Media Type</option>
+                        <?php foreach($mediaTypes as $t): ?> <option value="<?php echo $t; ?>"><?php echo $t; ?></option> <?php endforeach; ?>
+                    </select>
+                    <select id="filter-state" class="p-input" onchange="filterSites()">
+                        <option value="">Select State</option>
+                        <?php foreach($states as $s): ?> <option value="<?php echo $s; ?>"><?php echo $s; ?></option> <?php endforeach; ?>
+                    </select>
+                    <select id="filter-city" class="p-input" onchange="filterSites()">
+                        <option value="">Select City</option>
+                        <?php foreach($cities as $c): ?> <option value="<?php echo $c; ?>"><?php echo $c; ?></option> <?php endforeach; ?>
+                    </select>
+                    <select id="filter-illumination" class="p-input" onchange="filterSites()">
+                        <option value="">Select Illumination</option>
+                        <?php foreach($illuminations as $i): ?> <option value="<?php echo $i; ?>"><?php echo $i; ?></option> <?php endforeach; ?>
+                    </select>
+                    <div class="search-input-wrap" style="grid-column: span 2;">
+                        <input type="text" id="site-search" class="p-input" placeholder="Search site name, code or location..." onkeyup="filterSites()">
+                    </div>
+                    <button class="btn btn-primary" onclick="filterSites()" style="height: 38px;">
+                        <i class="fas fa-search"></i> Search
+                    </button>
+                </div>
+            </div>
+        </div>
+
         <div class="p-panel" id="asset-plan-panel" style="margin-bottom: 2rem;">
             <div class="p-header" style="display: flex; justify-content: space-between; align-items: center;">
                 <div style="display: flex; align-items: center; gap: 1rem;">
@@ -100,9 +189,6 @@ $sites = $pdo->query($sitesQuery)->fetchAll();
                 </div>
                 <div style="display: flex; gap: 1rem; align-items: center;">
                     <div class="selection-stats">Selected: <span id="selected-count">0</span> sites</div>
-                    <div class="asset-search-bar">
-                        <input type="text" placeholder="Search site, location or city..." id="site-search" class="p-input" onkeyup="filterSites()" style="width: 300px; height: 42px;">
-                    </div>
                 </div>
             </div>
 
@@ -129,6 +215,14 @@ $sites = $pdo->query($sitesQuery)->fetchAll();
                             id="row-<?php echo $s['id']; ?>"
                             data-id="<?php echo $s['id']; ?>" 
                             data-name="<?php echo $s['name']; ?>" 
+                            data-code="<?php echo $s['site_code']; ?>"
+                            data-location="<?php echo $s['location']; ?>"
+                            data-city="<?php echo $s['city']; ?>"
+                            data-state="<?php echo $s['state']; ?>"
+                            data-type="<?php echo $s['type']; ?>"
+                            data-genre="<?php echo $s['genre']; ?>"
+                            data-illumination="<?php echo $s['light_type']; ?>"
+                            data-status="<?php echo $s['status']; ?>"
                             data-rate="<?php echo $s['card_rate']; ?>" 
                             data-prate="<?php echo $s['purchase_rate']; ?>" 
                             data-owner="<?php echo $s['owner_type']; ?>"
@@ -301,6 +395,13 @@ $sites = $pdo->query($sitesQuery)->fetchAll();
 </div>
 
 <style>
+/* Search Panel Styles */
+.media-search-grid { padding: 0.5rem 0; }
+.search-row { display: flex; align-items: center; }
+.radio-group { display: flex; gap: 1.5rem; }
+.radio-group label { display: flex; align-items: center; gap: 0.5rem; font-size: 0.85rem; font-weight: 600; color: #475569; cursor: pointer; }
+.radio-group input[type="radio"] { width: 18px; height: 18px; cursor: pointer; accent-color: var(--primary); }
+
 /* Layout Structure */
 .proposal-full-wrapper { max-width: 100%; margin: 0 auto; padding: 1.5rem; background: #f8fafc; min-height: 100vh; }
 
@@ -430,6 +531,37 @@ $sites = $pdo->query($sitesQuery)->fetchAll();
 let selectedSites = [];
 let currentPage = 1;
 let pageSize = 10;
+
+function handleClientChange() {
+    const select = document.getElementById('client_id');
+    const contact = select.options[select.selectedIndex].dataset.contact;
+    document.getElementById('contact_person').value = contact || '';
+}
+
+function calculateEndDate() {
+    const startStr = document.getElementById('start_date').value;
+    const days = parseInt(document.getElementById('total_days').value);
+    
+    if (startStr && !isNaN(days) && days > 0) {
+        const startDate = new Date(startStr);
+        const endDate = new Date(startDate);
+        endDate.setDate(startDate.getDate() + days - 1);
+        document.getElementById('end_date').value = endDate.toISOString().split('T')[0];
+    }
+}
+
+function calculateTotalDays() {
+    const startStr = document.getElementById('start_date').value;
+    const endStr = document.getElementById('end_date').value;
+    
+    if (startStr && endStr) {
+        const start = new Date(startStr);
+        const end = new Date(endStr);
+        const diffTime = end - start;
+        const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24)) + 1;
+        document.getElementById('total_days').value = diffDays > 0 ? diffDays : 0;
+    }
+}
 
 function renderPagination() {
     const allRows = Array.from(document.querySelectorAll('#asset-body tr.site-row'));
@@ -671,16 +803,43 @@ function recalcAll() {
 
 function filterSites() {
     const q = document.getElementById('site-search').value.toLowerCase();
+    const ownership = document.querySelector('input[name="ownership"]:checked').value;
+    const availability = document.querySelector('input[name="availability"]:checked').value;
+    
+    const genre = document.getElementById('filter-genre').value;
+    const type = document.getElementById('filter-type').value;
+    const state = document.getElementById('filter-state').value;
+    const city = document.getElementById('filter-city').value;
+    const illumination = document.getElementById('filter-illumination').value;
+
     const rows = document.querySelectorAll('#asset-body tr.site-row');
     
     rows.forEach(row => {
-        const text = row.innerText.toLowerCase();
-        if (text.includes(q)) {
+        let show = true;
+        
+        // Ownership Filter
+        if (ownership !== 'all' && row.dataset.owner !== ownership) show = false;
+        
+        // Availability Filter
+        if (availability === 'available' && row.dataset.status !== 'available') show = false;
+        
+        // Select Filters
+        if (genre && row.dataset.genre !== genre) show = false;
+        if (type && row.dataset.type !== type) show = false;
+        if (state && row.dataset.state !== state) show = false;
+        if (city && row.dataset.city !== city) show = false;
+        if (illumination && row.dataset.illumination !== illumination) show = false;
+        
+        // Text Search
+        if (q) {
+            const rowText = (row.dataset.name + ' ' + row.dataset.code + ' ' + row.dataset.location + ' ' + row.dataset.city).toLowerCase();
+            if (!rowText.includes(q)) show = false;
+        }
+
+        if (show) {
             row.classList.remove('search-hidden');
-            row.style.display = ''; // Reset for pagination to handle
         } else {
             row.classList.add('search-hidden');
-            row.style.display = 'none';
         }
     });
 
@@ -697,6 +856,10 @@ function saveProposal() {
     const start = document.getElementById('start_date').value;
     const end = document.getElementById('end_date').value;
     const campaignName = document.getElementById('campaign_name').value;
+    const deliveryDate = document.getElementById('delivery_date').value;
+    const totalDays = document.getElementById('total_days').value;
+    const remark = document.getElementById('remark').value;
+    const contactPerson = document.getElementById('contact_person').value;
     
     if (!clientId || !start || !end || !campaignName || selectedSites.length === 0) {
         Swal.fire({
@@ -713,6 +876,10 @@ function saveProposal() {
         startDate: start,
         endDate: end,
         campaignName,
+        deliveryDate,
+        totalDays,
+        remark,
+        contactPerson,
         printCost: parseFloat(document.getElementById('print_cost').value) || 0,
         mountCost: parseFloat(document.getElementById('mount_cost').value) || 0,
         selectedSites
