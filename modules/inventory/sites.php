@@ -73,6 +73,16 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action'])) {
             } catch (PDOException $e) {
                 header("Location: sites.php?error=" . urlencode($e->getMessage())); exit;
             }
+        } else if ($_POST['action'] === 'delete_site') {
+            $id = intval($_POST['id']);
+            try {
+                // Also delete images from folder if needed, for now just DB cleanup
+                $pdo->prepare("DELETE FROM site_images WHERE site_id = ?")->execute([$id]);
+                $pdo->prepare("DELETE FROM sites WHERE id = ?")->execute([$id]);
+                echo json_encode(['success' => true]); exit;
+            } catch (PDOException $e) {
+                echo json_encode(['success' => false, 'message' => $e->getMessage()]); exit;
+            }
         }
     }
 }
