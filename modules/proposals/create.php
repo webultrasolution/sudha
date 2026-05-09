@@ -322,6 +322,25 @@ $sizes = $pdo->query("SELECT DISTINCT CONCAT(width, 'x', height) as size FROM si
         </div>
     </div>
 
+    <!-- SELECTION BUCKET (Cart View) -->
+    <div id="selection-bucket-panel" class="p-panel" style="margin-bottom: 2rem; border-top: 4px solid #059669; display: none;">
+        <div class="p-header" style="background: #f0fdf4; color: #065f46; display: flex; justify-content: space-between; align-items: center;">
+            <div style="display: flex; align-items: center; gap: 0.75rem;">
+                <i class="fas fa-shopping-basket"></i>
+                <span>Your Selection Bucket</span>
+            </div>
+            <div style="font-size: 0.7rem; font-weight: 700; color: #059669; background: white; padding: 0.2rem 0.6rem; border-radius: 4px; border: 1px solid #bbf7d0;">
+                <span id="bucket-count">0</span> Assets
+            </div>
+        </div>
+        <div id="bucket-empty-msg" style="padding: 2rem; text-align: center; color: #94a3b8; font-weight: 700;">
+            <i class="fas fa-info-circle" style="margin-right: 0.5rem;"></i> No assets selected yet.
+        </div>
+        <div id="bucket-list" style="display: grid; grid-template-columns: repeat(auto-fill, minmax(300px, 1fr)); gap: 1rem; padding: 1.5rem;">
+            <!-- Selected items will be injected here via JS -->
+        </div>
+    </div>
+
     <!-- Bottom: Configuration Grid -->
     <div class="proposal-bottom-grid" style="grid-template-columns: 1fr 1fr; display: grid; gap: 1.5rem;">
         <!-- Pricing Controls -->
@@ -761,7 +780,94 @@ function toggleSite(id) {
     const count = selectedSites.length;
     if(document.getElementById('selected-count')) document.getElementById('selected-count').innerText = count;
     if(document.getElementById('selected-count-btm')) document.getElementById('selected-count-btm').innerText = count;
+    
+    updateBucketUI();
     recalcAll();
+}
+
+function updateBucketUI() {
+    const bucketPanel = document.getElementById('selection-bucket-panel');
+    const bucketList = document.getElementById('bucket-list');
+    const emptyMsg = document.getElementById('bucket-empty-msg');
+    const bucketCount = document.getElementById('bucket-count');
+    
+    if (selectedSites.length === 0) {
+        bucketPanel.style.display = 'none';
+        emptyMsg.style.display = 'block';
+        bucketList.innerHTML = '';
+        return;
+    }
+    
+    bucketPanel.style.display = 'block';
+    emptyMsg.style.display = 'none';
+    bucketCount.innerText = selectedSites.length;
+    
+    let html = `
+        <table class="crs-table" style="width: 100%; border-collapse: separate; border-spacing: 0 0.5rem;">
+            <thead>
+                <tr style="border-bottom: 2px solid #f1f5f9;">
+                    <th style="width: 40px; padding: 1rem;">#</th>
+                    <th style="width: 50px; padding: 1rem;">ACT</th>
+                    <th style="width: 100px; padding: 1rem;">PREVIEW</th>
+                    <th style="padding: 1rem;">CITY / CODE</th>
+                    <th style="padding: 1rem;">ASSET DETAILS</th>
+                    <th style="padding: 1rem;">SIZE</th>
+                    <th style="padding: 1rem;">PRICING</th>
+                    <th style="padding: 1rem;">OFFER RATE</th>
+                    <th style="padding: 1rem;">MARKUP</th>
+                    <th style="padding: 1rem; text-align: right;">TOTAL</th>
+                </tr>
+            </thead>
+            <tbody>
+    `;
+
+    selectedSites.forEach((site, index) => {
+        const markupVal = site.saleRate - site.purchaseRate;
+        const markupPct = site.purchaseRate > 0 ? ((markupVal / site.purchaseRate) * 100).toFixed(1) : '0';
+        
+        html += `
+            <tr style="background: white;">
+                <td style="padding: 1rem; font-weight: 700; color: #64748b;">${index + 1}</td>
+                <td style="padding: 1rem; text-align: center;">
+                    <button onclick="toggleSite('${site.id}')" style="background: #fee2e2; color: #ef4444; border: none; width: 30px; height: 30px; border-radius: 8px; cursor: pointer; display: flex; align-items: center; justify-content: center;">
+                        <i class="fas fa-times"></i>
+                    </button>
+                </td>
+                <td style="padding: 1rem;">
+                    <div style="width: 80px; height: 50px; border-radius: 8px; background: #f8fafc; border: 1px solid #e2e8f0; display: flex; align-items: center; justify-content: center; font-size: 0.6rem; color: #94a3b8; font-weight: 700;">Img</div>
+                </td>
+                <td style="padding: 1rem;">
+                    <div style="font-weight: 800; color: #1e293b; font-size: 0.85rem; margin-bottom: 2px;">${site.name.split('-')[0] || ''}</div>
+                    <div style="color: #f97316; font-size: 0.7rem; font-weight: 800;">${site.id}</div>
+                </td>
+                <td style="padding: 1rem;">
+                    <div style="font-weight: 800; color: #1e293b; font-size: 0.85rem; margin-bottom: 4px;">${site.name}</div>
+                    <div style="display: flex; gap: 0.3rem;">
+                        <span style="background: #f1f5f9; color: #475569; padding: 0.1rem 0.4rem; border-radius: 4px; font-size: 0.55rem; font-weight: 800; text-transform: uppercase;">${site.owner}</span>
+                    </div>
+                </td>
+                <td style="padding: 1rem;">
+                    <div style="font-weight: 800; color: #1e293b; font-size: 0.85rem;">${site.sqft} SQFT</div>
+                </td>
+                <td style="padding: 1rem;">
+                    <div style="font-weight: 700; color: #64748b; font-size: 0.75rem;">C: ₹${site.cardRate.toLocaleString()}</div>
+                    <div style="font-size: 0.7rem; color: #94a3b8; font-weight: 700;">P: ₹${site.purchaseRate.toLocaleString()}</div>
+                </td>
+                <td style="padding: 1rem;">
+                    <div style="font-weight: 800; color: #1e293b; font-size: 0.85rem;">₹${site.saleRate.toLocaleString()}</div>
+                </td>
+                <td style="padding: 1rem;">
+                    <div style="font-weight: 800; font-size: 0.8rem; color: ${markupVal >= 0 ? '#059669' : '#ef4444'};">₹${markupVal.toLocaleString()}</div>
+                </td>
+                <td style="padding: 1rem; text-align: right;">
+                    <div style="font-weight: 900; color: var(--primary); font-size: 0.9rem;">₹${site.saleRate.toLocaleString()}</div>
+                </td>
+            </tr>
+        `;
+    });
+
+    html += `</tbody></table>`;
+    bucketList.innerHTML = html;
 }
 
 function updateSitePrice(id, val) {
