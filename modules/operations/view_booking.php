@@ -210,9 +210,14 @@ foreach ($items as $item) {
                 <td>
                     <div style="font-weight: 700; color: #334155;"><?php echo $item['location']; ?></div>
                     <div style="font-size: 0.7rem; color: #94a3b8; text-transform: uppercase; font-weight: 600; display: flex; align-items: center; gap: 0.5rem; flex-wrap: wrap;">
-                        <?php echo $item['media_type']; ?> • <?php echo $item['light_type']; ?> • <span class="badge-type"><?php echo $item['owner_type']; ?></span>
+                        <?php echo $item['media_type']; ?> • <?php echo $item['light_type']; ?>
+                        <?php if ($item['owner_type'] === 'HA'): ?>
+                             • <span class="badge-type"><?php echo $item['owner_type']; ?></span>
+                        <?php endif; ?>
+                        
                         <?php if ($item['owner_type'] === 'TA' && $item['vendor_name']): ?>
-                            <div style="display: flex; align-items: center; gap: 0.5rem; margin-top: 0.25rem;">
+                            <div style="display: flex; align-items: center; gap: 0.5rem; margin-top: 0.5rem; width: 100%;">
+                                <span class="badge-type" style="margin-right: 0.2rem;"><?php echo $item['owner_type']; ?></span>
                                 <span style="color: var(--primary); font-weight: 800; background: #f0fdfa; padding: 0.1rem 0.4rem; border-radius: 4px; border: 1px solid #ccfbf1; display: flex; align-items: center; gap: 0.3rem;">
                                     <i class="fas fa-truck-loading" style="font-size: 0.6rem;"></i> 
                                     <?php echo $item['vendor_name']; ?> 
