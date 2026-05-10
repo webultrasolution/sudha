@@ -875,6 +875,7 @@ function updateSitePrice(id, val) {
     const idx = selectedSites.findIndex(s => s.id === id);
     if (idx !== -1) {
         selectedSites[idx].saleRate = parseFloat(val) || 0;
+        updateBucketUI();
         recalcAll();
     }
 }

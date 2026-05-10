@@ -46,10 +46,24 @@ $items = $stmtItems->fetchAll();
 
 // Advanced Stats
 $totalSQFT = 0;
+$taCost = 0; $taSale = 0;
+$haCost = 0; $haSale = 0;
+
 foreach ($items as $item) {
     $sqft = $item['width'] * $item['height'];
     $totalSQFT += $sqft;
+    if ($item['owner_type'] === 'TA') {
+        $taCost += ($item['purchase_amount'] ?? 0);
+        $taSale += $item['amount'];
+    } else {
+        $haCost += ($item['purchase_amount'] ?? 0);
+        $haSale += $item['amount'];
+    }
 }
+
+$taMargin = $taSale - $taCost;
+$haMargin = $haSale - $haCost;
+$totalMargin = $taMargin + $haMargin;
 
 $grandTotal = $b['grand_total'];
 ?>
@@ -80,7 +94,7 @@ $grandTotal = $b['grand_total'];
 </div>
 
 <!-- Financial Summary & Stats -->
-<div style="display: grid; grid-template-columns: repeat(3, 1fr); gap: 1.5rem; margin-bottom: 2rem;">
+<div style="display: grid; grid-template-columns: repeat(4, 1fr); gap: 1.5rem; margin-bottom: 2rem;">
     <div class="p-panel">
         <h4 class="p-title"><i class="fas fa-chart-line"></i> Campaign Stats</h4>
         <div class="stat-box">
@@ -98,6 +112,16 @@ $grandTotal = $b['grand_total'];
         <div class="p-row"><span>Start Date</span><strong><?php echo date('d M Y', strtotime($b['start_date'])); ?></strong></div>
         <div class="p-row"><span>End Date</span><strong><?php echo date('d M Y', strtotime($b['end_date'])); ?></strong></div>
         <div class="p-row"><span>Mounting</span><strong><?php echo $b['mounting_date'] ? date('d M Y', strtotime($b['mounting_date'])) : 'Pending'; ?></strong></div>
+    </div>
+
+    <div class="p-panel" style="background: #f8fafc; border-color: #cbd5e1;">
+        <h4 class="p-title"><i class="fas fa-funnel-dollar"></i> Profitability</h4>
+        <div class="p-row"><span>Vendor Payout</span><strong><?php echo formatCurrency($taCost); ?></strong></div>
+        <div class="p-row"><span>Own Earnings</span><strong><?php echo formatCurrency($haMargin); ?></strong></div>
+        <div style="margin-top: 1rem; padding-top: 0.75rem; border-top: 1px dashed #cbd5e1; display: flex; justify-content: space-between; align-items: center;">
+            <span style="font-size: 0.75rem; font-weight: 700; color: #64748b; text-transform: uppercase;">Total Margin</span>
+            <span style="font-size: 1.1rem; font-weight: 800; color: var(--primary);"><?php echo formatCurrency($totalMargin); ?></span>
+        </div>
     </div>
 
     <div class="p-panel" style="background: linear-gradient(135deg, #0f172a 0%, #1e293b 100%); color: white; border: none;">
@@ -123,11 +147,16 @@ $grandTotal = $b['grand_total'];
                 <th>City / Code</th>
                 <th>Dimensions</th>
                 <th>Period</th>
-                <th style="text-align: right;">Amount</th>
+                <th>Cost / Margin</th>
+                <th style="text-align: right;">Sale Amount</th>
             </tr>
         </thead>
         <tbody>
             <?php foreach ($items as $item): ?>
+            <?php 
+                $itemMargin = $item['amount'] - ($item['purchase_amount'] ?? 0);
+                $marginPct = ($item['purchase_amount'] > 0) ? ($itemMargin / $item['purchase_amount'] * 100) : 0;
+            ?>
             <tr>
                 <td>
                     <div style="font-weight: 700; color: #334155;"><?php echo $item['location']; ?></div>
@@ -158,7 +187,21 @@ $grandTotal = $b['grand_total'];
                     </div>
                     <div style="font-size: 0.7rem; color: #94a3b8;"><?php echo $item['days']; ?> Days</div>
                 </td>
-                <td style="font-weight: 800; color: var(--primary); text-align: right; font-size: 1rem;"><?php echo formatCurrency($item['amount']); ?></td>
+                <td>
+                    <div style="margin-bottom: 0.5rem;">
+                        <span style="font-size: 0.65rem; font-weight: 800; color: #94a3b8; text-transform: uppercase; display: block; margin-bottom: 2px;">Purchase Cost</span>
+                        <div style="font-weight: 700; color: #475569; font-size: 0.9rem;"><?php echo formatCurrency($item['purchase_amount'] ?? 0); ?></div>
+                    </div>
+                    <div>
+                        <span style="font-size: 0.65rem; font-weight: 800; color: #94a3b8; text-transform: uppercase; display: block; margin-bottom: 2px;">Net Profit</span>
+                        <div style="display: inline-flex; align-items: center; gap: 0.4rem; background: #f0fdf4; color: #166534; padding: 0.25rem 0.6rem; border-radius: 6px; border: 1px solid #bbf7d0;">
+                            <i class="fas fa-arrow-up" style="font-size: 0.6rem;"></i>
+                            <span style="font-weight: 800; font-size: 0.8rem;"><?php echo formatCurrency($itemMargin); ?></span>
+                            <span style="font-size: 0.65rem; font-weight: 600; opacity: 0.8;">(<?php echo number_format($marginPct, 1); ?>%)</span>
+                        </div>
+                    </div>
+                </td>
+                <td style="font-weight: 800; color: #0f172a; text-align: right; font-size: 1rem;"><?php echo formatCurrency($item['amount']); ?></td>
             </tr>
             <?php endforeach; ?>
         </tbody>

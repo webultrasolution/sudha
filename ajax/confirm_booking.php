@@ -53,7 +53,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         $stmtItems->execute($itemIds);
         $items = $stmtItems->fetchAll();
 
-        $stmtBI = $pdo->prepare("INSERT INTO booking_items (booking_id, proposal_item_id, site_id, sale_rate, start_date, end_date, days, amount) VALUES (?, ?, ?, ?, ?, ?, ?, ?)");
+        $stmtBI = $pdo->prepare("INSERT INTO booking_items (booking_id, proposal_item_id, site_id, purchase_rate, sale_rate, start_date, end_date, days, purchase_amount, amount) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)");
         $stmtOps = $pdo->prepare("INSERT INTO operations (booking_id, site_id, status) VALUES (?, ?, 'pending')");
         
         foreach ($items as $item) {
@@ -62,10 +62,12 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 $bookingId, 
                 $item['id'], 
                 $item['site_id'], 
+                $item['purchase_rate'],
                 $item['sale_rate'], 
                 $proposal['start_date'], 
                 $proposal['end_date'], 
                 $item['days'], 
+                $item['purchase_rate'], // purchase_amount is same as purchase_rate for now
                 $item['amount']
             ]);
             
