@@ -87,6 +87,9 @@ $grandTotal = $b['grand_total'];
         <a href="bookings.php" class="btn" style="background: white; border: 1px solid #e2e8f0; color: #475569; padding: 0.75rem 1.25rem; border-radius: 10px; font-weight: 700; font-size: 0.9rem; cursor: pointer; text-decoration: none;">
             <i class="fas fa-arrow-left"></i> Back to List
         </a>
+        <a href="generate_invoice.php?booking_id=<?php echo $b['id']; ?>" target="_blank" class="btn" style="background: #0f172a; color: white; padding: 0.75rem 1.5rem; border-radius: 10px; font-weight: 800; text-decoration: none; display: flex; align-items: center; gap: 0.5rem;">
+            <i class="fas fa-file-invoice-dollar"></i> Final Tax Invoice
+        </a>
         <button class="btn btn-primary" onclick="window.print()" style="padding: 0.75rem 1.5rem; border-radius: 10px; font-weight: 800;">
             <i class="fas fa-print"></i> Print Details
         </button>
@@ -157,41 +160,6 @@ foreach ($items as $item) {
 }
 ?>
 
-<?php if (!empty($vendorSites)): ?>
-<!-- Operational Documents Section -->
-<div class="p-panel" style="margin-bottom: 2rem; border-left: 4px solid #f59e0b; width: 100%;">
-    <h4 class="p-title" style="color: #b45309;"><i class="fas fa-file-invoice"></i> Vendor Purchase Orders</h4>
-    <div style="display: flex; gap: 1.5rem; flex-wrap: wrap; padding: 0.5rem 0;">
-        <?php foreach ($vendorSites as $v): ?>
-        <div style="background: #fffbeb; border: 1px solid #fef3c7; padding: 1rem; border-radius: 12px; display: flex; align-items: center; gap: 1.5rem; min-width: 320px; flex: 1;">
-            <div style="background: #f59e0b; color: white; width: 40px; height: 40px; border-radius: 10px; display: flex; align-items: center; justify-content: center; font-size: 1.2rem;">
-                <i class="fas fa-truck-loading"></i>
-            </div>
-            <div style="flex: 1;">
-                <div style="font-weight: 800; color: #92400e; font-size: 0.95rem;">
-                    <?php echo $v['name']; ?>
-                    <?php if ($v['vendor_gst']): ?>
-                        <div style="font-size: 0.65rem; color: #b45309; opacity: 0.8; font-family: monospace;">BRANCH: <?php echo $v['vendor_gst']; ?></div>
-                    <?php endif; ?>
-                </div>
-                <div style="font-size: 0.75rem; color: #b45309; font-weight: 600;"><?php echo $v['count']; ?> Assets in this booking</div>
-            </div>
-            <div style="display: flex; gap: 0.5rem;">
-                <a href="generate_po.php?booking_id=<?php echo $b['id']; ?>&vendor_id=<?php echo $v['id']; ?>&vendor_gst=<?php echo urlencode($v['vendor_gst']); ?>" target="_blank" class="btn" style="background: #0f172a; color: white; padding: 0.6rem 1rem; border-radius: 8px; font-weight: 800; font-size: 0.75rem; text-decoration: none; display: flex; align-items: center; gap: 0.4rem;" title="View & Print PO">
-                    <i class="fas fa-file-pdf"></i> PDF
-                </a>
-                <button onclick="sendPOEmail(<?php echo $b['id']; ?>, <?php echo $v['id']; ?>)" class="btn" style="background: #3b82f6; color: white; padding: 0.6rem 1rem; border-radius: 8px; font-weight: 800; font-size: 0.75rem; border: none; cursor: pointer; display: flex; align-items: center; gap: 0.4rem;" title="Send via Email">
-                    <i class="fas fa-envelope"></i>
-                </button>
-                <a href="https://wa.me/<?php echo preg_replace('/[^0-9]/', '', $v['phone'] ?? ''); ?>?text=Dear <?php echo urlencode($v['name'] ?? 'Vendor'); ?>, Please find the Purchase Order for Campaign: <?php echo urlencode($b['campaign_name'] ?? 'General'); ?>. Booking Ref: #BK-<?php echo str_pad($b['id'], 4, '0', STR_PAD_LEFT); ?>. Thank you." target="_blank" class="btn" style="background: #22c55e; color: white; padding: 0.6rem 1rem; border-radius: 8px; font-weight: 800; font-size: 0.75rem; text-decoration: none; display: flex; align-items: center; gap: 0.4rem;" title="Send via WhatsApp">
-                    <i class="fab fa-whatsapp"></i>
-                </a>
-            </div>
-        </div>
-        <?php endforeach; ?>
-    </div>
-</div>
-<?php endif; ?>
 
 <!-- Detailed Site Table -->
 <div class="card" style="padding: 0; border-radius: 16px; overflow: hidden;">
@@ -234,8 +202,14 @@ foreach ($items as $item) {
                                         <span style="color: #64748b; font-weight: 500; font-size: 0.65rem;">(<?php echo $item['vendor_contact']; ?>)</span>
                                     <?php endif; ?>
                                 </span>
-                                <a href="generate_po.php?booking_id=<?php echo $b['id']; ?>&vendor_id=<?php echo $item['vendor_id']; ?>" target="_blank" title="Generate Purchase Order" style="background: #f59e0b; color: white; width: 24px; height: 24px; border-radius: 4px; display: flex; align-items: center; justify-content: center; font-size: 0.65rem; text-decoration: none;">
+                                <a href="generate_po.php?booking_id=<?php echo $b['id']; ?>&vendor_id=<?php echo $item['vendor_id']; ?>&vendor_gst=<?php echo urlencode($item['vendor_gst'] ?? ''); ?>" target="_blank" title="Download PO PDF" style="background: #0f172a; color: white; width: 26px; height: 26px; border-radius: 6px; display: flex; align-items: center; justify-content: center; font-size: 0.7rem; text-decoration: none;">
                                     <i class="fas fa-file-pdf"></i>
+                                </a>
+                                <button onclick="sendPOEmail(<?php echo $b['id']; ?>, <?php echo $item['vendor_id']; ?>)" title="Send PO via Email" style="background: #3b82f6; color: white; width: 26px; height: 26px; border-radius: 6px; border: none; cursor: pointer; display: flex; align-items: center; justify-content: center; font-size: 0.7rem;">
+                                    <i class="fas fa-envelope"></i>
+                                </button>
+                                <a href="https://wa.me/<?php echo preg_replace('/[^0-9]/', '', $item['vendor_phone'] ?? ''); ?>?text=Dear <?php echo urlencode($item['vendor_name'] ?? 'Vendor'); ?>, Please find the Purchase Order for Campaign: <?php echo urlencode($b['campaign_name'] ?? 'General'); ?>. Booking Ref: #BK-<?php echo str_pad($b['id'], 4, '0', STR_PAD_LEFT); ?>. Thank you." target="_blank" title="Send via WhatsApp" style="background: #22c55e; color: white; width: 26px; height: 26px; border-radius: 6px; display: flex; align-items: center; justify-content: center; font-size: 0.7rem; text-decoration: none;">
+                                    <i class="fab fa-whatsapp"></i>
                                 </a>
                             </div>
                         <?php endif; ?>

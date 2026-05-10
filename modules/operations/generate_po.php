@@ -212,7 +212,7 @@ $po_date = date('d-M-Y');
                         <div style="font-size: 0.8rem;"><?php echo date('d M', strtotime($item['start_date'])); ?> - <?php echo date('d M Y', strtotime($item['end_date'])); ?></div>
                         <div style="font-size: 0.65rem; color: #64748b;"><?php echo $item['days']; ?> Days</div>
                     </td>
-                    <td style="text-align: right; font-weight: 700;">₹<?php echo number_format($item['purchase_amount'], 2); ?></td>
+                    <td style="text-align: right; font-weight: 700;"><?php echo formatCurrency($item['purchase_amount']); ?></td>
                 </tr>
                 <?php endforeach; ?>
             </tbody>
@@ -222,7 +222,7 @@ $po_date = date('d-M-Y');
             <div class="totals-table">
                 <div class="totals-row">
                     <span>Taxable Amount</span>
-                    <strong>₹<?php echo number_format($net_total, 2); ?></strong>
+                    <strong><?php echo formatCurrency($net_total); ?></strong>
                 </div>
                 <?php 
                 $gst_total = $net_total * 0.18;
@@ -230,11 +230,11 @@ $po_date = date('d-M-Y');
                 ?>
                 <div class="totals-row">
                     <span>GST (18%)</span>
-                    <strong>₹<?php echo number_format($gst_total, 2); ?></strong>
+                    <strong><?php echo formatCurrency($gst_total); ?></strong>
                 </div>
                 <div class="totals-row grand">
                     <span>Gross Total</span>
-                    <span>₹<?php echo number_format($gross_total, 2); ?></span>
+                    <span><?php echo formatCurrency($gross_total); ?></span>
                 </div>
             </div>
         </div>
