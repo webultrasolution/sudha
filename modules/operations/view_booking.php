@@ -87,9 +87,9 @@ $grandTotal = $b['grand_total'];
         <a href="bookings.php" class="btn" style="background: white; border: 1px solid #e2e8f0; color: #475569; padding: 0.75rem 1.25rem; border-radius: 10px; font-weight: 700; font-size: 0.9rem; cursor: pointer; text-decoration: none;">
             <i class="fas fa-arrow-left"></i> Back to List
         </a>
-        <a href="generate_invoice.php?booking_id=<?php echo $b['id']; ?>" target="_blank" class="btn" style="background: #0f172a; color: white; padding: 0.75rem 1.5rem; border-radius: 10px; font-weight: 800; text-decoration: none; display: flex; align-items: center; gap: 0.5rem;">
+        <button class="btn" onclick="openInvoicePopup(<?php echo $b['id']; ?>)" style="background: #0f172a; color: white; padding: 0.75rem 1.5rem; border-radius: 10px; font-weight: 800; border: none; cursor: pointer; display: flex; align-items: center; gap: 0.5rem;">
             <i class="fas fa-file-invoice-dollar"></i> Final Tax Invoice
-        </a>
+        </button>
         <button class="btn btn-primary" onclick="window.print()" style="padding: 0.75rem 1.5rem; border-radius: 10px; font-weight: 800;">
             <i class="fas fa-print"></i> Print Details
         </button>
@@ -350,6 +350,91 @@ function promptSetCost(itemId) {
     }).then((result) => {
         if (result.isConfirmed) {
             updatePurchaseCost(itemId, result.value);
+        }
+    });
+}
+function toggleConfFields() {
+    const type = document.getElementById('confirmation_type').value;
+    const poFields = document.getElementById('po_fields');
+    const emailFields = document.getElementById('email_fields');
+    if (poFields) poFields.style.display = type === 'po' ? 'block' : 'none';
+    if (emailFields) emailFields.style.display = type === 'email' ? 'block' : 'none';
+}
+
+function openInvoicePopup(bookingId) {
+    Swal.fire({
+        title: 'Campaign Confirmation',
+        html: `
+            <div style="text-align: left;">
+                <label style="display:block; font-size: 0.75rem; font-weight: 700; color: #64748b; margin-bottom: 5px;">CONFIRMATION TYPE</label>
+                <select id="confirmation_type" class="swal2-input" style="margin: 0 0 1rem 0; width: 100%; box-sizing: border-box;" onchange="toggleConfFields()">
+                    <option value="po">Customer Purchase Order (PO)</option>
+                    <option value="email">Email Confirmation</option>
+                </select>
+
+                <div id="po_fields">
+                    <label style="display:block; font-size: 0.75rem; font-weight: 700; color: #64748b; margin-bottom: 5px;">CUSTOMER PO NUMBER</label>
+                    <input id="customer_po_no" class="swal2-input" placeholder="Enter PO ID" style="margin: 0 0 1rem 0; width: 100%; box-sizing: border-box;">
+                    
+                    <label style="display:block; font-size: 0.75rem; font-weight: 700; color: #64748b; margin-bottom: 5px;">PO DATE</label>
+                    <input id="customer_po_date" type="date" class="swal2-input" style="margin: 0 0 1rem 0; width: 100%; box-sizing: border-box;">
+                </div>
+
+                <div id="email_fields" style="display:none;">
+                    <label style="display:block; font-size: 0.75rem; font-weight: 700; color: #64748b; margin-bottom: 5px;">EMAIL CONFIRMATION DATE</label>
+                    <input id="email_date" type="date" class="swal2-input" style="margin: 0 0 1rem 0; width: 100%; box-sizing: border-box;">
+                </div>
+                
+                <label style="display:block; font-size: 0.75rem; font-weight: 700; color: #64748b; margin-bottom: 5px;">UPLOAD ATTACHMENT (PDF/IMAGE)</label>
+                <input id="customer_po_file" type="file" accept=".pdf,image/*" class="swal2-file" style="margin: 0; width: 100%; box-sizing: border-box; border: 1px solid #e2e8f0; padding: 10px; border-radius: 6px;">
+            </div>
+        `,
+        focusConfirm: false,
+        showCancelButton: true,
+        confirmButtonText: 'Save & Generate Invoice',
+        preConfirm: () => {
+            const type = document.getElementById('confirmation_type').value;
+            const po_no = document.getElementById('customer_po_no').value;
+            const po_date = document.getElementById('customer_po_date').value;
+            const email_date = document.getElementById('email_date').value;
+            const po_file = document.getElementById('customer_po_file').files[0];
+            
+            if (type === 'po') {
+                if (!po_no) { Swal.showValidationMessage(`Customer PO Number is mandatory`); return false; }
+                if (!po_date) { Swal.showValidationMessage(`PO Date is mandatory`); return false; }
+            }
+            if (type === 'email') {
+                if (!email_date) { Swal.showValidationMessage(`Email Confirmation Date is mandatory`); return false; }
+            }
+            if (!po_file) {
+                Swal.showValidationMessage(`Please upload the PO/Email attachment (PDF/Image)`);
+                return false;
+            }
+            
+            let formData = new FormData();
+            formData.append('booking_id', bookingId);
+            formData.append('confirmation_type', type);
+            formData.append('customer_po_no', po_no);
+            formData.append('customer_po_date', po_date);
+            formData.append('email_date', email_date);
+            formData.append('customer_po_file', po_file);
+            
+            return fetch('../../ajax/upload_customer_po.php', {
+                method: 'POST',
+                body: formData
+            }).then(response => response.json())
+            .then(data => {
+                if (!data.success) {
+                    throw new Error(data.message || 'Upload failed');
+                }
+                return true;
+            }).catch(error => {
+                Swal.showValidationMessage(`Request failed: ${error}`);
+            });
+        }
+    }).then((result) => {
+        if (result.isConfirmed) {
+            window.open(`generate_invoice.php?booking_id=${bookingId}`, '_blank');
         }
     });
 }
