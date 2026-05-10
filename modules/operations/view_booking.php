@@ -136,19 +136,23 @@ $grandTotal = $b['grand_total'];
 </div>
 
 <?php
-// Group sites by vendor for PO generation
+// Group sites by vendor & branch GST for PO generation
 $vendorSites = [];
 foreach ($items as $item) {
     if ($item['owner_type'] === 'TA' && isset($item['vendor_id'])) {
         $vId = $item['vendor_id'];
-        if (!isset($vendorSites[$vId])) {
-            $vendorSites[$vId] = [
+        $vgst = $item['vendor_gst'] ?? '';
+        $key = $vId . '_' . $vgst;
+        
+        if (!isset($vendorSites[$key])) {
+            $vendorSites[$key] = [
                 'id' => $vId,
                 'name' => $item['vendor_name'] ?? 'Unknown Vendor',
+                'vendor_gst' => $vgst,
                 'count' => 0
             ];
         }
-        $vendorSites[$vId]['count']++;
+        $vendorSites[$key]['count']++;
     }
 }
 ?>
@@ -164,11 +168,16 @@ foreach ($items as $item) {
                 <i class="fas fa-truck-loading"></i>
             </div>
             <div style="flex: 1;">
-                <div style="font-weight: 800; color: #92400e; font-size: 0.95rem;"><?php echo $v['name']; ?></div>
+                <div style="font-weight: 800; color: #92400e; font-size: 0.95rem;">
+                    <?php echo $v['name']; ?>
+                    <?php if ($v['vendor_gst']): ?>
+                        <div style="font-size: 0.65rem; color: #b45309; opacity: 0.8; font-family: monospace;">BRANCH: <?php echo $v['vendor_gst']; ?></div>
+                    <?php endif; ?>
+                </div>
                 <div style="font-size: 0.75rem; color: #b45309; font-weight: 600;"><?php echo $v['count']; ?> Assets in this booking</div>
             </div>
             <div style="display: flex; gap: 0.5rem;">
-                <a href="generate_po.php?booking_id=<?php echo $b['id']; ?>&vendor_id=<?php echo $v['id']; ?>" target="_blank" class="btn" style="background: #0f172a; color: white; padding: 0.6rem 1rem; border-radius: 8px; font-weight: 800; font-size: 0.75rem; text-decoration: none; display: flex; align-items: center; gap: 0.4rem;" title="View & Print PO">
+                <a href="generate_po.php?booking_id=<?php echo $b['id']; ?>&vendor_id=<?php echo $v['id']; ?>&vendor_gst=<?php echo urlencode($v['vendor_gst']); ?>" target="_blank" class="btn" style="background: #0f172a; color: white; padding: 0.6rem 1rem; border-radius: 8px; font-weight: 800; font-size: 0.75rem; text-decoration: none; display: flex; align-items: center; gap: 0.4rem;" title="View & Print PO">
                     <i class="fas fa-file-pdf"></i> PDF
                 </a>
                 <button onclick="sendPOEmail(<?php echo $b['id']; ?>, <?php echo $v['id']; ?>)" class="btn" style="background: #3b82f6; color: white; padding: 0.6rem 1rem; border-radius: 8px; font-weight: 800; font-size: 0.75rem; border: none; cursor: pointer; display: flex; align-items: center; gap: 0.4rem;" title="Send via Email">
