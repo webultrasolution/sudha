@@ -70,6 +70,7 @@ checkAuth();
                 </a>
                 <ul class="submenu" style="<?php echo in_array($activePage, ['reports', 'resources', 'photofactory']) ? 'display: block;' : 'display: none;'; ?>">
                     <li><a href="<?php echo BASE_URL; ?>modules/reports/reports.php" class="<?php echo $activePage == 'reports' ? 'active-sub' : ''; ?>"><i class="fas fa-chart-pie"></i> Reports</a></li>
+                    <li><a href="<?php echo BASE_URL; ?>modules/admin/settings.php" class="<?php echo $activePage == 'settings' ? 'active-sub' : ''; ?>"><i class="fas fa-cog"></i> Admin Settings</a></li>
                     <li><a href="<?php echo BASE_URL; ?>modules/admin/resources.php" class="<?php echo $activePage == 'resources' ? 'active-sub' : ''; ?>"><i class="fas fa-tools"></i> Resources</a></li>
                     <li><a href="<?php echo BASE_URL; ?>modules/inventory/photofactory.php" class="<?php echo $activePage == 'photofactory' ? 'active-sub' : ''; ?>"><i class="fas fa-images"></i> Photofactory</a></li>
                 </ul>

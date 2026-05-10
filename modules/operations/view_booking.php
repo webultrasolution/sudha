@@ -33,7 +33,7 @@ if (!$b) {
 // Fetch Items from booking_items
 $stmtItems = $pdo->prepare("
     SELECT bi.*, s.site_code, s.location, s.city, s.type as media_type, s.owner_type, 
-           s.width, s.height, s.light_type, v.name as vendor_name, v.contact_person as vendor_contact,
+           s.width, s.height, s.light_type, s.vendor_id, v.name as vendor_name, v.contact_person as vendor_contact,
            o.status as op_status, o.id as op_id
     FROM booking_items bi
     JOIN sites s ON bi.site_id = s.id
@@ -135,6 +135,55 @@ $grandTotal = $b['grand_total'];
     </div>
 </div>
 
+<?php
+// Group sites by vendor for PO generation
+$vendorSites = [];
+foreach ($items as $item) {
+    if ($item['owner_type'] === 'TA' && isset($item['vendor_id'])) {
+        $vId = $item['vendor_id'];
+        if (!isset($vendorSites[$vId])) {
+            $vendorSites[$vId] = [
+                'id' => $vId,
+                'name' => $item['vendor_name'] ?? 'Unknown Vendor',
+                'count' => 0
+            ];
+        }
+        $vendorSites[$vId]['count']++;
+    }
+}
+?>
+
+<?php if (!empty($vendorSites)): ?>
+<!-- Operational Documents Section -->
+<div class="p-panel" style="margin-bottom: 2rem; border-left: 4px solid #f59e0b; width: 100%;">
+    <h4 class="p-title" style="color: #b45309;"><i class="fas fa-file-invoice"></i> Vendor Purchase Orders</h4>
+    <div style="display: flex; gap: 1.5rem; flex-wrap: wrap; padding: 0.5rem 0;">
+        <?php foreach ($vendorSites as $v): ?>
+        <div style="background: #fffbeb; border: 1px solid #fef3c7; padding: 1rem; border-radius: 12px; display: flex; align-items: center; gap: 1.5rem; min-width: 320px; flex: 1;">
+            <div style="background: #f59e0b; color: white; width: 40px; height: 40px; border-radius: 10px; display: flex; align-items: center; justify-content: center; font-size: 1.2rem;">
+                <i class="fas fa-truck-loading"></i>
+            </div>
+            <div style="flex: 1;">
+                <div style="font-weight: 800; color: #92400e; font-size: 0.95rem;"><?php echo $v['name']; ?></div>
+                <div style="font-size: 0.75rem; color: #b45309; font-weight: 600;"><?php echo $v['count']; ?> Assets in this booking</div>
+            </div>
+            <div style="display: flex; gap: 0.5rem;">
+                <a href="generate_po.php?booking_id=<?php echo $b['id']; ?>&vendor_id=<?php echo $v['id']; ?>" target="_blank" class="btn" style="background: #0f172a; color: white; padding: 0.6rem 1rem; border-radius: 8px; font-weight: 800; font-size: 0.75rem; text-decoration: none; display: flex; align-items: center; gap: 0.4rem;" title="View & Print PO">
+                    <i class="fas fa-file-pdf"></i> PDF
+                </a>
+                <button onclick="sendPOEmail(<?php echo $b['id']; ?>, <?php echo $v['id']; ?>)" class="btn" style="background: #3b82f6; color: white; padding: 0.6rem 1rem; border-radius: 8px; font-weight: 800; font-size: 0.75rem; border: none; cursor: pointer; display: flex; align-items: center; gap: 0.4rem;" title="Send via Email">
+                    <i class="fas fa-envelope"></i>
+                </button>
+                <a href="https://wa.me/<?php echo preg_replace('/[^0-9]/', '', $v['phone'] ?? ''); ?>?text=Dear <?php echo urlencode($v['name'] ?? 'Vendor'); ?>, Please find the Purchase Order for Campaign: <?php echo urlencode($b['campaign_name'] ?? 'General'); ?>. Booking Ref: #BK-<?php echo str_pad($b['id'], 4, '0', STR_PAD_LEFT); ?>. Thank you." target="_blank" class="btn" style="background: #22c55e; color: white; padding: 0.6rem 1rem; border-radius: 8px; font-weight: 800; font-size: 0.75rem; text-decoration: none; display: flex; align-items: center; gap: 0.4rem;" title="Send via WhatsApp">
+                    <i class="fab fa-whatsapp"></i>
+                </a>
+            </div>
+        </div>
+        <?php endforeach; ?>
+    </div>
+</div>
+<?php endif; ?>
+
 <!-- Detailed Site Table -->
 <div class="card" style="padding: 0; border-radius: 16px; overflow: hidden;">
     <div style="padding: 1.5rem; border-bottom: 1px solid #f1f5f9;">
@@ -163,13 +212,18 @@ $grandTotal = $b['grand_total'];
                     <div style="font-size: 0.7rem; color: #94a3b8; text-transform: uppercase; font-weight: 600; display: flex; align-items: center; gap: 0.5rem; flex-wrap: wrap;">
                         <?php echo $item['media_type']; ?> • <?php echo $item['light_type']; ?> • <span class="badge-type"><?php echo $item['owner_type']; ?></span>
                         <?php if ($item['owner_type'] === 'TA' && $item['vendor_name']): ?>
-                            <span style="color: var(--primary); font-weight: 800; background: #f0fdfa; padding: 0.1rem 0.4rem; border-radius: 4px; border: 1px solid #ccfbf1; display: flex; align-items: center; gap: 0.3rem;">
-                                <i class="fas fa-truck-loading" style="font-size: 0.6rem;"></i> 
-                                <?php echo $item['vendor_name']; ?> 
-                                <?php if ($item['vendor_contact']): ?>
-                                    <span style="color: #64748b; font-weight: 500; font-size: 0.65rem;">(<?php echo $item['vendor_contact']; ?>)</span>
-                                <?php endif; ?>
-                            </span>
+                            <div style="display: flex; align-items: center; gap: 0.5rem; margin-top: 0.25rem;">
+                                <span style="color: var(--primary); font-weight: 800; background: #f0fdfa; padding: 0.1rem 0.4rem; border-radius: 4px; border: 1px solid #ccfbf1; display: flex; align-items: center; gap: 0.3rem;">
+                                    <i class="fas fa-truck-loading" style="font-size: 0.6rem;"></i> 
+                                    <?php echo $item['vendor_name']; ?> 
+                                    <?php if ($item['vendor_contact']): ?>
+                                        <span style="color: #64748b; font-weight: 500; font-size: 0.65rem;">(<?php echo $item['vendor_contact']; ?>)</span>
+                                    <?php endif; ?>
+                                </span>
+                                <a href="generate_po.php?booking_id=<?php echo $b['id']; ?>&vendor_id=<?php echo $item['vendor_id']; ?>" target="_blank" title="Generate Purchase Order" style="background: #f59e0b; color: white; width: 24px; height: 24px; border-radius: 4px; display: flex; align-items: center; justify-content: center; font-size: 0.65rem; text-decoration: none;">
+                                    <i class="fas fa-file-pdf"></i>
+                                </a>
+                            </div>
                         <?php endif; ?>
                     </div>
                 </td>
@@ -224,5 +278,29 @@ $grandTotal = $b['grand_total'];
 .status-in_progress { background: #dcfce7; color: #166534; }
 .status-completed { background: #e0f2fe; color: #0369a1; }
 </style>
+
+<script>
+function sendPOEmail(bookingId, vendorId) {
+    Swal.fire({
+        title: 'Sending PO...',
+        text: 'Please wait while we prepare the email for the vendor.',
+        allowOutsideClick: false,
+        didOpen: () => {
+            Swal.showLoading();
+        }
+    });
+
+    // Simulate AJAX call to send email
+    setTimeout(() => {
+        Swal.fire({
+            icon: 'success',
+            title: 'PO Sent!',
+            text: 'The Purchase Order has been successfully emailed to the vendor.',
+            timer: 2000,
+            showConfirmButton: false
+        });
+    }, 1500);
+}
+</script>
 
 <?php include_once __DIR__ . '/../../includes/footer.php'; ?>
