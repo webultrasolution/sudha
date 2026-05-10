@@ -30,13 +30,23 @@ if (!$b || !$v) {
 }
 
 // Fetch Items for this vendor in this booking
-$stmtItems = $pdo->prepare("
-    SELECT bi.*, s.site_code, s.location, s.city, s.width, s.height, s.light_type, s.hsn_code
+$vendor_gst_filter = $_GET['vendor_gst'] ?? '';
+$itemSql = "
+    SELECT bi.*, s.site_code, s.location, s.city, s.width, s.height, s.light_type, s.hsn_code, s.vendor_gst
     FROM booking_items bi
     JOIN sites s ON bi.site_id = s.id
     WHERE bi.booking_id = ? AND s.vendor_id = ?
-");
-$stmtItems->execute([$booking_id, $vendor_id]);
+";
+$itemParams = [$booking_id, $vendor_id];
+
+if ($vendor_gst_filter !== '') {
+    $itemSql .= " AND (s.vendor_gst = ? OR s.vendor_gst IS NULL AND ? = '')";
+    $itemParams[] = $vendor_gst_filter;
+    $itemParams[] = $vendor_gst_filter;
+}
+
+$stmtItems = $pdo->prepare($itemSql);
+$stmtItems->execute($itemParams);
 $items = $stmtItems->fetchAll();
 
 if (empty($items)) {
@@ -108,13 +118,21 @@ $po_date = date('d-M-Y');
     </button>
 
     <div class="po-container">
-        <div class="header">
-            <div class="header-left">
-                <h1>Purchase Order</h1>
-                <p style="font-size: 0.8rem; color: #64748b; margin-top: 0.5rem; font-weight: 600;">Original Copy</p>
+        <?php 
+        $letterhead = getSetting('company_letterhead');
+        if ($letterhead): ?>
+            <div style="margin-bottom: 2rem;">
+                <img src="<?php echo BASE_URL; ?>assets/images/<?php echo $letterhead; ?>" style="width: 100%; height: auto; display: block; border-radius: 8px;">
             </div>
-            <img src="<?php echo BASE_URL; ?>assets/images/<?php echo getSetting('company_logo', 'logo.png'); ?>" alt="Company Logo" class="logo" onerror="this.src='https://via.placeholder.com/150x50?text=SUDHA+CREATIVE'">
-        </div>
+        <?php else: ?>
+            <div class="header">
+                <div class="header-left">
+                    <h1>Purchase Order</h1>
+                    <p style="font-size: 0.8rem; color: #64748b; margin-top: 0.5rem; font-weight: 600;">Original Copy</p>
+                </div>
+                <img src="<?php echo BASE_URL; ?>assets/images/<?php echo getSetting('company_logo', 'logo.png'); ?>" alt="Company Logo" class="logo" onerror="this.src='https://via.placeholder.com/150x50?text=SUDHA+CREATIVE'">
+            </div>
+        <?php endif; ?>
 
         <div class="details-bar">
             <div class="detail-item">
@@ -142,7 +160,11 @@ $po_date = date('d-M-Y');
                     <p><strong><?php echo $v['name']; ?></strong></p>
                     <p><?php echo $v['address']; ?></p>
                     <p><?php echo $v['city']; ?>, <?php echo $v['state']; ?></p>
-                    <p>GSTIN: <strong><?php echo $v['gstin']; ?></strong></p>
+                    <?php if ($vendor_gst_filter): ?>
+                        <p>Branch GSTIN: <strong><?php echo $vendor_gst_filter; ?></strong></p>
+                    <?php else: ?>
+                        <p>GSTIN: <strong><?php echo $v['gstin']; ?></strong></p>
+                    <?php endif; ?>
                     <p>Contact: <?php echo $v['contact_person']; ?> (<?php echo $v['phone']; ?>)</p>
                 </div>
             </div>

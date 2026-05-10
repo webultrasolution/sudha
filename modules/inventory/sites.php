@@ -23,13 +23,14 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action'])) {
         $facing = clean($_POST['facing']);
         $light_type = clean($_POST['light_type']);
         $hsn_code = clean($_POST['hsn_code'] ?? '998366');
+        $vendor_gst = clean($_POST['vendor_gst'] ?? '');
         $grade = clean($_POST['grade']);
         $available_from = !empty($_POST['available_from']) ? $_POST['available_from'] : date('Y-m-d');
 
         if ($_POST['action'] === 'add_site') {
             try {
-                $stmt = $pdo->prepare("INSERT INTO sites (site_code, name, location, area, city, district, latitude, longitude, type, width, height, facing, light_type, hsn_code, grade, owner_type, vendor_id, card_rate, purchase_rate, available_from) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)");
-                $stmt->execute([$code, $name, $location, $area, $city, $district, $latitude, $longitude, $type, $width, $height, $facing, $light_type, $hsn_code, $grade, $owner_type, $vendor_id, $card_rate, $purchase_rate, $available_from]);
+                $stmt = $pdo->prepare("INSERT INTO sites (site_code, name, location, area, city, district, latitude, longitude, type, width, height, facing, light_type, hsn_code, vendor_gst, grade, owner_type, vendor_id, card_rate, purchase_rate, available_from) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)");
+                $stmt->execute([$code, $name, $location, $area, $city, $district, $latitude, $longitude, $type, $width, $height, $facing, $light_type, $hsn_code, $vendor_gst, $grade, $owner_type, $vendor_id, $card_rate, $purchase_rate, $available_from]);
                 $site_id = $pdo->lastInsertId();
                 
                 // Handle Multi-Image Upload
@@ -53,8 +54,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action'])) {
         } else {
             $id = intval($_POST['id']);
             try {
-                $stmt = $pdo->prepare("UPDATE sites SET site_code=?, name=?, location=?, area=?, city=?, district=?, latitude=?, longitude=?, type=?, width=?, height=?, facing=?, light_type=?, hsn_code=?, grade=?, owner_type=?, vendor_id=?, card_rate=?, purchase_rate=?, available_from=? WHERE id=?");
-                $stmt->execute([$code, $name, $location, $area, $city, $district, $latitude, $longitude, $type, $width, $height, $facing, $light_type, $hsn_code, $grade, $owner_type, $vendor_id, $card_rate, $purchase_rate, $available_from, $id]);
+                $stmt = $pdo->prepare("UPDATE sites SET site_code=?, name=?, location=?, area=?, city=?, district=?, latitude=?, longitude=?, type=?, width=?, height=?, facing=?, light_type=?, hsn_code=?, vendor_gst=?, grade=?, owner_type=?, vendor_id=?, card_rate=?, purchase_rate=?, available_from=? WHERE id=?");
+                $stmt->execute([$code, $name, $location, $area, $city, $district, $latitude, $longitude, $type, $width, $height, $facing, $light_type, $hsn_code, $vendor_gst, $grade, $owner_type, $vendor_id, $card_rate, $purchase_rate, $available_from, $id]);
                 
                 // Handle Multi-Image Upload (New)
                 if (!empty($_FILES['site_images']['name'][0])) {
@@ -303,6 +304,10 @@ $vendors = $pdo->query("SELECT id, name FROM partners WHERE type = 'vendor' ORDE
                         <option value="FL">Front-Lit (FL)</option>
                     </select>
                 </div>
+                <div class="form-group" id="vendor_gst_group" style="display: none;">
+                    <label>Vendor Branch GST (for Groups)</label>
+                    <input type="text" name="vendor_gst" id="f_vendor_gst" placeholder="Branch GSTIN">
+                </div>
                 <div class="form-group">
                     <label>HSN / SAC Code</label>
                     <input type="text" name="hsn_code" id="f_hsn" value="998366" placeholder="e.g. 998366">
@@ -482,14 +487,18 @@ function toggleVendor() {
     const type = document.getElementById('owner_toggle').value;
     const vendorSelect = document.getElementById('vendor_select');
     const vendorInput = document.getElementById('f_vendor');
+    const gstGroup = document.getElementById('vendor_gst_group');
     
     if (type === 'TA') {
         vendorSelect.style.display = 'block';
+        gstGroup.style.display = 'block';
         vendorInput.required = true;
     } else {
         vendorSelect.style.display = 'none';
+        gstGroup.style.display = 'none';
         vendorInput.required = false;
         vendorInput.value = '';
+        document.getElementById('f_vendor_gst').value = '';
     }
 }
 
@@ -650,6 +659,7 @@ function editSite(site) {
     document.getElementById('h_input').value = site.height;
     document.getElementById('f_light').value = site.light_type;
     document.getElementById('f_hsn').value = site.hsn_code || '998366';
+    document.getElementById('f_vendor_gst').value = site.vendor_gst || '';
     document.getElementById('f_facing').value = site.facing;
     document.getElementById('f_grade').value = site.grade;
     document.getElementById('f_avail').value = site.available_from;

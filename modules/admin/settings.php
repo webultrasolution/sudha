@@ -38,6 +38,13 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             }
         }
 
+        if (!empty($_FILES['company_letterhead']['name'])) {
+            $lhName = 'lh_' . time() . '_' . $_FILES['company_letterhead']['name'];
+            if (move_uploaded_file($_FILES['company_letterhead']['tmp_name'], $uploadDir . $lhName)) {
+                $stmt->execute([$lhName, 'company_letterhead']);
+            }
+        }
+
         $pdo->commit();
         $message = "Settings updated successfully!";
     } catch (Exception $e) {
@@ -137,6 +144,27 @@ include_once __DIR__ . '/../../includes/header.php';
                         <input type="file" name="company_logo" id="logo_input" style="display: none;" accept="image/*">
                         <button type="button" onclick="document.getElementById('logo_input').click()" class="btn" style="width: 100%; background: #f1f5f9; color: #475569; font-weight: 700; border: 1px solid #e2e8f0;">
                             Change Logo
+                        </button>
+                    </div>
+
+                    <h3 style="font-size: 1rem; font-weight: 800; color: #0f172a; margin-bottom: 1.5rem; text-align: left; border-top: 1px solid #f1f5f9; padding-top: 1.5rem;">
+                        <i class="fas fa-file-image" style="color: var(--primary);"></i> Full Letterhead
+                    </h3>
+                    
+                    <div style="margin-bottom: 1.5rem; padding: 1rem; background: #f8fafc; border: 2px dashed #e2e8f0; border-radius: 12px;">
+                        <?php 
+                        $lh = getSetting('company_letterhead');
+                        if ($lh): ?>
+                            <img src="<?php echo BASE_URL; ?>assets/images/<?php echo $lh; ?>" 
+                                 style="max-width: 100%; max-height: 120px; object-fit: contain; margin-bottom: 1rem; border-radius: 4px;">
+                        <?php else: ?>
+                            <div style="height: 60px; display: flex; align-items: center; justify-content: center; color: #94a3b8; font-size: 0.8rem; margin-bottom: 1rem;">
+                                No letterhead uploaded
+                            </div>
+                        <?php endif; ?>
+                        <input type="file" name="company_letterhead" id="lh_input" style="display: none;" accept="image/*">
+                        <button type="button" onclick="document.getElementById('lh_input').click()" class="btn" style="width: 100%; background: #f1f5f9; color: #475569; font-weight: 700; border: 1px solid #e2e8f0;">
+                            Change Letterhead
                         </button>
                     </div>
 

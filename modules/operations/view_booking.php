@@ -136,19 +136,23 @@ $grandTotal = $b['grand_total'];
 </div>
 
 <?php
-// Group sites by vendor for PO generation
+// Group sites by vendor & branch GST for PO generation
 $vendorSites = [];
 foreach ($items as $item) {
     if ($item['owner_type'] === 'TA' && isset($item['vendor_id'])) {
         $vId = $item['vendor_id'];
-        if (!isset($vendorSites[$vId])) {
-            $vendorSites[$vId] = [
+        $vgst = $item['vendor_gst'] ?? '';
+        $key = $vId . '_' . $vgst;
+        
+        if (!isset($vendorSites[$key])) {
+            $vendorSites[$key] = [
                 'id' => $vId,
                 'name' => $item['vendor_name'] ?? 'Unknown Vendor',
+                'vendor_gst' => $vgst,
                 'count' => 0
             ];
         }
-        $vendorSites[$vId]['count']++;
+        $vendorSites[$key]['count']++;
     }
 }
 ?>
@@ -164,11 +168,16 @@ foreach ($items as $item) {
                 <i class="fas fa-truck-loading"></i>
             </div>
             <div style="flex: 1;">
-                <div style="font-weight: 800; color: #92400e; font-size: 0.95rem;"><?php echo $v['name']; ?></div>
+                <div style="font-weight: 800; color: #92400e; font-size: 0.95rem;">
+                    <?php echo $v['name']; ?>
+                    <?php if ($v['vendor_gst']): ?>
+                        <div style="font-size: 0.65rem; color: #b45309; opacity: 0.8; font-family: monospace;">BRANCH: <?php echo $v['vendor_gst']; ?></div>
+                    <?php endif; ?>
+                </div>
                 <div style="font-size: 0.75rem; color: #b45309; font-weight: 600;"><?php echo $v['count']; ?> Assets in this booking</div>
             </div>
             <div style="display: flex; gap: 0.5rem;">
-                <a href="generate_po.php?booking_id=<?php echo $b['id']; ?>&vendor_id=<?php echo $v['id']; ?>" target="_blank" class="btn" style="background: #0f172a; color: white; padding: 0.6rem 1rem; border-radius: 8px; font-weight: 800; font-size: 0.75rem; text-decoration: none; display: flex; align-items: center; gap: 0.4rem;" title="View & Print PO">
+                <a href="generate_po.php?booking_id=<?php echo $b['id']; ?>&vendor_id=<?php echo $v['id']; ?>&vendor_gst=<?php echo urlencode($v['vendor_gst']); ?>" target="_blank" class="btn" style="background: #0f172a; color: white; padding: 0.6rem 1rem; border-radius: 8px; font-weight: 800; font-size: 0.75rem; text-decoration: none; display: flex; align-items: center; gap: 0.4rem;" title="View & Print PO">
                     <i class="fas fa-file-pdf"></i> PDF
                 </a>
                 <button onclick="sendPOEmail(<?php echo $b['id']; ?>, <?php echo $v['id']; ?>)" class="btn" style="background: #3b82f6; color: white; padding: 0.6rem 1rem; border-radius: 8px; font-weight: 800; font-size: 0.75rem; border: none; cursor: pointer; display: flex; align-items: center; gap: 0.4rem;" title="Send via Email">
@@ -197,7 +206,7 @@ foreach ($items as $item) {
                 <th>Dimensions</th>
                 <th>Period</th>
                 <th>Cost / Margin</th>
-                <th style="text-align: right;">Sale Amount</th>
+                <th style="text-align: right;">Selling Cost</th>
             </tr>
         </thead>
         <tbody>
@@ -247,18 +256,34 @@ foreach ($items as $item) {
                     <div style="font-size: 0.7rem; color: #94a3b8;"><?php echo $item['days']; ?> Days</div>
                 </td>
                 <td>
-                    <div style="margin-bottom: 0.5rem;">
-                        <span style="font-size: 0.65rem; font-weight: 800; color: #94a3b8; text-transform: uppercase; display: block; margin-bottom: 2px;">Purchase Cost</span>
-                        <div style="font-weight: 700; color: #475569; font-size: 0.9rem;"><?php echo formatCurrency($item['purchase_amount'] ?? 0); ?></div>
-                    </div>
-                    <div>
-                        <span style="font-size: 0.65rem; font-weight: 800; color: #94a3b8; text-transform: uppercase; display: block; margin-bottom: 2px;">Net Profit</span>
-                        <div style="display: inline-flex; align-items: center; gap: 0.4rem; background: #f0fdf4; color: #166534; padding: 0.25rem 0.6rem; border-radius: 6px; border: 1px solid #bbf7d0;">
-                            <i class="fas fa-arrow-up" style="font-size: 0.6rem;"></i>
-                            <span style="font-weight: 800; font-size: 0.8rem;"><?php echo formatCurrency($itemMargin); ?></span>
-                            <span style="font-size: 0.65rem; font-weight: 600; opacity: 0.8;">(<?php echo number_format($marginPct, 1); ?>%)</span>
+                    <?php if ($item['owner_type'] === 'TA'): ?>
+                        <?php if (($item['purchase_amount'] ?? 0) > 0): ?>
+                            <div style="margin-bottom: 0.5rem;">
+                                <span style="font-size: 0.65rem; font-weight: 800; color: #94a3b8; text-transform: uppercase; display: block; margin-bottom: 2px;">Purchase Cost</span>
+                                <input type="number" step="0.01" value="<?php echo floatval($item['purchase_amount'] ?? 0); ?>" 
+                                       onchange="updatePurchaseCost(<?php echo $item['id']; ?>, this.value)"
+                                       style="width: 100px; font-weight: 700; color: #475569; font-size: 0.9rem; border: 1px solid #e2e8f0; border-radius: 4px; padding: 2px 5px; outline: none;"
+                                       onfocus="this.style.borderColor='var(--primary)'" 
+                                       onblur="this.style.borderColor='#e2e8f0'">
+                            </div>
+                            <div>
+                                <span style="font-size: 0.65rem; font-weight: 800; color: #94a3b8; text-transform: uppercase; display: block; margin-bottom: 2px;">Net Profit</span>
+                                <div style="display: inline-flex; align-items: center; gap: 0.4rem; background: #f0fdf4; color: #166534; padding: 0.25rem 0.6rem; border-radius: 6px; border: 1px solid #bbf7d0;">
+                                    <i class="fas fa-arrow-up" style="font-size: 0.6rem;"></i>
+                                    <span style="font-weight: 800; font-size: 0.8rem;"><?php echo formatCurrency($itemMargin); ?></span>
+                                    <span style="font-size: 0.65rem; font-weight: 600; opacity: 0.8;">(<?php echo number_format($marginPct, 1); ?>%)</span>
+                                </div>
+                            </div>
+                        <?php else: ?>
+                            <button onclick="promptSetCost(<?php echo $item['id']; ?>)" style="background: #f1f5f9; border: 1px dashed #cbd5e1; color: #64748b; padding: 0.5rem; border-radius: 8px; font-size: 0.7rem; font-weight: 700; cursor: pointer; width: 100%; display: flex; align-items: center; justify-content: center; gap: 0.4rem;">
+                                <i class="fas fa-plus-circle"></i> SET PURCHASE COST
+                            </button>
+                        <?php endif; ?>
+                    <?php else: ?>
+                        <div style="color: #94a3b8; font-size: 0.75rem; font-weight: 600; display: flex; align-items: center; gap: 0.4rem;">
+                            <i class="fas fa-house-user"></i> Internal Asset
                         </div>
-                    </div>
+                    <?php endif; ?>
                 </td>
                 <td style="font-weight: 800; color: #0f172a; text-align: right; font-size: 1rem;"><?php echo formatCurrency($item['amount']); ?></td>
             </tr>
@@ -305,6 +330,54 @@ function sendPOEmail(bookingId, vendorId) {
             showConfirmButton: false
         });
     }, 1500);
+}
+
+function updatePurchaseCost(itemId, cost) {
+    const formData = new FormData();
+    formData.append('item_id', itemId);
+    formData.append('purchase_cost', cost);
+
+    fetch('../../ajax/update_purchase_cost.php', {
+        method: 'POST',
+        body: formData
+    })
+    .then(r => r.json())
+    .then(res => {
+        if(res.success) {
+            const Toast = Swal.mixin({
+                toast: true,
+                position: 'top-end',
+                showConfirmButton: false,
+                timer: 2000,
+                timerProgressBar: true
+            });
+            Toast.fire({
+                icon: 'success',
+                title: 'Purchase cost updated'
+            }).then(() => location.reload());
+        } else {
+            Swal.fire('Error', res.message || 'Failed to update cost', 'error');
+        }
+    });
+}
+function promptSetCost(itemId) {
+    Swal.fire({
+        title: 'Set Purchase Cost',
+        input: 'number',
+        inputLabel: 'Enter the purchase cost for this asset',
+        inputPlaceholder: '0.00',
+        showCancelButton: true,
+        confirmButtonText: 'Save Cost',
+        inputValidator: (value) => {
+            if (!value) {
+                return 'You need to enter an amount!'
+            }
+        }
+    }).then((result) => {
+        if (result.isConfirmed) {
+            updatePurchaseCost(itemId, result.value);
+        }
+    });
 }
 </script>
 
