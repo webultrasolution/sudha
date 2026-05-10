@@ -19,8 +19,7 @@ $stmt = $pdo->prepare("
     FROM operations op
     JOIN sites s ON op.site_id = s.id
     JOIN bookings b ON op.booking_id = b.id
-    JOIN proposals prop ON b.proposal_id = prop.id
-    JOIN partners p ON prop.client_id = p.id
+    JOIN partners p ON b.client_id = p.id
     $where
     ORDER BY op.id DESC
 ");

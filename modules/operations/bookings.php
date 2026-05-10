@@ -25,10 +25,10 @@ include_once __DIR__ . '/../../includes/header.php';
 
 // Fetch Bookings
 $bookings = $pdo->query("
-    SELECT b.*, p.proposal_number, c.name as client_name, p.start_date, p.end_date
+    SELECT b.*, p.proposal_number, c.name as client_name
     FROM bookings b 
-    JOIN proposals p ON b.proposal_id = p.id 
-    JOIN partners c ON p.client_id = c.id 
+    LEFT JOIN proposals p ON b.proposal_id = p.id 
+    LEFT JOIN partners c ON b.client_id = c.id 
     ORDER BY b.id DESC
 ")->fetchAll();
 ?>
@@ -61,7 +61,7 @@ $bookings = $pdo->query("
                 <?php foreach ($bookings as $b): ?>
                 <tr>
                     <td>
-                        <a href="../proposals/view.php?id=<?php echo $b['proposal_id']; ?>" style="text-decoration: none; color: inherit; transition: color 0.2s;" onmouseover="this.style.color='var(--primary)';" onmouseout="this.style.color='inherit';">
+                        <a href="view_booking.php?id=<?php echo $b['id']; ?>" style="text-decoration: none; color: inherit; transition: color 0.2s;" onmouseover="this.style.color='var(--primary)';" onmouseout="this.style.color='inherit';">
                             <strong>#BK-<?php echo str_pad($b['id'], 4, '0', STR_PAD_LEFT); ?></strong>
                         </a>
                     </td>

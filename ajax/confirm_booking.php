@@ -34,20 +34,42 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         $stmt->execute([$proposalId]);
 
         // 2. Create Booking
-        $stmtBooking = $pdo->prepare("INSERT INTO bookings (proposal_id, status) VALUES (?, 'active')");
-        $stmtBooking->execute([$proposalId]);
+        $stmtBooking = $pdo->prepare("INSERT INTO bookings (proposal_id, client_id, start_date, end_date, total_amount, tax_amount, grand_total, status) VALUES (?, ?, ?, ?, ?, ?, ?, 'active')");
+        $stmtBooking->execute([
+            $proposalId,
+            $proposal['client_id'],
+            $proposal['start_date'],
+            $proposal['end_date'],
+            $proposal['total_amount'],
+            $proposal['tax_amount'],
+            $proposal['grand_total']
+        ]);
         $bookingId = $pdo->lastInsertId();
 
-        // 3. Create Operations (Mounting Tasks) ONLY for selected items
+        // 3. Create Booking Items and Operations ONLY for selected items
         $placeholders = implode(',', array_fill(0, count($itemIds), '?'));
-        $params = array_merge($itemIds, [$proposalId]);
         
-        $stmtItems = $pdo->prepare("SELECT site_id FROM proposal_items WHERE id IN ($placeholders) AND proposal_id = ?");
-        $stmtItems->execute($params);
+        $stmtItems = $pdo->prepare("SELECT * FROM proposal_items WHERE id IN ($placeholders)");
+        $stmtItems->execute($itemIds);
         $items = $stmtItems->fetchAll();
 
+        $stmtBI = $pdo->prepare("INSERT INTO booking_items (booking_id, proposal_item_id, site_id, sale_rate, start_date, end_date, days, amount) VALUES (?, ?, ?, ?, ?, ?, ?, ?)");
         $stmtOps = $pdo->prepare("INSERT INTO operations (booking_id, site_id, status) VALUES (?, ?, 'pending')");
+        
         foreach ($items as $item) {
+            // Save snapshot to booking_items
+            $stmtBI->execute([
+                $bookingId, 
+                $item['id'], 
+                $item['site_id'], 
+                $item['sale_rate'], 
+                $proposal['start_date'], 
+                $proposal['end_date'], 
+                $item['days'], 
+                $item['amount']
+            ]);
+            
+            // Create operation task
             $stmtOps->execute([$bookingId, $item['site_id']]);
         }
 
