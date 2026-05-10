@@ -132,7 +132,8 @@ $indian_states = ["Andhra Pradesh", "Arunachal Pradesh", "Assam", "Bihar", "Chha
                         <?php echo strtoupper($c['status']); ?>
                     </span>
                 </td>
-                <td style="text-align: right;">
+                <td style="text-align: right; white-space: nowrap;">
+                    <a href="../financials/client_ledger.php?client_id=<?php echo $c['id']; ?>" class="btn-icon" title="View Ledger" style="color: #64748b;"><i class="fas fa-book"></i></a>
                     <button class="btn-icon" onclick="editClient(<?php echo htmlspecialchars(json_encode($c)); ?>)" style="color: var(--primary);"><i class="fas fa-edit"></i></button>
                     <button class="btn-icon" style="color: #ef4444;" onclick="deleteClient(<?php echo $c['id']; ?>)"><i class="fas fa-trash"></i></button>
                 </td>

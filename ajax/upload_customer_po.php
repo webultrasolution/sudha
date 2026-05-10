@@ -40,6 +40,21 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
     $stmt = $pdo->prepare($sql);
     if ($stmt->execute($params)) {
+        // Automatically create record in 'invoices' table if it doesn't exist
+        $checkInvoice = $pdo->prepare("SELECT id FROM invoices WHERE booking_id = ?");
+        $checkInvoice->execute([$booking_id]);
+        if (!$checkInvoice->fetch()) {
+            // Fetch booking totals for the invoice record
+            $stmtBooking = $pdo->prepare("SELECT total_amount, grand_total FROM bookings WHERE id = ?");
+            $stmtBooking->execute([$booking_id]);
+            $bookingData = $stmtBooking->fetch();
+            
+            $invNo = 'INV/' . date('Y') . '/' . str_pad($booking_id, 4, '0', STR_PAD_LEFT);
+            
+            $stmtInsert = $pdo->prepare("INSERT INTO invoices (invoice_number, booking_id, type, sub_total, total_amount, payment_status) VALUES (?, ?, 'tax', ?, ?, 'unpaid')");
+            $stmtInsert->execute([$invNo, $booking_id, $bookingData['total_amount'], $bookingData['grand_total']]);
+        }
+        
         echo json_encode(['success' => true]);
     } else {
         echo json_encode(['success' => false, 'message' => 'Database Update Failed']);

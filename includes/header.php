@@ -57,9 +57,10 @@ checkAuth();
                 <a href="#" class="nav-link submenu-toggle <?php echo in_array($activePage, ['invoices', 'payments']) ? 'active submenu-open' : ''; ?>">
                     <i class="fas fa-wallet"></i> <span>Financials</span> <i class="fas fa-chevron-down toggle-icon" style="margin-left: auto; font-size: 0.8rem;"></i>
                 </a>
-                <ul class="submenu" style="<?php echo in_array($activePage, ['invoices', 'payments']) ? 'display: block;' : 'display: none;'; ?>">
+                <ul class="submenu" style="<?php echo in_array($activePage, ['invoices', 'payments', 'ledger']) ? 'display: block;' : 'display: none;'; ?>">
                     <li><a href="<?php echo BASE_URL; ?>modules/financials/invoices.php" class="<?php echo $activePage == 'invoices' ? 'active-sub' : ''; ?>"><i class="fas fa-file-invoice-dollar"></i> Invoices</a></li>
                     <li><a href="<?php echo BASE_URL; ?>modules/financials/payments.php" class="<?php echo $activePage == 'payments' ? 'active-sub' : ''; ?>"><i class="fas fa-money-bill-wave"></i> Payments</a></li>
+                    <li><a href="<?php echo BASE_URL; ?>modules/financials/ledgers.php" class="<?php echo $activePage == 'ledger' ? 'active-sub' : ''; ?>"><i class="fas fa-book"></i> Client Ledger</a></li>
                 </ul>
             </li>
             

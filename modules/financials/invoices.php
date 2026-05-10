@@ -79,9 +79,8 @@ $invoices = $invoices->fetchAll();
                         </span>
                     </td>
                     <td style="text-align: right;">
-                        <a href="invoice_view.php?id=<?php echo $i['id']; ?>" class="btn-icon" title="View" style="color: #64748b;"><i class="fas fa-eye"></i></a>
-                        <button class="btn-icon" title="Download PDF" style="color: #64748b;"><i class="fas fa-download"></i></button>
-                        <button class="btn-icon" title="Email" style="color: var(--primary);"><i class="fas fa-envelope"></i></button>
+                        <a href="../operations/generate_invoice.php?booking_id=<?php echo $i['booking_id']; ?>" target="_blank" class="btn-icon" title="View & Print" style="color: #64748b;"><i class="fas fa-file-invoice"></i></a>
+                        <button class="btn-icon" title="Email Invoice" style="color: var(--primary);"><i class="fas fa-paper-plane"></i></button>
                     </td>
                 </tr>
                 <?php endforeach; ?>
