@@ -67,7 +67,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 $proposal['start_date'], 
                 $proposal['end_date'], 
                 $item['days'], 
-                $item['purchase_rate'], // purchase_amount is same as purchase_rate for now
+                0, // Set purchase_amount to 0 by default (user must confirm manually)
                 $item['amount']
             ]);
             

@@ -42,6 +42,10 @@ function calculateGST($subtotal, $isInterState = false) {
  * Format Currency (INR)
  */
 function formatCurrency($amount) {
+    $amount = (float)($amount ?? 0);
+    if (floor($amount) == $amount) {
+        return '₹' . number_format($amount, 0);
+    }
     return '₹' . number_format($amount, 2);
 }
 
