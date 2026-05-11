@@ -87,9 +87,23 @@ $grandTotal = $b['grand_total'];
         <a href="bookings.php" class="btn" style="background: white; border: 1px solid #e2e8f0; color: #475569; padding: 0.75rem 1.25rem; border-radius: 10px; font-weight: 700; font-size: 0.9rem; cursor: pointer; text-decoration: none;">
             <i class="fas fa-arrow-left"></i> Back to List
         </a>
-        <button class="btn" onclick="openInvoicePopup(<?php echo $b['id']; ?>)" style="background: #0f172a; color: white; padding: 0.75rem 1.5rem; border-radius: 10px; font-weight: 800; border: none; cursor: pointer; display: flex; align-items: center; gap: 0.5rem;">
-            <i class="fas fa-file-invoice-dollar"></i> Final Tax Invoice
-        </button>
+        
+        <?php
+        // Check if invoice already exists
+        $stmtInv = $pdo->prepare("SELECT id FROM invoices WHERE booking_id = ? AND type = 'tax' LIMIT 1");
+        $stmtInv->execute([$id]);
+        $existingInvoice = $stmtInv->fetch();
+
+        if ($existingInvoice): ?>
+            <a href="generate_invoice.php?booking_id=<?php echo $id; ?>" target="_blank" class="btn" style="background: #10b981; color: white; padding: 0.75rem 1.5rem; border-radius: 10px; font-weight: 800; border: none; cursor: pointer; display: flex; align-items: center; gap: 0.5rem; text-decoration: none;">
+                <i class="fas fa-eye"></i> View Tax Invoice
+            </a>
+        <?php else: ?>
+            <button class="btn" onclick="openInvoicePopup(<?php echo $b['id']; ?>)" style="background: #0f172a; color: white; padding: 0.75rem 1.5rem; border-radius: 10px; font-weight: 800; border: none; cursor: pointer; display: flex; align-items: center; gap: 0.5rem;">
+                <i class="fas fa-file-invoice-dollar"></i> Final Tax Invoice
+            </button>
+        <?php endif; ?>
+
         <button class="btn btn-primary" onclick="window.print()" style="padding: 0.75rem 1.5rem; border-radius: 10px; font-weight: 800;">
             <i class="fas fa-print"></i> Print Details
         </button>

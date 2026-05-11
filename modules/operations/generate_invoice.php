@@ -186,7 +186,15 @@ $gst = calculateGST($subtotal, $isInterState);
             </tr>
         </thead>
         <tbody>
-            <?php foreach ($items as $idx => $item): ?>
+            <?php foreach ($items as $idx => $item): 
+                // Safe Date Handling
+                $sDate = (!empty($item['start_date']) && $item['start_date'] != '0000-00-00') ? $item['start_date'] : $b['start_date'];
+                $eDate = (!empty($item['end_date']) && $item['end_date'] != '0000-00-00') ? $item['end_date'] : $b['end_date'];
+                
+                // Amount Per Month Calculation
+                $days = $item['days'] ?: 1;
+                $amtPerMonth = ($item['amount'] / $days) * 30;
+            ?>
             <tr>
                 <td><?php echo $idx + 1; ?></td>
                 <td style="text-align: left; padding-left: 10px;">
@@ -195,9 +203,12 @@ $gst = calculateGST($subtotal, $isInterState);
                 </td>
                 <td><?php echo $item['hsn_code'] ?: '998366'; ?></td>
                 <td><?php echo $item['width']; ?>'x<?php echo $item['height']; ?>'</td>
-                <td><?php echo date('d.m.y', strtotime($item['start_date'])); ?> to<br><?php echo date('d.m.y', strtotime($item['end_date'])); ?></td>
-                <td><?php echo number_format($item['amount'], 2); ?></td>
-                <td style="text-align: right; padding-right: 10px;"><?php echo number_format($item['amount'], 2); ?></td>
+                <td style="font-size: 9px;">
+                    <?php echo date('d.m.Y', strtotime($sDate)); ?> to<br>
+                    <?php echo date('d.m.Y', strtotime($eDate)); ?>
+                </td>
+                <td style="font-weight: 600;"><?php echo number_format($amtPerMonth, 2); ?></td>
+                <td style="text-align: right; padding-right: 10px; font-weight: bold;"><?php echo number_format($item['amount'], 2); ?></td>
             </tr>
             <?php endforeach; ?>
             

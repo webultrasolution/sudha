@@ -105,10 +105,20 @@ if ($mediaFilter !== 'all') {
     $params[] = $mediaFilter;
 }
 if (!empty($search)) {
-    $where .= " AND (s.site_code LIKE ? OR s.name LIKE ? OR s.location LIKE ?)";
-    $params[] = "%$search%";
-    $params[] = "%$search%";
-    $params[] = "%$search%";
+    $where .= " AND (s.site_code LIKE ? OR s.name LIKE ? OR s.location LIKE ? OR s.city LIKE ?)";
+    $searchParam = "%$search%";
+    $params[] = $searchParam;
+    $params[] = $searchParam;
+    $params[] = $searchParam;
+    $params[] = $searchParam;
+}
+if (!empty($_GET['from'])) {
+    $where .= " AND s.available_from <= ?";
+    $params[] = $_GET['from'];
+}
+if (!empty($_GET['to'])) {
+    // Basic logic: if we need it by 'to', it must be available before that date
+    // You might want more complex logic depending on booking overlaps
 }
 
 // Counts for Tabs
@@ -139,10 +149,22 @@ $vendors = $pdo->query("SELECT id, name FROM partners WHERE type = 'vendor' ORDE
 </div>
 
 <div class="card">
-    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1.5rem;">
-        <div style="display: flex; gap: 1rem; align-items: center;">
-            <input type="text" id="site-search" placeholder="Search ID, Name or Location..." class="p-input" value="<?php echo $search; ?>" style="width: 300px;">
-            <button class="btn btn-primary" onclick="doSearch()"><i class="fas fa-search"></i> Search</button>
+    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1.5rem; flex-wrap: wrap; gap: 1rem;">
+        <div style="display: flex; gap: 0.75rem; align-items: center; flex-wrap: wrap;">
+            <div class="search-group" style="position: relative;">
+                <i class="fas fa-search" style="position: absolute; left: 12px; top: 50%; transform: translateY(-50%); color: #94a3b8;"></i>
+                <input type="text" id="site-search" placeholder="Search ID, Location, City..." class="p-input" value="<?php echo $search; ?>" style="width: 250px; padding-left: 35px;">
+            </div>
+            
+            <div style="display: flex; align-items: center; gap: 0.5rem; background: #fff; padding: 2px 10px; border: 1px solid #cbd5e1; border-radius: 8px;">
+                <span style="font-size: 0.7rem; font-weight: 700; color: #64748b; text-transform: uppercase;">Available Between:</span>
+                <input type="date" id="filter-from" class="p-input" style="border:none; width: 130px; font-size: 0.8rem;" value="<?php echo $_GET['from'] ?? ''; ?>">
+                <span style="color: #cbd5e1;">-</span>
+                <input type="date" id="filter-to" class="p-input" style="border:none; width: 130px; font-size: 0.8rem;" value="<?php echo $_GET['to'] ?? ''; ?>">
+            </div>
+
+            <button class="btn btn-primary" onclick="doSearch()" style="padding: 0.6rem 1.5rem;"><i class="fas fa-filter"></i> Apply Filters</button>
+            <button class="btn" onclick="window.location.href='sites.php'" style="background: #f1f5f9; color: #475569;"><i class="fas fa-sync-alt"></i></button>
         </div>
         <div style="display: flex; gap: 1rem;">
             <button class="btn btn-secondary" onclick="openImportModal()" style="background: #f1f5f9; color: #475569; border: 1px solid #e2e8f0;">
@@ -181,7 +203,10 @@ $vendors = $pdo->query("SELECT id, name FROM partners WHERE type = 'vendor' ORDE
                     ?>
                         <img src="../../uploads/sites/<?php echo $img['filename']; ?>" style="width: 100px; height: 65px; object-fit: cover; border-radius: 8px; cursor: pointer; border: 1px solid #e2e8f0; box-shadow: 0 2px 4px rgba(0,0,0,0.1);" onclick="viewPhotos(<?php echo $s['id']; ?>, '<?php echo $s['light_type']; ?>')">
                     <?php else: ?>
-                        <small style="color: #cbd5e1;">No Img</small>
+                        <div style="width: 100px; height: 65px; background: #f8fafc; border: 1px dashed #cbd5e1; border-radius: 8px; display: flex; flex-direction: column; align-items: center; justify-content: center; color: #94a3b8;">
+                            <i class="fas fa-image" style="font-size: 1.2rem; margin-bottom: 2px;"></i>
+                            <span style="font-size: 0.6rem; font-weight: 700; text-transform: uppercase;">No Photo</span>
+                        </div>
                     <?php endif; ?>
                 </td>
                  <td>
@@ -498,7 +523,9 @@ let pendingFiles = []; // Global to store all selected files for upload
 
 function doSearch() {
     const s = document.getElementById('site-search').value;
-    window.location.href = `?media=<?php echo $mediaFilter; ?>&search=${encodeURIComponent(s)}`;
+    const from = document.getElementById('filter-from').value;
+    const to = document.getElementById('filter-to').value;
+    window.location.href = `?media=<?php echo $mediaFilter; ?>&search=${encodeURIComponent(s)}&from=${from}&to=${to}`;
 }
 function openModal() { 
     const form = document.getElementById('siteForm');
