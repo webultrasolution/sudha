@@ -951,20 +951,20 @@ function recalcAll() {
     if (taxType === 'cgst_sgst') {
         const halfTax = totalTax / 2;
         taxContainer.innerHTML = `
-            <div class="stat-row" style="display:flex; justify-content:space-between; margin-bottom:0.5rem;">
+            <div class="stat-row" style="display:flex; justify-content:space-between; margin-bottom:0.4rem; font-size:0.85rem;">
                 <span style="color:#64748b; font-weight:600;">CGST (9%):</span>
-                <span style="font-weight:800;">₹${halfTax.toLocaleString(undefined, {minimumFractionDigits: 2, maximumFractionDigits: 2})}</span>
+                <span style="font-weight:800; color:#1e293b;">₹${halfTax.toLocaleString(undefined, {minimumFractionDigits: 2, maximumFractionDigits: 2})}</span>
             </div>
-            <div class="stat-row" style="display:flex; justify-content:space-between; margin-bottom:0.5rem;">
+            <div class="stat-row" style="display:flex; justify-content:space-between; margin-bottom:0.4rem; font-size:0.85rem;">
                 <span style="color:#64748b; font-weight:600;">SGST (9%):</span>
-                <span style="font-weight:800;">₹${halfTax.toLocaleString(undefined, {minimumFractionDigits: 2, maximumFractionDigits: 2})}</span>
+                <span style="font-weight:800; color:#1e293b;">₹${halfTax.toLocaleString(undefined, {minimumFractionDigits: 2, maximumFractionDigits: 2})}</span>
             </div>
         `;
     } else {
         taxContainer.innerHTML = `
-            <div class="stat-row" style="display:flex; justify-content:space-between; margin-bottom:0.5rem;">
+            <div class="stat-row" style="display:flex; justify-content:space-between; margin-bottom:0.4rem; font-size:0.85rem;">
                 <span style="color:#64748b; font-weight:600;">IGST (18%):</span>
-                <span style="font-weight:800;">₹${totalTax.toLocaleString(undefined, {minimumFractionDigits: 2, maximumFractionDigits: 2})}</span>
+                <span style="font-weight:800; color:#1e293b;">₹${totalTax.toLocaleString(undefined, {minimumFractionDigits: 2, maximumFractionDigits: 2})}</span>
             </div>
         `;
     }
