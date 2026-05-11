@@ -52,7 +52,8 @@ checkAuth();
                 </ul>
             </li>
 
-            <!-- Financials Submenu -->
+            <!-- Financials Submenu (Dynamic Permissions) -->
+            <?php if (canAccess('financials')): ?>
             <li class="nav-item has-submenu">
                 <a href="#" class="nav-link submenu-toggle <?php echo in_array($activePage, ['invoices', 'payments']) ? 'active submenu-open' : ''; ?>">
                     <i class="fas fa-wallet"></i> <span>Financials</span> <i class="fas fa-chevron-down toggle-icon" style="margin-left: auto; font-size: 0.8rem;"></i>
@@ -63,6 +64,7 @@ checkAuth();
                     <li><a href="<?php echo BASE_URL; ?>modules/financials/ledgers.php" class="<?php echo $activePage == 'ledger' ? 'active-sub' : ''; ?>"><i class="fas fa-book"></i> Client Ledger</a></li>
                 </ul>
             </li>
+            <?php endif; ?>
             
             <!-- Tools & Insights Submenu -->
             <li class="nav-item has-submenu">
@@ -71,7 +73,13 @@ checkAuth();
                 </a>
                 <ul class="submenu" style="<?php echo in_array($activePage, ['reports', 'resources', 'photofactory']) ? 'display: block;' : 'display: none;'; ?>">
                     <li><a href="<?php echo BASE_URL; ?>modules/reports/reports.php" class="<?php echo $activePage == 'reports' ? 'active-sub' : ''; ?>"><i class="fas fa-chart-pie"></i> Reports</a></li>
-                    <li><a href="<?php echo BASE_URL; ?>modules/admin/settings.php" class="<?php echo $activePage == 'settings' ? 'active-sub' : ''; ?>"><i class="fas fa-cog"></i> Admin Settings</a></li>
+                    <?php if (hasRole('admin')): ?>
+                        <li><a href="<?php echo BASE_URL; ?>modules/admin/settings.php" class="<?php echo $activePage == 'settings' ? 'active-sub' : ''; ?>"><i class="fas fa-cog"></i> Admin Settings</a></li>
+                    <?php endif; ?>
+                    <?php if (($_SESSION['user_role'] ?? '') === 'admin'): ?>
+                        <li><a href="<?php echo BASE_URL; ?>modules/users/index.php" class="<?php echo $activePage == 'users' ? 'active-sub' : ''; ?>"><i class="fas fa-users-cog"></i> User Management</a></li>
+                        <li><a href="<?php echo BASE_URL; ?>modules/users/permissions.php" class="<?php echo $activePage == 'users' ? 'active-sub' : ''; ?>"><i class="fas fa-user-shield"></i> Role Permissions</a></li>
+                    <?php endif; ?>
                     <li><a href="<?php echo BASE_URL; ?>modules/admin/resources.php" class="<?php echo $activePage == 'resources' ? 'active-sub' : ''; ?>"><i class="fas fa-tools"></i> Resources</a></li>
                     <li><a href="<?php echo BASE_URL; ?>modules/inventory/photofactory.php" class="<?php echo $activePage == 'photofactory' ? 'active-sub' : ''; ?>"><i class="fas fa-images"></i> Photofactory</a></li>
                 </ul>

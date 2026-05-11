@@ -86,6 +86,9 @@ $indian_states = ["Andhra Pradesh", "Arunachal Pradesh", "Assam", "Bihar", "Chha
                 </select>
                 <button type="submit" class="btn" style="padding: 0.5rem 1rem;"><i class="fas fa-search"></i></button>
             </form>
+            <button class="btn btn-secondary" onclick="openImportModal()" style="background: #f1f5f9; color: #475569; border: 1px solid #e2e8f0;">
+                <i class="fas fa-file-import"></i> Bulk Import
+            </button>
             <button class="btn btn-primary" onclick="openModal()">
                 <i class="fas fa-plus"></i> Add New Company
             </button>
@@ -232,6 +235,30 @@ $indian_states = ["Andhra Pradesh", "Arunachal Pradesh", "Assam", "Bihar", "Chha
     </div>
 </div>
 
+<!-- Bulk Import Modal -->
+<div id="importModal" class="modal">
+    <div class="modal-content" style="max-width: 500px;">
+        <div class="modal-header">
+            <h2>Bulk Import Clients</h2>
+            <span class="close" onclick="closeImportModal()">&times;</span>
+        </div>
+        <form id="importForm" action="../../ajax/import_partners.php" method="POST" enctype="multipart/form-data" style="padding: 1rem 0;">
+            <input type="hidden" name="type" value="client">
+            <div class="form-group" style="margin-bottom: 1.5rem;">
+                <label>Select CSV File</label>
+                <input type="file" name="file" accept=".csv" required style="padding: 1rem; border: 2px dashed #e2e8f0; background: #f8fafc; text-align: center;">
+                <div style="font-size: 0.75rem; color: #64748b; margin-top: 0.5rem;">
+                    <i class="fas fa-info-circle"></i> Download <a href="../../templates/client_template.csv" download style="color: var(--primary); font-weight: 600;">Sample Template</a> first.
+                </div>
+            </div>
+            <div style="text-align: right;">
+                <button type="button" class="btn" onclick="closeImportModal()">Cancel</button>
+                <button type="submit" class="btn btn-primary">Start Upload</button>
+            </div>
+        </form>
+    </div>
+</div>
+
 <style>
 .modal { display: none; position: fixed; z-index: 1000; left: 0; top: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.5); overflow-y: auto; }
 .modal-content { background: white; margin: 2% auto; padding: 2rem; border-radius: 12px; }
@@ -250,6 +277,9 @@ function openModal() {
     document.getElementById('clientModal').style.display = 'block'; 
 }
 function closeModal() { document.getElementById('clientModal').style.display = 'none'; }
+
+function openImportModal() { document.getElementById('importModal').style.display = 'block'; }
+function closeImportModal() { document.getElementById('importModal').style.display = 'none'; }
 function editClient(c) {
     const form = document.getElementById('clientForm');
     form.classList.remove('was-validated');

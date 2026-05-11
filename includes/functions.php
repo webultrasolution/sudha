@@ -53,12 +53,59 @@ function formatCurrency($amount) {
  * Check User Role
  */
 function hasRole($requiredRoles) {
+    if (session_status() === PHP_SESSION_NONE) session_start();
     if (!isset($_SESSION['user_role'])) return false;
     if (is_array($requiredRoles)) {
         return in_array($_SESSION['user_role'], $requiredRoles);
     }
     return $_SESSION['user_role'] === $requiredRoles;
 }
+
+/**
+ * Check Granular Permissions (DB Backed)
+ */
+function getPerms($moduleKey) {
+    global $pdo;
+    if (session_status() === PHP_SESSION_NONE) session_start();
+    $role = $_SESSION['user_role'] ?? '';
+    
+    if ($role === 'admin') {
+        return ['can_view' => 1, 'can_add' => 1, 'can_edit' => 1, 'can_delete' => 1];
+    }
+    
+    static $all_perms = null;
+    if ($all_perms === null) {
+        $stmt = $pdo->prepare("SELECT module_key, can_view, can_add, can_edit, can_delete FROM role_permissions WHERE role = ?");
+        $stmt->execute([$role]);
+        $all_perms = $stmt->fetchAll(PDO::FETCH_UNIQUE | PDO::FETCH_ASSOC);
+    }
+    
+    return $all_perms[$moduleKey] ?? ['can_view' => 0, 'can_add' => 0, 'can_edit' => 0, 'can_delete' => 0];
+}
+
+function canView($module) { $p = getPerms($module); return $p['can_view'] == 1; }
+function canAdd($module) { $p = getPerms($module); return $p['can_add'] == 1; }
+function canEdit($module) { $p = getPerms($module); return $p['can_edit'] == 1; }
+function canDelete($module) { $p = getPerms($module); return $p['can_delete'] == 1; }
+
+// Backward Compatibility
+function canAccess($module) { return canView($module); }
+
+/**
+ * Force a role check and redirect if not permitted
+ */
+function requireRole($roles) {
+    if (!hasRole($roles)) {
+        // You can redirect to a custom 403 page or just show an error
+        echo "<div style='padding: 50px; text-align: center; font-family: sans-serif;'>
+                <h1 style='color: #ef4444;'>Access Denied</h1>
+                <p>Aapke paas is page ko dekhne ki permission nahi hai.</p>
+                <a href='" . BASE_URL . "index.php' style='color: var(--primary);'>Dashboard par wapas jayein</a>
+              </div>";
+        exit;
+    }
+}
+
 
 /**
  * Auth Middleware

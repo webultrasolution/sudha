@@ -144,9 +144,14 @@ $vendors = $pdo->query("SELECT id, name FROM partners WHERE type = 'vendor' ORDE
             <input type="text" id="site-search" placeholder="Search ID, Name or Location..." class="p-input" value="<?php echo $search; ?>" style="width: 300px;">
             <button class="btn btn-primary" onclick="doSearch()"><i class="fas fa-search"></i> Search</button>
         </div>
-        <button class="btn btn-primary" onclick="openModal()">
-            <i class="fas fa-plus"></i> Add New Site
-        </button>
+        <div style="display: flex; gap: 1rem;">
+            <button class="btn btn-secondary" onclick="openImportModal()" style="background: #f1f5f9; color: #475569; border: 1px solid #e2e8f0;">
+                <i class="fas fa-file-import"></i> Bulk Import
+            </button>
+            <button class="btn btn-primary" onclick="openModal()">
+                <i class="fas fa-plus"></i> Add New Site
+            </button>
+        </div>
     </div>
 
     <table class="table">
@@ -366,6 +371,29 @@ $vendors = $pdo->query("SELECT id, name FROM partners WHERE type = 'vendor' ORDE
     </div>
 </div>
 
+<!-- Bulk Import Sites Modal -->
+<div id="importModal" class="modal">
+    <div class="modal-content" style="max-width: 500px;">
+        <div class="modal-header">
+            <h2>Bulk Import Sites</h2>
+            <span class="close" onclick="closeImportModal()">&times;</span>
+        </div>
+        <form id="importForm" action="../../ajax/import_inventory.php" method="POST" enctype="multipart/form-data" style="padding: 1rem 0;">
+            <div class="form-group" style="margin-bottom: 1.5rem;">
+                <label>Select CSV File</label>
+                <input type="file" name="file" accept=".csv" required style="padding: 1rem; border: 2px dashed #e2e8f0; background: #f8fafc; text-align: center;">
+                <div style="font-size: 0.75rem; color: #64748b; margin-top: 0.5rem;">
+                    <i class="fas fa-info-circle"></i> Download <a href="../../templates/inventory_template.csv" download style="color: var(--primary); font-weight: 600;">Inventory Template</a> first.
+                </div>
+            </div>
+            <div style="text-align: right;">
+                <button type="button" class="btn" onclick="closeImportModal()">Cancel</button>
+                <button type="submit" class="btn btn-primary">Start Upload</button>
+            </div>
+        </form>
+    </div>
+</div>
+
 <!-- Custom Lightbox -->
 <div id="lbOverlay" class="lb-overlay">
     <span class="lb-close" onclick="closeLightbox()">&times;</span>
@@ -483,6 +511,9 @@ function openModal() {
     document.getElementById('siteModal').style.display = 'block'; 
 }
 function closeModal() { document.getElementById('siteModal').style.display = 'none'; }
+
+function openImportModal() { document.getElementById('importModal').style.display = 'block'; }
+function closeImportModal() { document.getElementById('importModal').style.display = 'none'; }
 function toggleVendor() {
     const type = document.getElementById('owner_toggle').value;
     const vendorSelect = document.getElementById('vendor_select');

@@ -207,6 +207,30 @@ $indian_states = ["Andhra Pradesh", "Arunachal Pradesh", "Assam", "Bihar", "Chha
     </div>
 </div>
 
+<!-- Bulk Import Modal -->
+<div id="importModal" class="modal">
+    <div class="modal-content" style="max-width: 500px;">
+        <div class="modal-header">
+            <h2>Bulk Import Vendors</h2>
+            <span class="close" onclick="closeImportModal()">&times;</span>
+        </div>
+        <form id="importForm" action="../../ajax/import_partners.php" method="POST" enctype="multipart/form-data" style="padding: 1rem 0;">
+            <input type="hidden" name="type" value="vendor">
+            <div class="form-group" style="margin-bottom: 1.5rem;">
+                <label>Select CSV File</label>
+                <input type="file" name="file" accept=".csv" required style="padding: 1rem; border: 2px dashed #e2e8f0; background: #f8fafc; text-align: center;">
+                <div style="font-size: 0.75rem; color: #64748b; margin-top: 0.5rem;">
+                    <i class="fas fa-info-circle"></i> Use the same <a href="../../templates/client_template.csv" download style="color: var(--primary); font-weight: 600;">Standard Template</a> for vendors.
+                </div>
+            </div>
+            <div style="text-align: right;">
+                <button type="button" class="btn" onclick="closeImportModal()">Cancel</button>
+                <button type="submit" class="btn btn-primary">Start Upload</button>
+            </div>
+        </form>
+    </div>
+</div>
+
 <style>
 .modal { display: none; position: fixed; z-index: 1000; left: 0; top: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.5); overflow-y: auto; }
 .modal-content { background: white; margin: 2% auto; padding: 2rem; border-radius: 12px; }
@@ -225,6 +249,9 @@ function openModal() {
     document.getElementById('vendorModal').style.display = 'block'; 
 }
 function closeModal() { document.getElementById('vendorModal').style.display = 'none'; }
+
+function openImportModal() { document.getElementById('importModal').style.display = 'block'; }
+function closeImportModal() { document.getElementById('importModal').style.display = 'none'; }
 function editVendor(v) {
     const form = document.getElementById('vendorForm');
     form.classList.remove('was-validated');
