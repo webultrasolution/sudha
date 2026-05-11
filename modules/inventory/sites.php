@@ -176,76 +176,75 @@ $vendors = $pdo->query("SELECT id, name FROM partners WHERE type = 'vendor' ORDE
         </div>
     </div>
 
-    <table class="table">
-        <thead>
-            <tr>
-                <th style="width: 40px;">#</th>
-                <th>Preview</th>
-                <th>City / Code</th>
-                <th>Asset Details</th>
-                <th>Size</th>
-                <th>Pricing</th>
-                <th>Availability</th>
-                <th>Status</th>
-                <th style="text-align: right;">Actions</th>
-            </tr>
-        </thead>
-        <tbody>
-            <?php $sn=1; foreach ($sites as $s): ?>
-            <tr>
-                <td><?php echo $sn++; ?></td>
-                   <td>
-                    <?php 
-                    $imgs = $pdo->prepare("SELECT filename FROM site_images WHERE site_id = ? LIMIT 1");
-                    $imgs->execute([$s['id']]);
-                    $img = $imgs->fetch();
-                    if($img):
-                    ?>
-                        <img src="../../uploads/sites/<?php echo $img['filename']; ?>" style="width: 100px; height: 65px; object-fit: cover; border-radius: 8px; cursor: pointer; border: 1px solid #e2e8f0; box-shadow: 0 2px 4px rgba(0,0,0,0.1);" onclick="viewPhotos(<?php echo $s['id']; ?>, '<?php echo $s['light_type']; ?>')">
-                    <?php else: ?>
-                        <div style="width: 100px; height: 65px; background: #f8fafc; border: 1px dashed #cbd5e1; border-radius: 8px; display: flex; flex-direction: column; align-items: center; justify-content: center; color: #94a3b8;">
-                            <i class="fas fa-image" style="font-size: 1.2rem; margin-bottom: 2px;"></i>
-                            <span style="font-size: 0.6rem; font-weight: 700; text-transform: uppercase;">No Photo</span>
+    <div class="table-responsive">
+        <table class="table responsive-table">
+            <thead>
+                <tr>
+                    <th style="width: 40px;">#</th>
+                    <th>Preview</th>
+                    <th>City / Code</th>
+                    <th>Asset Details</th>
+                    <th>Size</th>
+                    <th>Pricing</th>
+                    <th>Availability</th>
+                    <th>Status</th>
+                    <th style="text-align: right;">Actions</th>
+                </tr>
+            </thead>
+            <tbody>
+                <?php $sn=1; foreach ($sites as $s): ?>
+                <tr>
+                    <td data-label="#"><?php echo $sn++; ?></td>
+                    <td data-label="Preview">
+                        <?php 
+                        $imgs = $pdo->prepare("SELECT filename FROM site_images WHERE site_id = ? LIMIT 1");
+                        $imgs->execute([$s['id']]);
+                        $img = $imgs->fetch();
+                        if($img):
+                        ?>
+                            <img src="../../uploads/sites/<?php echo $img['filename']; ?>" style="width: 100px; height: 65px; object-fit: cover; border-radius: 8px; cursor: pointer; border: 1px solid #e2e8f0; box-shadow: 0 2px 4px rgba(0,0,0,0.1);" onclick="viewPhotos(<?php echo $s['id']; ?>, '<?php echo $s['light_type']; ?>')">
+                        <?php else: ?>
+                            <div style="width: 100px; height: 65px; background: #f8fafc; border: 1px dashed #cbd5e1; border-radius: 8px; display: flex; flex-direction: column; align-items: center; justify-content: center; color: #94a3b8;">
+                                <i class="fas fa-image" style="font-size: 1.2rem; margin-bottom: 2px;"></i>
+                                <span style="font-size: 0.6rem; font-weight: 700; text-transform: uppercase;">No Photo</span>
+                            </div>
+                        <?php endif; ?>
+                    </td>
+                    <td data-label="City / Code">
+                        <div style="font-weight: 700; color: #1e293b;"><?php echo $s['city']; ?></div>
+                        <small style="color: #ef3417ff;"><?php echo $s['area'] ?? ''; ?></small>
+                        <div style="font-size: 0.7rem; color: #94a3b8; font-weight: 600;"><?php echo $s['site_code']; ?></div>
+                    </td>
+                    <td data-label="Asset Details">
+                        <div style="font-weight: 700; color: #1e293b; margin-bottom: 2px;"><?php echo $s['name']; ?></div>
+                        <div style="font-size: 0.75rem; color: #64748b; margin-bottom: 6px;"><?php echo $s['location']; ?></div>
+                        <div style="font-size: 0.7rem; color: #94a3b8; text-transform: uppercase; font-weight: 600;">
+                            <span class="media-badge <?php echo strtolower($s['type']); ?>"><?php echo $s['type']; ?></span> • 
+                            <?php echo $s['light_type']; ?> • 
+                            <span style="color: var(--primary);"><?php echo $s['owner_type']; ?></span>
                         </div>
-                    <?php endif; ?>
-                </td>
-                 <td>
-                    <div style="font-weight: 700; color: #1e293b;"><?php echo $s['city']; ?></div>
-                    <small style="color: #ef3417ff;"><?php echo $s['area'] ?? ''; ?></small>
-                    <div style="font-size: 0.7rem; color: #94a3b8; font-weight: 600;"><?php echo $s['site_code']; ?></div>
-                </td>
-             
-                <td>
-                    <div style="font-weight: 700; color: #1e293b; margin-bottom: 2px;"><?php echo $s['name']; ?></div>
-                    <div style="font-size: 0.75rem; color: #64748b; margin-bottom: 6px;"><?php echo $s['location']; ?></div>
-                    <div style="font-size: 0.7rem; color: #94a3b8; text-transform: uppercase; font-weight: 600;">
-                        <span class="media-badge <?php echo strtolower($s['type']); ?>"><?php echo $s['type']; ?></span> • 
-                        <?php echo $s['light_type']; ?> • 
-                        <span style="color: var(--primary);"><?php echo $s['owner_type']; ?></span>
-                    </div>
-                </td>
-               
-             
-                <td>
-                    <div style="font-weight: 700; color: #475569;"><?php echo $s['width'] . "' x " . $s['height'] . "'"; ?></div>
-                    <div style="font-size: 0.7rem; color: #94a3b8;"><?php echo number_format($s['sqft']); ?> SQFT</div>
-                </td>
-                <td>
-                    <div style="font-weight: 700; color: #1e293b;"><?php echo formatCurrency($s['card_rate']); ?></div>
-                    <div style="font-size: 0.7rem; color: #94a3b8;">Cost: <?php echo formatCurrency($s['purchase_rate']); ?></div>
-                </td>
-                <td>
-                    <div style="font-weight: 600; color: #475569; font-size: 0.8rem;"><?php echo date('d M Y', strtotime($s['available_from'])); ?></div>
-                </td>
-                <td><span class="status-pill <?php echo $s['status']; ?>"><?php echo ucfirst($s['status']); ?></span></td>
-                <td style="text-align: right;">
-                    <button class="btn-icon" onclick="editSite(<?php echo htmlspecialchars(json_encode($s)); ?>)" style="color: var(--primary);"><i class="fas fa-edit"></i></button>
-                    <button class="btn-icon" style="color: #ef4444;" onclick="deleteSite(event, <?php echo $s['id']; ?>)"><i class="fas fa-trash"></i></button>
-                </td>
-            </tr>
-            <?php endforeach; ?>
-        </tbody>
-    </table>
+                    </td>
+                    <td data-label="Size">
+                        <div style="font-weight: 700; color: #475569;"><?php echo $s['width'] . "' x " . $s['height'] . "'"; ?></div>
+                        <div style="font-size: 0.7rem; color: #94a3b8;"><?php echo number_format($s['sqft']); ?> SQFT</div>
+                    </td>
+                    <td data-label="Pricing">
+                        <div style="font-weight: 700; color: #1e293b;"><?php echo formatCurrency($s['card_rate']); ?></div>
+                        <div style="font-size: 0.7rem; color: #94a3b8;">Cost: <?php echo formatCurrency($s['purchase_rate']); ?></div>
+                    </td>
+                    <td data-label="Availability">
+                        <div style="font-weight: 600; color: #475569; font-size: 0.8rem;"><?php echo date('d M Y', strtotime($s['available_from'])); ?></div>
+                    </td>
+                    <td data-label="Status"><span class="status-pill <?php echo $s['status']; ?>"><?php echo ucfirst($s['status']); ?></span></td>
+                    <td data-label="Actions" style="text-align: right;">
+                        <button class="btn-icon" onclick="editSite(<?php echo htmlspecialchars(json_encode($s)); ?>)" style="color: var(--primary);"><i class="fas fa-edit"></i></button>
+                        <button class="btn-icon" style="color: #ef4444;" onclick="deleteSite(event, <?php echo $s['id']; ?>)"><i class="fas fa-trash"></i></button>
+                    </td>
+                </tr>
+                <?php endforeach; ?>
+            </tbody>
+        </table>
+    </div>
 </div>
 
 <!-- Modal Same as before but with available_from field -->

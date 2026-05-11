@@ -93,6 +93,13 @@ checkAuth();
         </ul>
         
         <script>
+            function toggleSidebar() {
+                const sidebar = document.querySelector('.sidebar');
+                const mainContent = document.querySelector('.main-content');
+                sidebar.classList.toggle('active');
+                mainContent.classList.toggle('sidebar-active');
+            }
+
             document.addEventListener('DOMContentLoaded', function() {
                 const toggles = document.querySelectorAll('.submenu-toggle');
                 toggles.forEach(toggle => {
@@ -118,10 +125,10 @@ checkAuth();
     <?php endif; ?>
     
     <div class="main-content" style="<?php echo (isset($hideSidebar) && $hideSidebar) ? 'margin-left: 0; padding: 1.5rem;' : ''; ?>">
-        <div class="header">
+        <div class="header" style="position: sticky; top: 0; z-index: 900; background: rgba(255,255,255,0.8); backdrop-filter: blur(10px); padding: 1rem 1.5rem;">
             <div style="display: flex; align-items: center; gap: 1rem;">
                 <?php if (!isset($hideSidebar) || !$hideSidebar): ?>
-                <button class="menu-toggle" onclick="toggleSidebar()">
+                <button class="menu-toggle" onclick="toggleSidebar()" style="background: var(--primary); color: white; border: none; padding: 0.5rem 0.75rem; border-radius: 6px; cursor: pointer;">
                     <i class="fas fa-bars"></i>
                 </button>
                 <?php else: ?>
@@ -129,9 +136,9 @@ checkAuth();
                     <i class="fas fa-arrow-left"></i>
                 </a>
                 <?php endif; ?>
-                <h1><?php echo isset($pageTitle) ? $pageTitle : 'Dashboard'; ?></h1>
+                <h1 style="font-size: 1.25rem; font-weight: 800; color: #0f172a; margin: 0;"><?php echo isset($pageTitle) ? $pageTitle : 'Dashboard'; ?></h1>
             </div>
-            <div class="user-info">
-                <span>Welcome, <?php echo $_SESSION['user_name'] ?? 'Guest'; ?></span>
+            <div class="user-info hide-mobile">
+                <span style="font-weight: 600; color: #64748b;">Welcome, <?php echo $_SESSION['user_name'] ?? 'Guest'; ?></span>
             </div>
         </div>
