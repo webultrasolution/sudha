@@ -106,3 +106,20 @@ CREATE TABLE IF NOT EXISTS invoices (
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     FOREIGN KEY (booking_id) REFERENCES bookings(id)
 );
+
+CREATE TABLE IF NOT EXISTS payments (
+    id INT AUTO_INCREMENT PRIMARY KEY,
+    partner_id INT NOT NULL,
+    amount DECIMAL(15, 2) NOT NULL,
+    payment_date DATE NOT NULL,
+    payment_mode ENUM('Cash', 'Cheque', 'NEFT', 'RTGS', 'UPI', 'Other') DEFAULT 'NEFT',
+    transaction_id VARCHAR(100),
+    type ENUM('credit', 'debit') NOT NULL, -- credit: receipt from client, debit: payment to vendor
+    invoice_id INT, -- For client receipts
+    proposal_id INT, -- For vendor payments (PO reference)
+    notes TEXT,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    FOREIGN KEY (partner_id) REFERENCES partners(id),
+    FOREIGN KEY (invoice_id) REFERENCES invoices(id) ON DELETE SET NULL,
+    FOREIGN KEY (proposal_id) REFERENCES proposals(id) ON DELETE SET NULL
+);

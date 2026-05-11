@@ -52,16 +52,19 @@ checkAuth();
                 </ul>
             </li>
 
-            <!-- Financials Submenu -->
+            <!-- Financials Submenu (Dynamic Permissions) -->
+            <?php if (canAccess('financials')): ?>
             <li class="nav-item has-submenu">
                 <a href="#" class="nav-link submenu-toggle <?php echo in_array($activePage, ['invoices', 'payments']) ? 'active submenu-open' : ''; ?>">
                     <i class="fas fa-wallet"></i> <span>Financials</span> <i class="fas fa-chevron-down toggle-icon" style="margin-left: auto; font-size: 0.8rem;"></i>
                 </a>
-                <ul class="submenu" style="<?php echo in_array($activePage, ['invoices', 'payments']) ? 'display: block;' : 'display: none;'; ?>">
+                <ul class="submenu" style="<?php echo in_array($activePage, ['invoices', 'payments', 'ledger']) ? 'display: block;' : 'display: none;'; ?>">
                     <li><a href="<?php echo BASE_URL; ?>modules/financials/invoices.php" class="<?php echo $activePage == 'invoices' ? 'active-sub' : ''; ?>"><i class="fas fa-file-invoice-dollar"></i> Invoices</a></li>
                     <li><a href="<?php echo BASE_URL; ?>modules/financials/payments.php" class="<?php echo $activePage == 'payments' ? 'active-sub' : ''; ?>"><i class="fas fa-money-bill-wave"></i> Payments</a></li>
+                    <li><a href="<?php echo BASE_URL; ?>modules/financials/ledgers.php" class="<?php echo $activePage == 'ledger' ? 'active-sub' : ''; ?>"><i class="fas fa-book"></i> Client Ledger</a></li>
                 </ul>
             </li>
+            <?php endif; ?>
             
             <!-- Tools & Insights Submenu -->
             <li class="nav-item has-submenu">
@@ -70,7 +73,13 @@ checkAuth();
                 </a>
                 <ul class="submenu" style="<?php echo in_array($activePage, ['reports', 'resources', 'photofactory']) ? 'display: block;' : 'display: none;'; ?>">
                     <li><a href="<?php echo BASE_URL; ?>modules/reports/reports.php" class="<?php echo $activePage == 'reports' ? 'active-sub' : ''; ?>"><i class="fas fa-chart-pie"></i> Reports</a></li>
-                    <li><a href="<?php echo BASE_URL; ?>modules/admin/settings.php" class="<?php echo $activePage == 'settings' ? 'active-sub' : ''; ?>"><i class="fas fa-cog"></i> Admin Settings</a></li>
+                    <?php if (hasRole('admin')): ?>
+                        <li><a href="<?php echo BASE_URL; ?>modules/admin/settings.php" class="<?php echo $activePage == 'settings' ? 'active-sub' : ''; ?>"><i class="fas fa-cog"></i> Admin Settings</a></li>
+                    <?php endif; ?>
+                    <?php if (($_SESSION['user_role'] ?? '') === 'admin'): ?>
+                        <li><a href="<?php echo BASE_URL; ?>modules/users/index.php" class="<?php echo $activePage == 'users' ? 'active-sub' : ''; ?>"><i class="fas fa-users-cog"></i> User Management</a></li>
+                        <li><a href="<?php echo BASE_URL; ?>modules/users/permissions.php" class="<?php echo $activePage == 'users' ? 'active-sub' : ''; ?>"><i class="fas fa-user-shield"></i> Role Permissions</a></li>
+                    <?php endif; ?>
                     <li><a href="<?php echo BASE_URL; ?>modules/admin/resources.php" class="<?php echo $activePage == 'resources' ? 'active-sub' : ''; ?>"><i class="fas fa-tools"></i> Resources</a></li>
                     <li><a href="<?php echo BASE_URL; ?>modules/inventory/photofactory.php" class="<?php echo $activePage == 'photofactory' ? 'active-sub' : ''; ?>"><i class="fas fa-images"></i> Photofactory</a></li>
                 </ul>
@@ -84,6 +93,13 @@ checkAuth();
         </ul>
         
         <script>
+            function toggleSidebar() {
+                const sidebar = document.querySelector('.sidebar');
+                const mainContent = document.querySelector('.main-content');
+                sidebar.classList.toggle('active');
+                mainContent.classList.toggle('sidebar-active');
+            }
+
             document.addEventListener('DOMContentLoaded', function() {
                 const toggles = document.querySelectorAll('.submenu-toggle');
                 toggles.forEach(toggle => {
@@ -109,10 +125,10 @@ checkAuth();
     <?php endif; ?>
     
     <div class="main-content" style="<?php echo (isset($hideSidebar) && $hideSidebar) ? 'margin-left: 0; padding: 1.5rem;' : ''; ?>">
-        <div class="header">
+        <div class="header" style="position: sticky; top: 0; z-index: 900; background: rgba(255,255,255,0.8); backdrop-filter: blur(10px); padding: 1rem 1.5rem;">
             <div style="display: flex; align-items: center; gap: 1rem;">
                 <?php if (!isset($hideSidebar) || !$hideSidebar): ?>
-                <button class="menu-toggle" onclick="toggleSidebar()">
+                <button class="menu-toggle" onclick="toggleSidebar()" style="background: var(--primary); color: white; border: none; padding: 0.5rem 0.75rem; border-radius: 6px; cursor: pointer;">
                     <i class="fas fa-bars"></i>
                 </button>
                 <?php else: ?>
@@ -120,9 +136,9 @@ checkAuth();
                     <i class="fas fa-arrow-left"></i>
                 </a>
                 <?php endif; ?>
-                <h1><?php echo isset($pageTitle) ? $pageTitle : 'Dashboard'; ?></h1>
+                <h1 style="font-size: 1.25rem; font-weight: 800; color: #0f172a; margin: 0;"><?php echo isset($pageTitle) ? $pageTitle : 'Dashboard'; ?></h1>
             </div>
-            <div class="user-info">
-                <span>Welcome, <?php echo $_SESSION['user_name'] ?? 'Guest'; ?></span>
+            <div class="user-info hide-mobile">
+                <span style="font-weight: 600; color: #64748b;">Welcome, <?php echo $_SESSION['user_name'] ?? 'Guest'; ?></span>
             </div>
         </div>

@@ -105,10 +105,20 @@ if ($mediaFilter !== 'all') {
     $params[] = $mediaFilter;
 }
 if (!empty($search)) {
-    $where .= " AND (s.site_code LIKE ? OR s.name LIKE ? OR s.location LIKE ?)";
-    $params[] = "%$search%";
-    $params[] = "%$search%";
-    $params[] = "%$search%";
+    $where .= " AND (s.site_code LIKE ? OR s.name LIKE ? OR s.location LIKE ? OR s.city LIKE ?)";
+    $searchParam = "%$search%";
+    $params[] = $searchParam;
+    $params[] = $searchParam;
+    $params[] = $searchParam;
+    $params[] = $searchParam;
+}
+if (!empty($_GET['from'])) {
+    $where .= " AND s.available_from <= ?";
+    $params[] = $_GET['from'];
+}
+if (!empty($_GET['to'])) {
+    // Basic logic: if we need it by 'to', it must be available before that date
+    // You might want more complex logic depending on booking overlaps
 }
 
 // Counts for Tabs
@@ -139,83 +149,102 @@ $vendors = $pdo->query("SELECT id, name FROM partners WHERE type = 'vendor' ORDE
 </div>
 
 <div class="card">
-    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1.5rem;">
-        <div style="display: flex; gap: 1rem; align-items: center;">
-            <input type="text" id="site-search" placeholder="Search ID, Name or Location..." class="p-input" value="<?php echo $search; ?>" style="width: 300px;">
-            <button class="btn btn-primary" onclick="doSearch()"><i class="fas fa-search"></i> Search</button>
+    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1.5rem; flex-wrap: wrap; gap: 1rem;">
+        <div style="display: flex; gap: 0.75rem; align-items: center; flex-wrap: wrap;">
+            <div class="search-group" style="position: relative;">
+                <i class="fas fa-search" style="position: absolute; left: 12px; top: 50%; transform: translateY(-50%); color: #94a3b8;"></i>
+                <input type="text" id="site-search" placeholder="Search ID, Location, City..." class="p-input" value="<?php echo $search; ?>" style="width: 250px; padding-left: 35px;">
+            </div>
+            
+            <div style="display: flex; align-items: center; gap: 0.5rem; background: #fff; padding: 2px 10px; border: 1px solid #cbd5e1; border-radius: 8px;">
+                <span style="font-size: 0.7rem; font-weight: 700; color: #64748b; text-transform: uppercase;">Available Between:</span>
+                <input type="date" id="filter-from" class="p-input" style="border:none; width: 130px; font-size: 0.8rem;" value="<?php echo $_GET['from'] ?? ''; ?>">
+                <span style="color: #cbd5e1;">-</span>
+                <input type="date" id="filter-to" class="p-input" style="border:none; width: 130px; font-size: 0.8rem;" value="<?php echo $_GET['to'] ?? ''; ?>">
+            </div>
+
+            <button class="btn btn-primary" onclick="doSearch()" style="padding: 0.6rem 1.5rem;"><i class="fas fa-filter"></i> Apply Filters</button>
+            <button class="btn" onclick="window.location.href='sites.php'" style="background: #f1f5f9; color: #475569;"><i class="fas fa-sync-alt"></i></button>
         </div>
-        <button class="btn btn-primary" onclick="openModal()">
-            <i class="fas fa-plus"></i> Add New Site
-        </button>
+        <div style="display: flex; gap: 1rem;">
+            <button class="btn btn-secondary" onclick="openImportModal()" style="background: #f1f5f9; color: #475569; border: 1px solid #e2e8f0;">
+                <i class="fas fa-file-import"></i> Bulk Import
+            </button>
+            <button class="btn btn-primary" onclick="openModal()">
+                <i class="fas fa-plus"></i> Add New Site
+            </button>
+        </div>
     </div>
 
-    <table class="table">
-        <thead>
-            <tr>
-                <th style="width: 40px;">#</th>
-                <th>Preview</th>
-                <th>City / Code</th>
-                <th>Asset Details</th>
-                <th>Size</th>
-                <th>Pricing</th>
-                <th>Availability</th>
-                <th>Status</th>
-                <th style="text-align: right;">Actions</th>
-            </tr>
-        </thead>
-        <tbody>
-            <?php $sn=1; foreach ($sites as $s): ?>
-            <tr>
-                <td><?php echo $sn++; ?></td>
-                   <td>
-                    <?php 
-                    $imgs = $pdo->prepare("SELECT filename FROM site_images WHERE site_id = ? LIMIT 1");
-                    $imgs->execute([$s['id']]);
-                    $img = $imgs->fetch();
-                    if($img):
-                    ?>
-                        <img src="../../uploads/sites/<?php echo $img['filename']; ?>" style="width: 100px; height: 65px; object-fit: cover; border-radius: 8px; cursor: pointer; border: 1px solid #e2e8f0; box-shadow: 0 2px 4px rgba(0,0,0,0.1);" onclick="viewPhotos(<?php echo $s['id']; ?>, '<?php echo $s['light_type']; ?>')">
-                    <?php else: ?>
-                        <small style="color: #cbd5e1;">No Img</small>
-                    <?php endif; ?>
-                </td>
-                 <td>
-                    <div style="font-weight: 700; color: #1e293b;"><?php echo $s['city']; ?></div>
-                    <small style="color: #ef3417ff;"><?php echo $s['area'] ?? ''; ?></small>
-                    <div style="font-size: 0.7rem; color: #94a3b8; font-weight: 600;"><?php echo $s['site_code']; ?></div>
-                </td>
-             
-                <td>
-                    <div style="font-weight: 700; color: #1e293b; margin-bottom: 2px;"><?php echo $s['name']; ?></div>
-                    <div style="font-size: 0.75rem; color: #64748b; margin-bottom: 6px;"><?php echo $s['location']; ?></div>
-                    <div style="font-size: 0.7rem; color: #94a3b8; text-transform: uppercase; font-weight: 600;">
-                        <span class="media-badge <?php echo strtolower($s['type']); ?>"><?php echo $s['type']; ?></span> • 
-                        <?php echo $s['light_type']; ?> • 
-                        <span style="color: var(--primary);"><?php echo $s['owner_type']; ?></span>
-                    </div>
-                </td>
-               
-             
-                <td>
-                    <div style="font-weight: 700; color: #475569;"><?php echo $s['width'] . "' x " . $s['height'] . "'"; ?></div>
-                    <div style="font-size: 0.7rem; color: #94a3b8;"><?php echo number_format($s['sqft']); ?> SQFT</div>
-                </td>
-                <td>
-                    <div style="font-weight: 700; color: #1e293b;"><?php echo formatCurrency($s['card_rate']); ?></div>
-                    <div style="font-size: 0.7rem; color: #94a3b8;">Cost: <?php echo formatCurrency($s['purchase_rate']); ?></div>
-                </td>
-                <td>
-                    <div style="font-weight: 600; color: #475569; font-size: 0.8rem;"><?php echo date('d M Y', strtotime($s['available_from'])); ?></div>
-                </td>
-                <td><span class="status-pill <?php echo $s['status']; ?>"><?php echo ucfirst($s['status']); ?></span></td>
-                <td style="text-align: right;">
-                    <button class="btn-icon" onclick="editSite(<?php echo htmlspecialchars(json_encode($s)); ?>)" style="color: var(--primary);"><i class="fas fa-edit"></i></button>
-                    <button class="btn-icon" style="color: #ef4444;" onclick="deleteSite(event, <?php echo $s['id']; ?>)"><i class="fas fa-trash"></i></button>
-                </td>
-            </tr>
-            <?php endforeach; ?>
-        </tbody>
-    </table>
+    <div class="table-responsive">
+        <table class="table responsive-table">
+            <thead>
+                <tr>
+                    <th style="width: 40px;">#</th>
+                    <th>Preview</th>
+                    <th>City / Code</th>
+                    <th>Asset Details</th>
+                    <th>Size</th>
+                    <th>Pricing</th>
+                    <th>Availability</th>
+                    <th>Status</th>
+                    <th style="text-align: right;">Actions</th>
+                </tr>
+            </thead>
+            <tbody>
+                <?php $sn=1; foreach ($sites as $s): ?>
+                <tr>
+                    <td data-label="#"><?php echo $sn++; ?></td>
+                    <td data-label="Preview">
+                        <?php 
+                        $imgs = $pdo->prepare("SELECT filename FROM site_images WHERE site_id = ? LIMIT 1");
+                        $imgs->execute([$s['id']]);
+                        $img = $imgs->fetch();
+                        if($img):
+                        ?>
+                            <img src="../../uploads/sites/<?php echo $img['filename']; ?>" style="width: 100px; height: 65px; object-fit: cover; border-radius: 8px; cursor: pointer; border: 1px solid #e2e8f0; box-shadow: 0 2px 4px rgba(0,0,0,0.1);" onclick="viewPhotos(<?php echo $s['id']; ?>, '<?php echo $s['light_type']; ?>')">
+                        <?php else: ?>
+                            <div style="width: 100px; height: 65px; background: #f8fafc; border: 1px dashed #cbd5e1; border-radius: 8px; display: flex; flex-direction: column; align-items: center; justify-content: center; color: #94a3b8;">
+                                <i class="fas fa-image" style="font-size: 1.2rem; margin-bottom: 2px;"></i>
+                                <span style="font-size: 0.6rem; font-weight: 700; text-transform: uppercase;">No Photo</span>
+                            </div>
+                        <?php endif; ?>
+                    </td>
+                    <td data-label="City / Code">
+                        <div style="font-weight: 700; color: #1e293b;"><?php echo $s['city']; ?></div>
+                        <small style="color: #ef3417ff;"><?php echo $s['area'] ?? ''; ?></small>
+                        <div style="font-size: 0.7rem; color: #94a3b8; font-weight: 600;"><?php echo $s['site_code']; ?></div>
+                    </td>
+                    <td data-label="Asset Details">
+                        <div style="font-weight: 700; color: #1e293b; margin-bottom: 2px;"><?php echo $s['name']; ?></div>
+                        <div style="font-size: 0.75rem; color: #64748b; margin-bottom: 6px;"><?php echo $s['location']; ?></div>
+                        <div style="font-size: 0.7rem; color: #94a3b8; text-transform: uppercase; font-weight: 600;">
+                            <span class="media-badge <?php echo strtolower($s['type']); ?>"><?php echo $s['type']; ?></span> • 
+                            <?php echo $s['light_type']; ?> • 
+                            <span style="color: var(--primary);"><?php echo $s['owner_type']; ?></span>
+                        </div>
+                    </td>
+                    <td data-label="Size">
+                        <div style="font-weight: 700; color: #475569;"><?php echo $s['width'] . "' x " . $s['height'] . "'"; ?></div>
+                        <div style="font-size: 0.7rem; color: #94a3b8;"><?php echo number_format($s['sqft']); ?> SQFT</div>
+                    </td>
+                    <td data-label="Pricing">
+                        <div style="font-weight: 700; color: #1e293b;"><?php echo formatCurrency($s['card_rate']); ?></div>
+                        <div style="font-size: 0.7rem; color: #94a3b8;">Cost: <?php echo formatCurrency($s['purchase_rate']); ?></div>
+                    </td>
+                    <td data-label="Availability">
+                        <div style="font-weight: 600; color: #475569; font-size: 0.8rem;"><?php echo date('d M Y', strtotime($s['available_from'])); ?></div>
+                    </td>
+                    <td data-label="Status"><span class="status-pill <?php echo $s['status']; ?>"><?php echo ucfirst($s['status']); ?></span></td>
+                    <td data-label="Actions" style="text-align: right; white-space: nowrap;">
+                        <button class="btn-icon btn-edit" onclick="editSite(<?php echo htmlspecialchars(json_encode($s)); ?>)" title="Edit"><i class="fas fa-edit"></i></button>
+                        <button class="btn-icon btn-delete" onclick="deleteSite(event, <?php echo $s['id']; ?>)" title="Delete"><i class="fas fa-trash"></i></button>
+                    </td>
+                </tr>
+                <?php endforeach; ?>
+            </tbody>
+        </table>
+    </div>
 </div>
 
 <!-- Modal Same as before but with available_from field -->
@@ -366,6 +395,29 @@ $vendors = $pdo->query("SELECT id, name FROM partners WHERE type = 'vendor' ORDE
     </div>
 </div>
 
+<!-- Bulk Import Sites Modal -->
+<div id="importModal" class="modal">
+    <div class="modal-content" style="max-width: 500px;">
+        <div class="modal-header">
+            <h2>Bulk Import Sites</h2>
+            <span class="close" onclick="closeImportModal()">&times;</span>
+        </div>
+        <form id="importForm" action="../../ajax/import_inventory.php" method="POST" enctype="multipart/form-data" style="padding: 1rem 0;">
+            <div class="form-group" style="margin-bottom: 1.5rem;">
+                <label>Select CSV File</label>
+                <input type="file" name="file" accept=".csv" required style="padding: 1rem; border: 2px dashed #e2e8f0; background: #f8fafc; text-align: center;">
+                <div style="font-size: 0.75rem; color: #64748b; margin-top: 0.5rem;">
+                    <i class="fas fa-info-circle"></i> Download <a href="../../templates/inventory_template.csv" download style="color: var(--primary); font-weight: 600;">Inventory Template</a> first.
+                </div>
+            </div>
+            <div style="text-align: right;">
+                <button type="button" class="btn" onclick="closeImportModal()">Cancel</button>
+                <button type="submit" class="btn btn-primary">Start Upload</button>
+            </div>
+        </form>
+    </div>
+</div>
+
 <!-- Custom Lightbox -->
 <div id="lbOverlay" class="lb-overlay">
     <span class="lb-close" onclick="closeLightbox()">&times;</span>
@@ -470,7 +522,9 @@ let pendingFiles = []; // Global to store all selected files for upload
 
 function doSearch() {
     const s = document.getElementById('site-search').value;
-    window.location.href = `?media=<?php echo $mediaFilter; ?>&search=${encodeURIComponent(s)}`;
+    const from = document.getElementById('filter-from').value;
+    const to = document.getElementById('filter-to').value;
+    window.location.href = `?media=<?php echo $mediaFilter; ?>&search=${encodeURIComponent(s)}&from=${from}&to=${to}`;
 }
 function openModal() { 
     const form = document.getElementById('siteForm');
@@ -483,6 +537,9 @@ function openModal() {
     document.getElementById('siteModal').style.display = 'block'; 
 }
 function closeModal() { document.getElementById('siteModal').style.display = 'none'; }
+
+function openImportModal() { document.getElementById('importModal').style.display = 'block'; }
+function closeImportModal() { document.getElementById('importModal').style.display = 'none'; }
 function toggleVendor() {
     const type = document.getElementById('owner_toggle').value;
     const vendorSelect = document.getElementById('vendor_select');

@@ -87,6 +87,23 @@ $grandTotal = $b['grand_total'];
         <a href="bookings.php" class="btn" style="background: white; border: 1px solid #e2e8f0; color: #475569; padding: 0.75rem 1.25rem; border-radius: 10px; font-weight: 700; font-size: 0.9rem; cursor: pointer; text-decoration: none;">
             <i class="fas fa-arrow-left"></i> Back to List
         </a>
+        
+        <?php
+        // Check if invoice already exists
+        $stmtInv = $pdo->prepare("SELECT id FROM invoices WHERE booking_id = ? AND type = 'tax' LIMIT 1");
+        $stmtInv->execute([$id]);
+        $existingInvoice = $stmtInv->fetch();
+
+        if ($existingInvoice): ?>
+            <a href="generate_invoice.php?booking_id=<?php echo $id; ?>" target="_blank" class="btn" style="background: #10b981; color: white; padding: 0.75rem 1.5rem; border-radius: 10px; font-weight: 800; border: none; cursor: pointer; display: flex; align-items: center; gap: 0.5rem; text-decoration: none;">
+                <i class="fas fa-eye"></i> View Tax Invoice
+            </a>
+        <?php else: ?>
+            <button class="btn" onclick="openInvoicePopup(<?php echo $b['id']; ?>)" style="background: #0f172a; color: white; padding: 0.75rem 1.5rem; border-radius: 10px; font-weight: 800; border: none; cursor: pointer; display: flex; align-items: center; gap: 0.5rem;">
+                <i class="fas fa-file-invoice-dollar"></i> Final Tax Invoice
+            </button>
+        <?php endif; ?>
+
         <button class="btn btn-primary" onclick="window.print()" style="padding: 0.75rem 1.5rem; border-radius: 10px; font-weight: 800;">
             <i class="fas fa-print"></i> Print Details
         </button>
@@ -157,41 +174,6 @@ foreach ($items as $item) {
 }
 ?>
 
-<?php if (!empty($vendorSites)): ?>
-<!-- Operational Documents Section -->
-<div class="p-panel" style="margin-bottom: 2rem; border-left: 4px solid #f59e0b; width: 100%;">
-    <h4 class="p-title" style="color: #b45309;"><i class="fas fa-file-invoice"></i> Vendor Purchase Orders</h4>
-    <div style="display: flex; gap: 1.5rem; flex-wrap: wrap; padding: 0.5rem 0;">
-        <?php foreach ($vendorSites as $v): ?>
-        <div style="background: #fffbeb; border: 1px solid #fef3c7; padding: 1rem; border-radius: 12px; display: flex; align-items: center; gap: 1.5rem; min-width: 320px; flex: 1;">
-            <div style="background: #f59e0b; color: white; width: 40px; height: 40px; border-radius: 10px; display: flex; align-items: center; justify-content: center; font-size: 1.2rem;">
-                <i class="fas fa-truck-loading"></i>
-            </div>
-            <div style="flex: 1;">
-                <div style="font-weight: 800; color: #92400e; font-size: 0.95rem;">
-                    <?php echo $v['name']; ?>
-                    <?php if ($v['vendor_gst']): ?>
-                        <div style="font-size: 0.65rem; color: #b45309; opacity: 0.8; font-family: monospace;">BRANCH: <?php echo $v['vendor_gst']; ?></div>
-                    <?php endif; ?>
-                </div>
-                <div style="font-size: 0.75rem; color: #b45309; font-weight: 600;"><?php echo $v['count']; ?> Assets in this booking</div>
-            </div>
-            <div style="display: flex; gap: 0.5rem;">
-                <a href="generate_po.php?booking_id=<?php echo $b['id']; ?>&vendor_id=<?php echo $v['id']; ?>&vendor_gst=<?php echo urlencode($v['vendor_gst']); ?>" target="_blank" class="btn" style="background: #0f172a; color: white; padding: 0.6rem 1rem; border-radius: 8px; font-weight: 800; font-size: 0.75rem; text-decoration: none; display: flex; align-items: center; gap: 0.4rem;" title="View & Print PO">
-                    <i class="fas fa-file-pdf"></i> PDF
-                </a>
-                <button onclick="sendPOEmail(<?php echo $b['id']; ?>, <?php echo $v['id']; ?>)" class="btn" style="background: #3b82f6; color: white; padding: 0.6rem 1rem; border-radius: 8px; font-weight: 800; font-size: 0.75rem; border: none; cursor: pointer; display: flex; align-items: center; gap: 0.4rem;" title="Send via Email">
-                    <i class="fas fa-envelope"></i>
-                </button>
-                <a href="https://wa.me/<?php echo preg_replace('/[^0-9]/', '', $v['phone'] ?? ''); ?>?text=Dear <?php echo urlencode($v['name'] ?? 'Vendor'); ?>, Please find the Purchase Order for Campaign: <?php echo urlencode($b['campaign_name'] ?? 'General'); ?>. Booking Ref: #BK-<?php echo str_pad($b['id'], 4, '0', STR_PAD_LEFT); ?>. Thank you." target="_blank" class="btn" style="background: #22c55e; color: white; padding: 0.6rem 1rem; border-radius: 8px; font-weight: 800; font-size: 0.75rem; text-decoration: none; display: flex; align-items: center; gap: 0.4rem;" title="Send via WhatsApp">
-                    <i class="fab fa-whatsapp"></i>
-                </a>
-            </div>
-        </div>
-        <?php endforeach; ?>
-    </div>
-</div>
-<?php endif; ?>
 
 <!-- Detailed Site Table -->
 <div class="card" style="padding: 0; border-radius: 16px; overflow: hidden;">
@@ -207,6 +189,7 @@ foreach ($items as $item) {
                 <th>Period</th>
                 <th>Cost / Margin</th>
                 <th style="text-align: right;">Selling Cost</th>
+                <th style="text-align: right; width: 50px;">Action</th>
             </tr>
         </thead>
         <tbody>
@@ -234,8 +217,14 @@ foreach ($items as $item) {
                                         <span style="color: #64748b; font-weight: 500; font-size: 0.65rem;">(<?php echo $item['vendor_contact']; ?>)</span>
                                     <?php endif; ?>
                                 </span>
-                                <a href="generate_po.php?booking_id=<?php echo $b['id']; ?>&vendor_id=<?php echo $item['vendor_id']; ?>" target="_blank" title="Generate Purchase Order" style="background: #f59e0b; color: white; width: 24px; height: 24px; border-radius: 4px; display: flex; align-items: center; justify-content: center; font-size: 0.65rem; text-decoration: none;">
+                                <a href="generate_po.php?booking_id=<?php echo $b['id']; ?>&vendor_id=<?php echo $item['vendor_id']; ?>&vendor_gst=<?php echo urlencode($item['vendor_gst'] ?? ''); ?>" target="_blank" title="Download PO PDF" style="background: #0f172a; color: white; width: 26px; height: 26px; border-radius: 6px; display: flex; align-items: center; justify-content: center; font-size: 0.7rem; text-decoration: none;">
                                     <i class="fas fa-file-pdf"></i>
+                                </a>
+                                <button onclick="sendPOEmail(<?php echo $b['id']; ?>, <?php echo $item['vendor_id']; ?>)" title="Send PO via Email" style="background: #3b82f6; color: white; width: 26px; height: 26px; border-radius: 6px; border: none; cursor: pointer; display: flex; align-items: center; justify-content: center; font-size: 0.7rem;">
+                                    <i class="fas fa-envelope"></i>
+                                </button>
+                                <a href="https://wa.me/<?php echo preg_replace('/[^0-9]/', '', $item['vendor_phone'] ?? ''); ?>?text=Dear <?php echo urlencode($item['vendor_name'] ?? 'Vendor'); ?>, Please find the Purchase Order for Campaign: <?php echo urlencode($b['campaign_name'] ?? 'General'); ?>. Booking Ref: #BK-<?php echo str_pad($b['id'], 4, '0', STR_PAD_LEFT); ?>. Thank you." target="_blank" title="Send via WhatsApp" style="background: #22c55e; color: white; width: 26px; height: 26px; border-radius: 6px; display: flex; align-items: center; justify-content: center; font-size: 0.7rem; text-decoration: none;">
+                                    <i class="fab fa-whatsapp"></i>
                                 </a>
                             </div>
                         <?php endif; ?>
@@ -286,6 +275,11 @@ foreach ($items as $item) {
                     <?php endif; ?>
                 </td>
                 <td style="font-weight: 800; color: #0f172a; text-align: right; font-size: 1rem;"><?php echo formatCurrency($item['amount']); ?></td>
+                <td style="text-align: right;">
+                    <button onclick="deleteItem(<?php echo $item['id']; ?>)" style="background: none; border: none; color: #ef4444; cursor: pointer; padding: 0.5rem;" title="Remove Site from Booking">
+                        <i class="fas fa-trash-alt"></i>
+                    </button>
+                </td>
             </tr>
             <?php endforeach; ?>
         </tbody>
@@ -310,6 +304,33 @@ foreach ($items as $item) {
 </style>
 
 <script>
+function deleteItem(itemId) {
+    Swal.fire({
+        title: 'Remove this site?',
+        text: "This will remove the site from the booking and delete associated operation tasks. Are you sure?",
+        icon: 'warning',
+        showCancelButton: true,
+        confirmButtonColor: '#ef4444',
+        confirmButtonText: 'Yes, delete it'
+    }).then((result) => {
+        if (result.isConfirmed) {
+            fetch('../../ajax/delete_booking_item.php', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+                body: `id=${itemId}`
+            })
+            .then(r => r.json())
+            .then(res => {
+                if(res.success) {
+                    location.reload();
+                } else {
+                    Swal.fire('Error', res.message, 'error');
+                }
+            });
+        }
+    });
+}
+
 function sendPOEmail(bookingId, vendorId) {
     Swal.fire({
         title: 'Sending PO...',
@@ -376,6 +397,91 @@ function promptSetCost(itemId) {
     }).then((result) => {
         if (result.isConfirmed) {
             updatePurchaseCost(itemId, result.value);
+        }
+    });
+}
+function toggleConfFields() {
+    const type = document.getElementById('confirmation_type').value;
+    const poFields = document.getElementById('po_fields');
+    const emailFields = document.getElementById('email_fields');
+    if (poFields) poFields.style.display = type === 'po' ? 'block' : 'none';
+    if (emailFields) emailFields.style.display = type === 'email' ? 'block' : 'none';
+}
+
+function openInvoicePopup(bookingId) {
+    Swal.fire({
+        title: 'Campaign Confirmation',
+        html: `
+            <div style="text-align: left;">
+                <label style="display:block; font-size: 0.75rem; font-weight: 700; color: #64748b; margin-bottom: 5px;">CONFIRMATION TYPE</label>
+                <select id="confirmation_type" class="swal2-input" style="margin: 0 0 1rem 0; width: 100%; box-sizing: border-box;" onchange="toggleConfFields()">
+                    <option value="po">Customer Purchase Order (PO)</option>
+                    <option value="email">Email Confirmation</option>
+                </select>
+
+                <div id="po_fields">
+                    <label style="display:block; font-size: 0.75rem; font-weight: 700; color: #64748b; margin-bottom: 5px;">CUSTOMER PO NUMBER</label>
+                    <input id="customer_po_no" class="swal2-input" placeholder="Enter PO ID" style="margin: 0 0 1rem 0; width: 100%; box-sizing: border-box;">
+                    
+                    <label style="display:block; font-size: 0.75rem; font-weight: 700; color: #64748b; margin-bottom: 5px;">PO DATE</label>
+                    <input id="customer_po_date" type="date" class="swal2-input" style="margin: 0 0 1rem 0; width: 100%; box-sizing: border-box;">
+                </div>
+
+                <div id="email_fields" style="display:none;">
+                    <label style="display:block; font-size: 0.75rem; font-weight: 700; color: #64748b; margin-bottom: 5px;">EMAIL CONFIRMATION DATE</label>
+                    <input id="email_date" type="date" class="swal2-input" style="margin: 0 0 1rem 0; width: 100%; box-sizing: border-box;">
+                </div>
+                
+                <label style="display:block; font-size: 0.75rem; font-weight: 700; color: #64748b; margin-bottom: 5px;">UPLOAD ATTACHMENT (PDF/IMAGE)</label>
+                <input id="customer_po_file" type="file" accept=".pdf,image/*" class="swal2-file" style="margin: 0; width: 100%; box-sizing: border-box; border: 1px solid #e2e8f0; padding: 10px; border-radius: 6px;">
+            </div>
+        `,
+        focusConfirm: false,
+        showCancelButton: true,
+        confirmButtonText: 'Save & Generate Invoice',
+        preConfirm: () => {
+            const type = document.getElementById('confirmation_type').value;
+            const po_no = document.getElementById('customer_po_no').value;
+            const po_date = document.getElementById('customer_po_date').value;
+            const email_date = document.getElementById('email_date').value;
+            const po_file = document.getElementById('customer_po_file').files[0];
+            
+            if (type === 'po') {
+                if (!po_no) { Swal.showValidationMessage(`Customer PO Number is mandatory`); return false; }
+                if (!po_date) { Swal.showValidationMessage(`PO Date is mandatory`); return false; }
+            }
+            if (type === 'email') {
+                if (!email_date) { Swal.showValidationMessage(`Email Confirmation Date is mandatory`); return false; }
+            }
+            if (!po_file) {
+                Swal.showValidationMessage(`Please upload the PO/Email attachment (PDF/Image)`);
+                return false;
+            }
+            
+            let formData = new FormData();
+            formData.append('booking_id', bookingId);
+            formData.append('confirmation_type', type);
+            formData.append('customer_po_no', po_no);
+            formData.append('customer_po_date', po_date);
+            formData.append('email_date', email_date);
+            formData.append('customer_po_file', po_file);
+            
+            return fetch('../../ajax/upload_customer_po.php', {
+                method: 'POST',
+                body: formData
+            }).then(response => response.json())
+            .then(data => {
+                if (!data.success) {
+                    throw new Error(data.message || 'Upload failed');
+                }
+                return true;
+            }).catch(error => {
+                Swal.showValidationMessage(`Request failed: ${error}`);
+            });
+        }
+    }).then((result) => {
+        if (result.isConfirmed) {
+            window.open(`generate_invoice.php?booking_id=${bookingId}`, '_blank');
         }
     });
 }

@@ -2,42 +2,99 @@
 include_once __DIR__ . '/../../config/db.php';
 include_once __DIR__ . '/../../includes/functions.php';
 
-$booking_id = isset($_GET['booking_id']) ? intval($_GET['booking_id']) : 0;
-$vendor_id = isset($_GET['vendor_id']) ? intval($_GET['vendor_id']) : 0;
+// Prevent timezone warnings
+date_default_timezone_set('Asia/Kolkata');
 
-if (!$booking_id || !$vendor_id) {
-    die("Invalid request parameters.");
+$booking_id = isset($_GET['booking_id']) ? intval($_GET['booking_id']) : 0;
+$proposal_id = isset($_GET['proposal_id']) ? intval($_GET['proposal_id']) : 0;
+$vendor_id = isset($_GET['vendor_id']) ? intval($_GET['vendor_id']) : 0;
+$mode = $_GET['mode'] ?? '';
+
+if (!$vendor_id) {
+    die("Invalid request: Vendor ID is required.");
 }
 
-// Fetch Booking & Client Info
-$stmtB = $pdo->prepare("
-    SELECT b.*, c.name as client_name, p.campaign_name, p.proposal_number
-    FROM bookings b
-    JOIN partners c ON b.client_id = c.id
-    LEFT JOIN proposals p ON b.proposal_id = p.id
-    WHERE b.id = ?
-");
-$stmtB->execute([$booking_id]);
-$b = $stmtB->fetch();
-
-// Fetch Vendor Info
+// Fetch Vendor Info (Always required)
 $stmtV = $pdo->prepare("SELECT * FROM partners WHERE id = ? AND type = 'vendor'");
 $stmtV->execute([$vendor_id]);
 $v = $stmtV->fetch();
+if (!$v) die("Vendor not found.");
 
-if (!$b || !$v) {
-    die("Booking or Vendor not found.");
-}
-
-// Fetch Items for this vendor in this booking
 $vendor_gst_filter = $_GET['vendor_gst'] ?? '';
-$itemSql = "
-    SELECT bi.*, s.site_code, s.location, s.city, s.width, s.height, s.light_type, s.hsn_code, s.vendor_gst
-    FROM booking_items bi
-    JOIN sites s ON bi.site_id = s.id
-    WHERE bi.booking_id = ? AND s.vendor_id = ?
-";
-$itemParams = [$booking_id, $vendor_id];
+
+if ($mode === 'direct') {
+    // Standalone mode: uses provided data instead of DB records
+    $b = [
+        'campaign_name' => $_GET['campaign_name'] ?? 'Direct Campaign',
+        'start_date' => $_GET['start_date'] ?? date('Y-m-d'),
+        'end_date' => $_GET['end_date'] ?? date('Y-m-d', strtotime('+1 month')),
+        'proposal_number' => 'DPO-' . date('ymd') . '-' . rand(10, 99)
+    ];
+    
+    $site_ids = $_GET['site_ids'] ?? [];
+    if (empty($site_ids)) die("No sites selected.");
+    
+    $site_list = implode(',', array_map('intval', $site_ids));
+    $itemSql = "
+        SELECT s.*, s.site_code, s.location, s.city, s.width, s.height, s.light_type, s.hsn_code, s.vendor_gst, s.type as media_type,
+               s.purchase_rate as purchase_amount, ? as start_date, ? as end_date
+        FROM sites s
+        WHERE s.id IN ($site_list) AND s.vendor_id = ?
+    ";
+    $itemParams = [$b['start_date'], $b['end_date'], $vendor_id];
+
+    // Get custom rates if any
+    $custom_rates = $_GET['rates'] ?? [];
+} else {
+    // Normal mode: Fetch from Booking or Proposal
+    if ($booking_id) {
+        $stmtB = $pdo->prepare("
+            SELECT b.*, c.name as client_name, p.campaign_name, p.proposal_number, p.id as prop_id
+            FROM bookings b
+            JOIN partners c ON b.client_id = c.id
+            LEFT JOIN proposals p ON b.proposal_id = p.id
+            WHERE b.id = ?
+        ");
+        $stmtB->execute([$booking_id]);
+        $b = $stmtB->fetch();
+        $proposal_id = $b['prop_id'];
+    } else {
+        $stmtB = $pdo->prepare("
+            SELECT p.*, c.name as client_name, p.proposal_number as prop_no, p.proposal_number
+            FROM proposals p
+            JOIN partners c ON p.client_id = c.id
+            WHERE p.id = ?
+        ");
+        $stmtB->execute([$proposal_id]);
+        $b = $stmtB->fetch();
+        // Normalize fields for PO display
+        $b['campaign_name'] = $b['campaign_name'] ?? 'General Campaign';
+    }
+
+    if (!$b) die("Data not found for the given IDs.");
+
+    // Fetch Items (from proposal_items if booking doesn't exist, or from booking_items)
+    $vendor_gst_filter = $_GET['vendor_gst'] ?? '';
+
+    if ($booking_id) {
+        $itemSql = "
+            SELECT bi.*, s.site_code, s.location, s.city, s.width, s.height, s.light_type, s.hsn_code, s.vendor_gst, s.type as media_type
+            FROM booking_items bi
+            JOIN sites s ON bi.site_id = s.id
+            WHERE bi.booking_id = ? AND s.vendor_id = ?
+        ";
+        $itemParams = [$booking_id, $vendor_id];
+    } else {
+        $itemSql = "
+            SELECT pi.*, s.site_code, s.location, s.city, s.width, s.height, s.light_type, s.hsn_code, s.vendor_gst, s.type as media_type,
+                pi.purchase_rate as purchase_amount, ? as start_date, ? as end_date
+            FROM proposal_items pi
+            JOIN sites s ON pi.site_id = s.id
+            WHERE pi.proposal_id = ? AND s.vendor_id = ?
+        ";
+        $itemParams = [$b['start_date'], $b['end_date'], $proposal_id, $vendor_id];
+    }
+}
 
 if ($vendor_gst_filter !== '') {
     $itemSql .= " AND (s.vendor_gst = ? OR s.vendor_gst IS NULL AND ? = '')";
@@ -49,12 +106,21 @@ $stmtItems = $pdo->prepare($itemSql);
 $stmtItems->execute($itemParams);
 $items = $stmtItems->fetchAll();
 
-if (empty($items)) {
-    die("No items found for this vendor in this booking.");
-}
+// Safe PO Numbering
+$po_id = !empty($b['id']) ? $b['id'] : 0;
+$po_ref = ($po_id > 0) ? str_pad((string)$po_id, 3, '0', STR_PAD_LEFT) : ($b['proposal_number'] ?? 'DPO-' . date('His'));
+$po_number = "PO/" . date('y', strtotime($b['start_date'])) . "-" . date('y', strtotime($b['start_date'] . ' +1 year')) . "/" . $po_ref;
+$po_date = date('d-m-Y');
 
-$po_number = "PO-" . date('Y', strtotime($b['start_date'])) . "-" . str_pad($b['id'], 3, '0', STR_PAD_LEFT) . "-" . str_pad($v['id'], 2, '0', STR_PAD_LEFT);
-$po_date = date('d-M-Y');
+// Company Settings
+$company_name = getSetting('company_name', 'Sudha Creative & Advertising');
+$company_gstin = getSetting('company_gstin', '19AHRPT4740Q1Z6'); 
+$company_pan = getSetting('company_pan', 'AHRPT4740Q');
+$company_address = getSetting('company_address', 'Deshbandhu Para, P.O - Jhaljhalia, Dist - Malda - 732102, West Bengal');
+$company_phone = getSetting('company_phone', '8158854313');
+$company_email = getSetting('company_email', 'sudhacreativemalda@gmail.com');
+$company_letterhead = getSetting('company_letterhead');
+$company_signature = getSetting('company_signature', 'signature.png');
 
 ?>
 <!DOCTYPE html>
@@ -62,222 +128,220 @@ $po_date = date('d-M-Y');
 <head>
     <meta charset="UTF-8">
     <title>Purchase Order - <?php echo $po_number; ?></title>
-    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
     <style>
-        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700;800&display=swap');
+        @page { size: A4; margin: 0; }
+        body { font-family: 'Arial', sans-serif; margin: 0; padding: 20px; color: #000; font-size: 11px; line-height: 1.3; }
+        .po-wrapper { border: 1px solid #000; max-width: 800px; margin: 0 auto; position: relative; }
         
-        body { font-family: 'Inter', sans-serif; margin: 0; padding: 20px; background: #f1f5f9; color: #1e293b; }
-        .po-container { background: white; max-width: 900px; margin: 0 auto; padding: 40px; border-radius: 8px; box-shadow: 0 4px 6px -1px rgba(0,0,0,0.1); position: relative; min-height: 1100px; }
+        .header-top { border-bottom: 1px solid #000; padding: 5px 10px; }
+        .header-top p { margin: 0; }
         
-        .header { display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 2rem; border-bottom: 3px solid #0f172a; padding-bottom: 1rem; }
-        .header-left h1 { margin: 0; font-size: 2rem; font-weight: 800; color: #0f172a; text-transform: uppercase; letter-spacing: 2px; }
-        .logo { width: 120px; height: auto; }
+        .main-info { display: flex; border-bottom: 1px solid #000; }
+        .info-col { flex: 1; padding: 10px; }
+        .info-col:first-child { border-right: 1px solid #000; }
         
-        .info-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 2rem; margin-bottom: 2rem; }
-        .info-section { border: 1px solid #e2e8f0; padding: 1.5rem; border-radius: 8px; }
-        .info-title { font-size: 0.75rem; font-weight: 800; color: #64748b; text-transform: uppercase; margin-bottom: 1rem; border-bottom: 1px solid #f1f5f9; padding-bottom: 0.5rem; }
-        .info-content p { margin: 0.3rem 0; font-size: 0.9rem; line-height: 1.4; }
-        .info-content strong { color: #0f172a; }
-
-        .details-bar { display: grid; grid-template-columns: repeat(4, 1fr); gap: 1rem; margin-bottom: 2rem; background: #f8fafc; padding: 1rem; border-radius: 8px; border: 1px solid #e2e8f0; }
-        .detail-item small { display: block; font-size: 0.65rem; font-weight: 700; color: #64748b; text-transform: uppercase; margin-bottom: 0.2rem; }
-        .detail-item strong { display: block; font-size: 0.9rem; color: #0f172a; }
-
-        .po-table { width: 100%; border-collapse: collapse; margin-bottom: 2rem; }
-        .po-table th { background: #0f172a; color: white; text-align: left; padding: 12px; font-size: 0.75rem; text-transform: uppercase; }
-        .po-table td { padding: 12px; border-bottom: 1px solid #f1f5f9; font-size: 0.85rem; vertical-align: top; }
-        .po-table tr:last-child td { border-bottom: none; }
+        .info-row { display: flex; margin-bottom: 3px; }
+        .info-label { width: 90px; font-weight: normal; }
+        .info-sep { width: 15px; }
+        .info-value { flex: 1; font-weight: normal; }
         
-        .totals-section { display: flex; justify-content: flex-end; margin-bottom: 3rem; }
-        .totals-table { width: 300px; }
-        .totals-row { display: flex; justify-content: space-between; padding: 8px 0; font-size: 0.9rem; }
-        .totals-row.grand { border-top: 2px solid #0f172a; margin-top: 8px; padding-top: 12px; font-weight: 800; font-size: 1.1rem; color: #0f172a; }
-
-        .terms-section { margin-top: 2rem; font-size: 0.75rem; color: #64748b; }
-        .terms-title { font-weight: 800; color: #0f172a; margin-bottom: 0.5rem; text-transform: uppercase; }
-        .terms-list { padding-left: 1.5rem; margin: 0; }
-        .terms-list li { margin-bottom: 0.3rem; }
-
-        .signature-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 4rem; margin-top: 4rem; }
-        .sig-box { border-top: 1px solid #0f172a; padding-top: 1rem; text-align: center; font-size: 0.8rem; font-weight: 700; color: #0f172a; }
-
-        .print-btn { position: fixed; bottom: 30px; right: 30px; background: #0f172a; color: white; border: none; padding: 15px 30px; border-radius: 50px; font-weight: 800; cursor: pointer; box-shadow: 0 10px 15px -3px rgba(0,0,0,0.1); display: flex; align-items: center; gap: 0.75rem; z-index: 1000; transition: transform 0.2s; }
-        .print-btn:hover { transform: scale(1.05); }
-
-        @media print {
-            body { background: white; padding: 0; }
-            .po-container { box-shadow: none; width: 100%; margin: 0; padding: 0; max-width: none; min-height: auto; }
-            .print-btn { display: none; }
-        }
+        .section-title { font-weight: bold; text-decoration: underline; margin-bottom: 5px; font-style: italic; }
+        .table-title { background: #f0f0f0; border-bottom: 1px solid #000; text-align: center; font-weight: bold; padding: 4px; letter-spacing: 2px; text-transform: uppercase; }
+        
+        table { width: 100%; border-collapse: collapse; }
+        th { border-bottom: 1px solid #000; border-right: 1px solid #000; padding: 6px; text-align: center; font-weight: bold; background: #fafafa; }
+        th:last-child { border-right: none; }
+        td { border-bottom: 1px solid #d0d0d0; border-right: 1px solid #000; padding: 8px 5px; vertical-align: top; text-align: center; }
+        td:last-child { border-right: none; }
+        
+        .totals-row td { border-bottom: none; border-top: 1px solid #000; font-weight: bold; }
+        .footer { display: flex; border-top: 1px solid #000; }
+        .footer-left { flex: 2; padding: 10px; border-right: 1px solid #000; min-height: 120px; }
+        .footer-right { flex: 1; padding: 10px; text-align: center; display: flex; flex-direction: column; justify-content: space-between; }
+        
+        .btn-print { position: fixed; bottom: 30px; right: 30px; background: #000; color: #fff; border: none; padding: 10px 20px; cursor: pointer; border-radius: 4px; font-weight: bold; }
+        @media print { .btn-print { display: none; } body { padding: 0; } .po-wrapper { border: none; width: 100%; } }
     </style>
 </head>
 <body>
 
-    <button class="print-btn" onclick="window.print()">
-        <i class="fas fa-print"></i> PRINT PURCHASE ORDER
-    </button>
+<button class="btn-print" onclick="window.print()">PRINT PURCHASE ORDER</button>
 
-    <div class="po-container">
-        <?php 
-        $letterhead = getSetting('company_letterhead');
-        if ($letterhead): ?>
-            <div style="margin-bottom: 2rem;">
-                <img src="<?php echo BASE_URL; ?>assets/images/<?php echo $letterhead; ?>" style="width: 100%; height: auto; display: block; border-radius: 8px;">
-            </div>
-        <?php else: ?>
-            <div class="header">
-                <div class="header-left">
-                    <h1>Purchase Order</h1>
-                    <p style="font-size: 0.8rem; color: #64748b; margin-top: 0.5rem; font-weight: 600;">Original Copy</p>
-                </div>
-                <img src="<?php echo BASE_URL; ?>assets/images/<?php echo getSetting('company_logo', 'logo.png'); ?>" alt="Company Logo" class="logo" onerror="this.src='https://via.placeholder.com/150x50?text=SUDHA+CREATIVE'">
-            </div>
-        <?php endif; ?>
-
-        <div class="details-bar">
-            <div class="detail-item">
-                <small>PO Number</small>
-                <strong><?php echo $po_number; ?></strong>
-            </div>
-            <div class="detail-item">
-                <small>PO Date</small>
-                <strong><?php echo $po_date; ?></strong>
-            </div>
-            <div class="detail-item">
-                <small>Campaign</small>
-                <strong><?php echo $b['campaign_name']; ?></strong>
-            </div>
-            <div class="detail-item">
-                <small>Booking Ref</small>
-                <strong>#BK-<?php echo str_pad($b['id'], 4, '0', STR_PAD_LEFT); ?></strong>
-            </div>
+<div class="po-wrapper">
+    <!-- Header -->
+    <?php if ($company_letterhead): ?>
+        <img src="<?php echo BASE_URL; ?>assets/images/<?php echo $company_letterhead; ?>" style="width: 100%; height: auto; display: block; border-bottom: 1px solid #000;">
+    <?php else: ?>
+        <div class="header-top" style="text-align: center;">
+            <h2 style="margin: 0; text-transform: uppercase;"><?php echo $company_name; ?></h2>
+            <p><?php echo $company_address; ?></p>
+            <p>Ph: <?php echo $company_phone; ?> Email: <?php echo $company_email; ?></p>
         </div>
+    <?php endif; ?>
 
-        <div class="info-grid">
-            <div class="info-section">
-                <div class="info-title">Supplier Details</div>
-                <div class="info-content">
-                    <p><strong><?php echo $v['name']; ?></strong></p>
-                    <p><?php echo $v['address']; ?></p>
-                    <p><?php echo $v['city']; ?>, <?php echo $v['state']; ?></p>
-                    <?php if ($vendor_gst_filter): ?>
-                        <p>Branch GSTIN: <strong><?php echo $vendor_gst_filter; ?></strong></p>
-                    <?php else: ?>
-                        <p>GSTIN: <strong><?php echo $v['gstin']; ?></strong></p>
-                    <?php endif; ?>
-                    <p>Contact: <?php echo $v['contact_person']; ?> (<?php echo $v['phone']; ?>)</p>
+    <!-- PO Info -->
+    <div class="main-info">
+        <div class="info-col">
+            <div style="margin-bottom: 15px;">
+                <div class="section-title">Supplier / Vendor:</div>
+                <div style="font-weight: bold; font-size: 12px; margin-bottom: 2px;"><?php echo $v['name']; ?></div>
+                <div style="width: 250px;"><?php echo $v['address']; ?></div>
+                <div class="info-row" style="margin-top: 5px;">
+                    <span class="info-label">GSTIN / UIN</span>
+                    <span class="info-sep">:</span>
+                    <span class="info-value"><strong><?php echo $vendor_gst_filter ?: $v['gstin']; ?></strong></span>
                 </div>
-            </div>
-            <div class="info-section" style="background: #f8fafc;">
-                <div class="info-title">Buyer Details</div>
-                <div class="info-content">
-                    <p><strong><?php echo getSetting('company_name', COMPANY_NAME); ?></strong></p>
-                    <p><?php echo getSetting('company_address', COMPANY_ADDRESS); ?></p>
-                    <p><?php echo getSetting('company_city', COMPANY_CITY); ?></p>
-                    <p>GSTIN: <strong><?php echo getSetting('company_gstin', COMPANY_GSTIN); ?></strong></p>
-                    <p>PAN: <strong><?php echo getSetting('company_pan'); ?></strong></p>
-                    <p>Email: <?php echo getSetting('company_email', COMPANY_EMAIL); ?></p>
+                <div class="info-row">
+                    <span class="info-label">Contact Person</span>
+                    <span class="info-sep">:</span>
+                    <span class="info-value"><?php echo $v['contact_person']; ?></span>
+                </div>
+                <div class="info-row">
+                    <span class="info-label">Phone</span>
+                    <span class="info-sep">:</span>
+                    <span class="info-value"><?php echo $v['phone']; ?></span>
                 </div>
             </div>
         </div>
-
-        <table class="po-table">
-            <thead>
-                <tr>
-                    <th style="width: 40px;">#</th>
-                    <th>Asset & Location</th>
-                    <th>HSN</th>
-                    <th>Size</th>
-                    <th>Lit</th>
-                    <th>Period</th>
-                    <th style="text-align: right;">Amount</th>
-                </tr>
-            </thead>
-            <tbody>
-                <?php 
-                $net_total = 0;
-                foreach ($items as $idx => $item): 
-                    $net_total += $item['purchase_amount'];
-                ?>
-                <tr>
-                    <td><?php echo $idx + 1; ?></td>
-                    <td>
-                        <div style="font-weight: 700; color: #0f172a;"><?php echo $item['location']; ?></div>
-                        <div style="font-size: 0.7rem; color: #64748b; margin-top: 2px;"><?php echo $item['city']; ?> (<?php echo $item['site_code']; ?>)</div>
-                    </td>
-                    <td><?php echo $item['hsn_code'] ?: '998366'; ?></td>
-                    <td><?php echo $item['width']; ?>' x <?php echo $item['height']; ?>'</td>
-                    <td><?php echo $item['light_type']; ?></td>
-                    <td>
-                        <div style="font-size: 0.8rem;"><?php echo date('d M', strtotime($item['start_date'])); ?> - <?php echo date('d M Y', strtotime($item['end_date'])); ?></div>
-                        <div style="font-size: 0.65rem; color: #64748b;"><?php echo $item['days']; ?> Days</div>
-                    </td>
-                    <td style="text-align: right; font-weight: 700;">₹<?php echo number_format($item['purchase_amount'], 2); ?></td>
-                </tr>
-                <?php endforeach; ?>
-            </tbody>
-        </table>
-
-        <div class="totals-section">
-            <div class="totals-table">
-                <div class="totals-row">
-                    <span>Taxable Amount</span>
-                    <strong>₹<?php echo number_format($net_total, 2); ?></strong>
-                </div>
-                <?php 
-                $gst_total = $net_total * 0.18;
-                $gross_total = $net_total + $gst_total;
-                ?>
-                <div class="totals-row">
-                    <span>GST (18%)</span>
-                    <strong>₹<?php echo number_format($gst_total, 2); ?></strong>
-                </div>
-                <div class="totals-row grand">
-                    <span>Gross Total</span>
-                    <span>₹<?php echo number_format($gross_total, 2); ?></span>
-                </div>
+        
+        <div class="info-col">
+            <div class="info-row">
+                <span class="info-label">PO Number</span>
+                <span class="info-sep">:</span>
+                <span class="info-value"><strong><?php echo $po_number; ?></strong></span>
             </div>
-        </div>
-
-        <div style="margin-bottom: 2rem;">
-            <p style="font-size: 0.85rem; font-weight: 600;">Amount in Words: <span style="text-transform: capitalize; color: #0f172a;"><?php echo amountInWords($gross_total); ?> Only</span></p>
-        </div>
-
-        <div class="terms-section">
-            <div class="terms-title">Terms & Conditions</div>
-            <ul class="terms-list">
-                <li>Flex mounting and cleaning will be free of cost as per standard agreement.</li>
-                <li>Filing of GSTR-1 within time is mandatory for acceptance of invoice and payment processing.</li>
-                <li>In case of non-illumination of lit sites, display charges will be deducted on pro-rata basis.</li>
-                <li>The contract period will start from the date of physical display verification.</li>
-                <li>Payment will be processed within 30 days of invoice submission along with display photographs.</li>
-            </ul>
-        </div>
-
-        <div class="signature-grid">
-            <div class="sig-box">
-                <div style="height: 60px; border: 1px dashed #cbd5e1; width: 120px; margin: 0 auto 10px; display: flex; align-items: center; justify-content: center; font-size: 0.6rem; color: #94a3b8;">STAMP & SEAL</div>
-                Supplier Acceptance (Sign & Stamp)
+            <div class="info-row">
+                <span class="info-label">PO Date</span>
+                <span class="info-sep">:</span>
+                <span class="info-value"><?php echo $po_date; ?></span>
             </div>
-            <div class="sig-box">
-                <div style="height: 60px; display: flex; align-items: center; justify-content: center; margin-bottom: 10px;">
-                    <?php 
-                    $sig = getSetting('company_signature');
-                    if ($sig): ?>
-                        <img src="<?php echo BASE_URL; ?>assets/images/<?php echo $sig; ?>" style="height: 40px; opacity: 1;">
-                    <?php else: ?>
-                        <div style="height: 40px; border: 1px dashed #cbd5e1; width: 100px; display: flex; align-items: center; justify-content: center; font-size: 0.6rem; color: #94a3b8;">STAMP HERE</div>
-                    <?php endif; ?>
-                </div>
-                For <?php echo getSetting('company_name', COMPANY_NAME); ?> (Authorised Signatory)
+            <div class="info-row">
+                <span class="info-label">Reference</span>
+                <span class="info-sep">:</span>
+                <span class="info-value"><?php echo !empty($b['id']) ? '#BK-'.str_pad((string)$b['id'], 4, '0', STR_PAD_LEFT) : ($b['proposal_number'] ?? 'N/A'); ?></span>
             </div>
-        </div>
-
-        <div style="position: absolute; bottom: 20px; left: 40px; right: 40px; border-top: 1px solid #f1f5f9; padding-top: 10px; display: flex; justify-content: space-between; font-size: 0.65rem; color: #94a3b8;">
-            <span>Generated via Sudha Creative CRM</span>
-            <span>Page 1 of 1</span>
+            <div class="info-row">
+                <span class="info-label">Campaign</span>
+                <span class="info-sep">:</span>
+                <span class="info-value"><?php echo $b['campaign_name']; ?></span>
+            </div>
+            <div class="info-row" style="margin-top: 10px;">
+                <span class="info-label">Buyer PAN</span>
+                <span class="info-sep">:</span>
+                <span class="info-value"><?php echo $company_pan; ?></span>
+            </div>
+            <div class="info-row">
+                <span class="info-label">Buyer GSTIN</span>
+                <span class="info-sep">:</span>
+                <span class="info-value"><?php echo $company_gstin; ?></span>
+            </div>
         </div>
     </div>
+
+    <div class="table-title">Purchase Order Details:</div>
+
+    <table>
+        <thead>
+            <tr>
+                <th style="width: 30px;">S.N.</th>
+                <th>LOCATION & MEDIA TYPE</th>
+                <th style="width: 70px;">HSN/SAC<br>Code</th>
+                <th style="width: 80px;">SIZE</th>
+                <th style="width: 100px;">PERIOD</th>
+                <th style="width: 80px;">Days</th>
+                <th style="width: 90px;">Total Cost(₹)</th>
+            </tr>
+        </thead>
+        <tbody>
+            <?php 
+            $net_total = 0;
+            foreach ($items as $idx => $item): 
+                // Override with custom rate if in direct mode
+                if ($mode === 'direct' && isset($custom_rates[$item['id']])) {
+                    $item['purchase_amount'] = floatval($custom_rates[$item['id']]);
+                }
+                
+                $net_total += $item['purchase_amount'];
+                $sDate = (!empty($item['start_date']) && $item['start_date'] != '0000-00-00') ? $item['start_date'] : $b['start_date'];
+                $eDate = (!empty($item['end_date']) && $item['end_date'] != '0000-00-00') ? $item['end_date'] : $b['end_date'];
+            ?>
+            <tr>
+                <td><?php echo $idx + 1; ?></td>
+                <td style="text-align: left; padding-left: 10px;">
+                    <div style="font-weight: bold;"><?php echo $item['location']; ?></div>
+                    <div style="font-size: 9px; color: #555;"><?php echo $item['city']; ?> • <?php echo $item['media_type']; ?></div>
+                </td>
+                <td><?php echo $item['hsn_code'] ?: '998366'; ?></td>
+                <td><?php echo $item['width']; ?>'x<?php echo $item['height']; ?>'</td>
+                <td style="font-size: 9px;">
+                    <?php echo date('d.m.Y', strtotime($sDate)); ?> to<br>
+                    <?php echo date('d.m.Y', strtotime($eDate)); ?>
+                </td>
+                <td><?php 
+                    $date1 = date_create($sDate);
+                    $date2 = date_create($eDate);
+                    $diff = date_diff($date1, $date2);
+                    echo ($diff->days + 1); 
+                ?></td>
+                <td style="text-align: right; padding-right: 10px; font-weight: bold;"><?php echo number_format($item['purchase_amount'], 2); ?></td>
+            </tr>
+            <?php endforeach; ?>
+            
+            <?php 
+            $gst_amount = $net_total * 0.18;
+            $grand_total = $net_total + $gst_amount;
+            ?>
+            
+            <tr class="totals-row">
+                <td colspan="6" style="text-align: right; padding-right: 10px;">Taxable Amount (Total Cost)</td>
+                <td style="text-align: right; padding-right: 10px;"><?php echo number_format($net_total, 2); ?></td>
+            </tr>
+            <tr class="totals-row">
+                <td colspan="6" style="text-align: right; padding-right: 10px;">GST (18%)</td>
+                <td style="text-align: right; padding-right: 10px;"><?php echo number_format($gst_amount, 2); ?></td>
+            </tr>
+            <tr class="totals-row" style="background: #f9f9f9; border-top: 2px solid #000;">
+                <td colspan="6" style="text-align: right; padding-right: 10px; font-size: 12px; height: 30px; vertical-align: middle;">Gross Payable Amount</td>
+                <td style="text-align: right; padding-right: 10px; font-size: 12px; vertical-align: middle;"><?php echo number_format($grand_total, 2); ?></td>
+            </tr>
+        </tbody>
+    </table>
+
+    <div style="padding: 10px; border-top: 1px solid #000;">
+        <strong>Amount in Words:</strong> <span style="text-transform: capitalize;"><?php echo amountInWords($grand_total); ?> Only</span>
+    </div>
+
+    <div style="padding: 10px; border-top: 1px solid #000; font-size: 9px;">
+        <div style="font-weight: bold; text-decoration: underline; margin-bottom: 3px;">Terms & Conditions:</div>
+        <ol style="margin: 0; padding-left: 15px;">
+            <li>Flex mounting and cleaning will be free of cost as per standard agreement.</li>
+            <li>Filing of GSTR-1 within time is mandatory for payment processing.</li>
+            <li>Non-illumination of lit sites will lead to deduction on pro-rata basis.</li>
+            <li>Contract period starts from the date of physical display verification.</li>
+        </ol>
+    </div>
+
+    <div class="footer">
+        <div class="footer-left">
+            <div style="font-weight: bold; text-decoration: underline; margin-bottom: 5px;">Payment Terms:</div>
+            <p style="margin: 2px 0;">- 50% Advance with PO</p>
+            <p style="margin: 2px 0;">- 50% Balance after mounting with proofs</p>
+            <p style="margin: 2px 0;">- Cheque/NEFT in favor of: <strong><?php echo $v['name']; ?></strong></p>
+        </div>
+        <div class="footer-right">
+            <div>For <strong><?php echo $company_name; ?></strong></div>
+            <div style="margin-top: 30px;">
+                <img src="<?php echo BASE_URL; ?>assets/images/<?php echo $company_signature; ?>" style="height: 40px; display: block; margin: 0 auto;" onerror="this.style.display='none'">
+                <div style="border-top: 1px solid #000; width: 150px; margin: 5px auto 0;"></div>
+                <div style="font-weight: bold; margin-top: 2px;">Authorised Signatory</div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div style="max-width: 800px; margin: 10px auto; text-align: center; font-size: 9px; color: #888;">
+    This is a computer generated Purchase Order and does not require physical signature.
+</div>
 
 </body>
 </html>

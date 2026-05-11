@@ -35,33 +35,104 @@ $state_prefix = substr($gstin, 0, 2);
 $detected_state = $state_codes[$state_prefix] ?? '';
 
 /**
- * Note: High-quality GST data fetching usually requires a paid API (e.g., Karza, Masters India).
- * For this implementation, we attempt a fetch and provide a fallback.
+ * Note: Real GST data fetching via RapidAPI.
+ * You need to get a free API Key from RapidAPI (e.g., GST Search or GST Verification API).
  */
-
 function performGstLookup($gstin) {
-    // In production, replace this with a real API call (e.g., Razorpay, Karza, or Masters India)
-    // For now, we return mock data so you can see the auto-fill in action.
-    
+    // Using the RapidAPI Key provided by the user
+    $apiKey = '9e8f811eeamsh33238160ce02f0dp10ada1jsna3ec6f5d1138'; 
+    $apiHost = 'gst-return-status.p.rapidapi.com'; 
+
+    $url = "https://{$apiHost}/free/gstin/{$gstin}";
+
+    $curl = curl_init();
+    curl_setopt_array($curl, [
+        CURLOPT_URL => $url,
+        CURLOPT_RETURNTRANSFER => true,
+        CURLOPT_FOLLOWLOCATION => true,
+        CURLOPT_ENCODING => "",
+        CURLOPT_MAXREDIRS => 10,
+        CURLOPT_TIMEOUT => 30,
+        CURLOPT_HTTP_VERSION => CURL_HTTP_VERSION_1_1,
+        CURLOPT_CUSTOMREQUEST => "GET",
+        CURLOPT_HTTPHEADER => [
+            "X-RapidAPI-Host: {$apiHost}",
+            "X-RapidAPI-Key: {$apiKey}"
+        ],
+    ]);
+
+    $response = curl_exec($curl);
+    $err = curl_error($curl);
+    curl_close($curl);
+
+    if ($err) {
+        return ['error' => "cURL Error #:" . $err];
+    } else {
+        $res = json_decode($response, true);
+        
+        // Debugging: Save response to file
+        file_put_contents('gst_debug_json.txt', $response);
+
+        $d = $res['data'] ?? $res['taxpayerDetails'] ?? $res['taxpayer'] ?? $res;
+
+        if (is_array($d) && (isset($d['lgnm']) || isset($d['legalName']) || isset($d['trade_name']) || isset($d['stj']))) {
+            // Address logic
+            $addr = $d['pradr']['addr'] ?? $d['address'] ?? [];
+            $fullAddress = "";
+            if (is_array($addr)) {
+                $fullAddress = implode(', ', array_filter([
+                    $addr['bnm'] ?? $addr['buildingName'] ?? '',
+                    $addr['st'] ?? $addr['street'] ?? '',
+                    $addr['loc'] ?? $addr['location'] ?? '',
+                    $addr['dst'] ?? $addr['district'] ?? ''
+                ]));
+            } else {
+                $fullAddress = $addr;
+            }
+
+            return [
+                'name' => $d['lgnm'] ?? $d['legalName'] ?? $d['trade_name'] ?? $d['tradeName'] ?? 'Name Not Found',
+                'address' => $fullAddress,
+                'city' => $addr['dst'] ?? $addr['district'] ?? $d['city'] ?? '',
+                'district' => $addr['dst'] ?? $addr['district'] ?? '',
+                'pincode' => $addr['pncd'] ?? $addr['pincode'] ?? $d['pincode'] ?? '',
+                'state' => $addr['stcd'] ?? $addr['state'] ?? '',
+                'phone' => $d['mobNum'] ?? $d['contact'] ?? $d['phone'] ?? '', 
+                'email' => $d['emailId'] ?? $d['email'] ?? '',
+                'pan' => substr($gstin, 2, 10),
+                'success' => true
+            ];
+        } else {
+            // API returned something but not what we expected
+            $msg = $res['message'] ?? 'API format mismatch or not subscribed';
+            return [
+                'name' => 'Error: ' . $msg,
+                'address' => 'Raw Response: ' . substr($response, 0, 100),
+                'success' => false,
+                'pan' => substr($gstin, 2, 10)
+            ];
+        }
+    }
+
     return [
-        'name' => 'Sample Business Name Ltd',
-        'address' => 'Plot No. 45, Industrial Area, Phase 2',
-        'city' => 'Mumbai',
-        'district' => 'Mumbai Suburban',
-        'pincode' => '400051',
-        'phone' => '+91 98765 43210',
-        'email' => 'info@samplebusiness.com',
+        'name' => 'Connection Failed',
+        'address' => 'Could not connect to GST API',
+        'success' => false,
         'pan' => substr($gstin, 2, 10)
     ];
 }
 
-$data = performGstLookup($gstin);
 
-// Merge with detected state
-$data['state'] = $detected_state;
+$result = performGstLookup($gstin);
+
+// Merge with detected state from GSTIN prefix if API didn't provide it
+if (empty($result['state'])) {
+    $result['state'] = $detected_state;
+}
 
 echo json_encode([
-    'success' => true,
-    'data' => $data,
-    'message' => 'GST details fetched (Basic extraction from GSTIN)'
+    'success' => $result['success'] ?? true,
+    'data' => $result,
+    'message' => isset($result['success']) && $result['success'] ? 'GST details fetched successfully' : 'Using extraction/mock data'
 ]);
+

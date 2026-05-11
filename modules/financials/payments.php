@@ -11,11 +11,11 @@ if (!hasRole(['admin', 'accounts'])) {
 
 // Fetch Payments
 $payments = $pdo->query("
-    SELECT p.*, pr.name as partner_name, i.invoice_number, po.po_number 
+    SELECT p.*, pr.name as partner_name, i.invoice_number, prop.proposal_number as po_number 
     FROM payments p 
-    JOIN partners pr ON p.entity_id = pr.id 
+    JOIN partners pr ON p.partner_id = pr.id 
     LEFT JOIN invoices i ON p.invoice_id = i.id 
-    LEFT JOIN purchase_orders po ON p.po_id = po.id 
+    LEFT JOIN proposals prop ON p.proposal_id = prop.id 
     ORDER BY p.id DESC
 ")->fetchAll();
 
@@ -48,8 +48,8 @@ $partners = $pdo->query("SELECT id, name FROM partners ORDER BY name ASC")->fetc
                 <td><?php echo date('d M Y', strtotime($p['payment_date'])); ?></td>
                 <td><strong><?php echo $p['partner_name']; ?></strong></td>
                 <td>
-                    <span class="badge-<?php echo $p['type'] == 'receivable' ? 'success' : 'warning'; ?>" style="padding: 0.125rem 0.5rem; border-radius: 4px; font-size: 0.7rem; font-weight: 700;">
-                        <?php echo strtoupper($p['type']); ?>
+                    <span class="badge-<?php echo $p['type'] == 'credit' ? 'success' : 'warning'; ?>" style="padding: 0.125rem 0.5rem; border-radius: 4px; font-size: 0.7rem; font-weight: 700;">
+                        <?php echo $p['type'] == 'credit' ? 'RECEIVABLE' : 'PAYABLE'; ?>
                     </span>
                 </td>
                 <td><?php echo formatCurrency($p['amount']); ?></td>
@@ -72,18 +72,27 @@ $partners = $pdo->query("SELECT id, name FROM partners ORDER BY name ASC")->fetc
         <form id="paymentForm">
             <div class="form-group">
                 <label>Partner (Client/Vendor)</label>
-                <select id="entity_id" class="p-input" required>
+                <select id="entity_id" class="p-input" required onchange="loadPartnerDocs(this.value)">
+                    <option value="">Select Partner</option>
                     <?php foreach ($partners as $pr): ?>
                         <option value="<?php echo $pr['id']; ?>"><?php echo $pr['name']; ?></option>
                     <?php endforeach; ?>
                 </select>
             </div>
+            
+            <div class="form-group" id="doc_selection_group" style="display: none;">
+                <label id="doc_label">Link to Document</label>
+                <select id="doc_id" class="p-input">
+                    <option value="">No Link (General Payment)</option>
+                </select>
+            </div>
+
             <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 1rem;">
                 <div class="form-group">
                     <label>Transaction Type</label>
                     <select id="p_type" class="p-input">
-                        <option value="receivable">Income (Receivable)</option>
-                        <option value="payable">Expense (Payable)</option>
+                        <option value="receivable">Income (Receipt from Client)</option>
+                        <option value="payable">Expense (Payment to Vendor)</option>
                     </select>
                 </div>
                 <div class="form-group">
@@ -94,14 +103,14 @@ $partners = $pdo->query("SELECT id, name FROM partners ORDER BY name ASC")->fetc
             <div class="form-group">
                 <label>Payment Mode</label>
                 <select id="p_mode" class="p-input">
-                    <option value="Bank Transfer">Bank Transfer (NEFT/IMPS)</option>
+                    <option value="NEFT">Bank Transfer (NEFT/IMPS)</option>
                     <option value="Cheque">Cheque</option>
                     <option value="Cash">Cash</option>
                     <option value="UPI">UPI</option>
                 </select>
             </div>
             <div class="form-group">
-                <label>Reference No / Notes</label>
+                <label>Transaction ID / Notes</label>
                 <input type="text" id="p_ref" class="p-input" placeholder="e.g. UTR Number or Chq No">
             </div>
             <div style="margin-top: 1.5rem; text-align: right;">
@@ -125,26 +134,56 @@ $partners = $pdo->query("SELECT id, name FROM partners ORDER BY name ASC")->fetc
 function openPaymentModal() { document.getElementById('paymentModal').style.display = 'flex'; }
 function closeModal() { document.getElementById('paymentModal').style.display = 'none'; }
 
+function loadPartnerDocs(partnerId) {
+    const group = document.getElementById('doc_selection_group');
+    const select = document.getElementById('doc_id');
+    const type = document.getElementById('p_type').value;
+    
+    if (!partnerId) {
+        group.style.display = 'none';
+        return;
+    }
+
+    fetch(`../../ajax/get_partner_docs.php?id=${partnerId}`)
+    .then(r => r.json())
+    .then(data => {
+        select.innerHTML = '<option value="">No Link (General Payment)</option>';
+        group.style.display = 'block';
+        
+        if (type === 'receivable') {
+            document.getElementById('doc_label').innerText = 'Link to Tax Invoice';
+            data.invoices.forEach(inv => {
+                select.innerHTML += `<option value="${inv.id}">Inv: ${inv.invoice_number} (₹${inv.total_amount})</option>`;
+            });
+        } else {
+            document.getElementById('doc_label').innerText = 'Link to Purchase Order';
+            data.pos.forEach(po => {
+                select.innerHTML += `<option value="${po.id}">PO: ${po.po_number} (₹${po.grand_total})</option>`;
+            });
+        }
+    });
+}
+
 function savePayment() {
-    const data = {
-        entityId: document.getElementById('entity_id').value,
-        type: document.getElementById('p_type').value,
-        amount: document.getElementById('p_amount').value,
-        mode: document.getElementById('p_mode').value,
-        ref: document.getElementById('p_ref').value
-    };
+    const formData = new URLSearchParams();
+    formData.append('client_id', document.getElementById('entity_id').value);
+    formData.append('type', document.getElementById('p_type').value);
+    formData.append('amount', document.getElementById('p_amount').value);
+    formData.append('payment_mode', document.getElementById('p_mode').value);
+    formData.append('reference_no', document.getElementById('p_ref').value);
+    formData.append('doc_id', document.getElementById('doc_id').value);
 
     fetch('../../ajax/save_payment.php', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(data)
+        headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+        body: formData.toString()
     })
     .then(r => r.json())
     .then(res => {
         if (res.success) {
             Swal.fire('Recorded', 'Payment has been recorded successfully.', 'success').then(() => location.reload());
         } else {
-            alert('Error: ' + res.message);
+            Swal.fire('Error', res.message, 'error');
         }
     });
 }

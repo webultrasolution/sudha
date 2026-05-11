@@ -57,6 +57,7 @@ $pos = $pdo->query("
                 <td>
                     <a href="po_view.php?id=<?php echo $p['id']; ?>" class="btn-icon" title="View"><i class="fas fa-eye"></i></a>
                     <button class="btn-icon" style="color: var(--primary);" title="Download PDF"><i class="fas fa-file-pdf"></i></button>
+                    <button class="btn-icon" style="color: #ef4444;" onclick="deletePO(<?php echo $p['id']; ?>)" title="Delete PO"><i class="fas fa-trash-alt"></i></button>
                 </td>
             </tr>
             <?php endforeach; ?>
@@ -77,5 +78,34 @@ $pos = $pdo->query("
 .status-paid { background: #dcfce7; color: #166534; }
 .btn-icon { background: none; border: none; cursor: pointer; color: var(--secondary); font-size: 1rem; padding: 0.25rem; }
 </style>
+
+<script>
+function deletePO(id) {
+    Swal.fire({
+        title: 'Delete Purchase Order?',
+        text: "Are you sure you want to remove this PO? This cannot be undone.",
+        icon: 'warning',
+        showCancelButton: true,
+        confirmButtonColor: '#ef4444',
+        confirmButtonText: 'Yes, delete it'
+    }).then((result) => {
+        if (result.isConfirmed) {
+            fetch('../../ajax/delete_po.php', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+                body: `id=${id}`
+            })
+            .then(r => r.json())
+            .then(res => {
+                if(res.success) {
+                    location.reload();
+                } else {
+                    Swal.fire('Error', res.message, 'error');
+                }
+            });
+        }
+    });
+}
+</script>
 
 <?php include_once __DIR__ . '/../../includes/footer.php'; ?>

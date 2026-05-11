@@ -106,8 +106,25 @@ $sizes = $pdo->query("SELECT DISTINCT CONCAT(width, 'x', height) as size FROM si
         </div>
     </div>
 
-    <!-- Media Search Section (Inside Step 1) -->
-    <div class="p-panel" style="max-width: 1100px; margin: 1.5rem auto; border-left: 4px solid var(--primary);">
+    <!-- Single Next Step Button for Step 1 -->
+    <div style="display: flex; justify-content: flex-end; margin: 2rem auto; max-width: 1100px;">
+        <button class="btn btn-primary" onclick="goToStep2()" style="width: 250px; height: 48px; border-radius: 12px; font-weight: 800; font-size: 0.95rem; box-shadow: 0 4px 15px rgba(0,0,0,0.1);">
+            Next Step: Search & Select <i class="fas fa-arrow-right" style="margin-left: 0.75rem;"></i>
+        </button>
+    </div>
+</div>
+
+<!-- STEP 2: Media Selection & Search -->
+<div id="step-2" style="display: none;">
+    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1.5rem;">
+        <button class="btn btn-secondary" onclick="goToStep1()" style="background: white; border: 1px solid #e2e8f0; padding: 0.6rem 1.2rem; border-radius: 8px; font-weight: 700; cursor: pointer; color: #475569; display: flex; align-items: center; gap: 0.5rem;">
+            <i class="fas fa-arrow-left"></i> Back to Details
+        </button>
+        <div style="font-size: 1.1rem; font-weight: 800; color: var(--secondary);">Step 2: Search & Select Media Assets</div>
+    </div>
+
+    <!-- Media Search Section (Now in Step 2) -->
+    <div class="p-panel" style="margin-bottom: 1.5rem; border-left: 4px solid var(--primary);">
         <div style="font-size: 0.75rem; font-weight: 800; color: var(--primary); text-transform: uppercase; margin-bottom: 1rem; display: flex; align-items: center; gap: 0.5rem;">
             <i class="fas fa-search"></i> Media Search Criteria
         </div>
@@ -141,72 +158,49 @@ $sizes = $pdo->query("SELECT DISTINCT CONCAT(width, 'x', height) as size FROM si
                 </div>
             </div>
 
-            <!-- Media Search Criteria -->
-            <div style="display: grid; grid-template-columns: repeat(2, 1fr); gap: 1rem; margin-bottom: 1rem;">
+            <!-- Search Criteria -->
+            <div style="display: grid; grid-template-columns: 2fr 1fr 1fr 1fr 1fr 1fr; gap: 0.75rem; margin-bottom: 1rem; align-items: flex-end;">
                 <div class="form-group" style="margin-bottom: 0;">
-                    <label style="font-size: 0.7rem; font-weight: 800; color: var(--secondary); margin-bottom: 0.3rem; text-transform: uppercase;">Media Type</label>
-                    <select id="media_type" class="p-input" onchange="filterSites()" style="height: 38px;">
-                        <option value="">Select Media Type</option>
-                        <option value="Hoarding">Hoarding</option>
-                        <option value="Unipole">Unipole</option>
-                        <option value="Gantry">Gantry</option>
-                        <option value="BQS">Bus Shelter (BQS)</option>
-                        <option value="DCP">Digital City Panel (DCP)</option>
-                        <option value="LED Screen">LED Screen</option>
+                    <label style="font-size: 0.65rem; font-weight: 800; color: var(--secondary); margin-bottom: 0.3rem; text-transform: uppercase;">Search Site / Code / Area</label>
+                    <input type="text" id="site-search" class="p-input" placeholder="Type to search..." oninput="filterSites()" style="height: 34px; font-size: 0.75rem;">
+                </div>
+                <div class="form-group" style="margin-bottom: 0;">
+                    <label style="font-size: 0.65rem; font-weight: 800; color: var(--secondary); margin-bottom: 0.3rem; text-transform: uppercase;">Media Type</label>
+                    <select id="media_type" class="p-input" onchange="filterSites()" style="height: 34px; font-size: 0.75rem;">
+                        <option value="">All Media</option>
+                        <?php foreach($mediaTypes as $mt): ?> <option value="<?php echo $mt; ?>"><?php echo $mt; ?></option> <?php endforeach; ?>
                     </select>
                 </div>
                 <div class="form-group" style="margin-bottom: 0;">
-                    <label style="font-size: 0.7rem; font-weight: 800; color: var(--secondary); margin-bottom: 0.3rem; text-transform: uppercase;">Light Type</label>
-                    <select id="light_type" class="p-input" onchange="filterSites()" style="height: 38px;">
-                        <option value="">Select Light Type</option>
-                        <option value="FL">Frontlit (FL)</option>
-                        <option value="BL">Backlit (BL)</option>
-                        <option value="NL">Non-Lit (NL)</option>
-                    </select>
-                </div>
-            </div>
-
-            <!-- Location & Size Filters -->
-            <div style="display: grid; grid-template-columns: repeat(3, 1fr); gap: 1rem; margin-bottom: 1rem;">
-                <div class="form-group" style="margin-bottom: 0;">
-                    <label style="font-size: 0.7rem; font-weight: 800; color: var(--secondary); margin-bottom: 0.3rem; text-transform: uppercase;">State</label>
-                    <select id="filter-state" class="p-input" onchange="filterSites()" style="height: 38px;">
-                        <option value="">Select State</option>
+                    <label style="font-size: 0.65rem; font-weight: 800; color: var(--secondary); margin-bottom: 0.3rem; text-transform: uppercase;">State</label>
+                    <select id="filter-state" class="p-input" onchange="filterSites()" style="height: 34px; font-size: 0.75rem;">
+                        <option value="">All States</option>
                         <?php foreach($states as $s): ?> <option value="<?php echo $s; ?>"><?php echo $s; ?></option> <?php endforeach; ?>
                     </select>
                 </div>
                 <div class="form-group" style="margin-bottom: 0;">
-                    <label style="font-size: 0.7rem; font-weight: 800; color: var(--secondary); margin-bottom: 0.3rem; text-transform: uppercase;">City</label>
-                    <select id="filter-city" class="p-input" onchange="filterSites()" style="height: 38px;">
-                        <option value="">Select City</option>
+                    <label style="font-size: 0.65rem; font-weight: 800; color: var(--secondary); margin-bottom: 0.3rem; text-transform: uppercase;">City</label>
+                    <select id="filter-city" class="p-input" onchange="filterSites()" style="height: 34px; font-size: 0.75rem;">
+                        <option value="">All Cities</option>
                         <?php foreach($cities as $c): ?> <option value="<?php echo $c; ?>"><?php echo $c; ?></option> <?php endforeach; ?>
                     </select>
                 </div>
                 <div class="form-group" style="margin-bottom: 0;">
-                    <label style="font-size: 0.7rem; font-weight: 800; color: var(--secondary); margin-bottom: 0.3rem; text-transform: uppercase;">Size</label>
-                    <select id="filter-size" class="p-input" onchange="filterSites()" style="height: 38px;">
-                        <option value="">Select Size</option>
+                    <label style="font-size: 0.65rem; font-weight: 800; color: var(--secondary); margin-bottom: 0.3rem; text-transform: uppercase;">Light</label>
+                    <select id="light_type" class="p-input" onchange="filterSites()" style="height: 34px; font-size: 0.75rem;">
+                        <option value="">All Types</option>
+                        <?php foreach($illuminations as $il): ?> <option value="<?php echo $il; ?>"><?php echo $il; ?></option> <?php endforeach; ?>
+                    </select>
+                </div>
+                <div class="form-group" style="margin-bottom: 0;">
+                    <label style="font-size: 0.65rem; font-weight: 800; color: var(--secondary); margin-bottom: 0.3rem; text-transform: uppercase;">Size</label>
+                    <select id="filter-size" class="p-input" onchange="filterSites()" style="height: 34px; font-size: 0.75rem;">
+                        <option value="">All Sizes</option>
                         <?php foreach($sizes as $sz): ?> <option value="<?php echo $sz; ?>"><?php echo $sz; ?></option> <?php endforeach; ?>
                     </select>
                 </div>
             </div>
         </div>
-    </div>
-
-    <!-- Single Next Step Button for Step 1 -->
-    <div style="display: flex; justify-content: flex-end; margin: 2rem auto; max-width: 1100px;">
-        <button class="btn btn-primary" onclick="goToStep2()" style="width: 250px; height: 48px; border-radius: 12px; font-weight: 800; font-size: 0.95rem; box-shadow: 0 4px 15px rgba(0,0,0,0.1);">
-            Next Step: Select Assets <i class="fas fa-arrow-right" style="margin-left: 0.75rem;"></i>
-        </button>
-    </div>
-</div>
-
-<!-- STEP 2: Asset Selection & Pricing -->
-<div id="step-2" style="display: none;">
-    <div style="margin-bottom: 1.5rem;">
-        <button class="btn btn-secondary" onclick="goToStep1()" style="background: white; border: 1px solid #e2e8f0; padding: 0.6rem 1.2rem; border-radius: 8px; font-weight: 700; cursor: pointer; color: #475569; display: flex; align-items: center; gap: 0.5rem;">
-            <i class="fas fa-arrow-left"></i> Back to Search
-        </button>
     </div>
 
     <!-- Asset Selection Table -->
@@ -282,9 +276,10 @@ $sizes = $pdo->query("SELECT DISTINCT CONCAT(width, 'x', height) as size FROM si
                             <div style="color: #f97316; font-size: 0.75rem; font-weight: 800; letter-spacing: 0.02em;"><?php echo $s['site_code']; ?></div>
                         </td>
 
+                      
                         <td style="padding: 1.5rem 1rem;">
-                            <div style="font-weight: 800; color: #1e293b; font-size: 0.9rem; margin-bottom: 4px;"><?php echo $s['location']; ?></div>
-                            <div style="font-size: 0.7rem; color: #64748b; font-weight: 700; margin-bottom: 0.75rem;">Near <?php echo $s['city']; ?></div>
+                            <div style="font-weight: 800; color: #1e293b; font-size: 0.9rem; margin-bottom: 4px;"><?php echo $s['name']; ?></div>
+                            <div style="font-size: 0.7rem; color: #64748b; font-weight: 700; margin-bottom: 0.75rem;"> <?php echo $s['city']; ?></div>
                             <div style="display: flex; gap: 0.4rem; align-items: center;">
                                 <span style="background: #ecfdf5; color: #059669; padding: 0.2rem 0.6rem; border-radius: 6px; font-size: 0.6rem; font-weight: 800; text-transform: uppercase;"><?php echo $s['type']; ?></span>
                                 <span style="background: #f1f5f9; color: #475569; padding: 0.2rem 0.6rem; border-radius: 6px; font-size: 0.6rem; font-weight: 800; text-transform: uppercase;"><?php echo $s['light_type']; ?></span>
@@ -770,17 +765,22 @@ function toggleSite(id) {
 
     const idx = selectedSites.findIndex(s => s.id === id);
     if (idx === -1) {
-        selectedSites.push({ id, name, cardRate: rate, purchaseRate: prate, saleRate: rate, owner, sqft });
-        row.classList.add('selected');
-        chk.checked = true;
-        input.disabled = false;
+        const city = row.dataset.city;
+        const siteCode = row.dataset.code;
+        const area = row.querySelector('.location-area') ? row.querySelector('.location-area').innerText : '';
+
+        selectedSites.push({ id, name, cardRate: rate, purchaseRate: prate, saleRate: rate, owner, sqft, city, siteCode, area });
+        if(row) row.classList.add('selected');
+        if(chk) chk.checked = true;
+        if(input) input.disabled = false;
     } else {
         selectedSites.splice(idx, 1);
-        row.classList.remove('selected');
-        chk.checked = false;
-        input.disabled = true;
-        row.querySelector('.total-cell').innerText = '₹0';
-        row.querySelector('.markup-cell').innerText = '-';
+        if(row) {
+            row.classList.remove('selected');
+            if(chk) chk.checked = false;
+            if(input) input.disabled = true;
+            row.querySelector('.total-cell').innerText = '₹0';
+        }
     }
     
     const count = selectedSites.length;
@@ -809,59 +809,71 @@ function updateBucketUI() {
     bucketCount.innerText = selectedSites.length;
     
     let html = `
-        <table class="crs-table" style="width: 100%; border-collapse: separate; border-spacing: 0 0.5rem;">
+        <table class="crs-table selection-table" style="width: 100%; border-collapse: separate; border-spacing: 0 0.5rem;">
             <thead>
                 <tr style="border-bottom: 2px solid #f1f5f9;">
-                    <th style="width: 40px; padding: 1rem;">#</th>
-                    <th style="width: 50px; padding: 1rem;">ACT</th>
-                    <th style="width: 100px; padding: 1rem;">PREVIEW</th>
-                    <th style="padding: 1rem;">CITY / CODE</th>
-                    <th style="padding: 1rem;">ASSET DETAILS</th>
-                    <th style="padding: 1rem;">SIZE</th>
-                    <th style="padding: 1rem;">PRICING</th>
-                    <th style="padding: 1rem;">OFFER RATE</th>
-                    <th style="padding: 1rem; text-align: right;">TOTAL</th>
+                    <th style="width: 40px; padding: 1.2rem 1rem;">#</th>
+                    <th style="width: 50px; padding: 1.2rem 1rem;">ACT</th>
+                    <th style="width: 100px; padding: 1.2rem 1rem;">PREVIEW</th>
+                    <th style="padding: 1.2rem 1rem;">CITY / CODE</th>
+                    <th style="padding: 1.2rem 1rem;">ASSET DETAILS</th>
+                    <th style="padding: 1.2rem 1rem;">SIZE</th>
+                    <th style="padding: 1.2rem 1rem;">PRICING</th>
+                    <th style="padding: 1.2rem 1rem;">OFFER RATE</th>
+                    <th style="padding: 1.2rem 1rem; text-align: right;">TOTAL</th>
                 </tr>
             </thead>
             <tbody>
     `;
 
     selectedSites.forEach((site, index) => {
-        const markupVal = site.saleRate - site.purchaseRate;
-        const markupPct = site.purchaseRate > 0 ? ((markupVal / site.purchaseRate) * 100).toFixed(1) : '0';
-        
+        // Find the original row to get all data if needed, or use the site object
         html += `
-            <tr style="background: white;">
-                <td style="padding: 1rem; font-weight: 700; color: #64748b;">${index + 1}</td>
-                <td style="padding: 1rem; text-align: center;">
-                    <button onclick="toggleSite('${site.id}')" style="background: #fee2e2; color: #ef4444; border: none; width: 30px; height: 30px; border-radius: 8px; cursor: pointer; display: flex; align-items: center; justify-content: center;">
-                        <i class="fas fa-times"></i>
+            <tr class="site-row selected" style="background: white; transition: all 0.2s;">
+                <td class="sno-cell" style="padding: 1.5rem 1rem; font-weight: 700; color: #64748b;">${index + 1}</td>
+                
+                <td style="padding: 1.5rem 1rem; text-align: center;">
+                    <button onclick="toggleSite('${site.id}')" style="background: #fee2e2; color: #ef4444; border: none; width: 32px; height: 32px; border-radius: 8px; cursor: pointer; display: flex; align-items: center; justify-content: center; transition: all 0.2s;">
+                        <i class="fas fa-trash-alt"></i>
                     </button>
                 </td>
-                <td style="padding: 1rem;">
-                    <div style="width: 80px; height: 50px; border-radius: 8px; background: #f8fafc; border: 1px solid #e2e8f0; display: flex; align-items: center; justify-content: center; font-size: 0.6rem; color: #94a3b8; font-weight: 700;">Img</div>
+
+                <td style="padding: 1.5rem 1rem;">
+                    <div style="width: 100px; height: 65px; border-radius: 12px; background: #f8fafc; border: 1px dashed #e2e8f0; display: flex; align-items: center; justify-content: center; font-size: 0.7rem; color: #94a3b8; font-weight: 700;">Img</div>
                 </td>
-                <td style="padding: 1rem;">
-                    <div style="font-weight: 800; color: #1e293b; font-size: 0.85rem; margin-bottom: 2px;">${site.name.split('-')[0] || ''}</div>
-                    <div style="color: #f97316; font-size: 0.7rem; font-weight: 800;">${site.id}</div>
+
+                <td style="padding: 1.5rem 1rem;">
+                    <div style="font-weight: 800; color: #1e293b; font-size: 0.9rem; margin-bottom: 2px;">${site.city}</div>
+                    <div style="color: #ef4444; font-size: 0.75rem; font-weight: 700; letter-spacing: 0.02em;">${site.siteCode}</div>
                 </td>
-                <td style="padding: 1rem;">
-                    <div style="font-weight: 800; color: #1e293b; font-size: 0.85rem; margin-bottom: 4px;">${site.name}</div>
-                    <div style="display: flex; gap: 0.3rem;">
-                        <span style="background: #f1f5f9; color: #475569; padding: 0.1rem 0.4rem; border-radius: 4px; font-size: 0.55rem; font-weight: 800; text-transform: uppercase;">${site.owner}</span>
+
+                <td style="padding: 1.5rem 1rem;">
+                    <div style="font-weight: 800; color: #1e293b; font-size: 0.95rem; margin-bottom: 2px;">${site.name}</div>
+                    <div style="font-size: 0.75rem; color: #64748b; font-weight: 600; margin-bottom: 0.5rem;">${site.area || ''}</div>
+                    <div style="display: flex; gap: 0.4rem; align-items: center;">
+                        <span style="background: #ecfdf5; color: #059669; padding: 0.15rem 0.5rem; border-radius: 4px; font-size: 0.6rem; font-weight: 800; text-transform: uppercase;">SITE</span>
+                        <span style="color: #94a3b8; font-size: 0.6rem; font-weight: 700;">• ${site.owner}</span>
                     </div>
                 </td>
-                <td style="padding: 1rem;">
-                    <div style="font-weight: 800; color: #1e293b; font-size: 0.85rem;">${site.sqft} SQFT</div>
+
+                <td style="padding: 1.5rem 1rem;">
+                    <div style="font-weight: 800; color: #1e293b; font-size: 0.9rem; margin-bottom: 2px;">${site.sqft} SQFT</div>
                 </td>
-                <td style="padding: 1rem;">
-                    <div style="font-weight: 700; color: #64748b; font-size: 0.75rem;">₹${site.cardRate.toLocaleString()}</div>
+
+                <td style="padding: 1.5rem 1rem;">
+                    <div style="font-weight: 800; color: #64748b; font-size: 0.8rem;">₹${site.cardRate.toLocaleString()}</div>
                 </td>
-                <td style="padding: 1rem;">
-                    <div style="font-weight: 800; color: #1e293b; font-size: 0.85rem;">₹${site.saleRate.toLocaleString()}</div>
+
+                <td style="padding: 1.5rem 1rem;">
+                    <input type="number" class="p-input bucket-rate-input" 
+                           value="${site.saleRate}" 
+                           oninput="updateSitePrice('${site.id}', this.value)"
+                           style="width: 100px; height: 32px; font-size: 0.85rem; font-weight: 800; border-radius: 8px; border: 1px solid #e2e8f0; padding: 0 0.5rem; color: var(--primary);">
                 </td>
-                <td style="padding: 1rem; text-align: right;">
-                    <div style="font-weight: 900; color: var(--primary); font-size: 0.9rem;">₹${site.saleRate.toLocaleString()}</div>
+
+                <td style="padding: 1.5rem 1rem; text-align: right;">
+                    <div style="font-size: 0.65rem; color: #64748b; font-weight: 800; margin-bottom: 4px; text-transform: uppercase;">Total</div>
+                    <div class="total-cell" style="font-weight: 900; color: var(--primary); font-size: 1rem;">₹${site.saleRate.toLocaleString()}</div>
                 </td>
             </tr>
         `;
@@ -874,8 +886,20 @@ function updateBucketUI() {
 function updateSitePrice(id, val) {
     const idx = selectedSites.findIndex(s => s.id === id);
     if (idx !== -1) {
-        selectedSites[idx].saleRate = parseFloat(val) || 0;
-        updateBucketUI();
+        const rate = parseFloat(val) || 0;
+        selectedSites[idx].saleRate = rate;
+        
+        // Update Bucket Total Cell for this row
+        const bucketRows = document.querySelectorAll('#bucket-list tr');
+        bucketRows.forEach(row => {
+            // We can identify the row by its content or better yet, add an ID to bucket rows
+            // For now, let's just find the row that has the toggleSite(id) button
+            if (row.innerHTML.includes(`toggleSite('${id}')`)) {
+                const totalCell = row.querySelector('td:last-child div');
+                if (totalCell) totalCell.innerText = '₹' + rate.toLocaleString();
+            }
+        });
+
         recalcAll();
     }
 }
@@ -927,20 +951,20 @@ function recalcAll() {
     if (taxType === 'cgst_sgst') {
         const halfTax = totalTax / 2;
         taxContainer.innerHTML = `
-            <div class="stat-row" style="display:flex; justify-content:space-between; margin-bottom:0.5rem;">
+            <div class="stat-row" style="display:flex; justify-content:space-between; margin-bottom:0.4rem; font-size:0.85rem;">
                 <span style="color:#64748b; font-weight:600;">CGST (9%):</span>
-                <span style="font-weight:800;">₹${halfTax.toLocaleString(undefined, {minimumFractionDigits: 2, maximumFractionDigits: 2})}</span>
+                <span style="font-weight:800; color:#1e293b;">₹${halfTax.toLocaleString(undefined, {minimumFractionDigits: 2, maximumFractionDigits: 2})}</span>
             </div>
-            <div class="stat-row" style="display:flex; justify-content:space-between; margin-bottom:0.5rem;">
+            <div class="stat-row" style="display:flex; justify-content:space-between; margin-bottom:0.4rem; font-size:0.85rem;">
                 <span style="color:#64748b; font-weight:600;">SGST (9%):</span>
-                <span style="font-weight:800;">₹${halfTax.toLocaleString(undefined, {minimumFractionDigits: 2, maximumFractionDigits: 2})}</span>
+                <span style="font-weight:800; color:#1e293b;">₹${halfTax.toLocaleString(undefined, {minimumFractionDigits: 2, maximumFractionDigits: 2})}</span>
             </div>
         `;
     } else {
         taxContainer.innerHTML = `
-            <div class="stat-row" style="display:flex; justify-content:space-between; margin-bottom:0.5rem;">
+            <div class="stat-row" style="display:flex; justify-content:space-between; margin-bottom:0.4rem; font-size:0.85rem;">
                 <span style="color:#64748b; font-weight:600;">IGST (18%):</span>
-                <span style="font-weight:800;">₹${totalTax.toLocaleString(undefined, {minimumFractionDigits: 2, maximumFractionDigits: 2})}</span>
+                <span style="font-weight:800; color:#1e293b;">₹${totalTax.toLocaleString(undefined, {minimumFractionDigits: 2, maximumFractionDigits: 2})}</span>
             </div>
         `;
     }

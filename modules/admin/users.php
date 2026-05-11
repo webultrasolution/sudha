@@ -127,11 +127,11 @@ $users = $users->fetchAll();
                 <td><?php echo date('d M Y', strtotime($user['created_at'])); ?></td>
                 <?php if ($canManage): ?>
                 <td>
-                    <button class="btn-icon" onclick="editUser(<?php echo htmlspecialchars(json_encode($user)); ?>)">
+                    <button class="btn-icon btn-edit" onclick="editUser(<?php echo htmlspecialchars(json_encode($user)); ?>)">
                         <i class="fas fa-edit"></i>
                     </button>
                     <?php if ($user['id'] != $_SESSION['user_id']): ?>
-                    <button type="button" class="btn-icon" style="color: var(--danger);" onclick="deleteUser(event, <?php echo $user['id']; ?>)">
+                    <button type="button" class="btn-icon btn-delete" onclick="deleteUser(event, <?php echo $user['id']; ?>)">
                         <i class="fas fa-trash"></i>
                     </button>
                     <?php endif; ?>

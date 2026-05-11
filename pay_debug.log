@@ -1,0 +1,22 @@
+2026-05-11 23:12:11 - POST: Array
+(
+    [client_id] => 2
+    [amount] => 232
+    [payment_date] => 2026-05-11
+    [reference_no] => 
+    [payment_mode] => NEFT
+    [doc_id] => 3
+    [type] => receivable
+)
+
+2026-05-11 23:12:54 - POST: Array
+(
+    [client_id] => 1
+    [amount] => 236
+    [payment_date] => 2026-05-11
+    [reference_no] => 
+    [payment_mode] => NEFT
+    [doc_id] => 4
+    [type] => receivable
+)
+
