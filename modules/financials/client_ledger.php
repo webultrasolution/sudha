@@ -44,14 +44,15 @@ if ($pType == 'client') {
 $stmtInv->execute([$partner_id]);
 $bills = $stmtInv->fetchAll();
 
-// Fetch all Payments (Credits)
+// Fetch all Payments (Credits for Client, Debits for Vendor)
 $pMode = ($pType == 'client') ? 'receivable' : 'payable';
+$dbType = ($pType == 'client') ? 'credit' : 'debit';
 $stmtPay = $pdo->prepare("
-    SELECT 'payment' as type, payment_date as date, reference_no as ref, 0 as debit, amount as credit 
+    SELECT 'payment' as type, payment_date as date, transaction_id as ref, 0 as debit, amount as credit 
     FROM payments 
-    WHERE entity_id = ? AND type = ?
+    WHERE partner_id = ? AND type = ?
 ");
-$stmtPay->execute([$partner_id, $pMode]);
+$stmtPay->execute([$partner_id, $dbType]);
 $payments = $stmtPay->fetchAll();
 
 // Combine and Sort by Date
@@ -137,63 +138,90 @@ $balance = 0;
 <script>
 function addPayment(clientId, type) {
     const title = type === 'receivable' ? 'Record Receipt' : 'Record Payment Made';
-    const amountLabel = type === 'receivable' ? 'AMOUNT RECEIVED (₹)' : 'AMOUNT PAID OUT (₹)';
     
-    Swal.fire({
-        title: title,
-        html: `
-            <div style="text-align: left;">
-                <label style="display:block; font-size: 0.75rem; font-weight: 700; color: #64748b; margin-bottom: 5px;">${amountLabel}</label>
-                <input id="pay_amount" type="number" class="swal2-input" placeholder="0.00" style="margin: 0 0 1rem 0; width: 100%;">
-                
-                <label style="display:block; font-size: 0.75rem; font-weight: 700; color: #64748b; margin-bottom: 5px;">DATE</label>
-                <input id="pay_date" type="date" class="swal2-input" value="<?php echo date('Y-m-d'); ?>" style="margin: 0 0 1rem 0; width: 100%;">
-                
-                <label style="display:block; font-size: 0.75rem; font-weight: 700; color: #64748b; margin-bottom: 5px;">REFERENCE / TRANS ID</label>
-                <input id="pay_ref" class="swal2-input" placeholder="e.g. Bank Ref No." style="margin: 0 0 1rem 0; width: 100%;">
-                
-                <label style="display:block; font-size: 0.75rem; font-weight: 700; color: #64748b; margin-bottom: 5px;">NOTES</label>
-                <textarea id="pay_notes" class="swal2-textarea" style="margin: 0; width: 100%;" placeholder="Any additional info..."></textarea>
-            </div>
-        `,
-        showCancelButton: true,
-        confirmButtonText: 'Save Transaction',
-        preConfirm: () => {
-            const amount = document.getElementById('pay_amount').value;
-            const date = document.getElementById('pay_date').value;
-            const ref = document.getElementById('pay_ref').value;
-            const notes = document.getElementById('pay_notes').value;
+    fetch('../../ajax/get_partner_docs.php?id=' + clientId)
+    .then(r => r.json())
+    .then(data => {
+        let docOptions = '<option value="">No Link (General Payment)</option>';
+        if (type === 'receivable') {
+            data.invoices.forEach(i => {
+                docOptions += '<option value="' + i.id + '">Inv: ' + i.invoice_number + ' (₹' + i.total_amount + ')</option>';
+            });
+        } else {
+            data.pos.forEach(p => {
+                docOptions += '<option value="' + p.id + '">PO: ' + p.po_number + ' (₹' + p.grand_total + ')</option>';
+            });
+        }
 
-            if (!amount || amount <= 0) {
-                Swal.showValidationMessage('Please enter a valid amount');
-                return false;
+        Swal.fire({
+            title: title,
+            html: 
+                '<div style="text-align: left;">' +
+                    '<label style="display:block; font-size: 0.75rem; font-weight: 700; color: #64748b; margin-bottom: 5px;">LINK TO DOCUMENT</label>' +
+                    '<select id="pay_doc_id" class="swal2-input" style="margin: 0 0 1rem 0; width: 100%; font-size: 0.9rem;">' + docOptions + '</select>' +
+                    '<label style="display:block; font-size: 0.75rem; font-weight: 700; color: #64748b; margin-bottom: 5px;">AMOUNT (₹)</label>' +
+                    '<input id="pay_amount" type="number" class="swal2-input" placeholder="0.00" style="margin: 0 0 1rem 0; width: 100%;">' +
+                    '<label style="display:block; font-size: 0.75rem; font-weight: 700; color: #64748b; margin-bottom: 5px;">DATE</label>' +
+                    '<input id="pay_date" type="date" class="swal2-input" value="<?php echo date('Y-m-d'); ?>" style="margin: 0 0 1rem 0; width: 100%;">' +
+                    '<label style="display:block; font-size: 0.75rem; font-weight: 700; color: #64748b; margin-bottom: 5px;">PAYMENT MODE</label>' +
+                    '<select id="pay_mode" class="swal2-input" style="margin: 0 0 1rem 0; width: 100%;">' +
+                        '<option value="NEFT">Bank Transfer (NEFT/IMPS)</option>' +
+                        '<option value="Cheque">Cheque</option>' +
+                        '<option value="Cash">Cash</option>' +
+                        '<option value="UPI">UPI</option>' +
+                    '</select>' +
+                    '<label style="display:block; font-size: 0.75rem; font-weight: 700; color: #64748b; margin-bottom: 5px;">REFERENCE / TRANS ID</label>' +
+                    '<input id="pay_ref" class="swal2-input" placeholder="e.g. Bank Ref No." style="margin: 0 0 1rem 0; width: 100%;">' +
+                '</div>',
+            showCancelButton: true,
+            confirmButtonText: 'Save Transaction',
+            preConfirm: () => {
+                const amount = document.getElementById('pay_amount').value;
+                const date = document.getElementById('pay_date').value;
+                const ref = document.getElementById('pay_ref').value;
+                const mode = document.getElementById('pay_mode').value;
+                const docId = document.getElementById('pay_doc_id').value;
+
+                if (!amount || amount <= 0) {
+                    Swal.showValidationMessage('Please enter a valid amount');
+                    return false;
+                }
+
+                let params = new URLSearchParams();
+                params.append('client_id', clientId);
+                params.append('amount', amount);
+                params.append('payment_date', date);
+                params.append('reference_no', ref);
+                params.append('payment_mode', mode);
+                params.append('doc_id', docId);
+                params.append('type', type);
+
+                return fetch('../../ajax/save_payment.php', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+                    body: params.toString()
+                }).then(async response => {
+                    const text = await response.text();
+                    try {
+                        return JSON.parse(text);
+                    } catch(e) {
+                        throw new Error('Server Error: ' + text);
+                    }
+                })
+                .then(data => {
+                    if (!data.success) throw new Error(data.message || 'Unknown Error');
+                    return true;
+                }).catch(error => {
+                    Swal.showValidationMessage('Failed: ' + error.message);
+                });
             }
-
-            let formData = new FormData();
-            formData.append('client_id', clientId);
-            formData.append('amount', amount);
-            formData.append('payment_date', date);
-            formData.append('reference_no', ref);
-            formData.append('notes', notes);
-            formData.append('type', type);
-
-            return fetch('../../ajax/save_payment.php', {
-                method: 'POST',
-                body: formData
-            }).then(response => response.json())
-            .then(data => {
-                if (!data.success) throw new Error(data.message);
-                return true;
-            }).catch(error => {
-                Swal.showValidationMessage(`Error: ${error}`);
-            });
-        }
-    }).then((result) => {
-        if (result.isConfirmed) {
-            Swal.fire('Success', 'Transaction recorded', 'success').then(() => {
-                location.reload();
-            });
-        }
+        }).then((result) => {
+            if (result.isConfirmed) {
+                Swal.fire('Success', 'Transaction recorded', 'success').then(() => {
+                    location.reload();
+                });
+            }
+        });
     });
 }
 </script>
