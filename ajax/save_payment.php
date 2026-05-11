@@ -5,6 +5,8 @@ include_once __DIR__ . '/../includes/functions.php';
 header('Content-Type: application/json');
 
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
+    file_put_contents(__DIR__ . '/../pay_debug.log', date('Y-m-d H:i:s') . ' - POST: ' . print_r($_POST, true) . PHP_EOL, FILE_APPEND);
+    
     $partner_id = intval($_POST['client_id'] ?? 0);
     $amount = floatval($_POST['amount'] ?? 0);
     $date = clean($_POST['payment_date'] ?? date('Y-m-d'));
@@ -25,15 +27,26 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
     try {
         $stmt = $pdo->prepare("INSERT INTO payments (partner_id, amount, payment_date, payment_mode, transaction_id, type, invoice_id, proposal_id, notes) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)");
-        if ($stmt->execute([$partner_id, $amount, $date, $mode, $ref, $db_type, $invoice_id, $proposal_id, $notes])) {
+        
+        $params = [
+            $partner_id, 
+            $amount, 
+            $date, 
+            $mode, 
+            $ref, 
+            $db_type, 
+            $invoice_id, 
+            $proposal_id, 
+            $notes
+        ];
+
+        if ($stmt->execute($params)) {
             // Update Invoice Status if linked
             if ($invoice_id) {
-                // Get total paid for this invoice
                 $paidStmt = $pdo->prepare("SELECT SUM(amount) FROM payments WHERE invoice_id = ?");
                 $paidStmt->execute([$invoice_id]);
                 $totalPaid = floatval($paidStmt->fetchColumn());
 
-                // Get invoice total
                 $invStmt = $pdo->prepare("SELECT total_amount FROM invoices WHERE id = ?");
                 $invStmt->execute([$invoice_id]);
                 $invTotal = floatval($invStmt->fetchColumn());
@@ -44,10 +57,11 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             }
             echo json_encode(['success' => true]);
         } else {
-            echo json_encode(['success' => false, 'message' => 'Failed to save payment']);
+            $err = $stmt->errorInfo();
+            echo json_encode(['success' => false, 'message' => 'DB Error: ' . $err[2]]);
         }
     } catch (Exception $e) {
-        echo json_encode(['success' => false, 'message' => $e->getMessage()]);
+        echo json_encode(['success' => false, 'message' => 'System Error: ' . $e->getMessage()]);
     }
 }
 ?>

@@ -175,7 +175,9 @@ function addPayment(clientId, type) {
                 '</div>',
             showCancelButton: true,
             confirmButtonText: 'Save Transaction',
+            showLoaderOnConfirm: true,
             preConfirm: () => {
+                Swal.showLoading();
                 const amount = document.getElementById('pay_amount').value;
                 const date = document.getElementById('pay_date').value;
                 const ref = document.getElementById('pay_ref').value;
