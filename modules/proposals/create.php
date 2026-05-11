@@ -106,8 +106,25 @@ $sizes = $pdo->query("SELECT DISTINCT CONCAT(width, 'x', height) as size FROM si
         </div>
     </div>
 
-    <!-- Media Search Section (Inside Step 1) -->
-    <div class="p-panel" style="max-width: 1100px; margin: 1.5rem auto; border-left: 4px solid var(--primary);">
+    <!-- Single Next Step Button for Step 1 -->
+    <div style="display: flex; justify-content: flex-end; margin: 2rem auto; max-width: 1100px;">
+        <button class="btn btn-primary" onclick="goToStep2()" style="width: 250px; height: 48px; border-radius: 12px; font-weight: 800; font-size: 0.95rem; box-shadow: 0 4px 15px rgba(0,0,0,0.1);">
+            Next Step: Search & Select <i class="fas fa-arrow-right" style="margin-left: 0.75rem;"></i>
+        </button>
+    </div>
+</div>
+
+<!-- STEP 2: Media Selection & Search -->
+<div id="step-2" style="display: none;">
+    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1.5rem;">
+        <button class="btn btn-secondary" onclick="goToStep1()" style="background: white; border: 1px solid #e2e8f0; padding: 0.6rem 1.2rem; border-radius: 8px; font-weight: 700; cursor: pointer; color: #475569; display: flex; align-items: center; gap: 0.5rem;">
+            <i class="fas fa-arrow-left"></i> Back to Details
+        </button>
+        <div style="font-size: 1.1rem; font-weight: 800; color: var(--secondary);">Step 2: Search & Select Media Assets</div>
+    </div>
+
+    <!-- Media Search Section (Now in Step 2) -->
+    <div class="p-panel" style="margin-bottom: 1.5rem; border-left: 4px solid var(--primary);">
         <div style="font-size: 0.75rem; font-weight: 800; color: var(--primary); text-transform: uppercase; margin-bottom: 1rem; display: flex; align-items: center; gap: 0.5rem;">
             <i class="fas fa-search"></i> Media Search Criteria
         </div>
@@ -141,72 +158,49 @@ $sizes = $pdo->query("SELECT DISTINCT CONCAT(width, 'x', height) as size FROM si
                 </div>
             </div>
 
-            <!-- Media Search Criteria -->
-            <div style="display: grid; grid-template-columns: repeat(2, 1fr); gap: 1rem; margin-bottom: 1rem;">
+            <!-- Search Criteria -->
+            <div style="display: grid; grid-template-columns: 2fr 1fr 1fr 1fr 1fr 1fr; gap: 0.75rem; margin-bottom: 1rem; align-items: flex-end;">
                 <div class="form-group" style="margin-bottom: 0;">
-                    <label style="font-size: 0.7rem; font-weight: 800; color: var(--secondary); margin-bottom: 0.3rem; text-transform: uppercase;">Media Type</label>
-                    <select id="media_type" class="p-input" onchange="filterSites()" style="height: 38px;">
-                        <option value="">Select Media Type</option>
-                        <option value="Hoarding">Hoarding</option>
-                        <option value="Unipole">Unipole</option>
-                        <option value="Gantry">Gantry</option>
-                        <option value="BQS">Bus Shelter (BQS)</option>
-                        <option value="DCP">Digital City Panel (DCP)</option>
-                        <option value="LED Screen">LED Screen</option>
+                    <label style="font-size: 0.65rem; font-weight: 800; color: var(--secondary); margin-bottom: 0.3rem; text-transform: uppercase;">Search Site / Code / Area</label>
+                    <input type="text" id="site-search" class="p-input" placeholder="Type to search..." oninput="filterSites()" style="height: 34px; font-size: 0.75rem;">
+                </div>
+                <div class="form-group" style="margin-bottom: 0;">
+                    <label style="font-size: 0.65rem; font-weight: 800; color: var(--secondary); margin-bottom: 0.3rem; text-transform: uppercase;">Media Type</label>
+                    <select id="media_type" class="p-input" onchange="filterSites()" style="height: 34px; font-size: 0.75rem;">
+                        <option value="">All Media</option>
+                        <?php foreach($mediaTypes as $mt): ?> <option value="<?php echo $mt; ?>"><?php echo $mt; ?></option> <?php endforeach; ?>
                     </select>
                 </div>
                 <div class="form-group" style="margin-bottom: 0;">
-                    <label style="font-size: 0.7rem; font-weight: 800; color: var(--secondary); margin-bottom: 0.3rem; text-transform: uppercase;">Light Type</label>
-                    <select id="light_type" class="p-input" onchange="filterSites()" style="height: 38px;">
-                        <option value="">Select Light Type</option>
-                        <option value="FL">Frontlit (FL)</option>
-                        <option value="BL">Backlit (BL)</option>
-                        <option value="NL">Non-Lit (NL)</option>
-                    </select>
-                </div>
-            </div>
-
-            <!-- Location & Size Filters -->
-            <div style="display: grid; grid-template-columns: repeat(3, 1fr); gap: 1rem; margin-bottom: 1rem;">
-                <div class="form-group" style="margin-bottom: 0;">
-                    <label style="font-size: 0.7rem; font-weight: 800; color: var(--secondary); margin-bottom: 0.3rem; text-transform: uppercase;">State</label>
-                    <select id="filter-state" class="p-input" onchange="filterSites()" style="height: 38px;">
-                        <option value="">Select State</option>
+                    <label style="font-size: 0.65rem; font-weight: 800; color: var(--secondary); margin-bottom: 0.3rem; text-transform: uppercase;">State</label>
+                    <select id="filter-state" class="p-input" onchange="filterSites()" style="height: 34px; font-size: 0.75rem;">
+                        <option value="">All States</option>
                         <?php foreach($states as $s): ?> <option value="<?php echo $s; ?>"><?php echo $s; ?></option> <?php endforeach; ?>
                     </select>
                 </div>
                 <div class="form-group" style="margin-bottom: 0;">
-                    <label style="font-size: 0.7rem; font-weight: 800; color: var(--secondary); margin-bottom: 0.3rem; text-transform: uppercase;">City</label>
-                    <select id="filter-city" class="p-input" onchange="filterSites()" style="height: 38px;">
-                        <option value="">Select City</option>
+                    <label style="font-size: 0.65rem; font-weight: 800; color: var(--secondary); margin-bottom: 0.3rem; text-transform: uppercase;">City</label>
+                    <select id="filter-city" class="p-input" onchange="filterSites()" style="height: 34px; font-size: 0.75rem;">
+                        <option value="">All Cities</option>
                         <?php foreach($cities as $c): ?> <option value="<?php echo $c; ?>"><?php echo $c; ?></option> <?php endforeach; ?>
                     </select>
                 </div>
                 <div class="form-group" style="margin-bottom: 0;">
-                    <label style="font-size: 0.7rem; font-weight: 800; color: var(--secondary); margin-bottom: 0.3rem; text-transform: uppercase;">Size</label>
-                    <select id="filter-size" class="p-input" onchange="filterSites()" style="height: 38px;">
-                        <option value="">Select Size</option>
+                    <label style="font-size: 0.65rem; font-weight: 800; color: var(--secondary); margin-bottom: 0.3rem; text-transform: uppercase;">Light</label>
+                    <select id="light_type" class="p-input" onchange="filterSites()" style="height: 34px; font-size: 0.75rem;">
+                        <option value="">All Types</option>
+                        <?php foreach($illuminations as $il): ?> <option value="<?php echo $il; ?>"><?php echo $il; ?></option> <?php endforeach; ?>
+                    </select>
+                </div>
+                <div class="form-group" style="margin-bottom: 0;">
+                    <label style="font-size: 0.65rem; font-weight: 800; color: var(--secondary); margin-bottom: 0.3rem; text-transform: uppercase;">Size</label>
+                    <select id="filter-size" class="p-input" onchange="filterSites()" style="height: 34px; font-size: 0.75rem;">
+                        <option value="">All Sizes</option>
                         <?php foreach($sizes as $sz): ?> <option value="<?php echo $sz; ?>"><?php echo $sz; ?></option> <?php endforeach; ?>
                     </select>
                 </div>
             </div>
         </div>
-    </div>
-
-    <!-- Single Next Step Button for Step 1 -->
-    <div style="display: flex; justify-content: flex-end; margin: 2rem auto; max-width: 1100px;">
-        <button class="btn btn-primary" onclick="goToStep2()" style="width: 250px; height: 48px; border-radius: 12px; font-weight: 800; font-size: 0.95rem; box-shadow: 0 4px 15px rgba(0,0,0,0.1);">
-            Next Step: Select Assets <i class="fas fa-arrow-right" style="margin-left: 0.75rem;"></i>
-        </button>
-    </div>
-</div>
-
-<!-- STEP 2: Asset Selection & Pricing -->
-<div id="step-2" style="display: none;">
-    <div style="margin-bottom: 1.5rem;">
-        <button class="btn btn-secondary" onclick="goToStep1()" style="background: white; border: 1px solid #e2e8f0; padding: 0.6rem 1.2rem; border-radius: 8px; font-weight: 700; cursor: pointer; color: #475569; display: flex; align-items: center; gap: 0.5rem;">
-            <i class="fas fa-arrow-left"></i> Back to Search
-        </button>
     </div>
 
     <!-- Asset Selection Table -->
