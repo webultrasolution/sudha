@@ -69,3 +69,17 @@ Stack trace:
 #0 D:\xampp\htdocs\easy-outdoor-crm\modules\users\index.php(46): PDO->query('SELECT * FROM u...')
 #1 {main}
   thrown in D:\xampp\htdocs\easy-outdoor-crm\modules\users\index.php on line 46
+[12-May-2026 02:31:04 Asia/Kolkata] PHP Warning:  Undefined array key "id" in D:\xampp\htdocs\easy-outdoor-crm\modules\operations\generate_po.php on line 106
+[12-May-2026 02:31:04 Asia/Kolkata] PHP Deprecated:  str_pad(): Passing null to parameter #1 ($string) of type string is deprecated in D:\xampp\htdocs\easy-outdoor-crm\modules\operations\generate_po.php on line 106
+[12-May-2026 02:31:04 Asia/Kolkata] PHP Warning:  Undefined array key "id" in D:\xampp\htdocs\easy-outdoor-crm\modules\operations\generate_po.php on line 215
+[12-May-2026 02:31:04 Asia/Kolkata] PHP Deprecated:  str_pad(): Passing null to parameter #1 ($string) of type string is deprecated in D:\xampp\htdocs\easy-outdoor-crm\modules\operations\generate_po.php on line 215
+[12-May-2026 02:31:04 Asia/Kolkata] PHP Warning:  Undefined array key "days" in D:\xampp\htdocs\easy-outdoor-crm\modules\operations\generate_po.php on line 269
+[12-May-2026 02:31:28 Asia/Kolkata] PHP Warning:  Undefined array key "id" in D:\xampp\htdocs\easy-outdoor-crm\modules\operations\generate_po.php on line 218
+[12-May-2026 02:31:28 Asia/Kolkata] PHP Deprecated:  str_pad(): Passing null to parameter #1 ($string) of type string is deprecated in D:\xampp\htdocs\easy-outdoor-crm\modules\operations\generate_po.php on line 218
+[12-May-2026 02:31:28 Asia/Kolkata] PHP Warning:  Undefined array key "days" in D:\xampp\htdocs\easy-outdoor-crm\modules\operations\generate_po.php on line 272
+[12-May-2026 02:31:40 Asia/Kolkata] PHP Warning:  Undefined array key "id" in D:\xampp\htdocs\easy-outdoor-crm\modules\operations\generate_po.php on line 218
+[12-May-2026 02:31:40 Asia/Kolkata] PHP Deprecated:  str_pad(): Passing null to parameter #1 ($string) of type string is deprecated in D:\xampp\htdocs\easy-outdoor-crm\modules\operations\generate_po.php on line 218
+[12-May-2026 02:31:40 Asia/Kolkata] PHP Warning:  Undefined array key "days" in D:\xampp\htdocs\easy-outdoor-crm\modules\operations\generate_po.php on line 272
+[12-May-2026 02:31:42 Asia/Kolkata] PHP Warning:  Undefined array key "id" in D:\xampp\htdocs\easy-outdoor-crm\modules\operations\generate_po.php on line 218
+[12-May-2026 02:31:42 Asia/Kolkata] PHP Deprecated:  str_pad(): Passing null to parameter #1 ($string) of type string is deprecated in D:\xampp\htdocs\easy-outdoor-crm\modules\operations\generate_po.php on line 218
+[12-May-2026 02:31:42 Asia/Kolkata] PHP Warning:  Undefined array key "days" in D:\xampp\htdocs\easy-outdoor-crm\modules\operations\generate_po.php on line 272

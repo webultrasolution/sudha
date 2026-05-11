@@ -6,41 +6,95 @@ include_once __DIR__ . '/../../includes/functions.php';
 date_default_timezone_set('Asia/Kolkata');
 
 $booking_id = isset($_GET['booking_id']) ? intval($_GET['booking_id']) : 0;
+$proposal_id = isset($_GET['proposal_id']) ? intval($_GET['proposal_id']) : 0;
 $vendor_id = isset($_GET['vendor_id']) ? intval($_GET['vendor_id']) : 0;
+$mode = $_GET['mode'] ?? '';
 
-if (!$booking_id || !$vendor_id) {
-    die("Invalid request parameters.");
+if (!$vendor_id) {
+    die("Invalid request: Vendor ID is required.");
 }
 
-// Fetch Booking & Client Info
-$stmtB = $pdo->prepare("
-    SELECT b.*, c.name as client_name, p.campaign_name, p.proposal_number
-    FROM bookings b
-    JOIN partners c ON b.client_id = c.id
-    LEFT JOIN proposals p ON b.proposal_id = p.id
-    WHERE b.id = ?
-");
-$stmtB->execute([$booking_id]);
-$b = $stmtB->fetch();
-
-// Fetch Vendor Info
+// Fetch Vendor Info (Always required)
 $stmtV = $pdo->prepare("SELECT * FROM partners WHERE id = ? AND type = 'vendor'");
 $stmtV->execute([$vendor_id]);
 $v = $stmtV->fetch();
+if (!$v) die("Vendor not found.");
 
-if (!$b || !$v) {
-    die("Booking or Vendor not found.");
-}
-
-// Fetch Items for this vendor
 $vendor_gst_filter = $_GET['vendor_gst'] ?? '';
-$itemSql = "
-    SELECT bi.*, s.site_code, s.location, s.city, s.width, s.height, s.light_type, s.hsn_code, s.vendor_gst, s.type as media_type
-    FROM booking_items bi
-    JOIN sites s ON bi.site_id = s.id
-    WHERE bi.booking_id = ? AND s.vendor_id = ?
-";
-$itemParams = [$booking_id, $vendor_id];
+
+if ($mode === 'direct') {
+    // Standalone mode: uses provided data instead of DB records
+    $b = [
+        'campaign_name' => $_GET['campaign_name'] ?? 'Direct Campaign',
+        'start_date' => $_GET['start_date'] ?? date('Y-m-d'),
+        'end_date' => $_GET['end_date'] ?? date('Y-m-d', strtotime('+1 month')),
+        'proposal_number' => 'DPO-' . date('ymd') . '-' . rand(10, 99)
+    ];
+    
+    $site_ids = $_GET['site_ids'] ?? [];
+    if (empty($site_ids)) die("No sites selected.");
+    
+    $site_list = implode(',', array_map('intval', $site_ids));
+    $itemSql = "
+        SELECT s.*, s.site_code, s.location, s.city, s.width, s.height, s.light_type, s.hsn_code, s.vendor_gst, s.type as media_type,
+               s.purchase_rate as purchase_amount, ? as start_date, ? as end_date
+        FROM sites s
+        WHERE s.id IN ($site_list) AND s.vendor_id = ?
+    ";
+    $itemParams = [$b['start_date'], $b['end_date'], $vendor_id];
+
+    // Get custom rates if any
+    $custom_rates = $_GET['rates'] ?? [];
+} else {
+    // Normal mode: Fetch from Booking or Proposal
+    if ($booking_id) {
+        $stmtB = $pdo->prepare("
+            SELECT b.*, c.name as client_name, p.campaign_name, p.proposal_number, p.id as prop_id
+            FROM bookings b
+            JOIN partners c ON b.client_id = c.id
+            LEFT JOIN proposals p ON b.proposal_id = p.id
+            WHERE b.id = ?
+        ");
+        $stmtB->execute([$booking_id]);
+        $b = $stmtB->fetch();
+        $proposal_id = $b['prop_id'];
+    } else {
+        $stmtB = $pdo->prepare("
+            SELECT p.*, c.name as client_name, p.proposal_number as prop_no, p.proposal_number
+            FROM proposals p
+            JOIN partners c ON p.client_id = c.id
+            WHERE p.id = ?
+        ");
+        $stmtB->execute([$proposal_id]);
+        $b = $stmtB->fetch();
+        // Normalize fields for PO display
+        $b['campaign_name'] = $b['campaign_name'] ?? 'General Campaign';
+    }
+
+    if (!$b) die("Data not found for the given IDs.");
+
+    // Fetch Items (from proposal_items if booking doesn't exist, or from booking_items)
+    $vendor_gst_filter = $_GET['vendor_gst'] ?? '';
+
+    if ($booking_id) {
+        $itemSql = "
+            SELECT bi.*, s.site_code, s.location, s.city, s.width, s.height, s.light_type, s.hsn_code, s.vendor_gst, s.type as media_type
+            FROM booking_items bi
+            JOIN sites s ON bi.site_id = s.id
+            WHERE bi.booking_id = ? AND s.vendor_id = ?
+        ";
+        $itemParams = [$booking_id, $vendor_id];
+    } else {
+        $itemSql = "
+            SELECT pi.*, s.site_code, s.location, s.city, s.width, s.height, s.light_type, s.hsn_code, s.vendor_gst, s.type as media_type,
+                pi.purchase_rate as purchase_amount, ? as start_date, ? as end_date
+            FROM proposal_items pi
+            JOIN sites s ON pi.site_id = s.id
+            WHERE pi.proposal_id = ? AND s.vendor_id = ?
+        ";
+        $itemParams = [$b['start_date'], $b['end_date'], $proposal_id, $vendor_id];
+    }
+}
 
 if ($vendor_gst_filter !== '') {
     $itemSql .= " AND (s.vendor_gst = ? OR s.vendor_gst IS NULL AND ? = '')";
@@ -52,7 +106,10 @@ $stmtItems = $pdo->prepare($itemSql);
 $stmtItems->execute($itemParams);
 $items = $stmtItems->fetchAll();
 
-$po_number = "PO/" . date('y', strtotime($b['start_date'])) . "-" . date('y', strtotime($b['start_date'] . ' +1 year')) . "/" . str_pad($b['id'], 3, '0', STR_PAD_LEFT);
+// Safe PO Numbering
+$po_id = !empty($b['id']) ? $b['id'] : 0;
+$po_ref = ($po_id > 0) ? str_pad((string)$po_id, 3, '0', STR_PAD_LEFT) : ($b['proposal_number'] ?? 'DPO-' . date('His'));
+$po_number = "PO/" . date('y', strtotime($b['start_date'])) . "-" . date('y', strtotime($b['start_date'] . ' +1 year')) . "/" . $po_ref;
 $po_date = date('d-m-Y');
 
 // Company Settings
@@ -159,9 +216,9 @@ $company_signature = getSetting('company_signature', 'signature.png');
                 <span class="info-value"><?php echo $po_date; ?></span>
             </div>
             <div class="info-row">
-                <span class="info-label">Booking Ref</span>
+                <span class="info-label">Reference</span>
                 <span class="info-sep">:</span>
-                <span class="info-value">#BK-<?php echo str_pad($b['id'], 4, '0', STR_PAD_LEFT); ?></span>
+                <span class="info-value"><?php echo !empty($b['id']) ? '#BK-'.str_pad((string)$b['id'], 4, '0', STR_PAD_LEFT) : ($b['proposal_number'] ?? 'N/A'); ?></span>
             </div>
             <div class="info-row">
                 <span class="info-label">Campaign</span>
@@ -199,6 +256,11 @@ $company_signature = getSetting('company_signature', 'signature.png');
             <?php 
             $net_total = 0;
             foreach ($items as $idx => $item): 
+                // Override with custom rate if in direct mode
+                if ($mode === 'direct' && isset($custom_rates[$item['id']])) {
+                    $item['purchase_amount'] = floatval($custom_rates[$item['id']]);
+                }
+                
                 $net_total += $item['purchase_amount'];
                 $sDate = (!empty($item['start_date']) && $item['start_date'] != '0000-00-00') ? $item['start_date'] : $b['start_date'];
                 $eDate = (!empty($item['end_date']) && $item['end_date'] != '0000-00-00') ? $item['end_date'] : $b['end_date'];
@@ -215,7 +277,12 @@ $company_signature = getSetting('company_signature', 'signature.png');
                     <?php echo date('d.m.Y', strtotime($sDate)); ?> to<br>
                     <?php echo date('d.m.Y', strtotime($eDate)); ?>
                 </td>
-                <td><?php echo $item['days']; ?></td>
+                <td><?php 
+                    $date1 = date_create($sDate);
+                    $date2 = date_create($eDate);
+                    $diff = date_diff($date1, $date2);
+                    echo ($diff->days + 1); 
+                ?></td>
                 <td style="text-align: right; padding-right: 10px; font-weight: bold;"><?php echo number_format($item['purchase_amount'], 2); ?></td>
             </tr>
             <?php endforeach; ?>
