@@ -41,8 +41,12 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         ];
 
         if ($stmt->execute($params)) {
+            file_put_contents(__DIR__ . '/../pay_debug.log', "INSERT Success. ID: " . $pdo->lastInsertId() . PHP_EOL, FILE_APPEND);
+            
             // Update Invoice Status if linked
             if ($invoice_id) {
+                file_put_contents(__DIR__ . '/../pay_debug.log', "Updating Invoice: $invoice_id" . PHP_EOL, FILE_APPEND);
+                
                 $paidStmt = $pdo->prepare("SELECT SUM(amount) FROM payments WHERE invoice_id = ?");
                 $paidStmt->execute([$invoice_id]);
                 $totalPaid = floatval($paidStmt->fetchColumn());
@@ -54,6 +58,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 $status = ($totalPaid >= $invTotal) ? 'paid' : 'partially_paid';
                 $upd = $pdo->prepare("UPDATE invoices SET payment_status = ? WHERE id = ?");
                 $upd->execute([$status, $invoice_id]);
+                
+                file_put_contents(__DIR__ . '/../pay_debug.log', "Invoice Updated to $status" . PHP_EOL, FILE_APPEND);
             }
             echo json_encode(['success' => true]);
         } else {
