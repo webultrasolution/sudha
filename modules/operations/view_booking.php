@@ -189,6 +189,7 @@ foreach ($items as $item) {
                 <th>Period</th>
                 <th>Cost / Margin</th>
                 <th style="text-align: right;">Selling Cost</th>
+                <th style="text-align: right; width: 50px;">Action</th>
             </tr>
         </thead>
         <tbody>
@@ -274,6 +275,11 @@ foreach ($items as $item) {
                     <?php endif; ?>
                 </td>
                 <td style="font-weight: 800; color: #0f172a; text-align: right; font-size: 1rem;"><?php echo formatCurrency($item['amount']); ?></td>
+                <td style="text-align: right;">
+                    <button onclick="deleteItem(<?php echo $item['id']; ?>)" style="background: none; border: none; color: #ef4444; cursor: pointer; padding: 0.5rem;" title="Remove Site from Booking">
+                        <i class="fas fa-trash-alt"></i>
+                    </button>
+                </td>
             </tr>
             <?php endforeach; ?>
         </tbody>
@@ -298,6 +304,33 @@ foreach ($items as $item) {
 </style>
 
 <script>
+function deleteItem(itemId) {
+    Swal.fire({
+        title: 'Remove this site?',
+        text: "This will remove the site from the booking and delete associated operation tasks. Are you sure?",
+        icon: 'warning',
+        showCancelButton: true,
+        confirmButtonColor: '#ef4444',
+        confirmButtonText: 'Yes, delete it'
+    }).then((result) => {
+        if (result.isConfirmed) {
+            fetch('../../ajax/delete_booking_item.php', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+                body: `id=${itemId}`
+            })
+            .then(r => r.json())
+            .then(res => {
+                if(res.success) {
+                    location.reload();
+                } else {
+                    Swal.fire('Error', res.message, 'error');
+                }
+            });
+        }
+    });
+}
+
 function sendPOEmail(bookingId, vendorId) {
     Swal.fire({
         title: 'Sending PO...',

@@ -237,7 +237,7 @@ $taMarkupPct = ($taCost > 0) ? ($taMarkup / $taCost) * 100 : 0;
                 </td>
                 <td style="font-weight: 800; color: var(--primary); text-align: right; font-size: 1rem;"><?php echo formatCurrency($item['amount']); ?></td>
                 <td style="text-align: right;">
-                    <button class="btn-icon" style="color: #ef4444; cursor: pointer; border: none; background: transparent; font-size: 1rem;"><i class="fas fa-trash-alt"></i></button>
+                    <button class="btn-icon" onclick="deleteItem(<?php echo $item['id']; ?>)" style="color: #ef4444; cursor: pointer; border: none; background: transparent; font-size: 1rem;"><i class="fas fa-trash-alt"></i></button>
                 </td>
             </tr>
             <?php endforeach; ?>
@@ -331,6 +331,33 @@ function updateItem(itemId, field, val) {
         headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
         body: `id=${itemId}&field=${field}&value=${val}`
     }).then(() => location.reload());
+}
+
+function deleteItem(itemId) {
+    Swal.fire({
+        title: 'Remove this site?',
+        text: "This asset will be removed from the proposal.",
+        icon: 'warning',
+        showCancelButton: true,
+        confirmButtonColor: '#ef4444',
+        confirmButtonText: 'Yes, delete it'
+    }).then((result) => {
+        if (result.isConfirmed) {
+            fetch('../../ajax/delete_proposal_item.php', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+                body: `id=${itemId}`
+            })
+            .then(r => r.json())
+            .then(res => {
+                if(res.success) {
+                    location.reload();
+                } else {
+                    Swal.fire('Error', res.message, 'error');
+                }
+            });
+        }
+    });
 }
 
 function confirmProposal(id) {

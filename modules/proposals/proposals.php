@@ -104,7 +104,7 @@ $proposals = $proposals->fetchAll();
                     </td>
                     <td style="text-align: right;">
                         <div class="dropdown" style="display: inline-block;">
-                            <button class="btn-icon" style="color: var(--primary); background: #f0fdfa; border-radius: 8px; width: 32px; height: 32px;" title="Export Options"><i class="fas fa-file-export"></i></button>
+                            <button class="btn-icon btn-view" title="Export Options"><i class="fas fa-file-export"></i></button>
                             <div class="dropdown-content">
                                 <div style="font-size: 0.6rem; font-weight: 800; color: #94a3b8; padding: 0.5rem 0.8rem; text-transform: uppercase; letter-spacing: 0.05em;">Client Documents</div>
                                 <a href="export_pdf.php?id=<?php echo $p['id']; ?>" target="_blank"><i class="fas fa-file-pdf" style="color: #ef4444;"></i> Visual Media Plan (PDF)</a>
@@ -117,8 +117,8 @@ $proposals = $proposals->fetchAll();
                                 <a href="download_photos.php?id=<?php echo $p['id']; ?>"><i class="fas fa-images" style="color: #8b5cf6;"></i> Download Photos</a>
                             </div>
                         </div>
-                        <a href="view.php?id=<?php echo $p['id']; ?>" class="btn-icon" title="Workspace" style="background: #f8fafc; border-radius: 8px; width: 32px; height: 32px; color: #64748b;"><i class="fas fa-layer-group"></i></a>
-                        <button class="btn-icon" style="background: #fef2f2; border-radius: 8px; width: 32px; height: 32px; color: #ef4444;" onclick="deleteProposal(<?php echo $p['id']; ?>)"><i class="fas fa-trash"></i></button>
+                        <a href="view.php?id=<?php echo $p['id']; ?>" class="btn-icon btn-view" title="Workspace" style="color: #64748b;"><i class="fas fa-layer-group"></i></a>
+                        <button class="btn-icon btn-delete" onclick="deleteProposal(<?php echo $p['id']; ?>)"><i class="fas fa-trash"></i></button>
                     </td>
                 </tr>
                 <?php endforeach; ?>
@@ -130,12 +130,8 @@ $proposals = $proposals->fetchAll();
 
 <style>
 .status-pill { padding: 0.25rem 0.625rem; border-radius: 9999px; font-size: 0.75rem; font-weight: 500; }
-.status-draft { background: #f1f5f9; color: #475569; }
-.status-sent { background: #e0f2fe; color: #0369a1; }
 .status-confirmed { background: #dcfce7; color: #166534; }
 .status-cancelled { background: #fee2e2; color: #991b1b; }
-.btn-icon { color: var(--secondary); background: none; border: none; cursor: pointer; text-decoration: none; margin-right: 0.25rem; transition: color 0.2s; padding: 0.25rem; display: inline-flex; align-items: center; justify-content: center; }
-.btn-icon:hover { color: var(--primary); }
 
 /* Improved Dropdown styling */
 .dropdown { position: relative; }

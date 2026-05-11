@@ -236,9 +236,9 @@ $vendors = $pdo->query("SELECT id, name FROM partners WHERE type = 'vendor' ORDE
                         <div style="font-weight: 600; color: #475569; font-size: 0.8rem;"><?php echo date('d M Y', strtotime($s['available_from'])); ?></div>
                     </td>
                     <td data-label="Status"><span class="status-pill <?php echo $s['status']; ?>"><?php echo ucfirst($s['status']); ?></span></td>
-                    <td data-label="Actions" style="text-align: right;">
-                        <button class="btn-icon" onclick="editSite(<?php echo htmlspecialchars(json_encode($s)); ?>)" style="color: var(--primary);"><i class="fas fa-edit"></i></button>
-                        <button class="btn-icon" style="color: #ef4444;" onclick="deleteSite(event, <?php echo $s['id']; ?>)"><i class="fas fa-trash"></i></button>
+                    <td data-label="Actions" style="text-align: right; white-space: nowrap;">
+                        <button class="btn-icon btn-edit" onclick="editSite(<?php echo htmlspecialchars(json_encode($s)); ?>)" title="Edit"><i class="fas fa-edit"></i></button>
+                        <button class="btn-icon btn-delete" onclick="deleteSite(event, <?php echo $s['id']; ?>)" title="Delete"><i class="fas fa-trash"></i></button>
                     </td>
                 </tr>
                 <?php endforeach; ?>

@@ -130,16 +130,27 @@ function assignMounter(opId, mounterId) {
 }
 
 function markCompleted(opId) {
-    if(!confirm('Mark this task as completed?')) return;
-    
-    fetch('../../ajax/update_op_status.php', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ op_id: opId, status: 'completed' })
-    })
-    .then(r => r.json())
-    .then(data => {
-        if (data.success) location.reload();
+    Swal.fire({
+        title: 'Task Completed?',
+        text: "Are you sure you want to mark this task as completed?",
+        icon: 'question',
+        showCancelButton: true,
+        confirmButtonColor: '#10b981',
+        confirmButtonText: 'Yes, Mark Completed'
+    }).then((result) => {
+        if (result.isConfirmed) {
+            fetch('../../ajax/update_op_status.php', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ op_id: opId, status: 'completed' })
+            })
+            .then(r => r.json())
+            .then(data => {
+                if (data.success) {
+                    Swal.fire('Success', 'Task marked as completed.', 'success').then(() => location.reload());
+                }
+            });
+        }
     });
 }
 

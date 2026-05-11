@@ -1,0 +1,56 @@
+<?php
+include_once __DIR__ . '/../config/db.php';
+include_once __DIR__ . '/../includes/functions.php';
+
+header('Content-Type: application/json');
+
+if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
+    echo json_encode(['success' => false, 'message' => 'Invalid request method']);
+    exit;
+}
+
+$id = isset($_POST['id']) ? intval($_POST['id']) : 0;
+
+if (!$id) {
+    echo json_encode(['success' => false, 'message' => 'Missing ID']);
+    exit;
+}
+
+try {
+    // Get proposal_id to update totals later if needed
+    $stmt = $pdo->prepare("SELECT proposal_id FROM proposal_items WHERE id = ?");
+    $stmt->execute([$id]);
+    $item = $stmt->fetch();
+    
+    if (!$item) {
+        echo json_encode(['success' => false, 'message' => 'Item not found']);
+        exit;
+    }
+    
+    $proposalId = $item['proposal_id'];
+
+    $pdo->prepare("DELETE FROM proposal_items WHERE id = ?")->execute([$id]);
+
+    // Recalculate proposal totals
+    $stmtSums = $pdo->prepare("SELECT SUM(amount) as subtotal FROM proposal_items WHERE proposal_id = ?");
+    $stmtSums->execute([$proposalId]);
+    $sums = $stmtSums->fetch();
+    $newSubtotal = $sums['subtotal'] ?: 0;
+    
+    // Get existing proposal to keep discount pct
+    $stmtP = $pdo->prepare("SELECT discounting_pct, printing_cost, mounting_cost FROM proposals WHERE id = ?");
+    $stmtP->execute([$proposalId]);
+    $p = $stmtP->fetch();
+    
+    $discountVal = $newSubtotal * ($p['discounting_pct'] / 100);
+    $taxable = $newSubtotal - $discountVal + $p['printing_cost'] + $p['mounting_cost'];
+    $tax = $taxable * 0.18;
+    $grand = $taxable + $tax;
+
+    $stmtUpdate = $pdo->prepare("UPDATE proposals SET total_amount = ?, tax_amount = ?, grand_total = ? WHERE id = ?");
+    $stmtUpdate->execute([$newSubtotal, $tax, $grand, $proposalId]);
+
+    echo json_encode(['success' => true]);
+} catch (PDOException $e) {
+    echo json_encode(['success' => false, 'message' => 'Database error: ' . $e->getMessage()]);
+}

@@ -93,7 +93,8 @@ let campaignSites = [];
 
 function goToStep(step) {
     if (step === 2 && !document.getElementById('campaign_id').value) {
-        alert('Please select a campaign.'); return;
+        Swal.fire('Selection Required', 'Please select a campaign before proceeding.', 'warning');
+        return;
     }
     
     document.querySelectorAll('.wizard-step').forEach(s => s.style.display = 'none');
@@ -216,7 +217,7 @@ function finalizePO() {
             Swal.fire('PO Generated', 'Purchase Order #' + res.po_number + ' has been created successfully.', 'success')
             .then(() => window.location.href = 'purchase_orders.php');
         } else {
-            alert('Error: ' + res.message);
+            Swal.fire('Error', res.message, 'error');
             btn.disabled = false;
             btn.innerHTML = '<i class="fas fa-check-circle"></i> Confirm & Generate PO';
         }

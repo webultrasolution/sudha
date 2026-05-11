@@ -76,8 +76,8 @@ $bookings = $pdo->query("
                         </span>
                     </td>
                     <td>
-                        <a href="mounting.php?booking_id=<?php echo $b['id']; ?>" class="btn-icon" title="View Operations"><i class="fas fa-clipboard-list"></i></a>
-                        <button class="btn-icon" style="color: var(--danger);" onclick="deleteBooking(<?php echo $b['id']; ?>)"><i class="fas fa-trash"></i></button>
+                        <a href="mounting.php?booking_id=<?php echo $b['id']; ?>" class="btn-icon btn-view" title="View Operations"><i class="fas fa-clipboard-list"></i></a>
+                        <button class="btn-icon btn-delete" onclick="deleteBooking(<?php echo $b['id']; ?>)"><i class="fas fa-trash"></i></button>
                     </td>
                 </tr>
                 <?php endforeach; ?>

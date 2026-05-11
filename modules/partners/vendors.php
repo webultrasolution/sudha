@@ -114,9 +114,9 @@ $indian_states = ["Andhra Pradesh", "Arunachal Pradesh", "Assam", "Bihar", "Chha
                 <td><span class="badge" style="background: #e0f2fe; color: #0369a1; padding: 0.25rem 0.5rem; border-radius: 4px; font-weight: 600;"><?php echo $v['site_count']; ?> Sites</span></td>
                 <td><?php echo $v['city']; ?>, <?php echo $v['state']; ?></td>
                 <td>
-                    <a href="../operations/direct_po.php?vendor_id=<?php echo $v['id']; ?>" class="btn-icon" title="Direct PO (No Proposal)" style="color: #6366f1; background: #e0e7ff; border-radius: 6px; width: 30px; height: 30px; margin-right: 5px;"><i class="fas fa-file-signature"></i></a>
-                    <button class="btn-icon" onclick="editVendor(<?php echo htmlspecialchars(json_encode($v)); ?>)"><i class="fas fa-edit"></i></button>
-                    <button class="btn-icon" style="color: var(--danger);" onclick="deleteVendor(<?php echo $v['id']; ?>)"><i class="fas fa-trash"></i></button>
+                    <a href="../operations/direct_po.php?vendor_id=<?php echo $v['id']; ?>" class="btn-icon btn-view" title="Direct PO (No Proposal)"><i class="fas fa-file-signature"></i></a>
+                    <button class="btn-icon btn-edit" onclick="editVendor(<?php echo htmlspecialchars(json_encode($v)); ?>)" title="Edit"><i class="fas fa-edit"></i></button>
+                    <button class="btn-icon btn-delete" onclick="deleteVendor(<?php echo $v['id']; ?>)" title="Delete"><i class="fas fa-trash"></i></button>
                 </td>
             </tr>
             <?php endforeach; ?>

@@ -29,14 +29,14 @@ $pType = $partner['type']; // 'client' or 'vendor'
 // Fetch all Bills (Debits)
 if ($pType == 'client') {
     $stmtInv = $pdo->prepare("
-        SELECT 'invoice' as type, i.created_at as date, invoice_number as ref, i.total_amount as debit, 0 as credit 
+        SELECT id, 'invoice' as type, i.created_at as date, invoice_number as ref, i.total_amount as debit, 0 as credit 
         FROM invoices i
         JOIN bookings b ON i.booking_id = b.id
         WHERE b.client_id = ?
     ");
 } else {
     $stmtInv = $pdo->prepare("
-        SELECT 'po' as type, po_date as date, po_number as ref, total_amount as debit, 0 as credit 
+        SELECT id, 'po' as type, po_date as date, po_number as ref, total_amount as debit, 0 as credit 
         FROM purchase_orders 
         WHERE vendor_id = ?
     ");
@@ -48,7 +48,7 @@ $bills = $stmtInv->fetchAll();
 $pMode = ($pType == 'client') ? 'receivable' : 'payable';
 $dbType = ($pType == 'client') ? 'credit' : 'debit';
 $stmtPay = $pdo->prepare("
-    SELECT 'payment' as type, payment_date as date, transaction_id as ref, 0 as debit, amount as credit 
+    SELECT id, 'payment' as type, payment_date as date, transaction_id as ref, 0 as debit, amount as credit 
     FROM payments 
     WHERE partner_id = ? AND type = ?
 ");
@@ -88,6 +88,7 @@ $balance = 0;
                 <th style="padding: 1rem; text-align: right; font-size: 0.75rem; text-transform: uppercase; color: #64748b; font-weight: 800;"><?php echo ($pType == 'client') ? 'Debit (Billed)' : 'Credit (Bill Recd)'; ?></th>
                 <th style="padding: 1rem; text-align: right; font-size: 0.75rem; text-transform: uppercase; color: #64748b; font-weight: 800;"><?php echo ($pType == 'client') ? 'Credit (Paid)' : 'Debit (Paid Out)'; ?></th>
                 <th style="padding: 1rem; text-align: right; font-size: 0.75rem; text-transform: uppercase; color: #64748b; font-weight: 800;">Balance</th>
+                <th style="padding: 1rem; text-align: right; font-size: 0.75rem; text-transform: uppercase; color: #64748b; font-weight: 800;">Action</th>
             </tr>
         </thead>
         <tbody>
@@ -121,6 +122,13 @@ $balance = 0;
                 <td style="padding: 1rem; text-align: right; font-weight: 800; color: <?php echo $balance > 0 ? '#e11d48' : '#059669'; ?>;">
                     <?php echo formatCurrency(abs($balance)); ?> <?php echo $balance > 0 ? 'DUE' : 'ADV'; ?>
                 </td>
+                <td style="padding: 1rem; text-align: right;">
+                    <?php if ($item['type'] === 'payment'): ?>
+                        <button onclick="deletePayment(<?php echo $item['id']; ?>)" class="btn-icon btn-delete" title="Delete Payment">
+                            <i class="fas fa-trash-alt"></i>
+                        </button>
+                    <?php endif; ?>
+                </td>
             </tr>
             <?php endforeach; ?>
         </tbody>
@@ -130,6 +138,7 @@ $balance = 0;
                 <td style="padding: 1rem; text-align: right; font-weight: 900; font-size: 1.1rem; color: <?php echo $balance > 0 ? '#e11d48' : '#059669'; ?>;">
                     <?php echo formatCurrency(abs($balance)); ?> <?php echo $balance > 0 ? 'OUTSTANDING' : 'ADVANCE'; ?>
                 </td>
+                <td></td>
             </tr>
         </tfoot>
     </table>
@@ -224,6 +233,32 @@ function addPayment(clientId, type) {
                 });
             }
         });
+    });
+}
+function deletePayment(id) {
+    Swal.fire({
+        title: 'Delete this transaction?',
+        text: "This will remove the payment entry from the ledger. Are you sure?",
+        icon: 'warning',
+        showCancelButton: true,
+        confirmButtonColor: '#ef4444',
+        confirmButtonText: 'Yes, delete it'
+    }).then((result) => {
+        if (result.isConfirmed) {
+            fetch('../../ajax/delete_payment.php', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+                body: `id=${id}`
+            })
+            .then(r => r.json())
+            .then(res => {
+                if(res.success) {
+                    location.reload();
+                } else {
+                    Swal.fire('Error', res.message, 'error');
+                }
+            });
+        }
     });
 }
 </script>
