@@ -359,7 +359,7 @@ $sizes = $pdo->query("SELECT DISTINCT CONCAT(width, 'x', height) as size FROM si
 
     <!-- SELECTION BUCKET (Slide-out Drawer) -->
     <div id="bucket-backdrop" onclick="closeBucket()" style="position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.4); backdrop-filter: blur(4px); z-index: 2000; display: none;"></div>
-    <div id="selection-bucket-panel" style="position: fixed; top: 0; right: -850px; width: 850px; height: 100%; background: white; z-index: 2001; box-shadow: -10px 0 30px rgba(0,0,0,0.1); transition: all 0.4s cubic-bezier(0.4, 0, 0.2, 1); display: flex; flex-direction: column;">
+    <div id="selection-bucket-panel" style="position: fixed; top: 0; right: -1400px; width: 1400px; max-width: 95vw; height: 100%; background: white; z-index: 2001; box-shadow: -10px 0 30px rgba(0,0,0,0.1); transition: all 0.4s cubic-bezier(0.4, 0, 0.2, 1); display: flex; flex-direction: column;">
         <div class="p-header" style="display: flex; justify-content: space-between; align-items: center; padding: 1.5rem; background: #059669; color: white; border: none; margin: 0;">
             <div style="display: flex; align-items: center; gap: 1rem;">
                 <i class="fas fa-shopping-basket" style="font-size: 1.2rem;"></i>
@@ -883,7 +883,9 @@ function toggleSite(id) {
         const location = row.dataset.location;
         const area = row.querySelector('.location-area') ? row.querySelector('.location-area').innerText : '';
 
-        selectedSites.push({ id, name, cardRate: rate, purchaseRate: prate, saleRate: rate, owner, sqft, city, state, type, illumination, thumbnail, width, height, vendorName, siteCode, area, location });
+        const allImages = row.dataset.images;
+
+        selectedSites.push({ id, name, cardRate: rate, purchaseRate: prate, saleRate: rate, owner, sqft, city, state, type, illumination, thumbnail, allImages, width, height, vendorName, siteCode, area, location });
         if(row) row.classList.add('selected');
         if(chk) chk.checked = true;
         if(input) input.disabled = false;
@@ -917,7 +919,7 @@ function openBucket() {
 }
 
 function closeBucket() {
-    document.getElementById('selection-bucket-panel').style.right = '-850px';
+    document.getElementById('selection-bucket-panel').style.right = '-1400px';
     document.getElementById('bucket-backdrop').style.display = 'none';
     document.body.style.overflow = '';
 }
@@ -942,59 +944,72 @@ function updateBucketUI() {
         <table class="crs-table selection-table" style="width: 100%; border-collapse: separate; border-spacing: 0 0.5rem;">
             <thead>
                 <tr style="border-bottom: 2px solid #f1f5f9;">
-                    <th style="width: 40px; padding: 1.2rem 1rem;">#</th>
-                    <th style="width: 50px; padding: 1.2rem 1rem;">ACT</th>
-                    <th style="width: 100px; padding: 1.2rem 1rem;">PREVIEW</th>
-                    <th style="padding: 1.2rem 1rem;">CITY / CODE</th>
-                    <th style="padding: 1.2rem 1rem;">ASSET DETAILS</th>
-                    <th style="padding: 1.2rem 1rem;">SIZE</th>
-                    <th style="padding: 1.2rem 1rem;">PRICING</th>
-                    <th style="padding: 1.2rem 1rem;">OFFER RATE</th>
-                    <th style="padding: 1.2rem 1rem; text-align: right;">TOTAL</th>
+                    <th style="width: 40px; padding: 0.8rem 1rem;">#</th>
+                    <th style="width: 50px; padding: 0.8rem 1rem;">ACT</th>
+                    <th style="width: 100px; padding: 0.8rem 1rem;">PREVIEW</th>
+                    <th style="padding: 0.8rem 1rem;">CITY / CODE</th>
+                    <th style="padding: 0.8rem 1rem;">ASSET DETAILS</th>
+                    <th style="padding: 0.8rem 1rem;">SIZE</th>
+                    <th style="padding: 0.8rem 1rem;">PRICING</th>
+                    <th style="padding: 0.8rem 1rem;">OFFER RATE</th>
+                    <th style="padding: 0.8rem 1rem; text-align: right;">TOTAL</th>
                 </tr>
             </thead>
             <tbody>
     `;
 
     selectedSites.forEach((site, index) => {
+        const imgList = (site.allImages || "").split(',').filter(i => i.trim() !== "");
+        const imgCount = imgList.length;
+
         const previewHtml = site.thumbnail 
-            ? `<img src="../../uploads/sites/${site.thumbnail}" class="site-thumb" style="width: 100px; height: 65px; border-radius: 12px; object-fit: cover; border: 1px solid #e2e8f0; box-shadow: 0 4px 10px rgba(0,0,0,0.05);">`
-            : `<div style="width: 100px; height: 65px; border-radius: 12px; background: #f8fafc; border: 1px dashed #e2e8f0; display: flex; align-items: center; justify-content: center; font-size: 0.7rem; color: #94a3b8; font-weight: 700;">No Img</div>`;
+            ? ` <div style="position: relative; width: 80px; height: 50px;">
+                    <img src="<?php echo BASE_URL; ?>uploads/sites/${site.thumbnail}" 
+                         onclick="openLightboxSlider('${site.allImages}')" 
+                         class="site-thumb" 
+                         style="width: 100%; height: 100%; border-radius: 8px; object-fit: cover; border: 1px solid #e2e8f0; cursor: pointer; transition: transform 0.2s;">
+                    ${imgCount > 1 ? `
+                        <div style="position: absolute; bottom: 4px; right: 4px; background: rgba(0,0,0,0.7); color: white; font-size: 0.5rem; padding: 1px 4px; border-radius: 3px; font-weight: 800; backdrop-filter: blur(2px);">
+                            <i class="fas fa-images"></i> ${imgCount}
+                        </div>
+                    ` : ''}
+                </div>`
+            : `<div style="width: 80px; height: 50px; border-radius: 8px; background: #f8fafc; border: 1px dashed #e2e8f0; display: flex; align-items: center; justify-content: center; font-size: 0.6rem; color: #94a3b8; font-weight: 700;">No Img</div>`;
 
         html += `
             <tr class="site-row selected" style="background: white; transition: all 0.2s;" id="bucket-row-${site.id}">
-                <td class="sno-cell" style="padding: 1.5rem 1rem; font-weight: 700; color: #64748b;">${index + 1}</td>
+                <td class="sno-cell" style="padding: 0.6rem 1rem; font-weight: 700; color: #64748b;">${index + 1}</td>
                 
-                <td style="padding: 1.5rem 1rem; text-align: center;">
-                    <button onclick="toggleSite('${site.id}')" style="background: #fee2e2; color: #ef4444; border: none; width: 32px; height: 32px; border-radius: 8px; cursor: pointer; display: flex; align-items: center; justify-content: center; transition: all 0.2s;">
-                        <i class="fas fa-trash-alt"></i>
+                <td style="padding: 0.6rem 1rem; text-align: center;">
+                    <button onclick="toggleSite('${site.id}')" style="background: #fee2e2; color: #ef4444; border: none; width: 28px; height: 28px; border-radius: 6px; cursor: pointer; display: flex; align-items: center; justify-content: center; transition: all 0.2s;">
+                        <i class="fas fa-trash-alt" style="font-size: 0.75rem;"></i>
                     </button>
                 </td>
 
-                <td style="padding: 1.5rem 1rem;">
+                <td style="padding: 0.6rem 1rem;">
                     ${previewHtml}
                 </td>
 
-                <td style="padding: 1.5rem 1rem;">
-                    <div style="font-weight: 800; color: #1e293b; font-size: 0.9rem; margin-bottom: 2px;">${site.city}, ${site.state}</div>
-                    <div style="color: #f97316; font-size: 0.75rem; font-weight: 800; letter-spacing: 0.02em;">${site.siteCode}</div>
+                <td style="padding: 0.6rem 1rem;">
+                    <div style="font-weight: 800; color: #1e293b; font-size: 0.8rem; margin-bottom: 1px;">${site.city}</div>
+                    <div style="color: #f97316; font-size: 0.65rem; font-weight: 800;">${site.siteCode}</div>
                 </td>
 
-                <td style="padding: 1.5rem 1rem;">
-                    <div style="font-weight: 800; color: #1e293b; font-size: 0.9rem; margin-bottom: 2px;">${site.name}</div>
-                    <div style="font-size: 0.75rem; color: #64748b; margin-bottom: 6px;">${site.location}</div>
-                    <div style="display: flex; gap: 0.4rem; align-items: center;">
-                        <span style="background: #ecfdf5; color: #059669; padding: 0.2rem 0.6rem; border-radius: 6px; font-size: 0.6rem; font-weight: 800; text-transform: uppercase;">${site.type}</span>
-                        <span style="background: #f1f5f9; color: #475569; padding: 0.2rem 0.6rem; border-radius: 6px; font-size: 0.6rem; font-weight: 800; text-transform: uppercase;">${site.illumination}</span>
-                        <span style="background: #f1f5f9; color: #475569; padding: 0.2rem 0.6rem; border-radius: 6px; font-size: 0.6rem; font-weight: 800; text-transform: uppercase;">
+                <td style="padding: 0.6rem 1rem;">
+                    <div style="font-weight: 800; color: #1e293b; font-size: 0.8rem; margin-bottom: 1px;">${site.name}</div>
+                    <div style="font-size: 0.65rem; color: #64748b; margin-bottom: 4px; line-height: 1.1;">${site.location}</div>
+                    <div style="display: flex; gap: 0.3rem; align-items: center;">
+                        <span style="background: #ecfdf5; color: #059669; padding: 0.1rem 0.4rem; border-radius: 4px; font-size: 0.55rem; font-weight: 800; text-transform: uppercase;">${site.type}</span>
+                        <span style="background: #f1f5f9; color: #475569; padding: 0.1rem 0.4rem; border-radius: 4px; font-size: 0.55rem; font-weight: 800; text-transform: uppercase;">${site.illumination}</span>
+                        <span style="background: #f1f5f9; color: #475569; padding: 0.1rem 0.4rem; border-radius: 4px; font-size: 0.55rem; font-weight: 800; text-transform: uppercase;">
                             ${site.owner}${site.owner === 'TA' && site.vendorName ? ' - ' + site.vendorName : ''}
                         </span>
                     </div>
                 </td>
 
-                <td style="padding: 1.5rem 1rem;">
-                    <div style="font-weight: 800; color: #1e293b; font-size: 0.9rem; margin-bottom: 2px;">${site.width}' x ${site.height}'</div>
-                    <div style="font-size: 0.75rem; color: #94a3b8; font-weight: 700;">${site.sqft.toLocaleString()} SQFT</div>
+                <td style="padding: 0.6rem 1rem;">
+                    <div style="font-weight: 800; color: #1e293b; font-size: 0.8rem; margin-bottom: 1px;">${site.width}' x ${site.height}'</div>
+                    <div style="font-size: 0.65rem; color: #94a3b8; font-weight: 700;">${site.sqft.toLocaleString()} SQFT</div>
                 </td>
 
                 <td style="padding: 1.5rem 1rem;">
