@@ -48,11 +48,11 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
         // 2. Insert Proposal
         $stmt = $pdo->prepare("INSERT INTO proposals 
-            (proposal_number, campaign_name, media_type, inventory_type, light_type, client_id, contact_person, start_date, end_date, total_days, remark,
+            (proposal_number, campaign_name, media_type, inventory_type, light_type, client_id, billing_gstin, contact_person, start_date, end_date, total_days, remark,
              printing_cost, mounting_cost, 
              ha_markup_amount, ta_markup_amount, total_sqft, price_per_sqft, display_cost, 
              total_amount, tax_amount, grand_total, status, created_by) 
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'sent', ?)");
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'sent', ?)");
             
         $stmt->execute([
             $propNum,
@@ -61,6 +61,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             $data['inventoryType'] ?? '',
             $data['lightType'] ?? '',
             $data['clientId'],
+            $data['selectedGstin'] ?? null,
             $data['contactPerson'] ?? '',
             $data['startDate'],
             $data['endDate'],

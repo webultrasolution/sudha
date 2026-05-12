@@ -236,4 +236,37 @@ function getSetting($key, $default = '') {
     
     return $settings[$key] ?? $default;
 }
+
+/**
+ * Get active business entity / content
+ */
+function getActiveEntity() {
+    global $pdo;
+    if (session_status() === PHP_SESSION_NONE) session_start();
+    
+    // Handle switching
+    if (isset($_GET['set_entity'])) {
+        $_SESSION['active_entity_id'] = (int)$_GET['set_entity'];
+        // Remove the parameter and redirect
+        $clean_url = strtok($_SERVER['REQUEST_URI'], '?');
+        header("Location: " . $clean_url);
+        exit;
+    }
+
+    if (!isset($_SESSION['active_entity_id'])) {
+        $stmt = $pdo->query("SELECT id FROM entities LIMIT 1");
+        $id = $stmt->fetchColumn();
+        if ($id) {
+            $_SESSION['active_entity_id'] = $id;
+        }
+    }
+
+    if (isset($_SESSION['active_entity_id'])) {
+        $stmt = $pdo->prepare("SELECT * FROM entities WHERE id = ?");
+        $stmt->execute([$_SESSION['active_entity_id']]);
+        return $stmt->fetch(PDO::FETCH_ASSOC);
+    }
+    
+    return null;
+}
 ?>

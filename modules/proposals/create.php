@@ -83,6 +83,24 @@ $sizes = $pdo->query("SELECT DISTINCT CONCAT(width, 'x', height) as size FROM si
                     <?php endforeach; ?>
                 </select>
             </div>
+            <!-- GST Selection for Group Companies -->
+            <div id="gst_selection_container" style="display: none; grid-column: span 3; margin-top: 0.5rem; background: #f0fdfa; padding: 1rem; border-radius: 12px; border: 1px solid #ccfbf1; box-shadow: inset 0 2px 4px rgba(0,0,0,0.05);">
+                <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 0.75rem;">
+                    <label style="color: var(--primary); font-weight: 800; font-size: 0.7rem; margin-bottom: 0; display: block; text-transform: uppercase;">
+                        <i class="fas fa-id-card"></i> Billing GSTIN / State Selection
+                    </label>
+                    <span id="gst_count_badge" style="background: var(--primary); color: white; font-size: 0.65rem; padding: 2px 8px; border-radius: 50px; font-weight: 700;"></span>
+                </div>
+                <div style="display: flex; gap: 1rem;">
+                    <select id="selected_gstin" class="p-input" style="flex: 1; height: 38px; border-color: #5eead4; background: white;" onchange="handleGstSelectionChange()">
+                        <!-- Dynamic Options -->
+                    </select>
+                    <div id="gst_details_preview" style="flex: 2; background: white; border: 1px solid #ccfbf1; border-radius: 6px; padding: 0.5rem; font-size: 0.75rem; color: #0f766e; display: flex; align-items: center; gap: 0.5rem;">
+                        <i class="fas fa-map-marker-alt"></i>
+                        <span id="gst_preview_text">Select a GSTIN to see location details</span>
+                    </div>
+                </div>
+            </div>
             <div class="form-group">
                 <label>Contact Person</label>
                 <input type="text" id="contact_person" class="p-input" placeholder="Contact person name" style="height: 38px;">
@@ -594,8 +612,87 @@ let pageSize = 10;
 
 function handleClientChange() {
     const select = document.getElementById('client_id');
+    const clientId = select.value;
     const contact = select.options[select.selectedIndex].dataset.contact;
     document.getElementById('contact_person').value = contact || '';
+
+    const gstContainer = document.getElementById('gst_selection_container');
+    const gstSelect = document.getElementById('selected_gstin');
+    const gstBadge = document.getElementById('gst_count_badge');
+    const gstPreview = document.getElementById('gst_preview_text');
+
+    if (!clientId) {
+        gstContainer.style.display = 'none';
+        return;
+    }
+
+    // Fetch Full Client Details via AJAX
+    fetch(`../../ajax/get_partner_details.php?id=${clientId}`)
+    .then(r => r.json())
+    .then(res => {
+        if (res.success) {
+            const p = res.data;
+            gstSelect.innerHTML = '';
+            
+            // User requested to ONLY show this for Group of Companies
+            if (p.business_type !== 'Group of Companies') {
+                gstContainer.style.display = 'none';
+                return;
+            }
+
+            let gsts = [];
+            // Add primary GST if exists
+            if (p.gstin) {
+                gsts.push({ gstin: p.gstin, state: 'Primary', city: '', district: '', address: 'Main Address' });
+            }
+
+            // Parse additional GSTs
+            if (p.additional_gst) {
+                try {
+                    const extra = JSON.parse(p.additional_gst);
+                    if (Array.isArray(extra)) {
+                        gsts = gsts.concat(extra);
+                    } else if (typeof extra === 'object') {
+                        gsts = gsts.concat(Object.values(extra));
+                    }
+                } catch(e) { console.error("GST Parse Error", e); }
+            }
+
+            if (gsts.length > 0) {
+                gstContainer.style.display = 'grid';
+                gstBadge.innerText = `${gsts.length} GST Records Found`;
+                
+                gsts.forEach((g, idx) => {
+                    const opt = document.createElement('option');
+                    opt.value = g.gstin;
+                    opt.text = `${g.gstin} - ${g.state || ''} ${g.city ? '(' + g.city + ')' : ''}`;
+                    opt.dataset.details = JSON.stringify(g);
+                    gstSelect.add(opt);
+                });
+                
+                handleGstSelectionChange(); // Update preview for first option
+            } else {
+                gstContainer.style.display = 'none';
+            }
+        } else {
+            gstContainer.style.display = 'none';
+        }
+    });
+}
+
+function handleGstSelectionChange() {
+    const select = document.getElementById('selected_gstin');
+    const preview = document.getElementById('gst_preview_text');
+    
+    if (select.selectedIndex === -1) return;
+    
+    const data = JSON.parse(select.options[select.selectedIndex].dataset.details);
+    let text = "";
+    if (data.address) text += data.address;
+    if (data.city) text += (text ? ", " : "") + data.city;
+    if (data.state) text += (text ? ", " : "") + data.state;
+    
+    preview.innerText = text || "No specific location details";
 }
 
 function calculateEndDate() {
@@ -1045,6 +1142,7 @@ function saveProposal() {
     const totalDays = document.getElementById('total_days').value;
     const contactPerson = document.getElementById('contact_person').value;
     const lightType = document.getElementById('light_type').value;
+    const selectedGstin = document.getElementById('selected_gstin').value;
     
     if (!clientId || !campaignName || selectedSites.length === 0) {
         Swal.fire({
@@ -1058,6 +1156,7 @@ function saveProposal() {
 
     const data = {
         clientId,
+        selectedGstin,
         startDate: start,
         endDate: end,
         campaignName,
