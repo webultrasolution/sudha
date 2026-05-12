@@ -232,25 +232,24 @@ $sizes = $pdo->query("SELECT DISTINCT CONCAT(width, 'x', height) as size FROM si
             </div>
         </div>
 
-        <div class="site-list-container" style="max-height: 550px; overflow-y: auto;">
+        <div class="site-list-container" style="max-height: 700px; overflow-y: auto; border: 1px solid #f1f5f9; border-radius: 0 0 12px 12px;">
             <table class="crs-table selection-table" id="asset-table" style="width: 100%; border-collapse: separate; border-spacing: 0 0.5rem;">
                 <thead style="background: white; position: sticky; top: 0; z-index: 10;">
                     <tr style="border-bottom: 2px solid #f1f5f9;">
-                        <th style="width: 40px; padding: 1.2rem 1rem;">#</th>
-                        <th style="width: 50px; padding: 1.2rem 1rem;"><i class="far fa-check-square"></i></th>
-                        <th style="width: 100px; padding: 1.2rem 1rem;">PREVIEW</th>
-                        <th style="padding: 1.2rem 1rem;">CITY / CODE</th>
-                        <th style="padding: 1.2rem 1rem;">ASSET DETAILS</th>
-                        <th style="padding: 1.2rem 1rem;">SIZE</th>
-                        <th style="padding: 1.2rem 1rem;">PRICING</th>
-                        <th style="padding: 1.2rem 1rem;">OFFER RATE</th>
-                        <th style="padding: 1.2rem 1rem; text-align: right;">TOTAL</th>
+                        <th style="width: 40px; padding: 0.8rem 1rem;">#</th>
+                        <th style="width: 50px; padding: 0.8rem 1rem;"><i class="far fa-check-square"></i></th>
+                        <th style="width: 100px; padding: 0.8rem 1rem;">PREVIEW</th>
+                        <th style="padding: 0.8rem 1rem;">CITY / CODE</th>
+                        <th style="padding: 0.8rem 1rem;">ASSET DETAILS</th>
+                        <th style="padding: 0.8rem 1rem;">SIZE</th>
+                        <th style="padding: 0.8rem 1rem;">PRICING</th>
+                        <th style="padding: 0.8rem 1rem;">OFFER RATE</th>
+                        <th style="padding: 0.8rem 1rem; text-align: right;">TOTAL</th>
                     </tr>
                 </thead>
                 <tbody id="asset-body">
                     <?php $sno = 1; foreach ($sites as $s): 
                         $sqft = $s['width'] * $s['height'];
-                        $availDate = date('d M Y'); // Dummy date for now
                     ?>
                     <tr class="site-row" 
                         id="row-<?php echo $s['id']; ?>"
@@ -275,60 +274,59 @@ $sizes = $pdo->query("SELECT DISTINCT CONCAT(width, 'x', height) as size FROM si
                         data-thumbnail="<?php echo $s['thumbnail'] ?? ''; ?>"
                         data-sqft="<?php echo $sqft; ?>">
                         
-                        <td class="sno-cell" style="padding: 1.5rem 1rem; font-weight: 700; color: #64748b;"><?php echo $sno++; ?></td>
+                        <td class="sno-cell" style="padding: 0.6rem 1rem; font-weight: 700; color: #64748b;"><?php echo $sno++; ?></td>
                         
-                        <td style="padding: 1.5rem 1rem; text-align: center;">
-                            <input type="checkbox" class="asset-chk" onclick="toggleSite('<?php echo $s['id']; ?>')" style="width: 20px; height: 20px; border-radius: 6px; cursor: pointer; accent-color: var(--primary);">
+                        <td style="padding: 0.6rem 1rem; text-align: center;">
+                            <input type="checkbox" class="asset-chk" onclick="toggleSite('<?php echo $s['id']; ?>')" style="width: 18px; height: 18px; border-radius: 4px; cursor: pointer; accent-color: var(--primary);">
                         </td>
 
-                        <td style="padding: 1.5rem 1rem;">
-                            <?php if ($s['thumbnail']): ?>
-                                <img src="../../uploads/sites/<?php echo $s['thumbnail']; ?>" class="site-thumb" style="width: 100px; height: 65px; border-radius: 12px; object-fit: cover; border: 1px solid #e2e8f0; box-shadow: 0 4px 10px rgba(0,0,0,0.05);">
+                        <td style="padding: 0.6rem 1rem;">
+                            <?php if (!empty($s['thumbnail'])): ?>
+                                <img src="<?php echo BASE_URL; ?>uploads/sites/<?php echo $s['thumbnail']; ?>" onclick="openLightbox(this.src)" class="site-thumb" style="width: 80px; height: 50px; border-radius: 8px; object-fit: cover; border: 1px solid #e2e8f0; cursor: pointer; transition: transform 0.2s;">
                             <?php else: ?>
-                                <div style="width: 100px; height: 65px; border-radius: 12px; background: #f8fafc; border: 1px dashed #e2e8f0; display: flex; align-items: center; justify-content: center; font-size: 0.7rem; color: #94a3b8; font-weight: 700;">No Img</div>
+                                <div style="width: 80px; height: 50px; border-radius: 8px; background: #f8fafc; border: 1px dashed #e2e8f0; display: flex; align-items: center; justify-content: center; font-size: 0.6rem; color: #94a3b8; font-weight: 700;">No Img</div>
                             <?php endif; ?>
                         </td>
 
-                        <td style="padding: 1.5rem 1rem;">
-                            <div style="font-weight: 800; color: #1e293b; font-size: 0.9rem; margin-bottom: 2px;"><?php echo $s['city']; ?>, <?php echo $s['state']; ?></div>
-                            <div style="color: #f97316; font-size: 0.75rem; font-weight: 800; letter-spacing: 0.02em;"><?php echo $s['site_code']; ?></div>
+                        <td style="padding: 0.6rem 1rem;">
+                            <div style="font-weight: 800; color: #1e293b; font-size: 0.8rem; margin-bottom: 1px;"><?php echo $s['city']; ?>, <?php echo $s['state']; ?></div>
+                            <div style="color: #f97316; font-size: 0.65rem; font-weight: 800;"><?php echo $s['site_code']; ?></div>
                         </td>
 
-                      
-                        <td style="padding: 1.5rem 1rem;">
-                            <div style="font-weight: 800; color: #1e293b; font-size: 0.9rem; margin-bottom: 2px;"><?php echo $s['name']; ?></div>
-                            <div style="font-size: 0.75rem; color: #64748b; margin-bottom: 6px;"><?php echo $s['location']; ?></div>
-                            <div style="display: flex; gap: 0.4rem; align-items: center;">
-                                <span style="background: #ecfdf5; color: #059669; padding: 0.2rem 0.6rem; border-radius: 6px; font-size: 0.6rem; font-weight: 800; text-transform: uppercase;"><?php echo $s['type']; ?></span>
-                                <span style="background: #f1f5f9; color: #475569; padding: 0.2rem 0.6rem; border-radius: 6px; font-size: 0.6rem; font-weight: 800; text-transform: uppercase;"><?php echo $s['light_type']; ?></span>
-                                <span style="background: #f1f5f9; color: #475569; padding: 0.2rem 0.6rem; border-radius: 6px; font-size: 0.6rem; font-weight: 800; text-transform: uppercase;">
+                        <td style="padding: 0.6rem 1rem;">
+                            <div style="font-weight: 800; color: #1e293b; font-size: 0.8rem; margin-bottom: 1px;"><?php echo $s['name']; ?></div>
+                            <div style="font-size: 0.65rem; color: #64748b; margin-bottom: 3px; line-height: 1.1;"><?php echo $s['location']; ?></div>
+                            <div style="display: flex; gap: 0.3rem; align-items: center;">
+                                <span style="background: #ecfdf5; color: #059669; padding: 0.1rem 0.4rem; border-radius: 4px; font-size: 0.55rem; font-weight: 800; text-transform: uppercase;"><?php echo $s['type']; ?></span>
+                                <span style="background: #f1f5f9; color: #475569; padding: 0.1rem 0.4rem; border-radius: 4px; font-size: 0.55rem; font-weight: 800; text-transform: uppercase;"><?php echo $s['light_type']; ?></span>
+                                <span style="background: #f1f5f9; color: #475569; padding: 0.1rem 0.4rem; border-radius: 4px; font-size: 0.55rem; font-weight: 800; text-transform: uppercase;">
                                     <?php echo $s['owner_type']; ?>
                                     <?php if ($s['owner_type'] === 'TA' && $s['vendor_name']) echo " - " . htmlspecialchars($s['vendor_name']); ?>
                                 </span>
                             </div>
                         </td>
 
-                        <td style="padding: 1.5rem 1rem;">
-                            <div style="font-weight: 800; color: #1e293b; font-size: 0.9rem; margin-bottom: 2px;"><?php echo $s['width']; ?>' x <?php echo $s['height']; ?>'</div>
-                            <div style="font-size: 0.75rem; color: #94a3b8; font-weight: 700;"><?php echo number_format($sqft); ?> SQFT</div>
+                        <td style="padding: 0.6rem 1rem;">
+                            <div style="font-weight: 800; color: #1e293b; font-size: 0.8rem; margin-bottom: 1px;"><?php echo $s['width']; ?>' x <?php echo $s['height']; ?>'</div>
+                            <div style="font-size: 0.65rem; color: #94a3b8; font-weight: 700;"><?php echo number_format($sqft); ?> SQFT</div>
                         </td>
 
-                        <td style="padding: 1.5rem 1rem;">
-                            <div style="font-weight: 800; color: #64748b; font-size: 0.8rem;">CARD: ₹<?php echo number_format($s['card_rate']); ?></div>
+                        <td style="padding: 0.6rem 1rem;">
+                            <div style="font-size: 0.55rem; color: #94a3b8; font-weight: 800; text-transform: uppercase;">Card Rate</div>
+                            <div style="font-weight: 700; color: #1e293b; font-size: 0.8rem;">₹<?php echo number_format($s['card_rate']); ?></div>
                         </td>
 
-                        <td style="padding: 1.5rem 1rem;">
-                            <div style="font-size: 0.65rem; color: var(--primary); font-weight: 800; margin-bottom: 4px; text-transform: uppercase;">Offer Rate</div>
+                        <td style="padding: 0.6rem 1rem;">
+                            <div style="font-size: 0.5rem; color: var(--primary); font-weight: 900; text-transform: uppercase; margin-bottom: 2px;">Offer Rate</div>
                             <input type="number" class="p-input sale-rate-input" 
                                    value="<?php echo $s['card_rate']; ?>" 
                                    oninput="updateSitePrice('<?php echo $s['id']; ?>', this.value)"
-                                   disabled
-                                   style="width: 100px; height: 32px; font-size: 0.85rem; font-weight: 800; border-radius: 8px; border: 1px solid #e2e8f0; padding: 0 0.5rem; color: #1e293b;">
+                                   style="width: 80px; height: 24px; font-size: 0.75rem; font-weight: 800; border-radius: 5px; padding: 0 0.3rem;">
                         </td>
 
-                        <td style="padding: 1.5rem 1rem; text-align: right;">
-                            <div style="font-size: 0.65rem; color: #64748b; font-weight: 800; margin-bottom: 4px; text-transform: uppercase;">Total</div>
-                            <div class="total-cell" style="font-weight: 900; color: var(--primary); font-size: 0.95rem;">₹0</div>
+                        <td style="padding: 0.6rem 1rem; text-align: right;">
+                            <div style="font-size: 0.55rem; color: #64748b; font-weight: 800; text-transform: uppercase;">Total</div>
+                            <div class="total-cell" style="font-weight: 900; color: var(--primary); font-size: 0.9rem;">₹0</div>
                         </td>
                     </tr>
                     <?php endforeach; ?>
@@ -1284,6 +1282,31 @@ function goToStep1() {
     // Progress Line
     document.getElementById('wizard-progress-line').style.width = '0%';
 }
+
+// Lightbox Functions
+function openLightbox(src) {
+    console.log("Opening Lightbox for:", src);
+    const lb = document.getElementById('simple-lightbox');
+    const lbImg = document.getElementById('lightbox-img');
+    if(lb && lbImg) {
+        lbImg.src = src;
+        lb.style.display = 'flex';
+    } else {
+        console.error("Lightbox elements not found");
+    }
+}
+
+function closeLightbox() {
+    const lb = document.getElementById('simple-lightbox');
+    if(lb) lb.style.display = 'none';
+}
 </script>
 
+<!-- Simple Lightbox HTML -->
+<div id="simple-lightbox" onclick="closeLightbox()" style="position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.9); z-index: 9999; display: none; align-items: center; justify-content: center; backdrop-filter: blur(8px);">
+    <div style="position: relative; max-width: 90%; max-height: 90%;">
+        <img id="lightbox-img" src="" style="max-width: 100%; max-height: 90vh; border-radius: 12px; box-shadow: 0 20px 50px rgba(0,0,0,0.5); border: 4px solid white;">
+        <div style="position: absolute; top: -40px; right: 0; color: white; font-size: 2rem; cursor: pointer;">&times;</div>
+    </div>
+</div>
 <?php include_once __DIR__ . '/../../includes/footer.php'; ?>
