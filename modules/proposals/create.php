@@ -273,6 +273,7 @@ $sizes = $pdo->query("SELECT DISTINCT CONCAT(width, 'x', height) as size FROM si
                         data-width="<?php echo $s['width']; ?>"
                         data-height="<?php echo $s['height']; ?>"
                         data-size="<?php echo $s['width'] . 'x' . $s['height']; ?>"
+                        data-thumbnail="<?php echo $s['thumbnail'] ?? ''; ?>"
                         data-sqft="<?php echo $sqft; ?>">
                         
                         <td class="sno-cell" style="padding: 1.5rem 1rem; font-weight: 700; color: #64748b;"><?php echo $sno++; ?></td>
@@ -343,13 +344,15 @@ $sizes = $pdo->query("SELECT DISTINCT CONCAT(width, 'x', height) as size FROM si
 
     <!-- SELECTION BUCKET (Cart View) -->
     <div id="selection-bucket-panel" class="p-panel" style="margin-bottom: 2rem; border-top: 4px solid #059669; display: none;">
-        <div class="p-header" style="background: #f0fdf4; color: #065f46; display: flex; justify-content: space-between; align-items: center;">
-            <div style="display: flex; align-items: center; gap: 0.75rem;">
+        <div class="p-header" style="display: flex; justify-content: space-between; align-items: center;">
+            <div style="display: flex; align-items: center; gap: 1rem;">
                 <i class="fas fa-shopping-basket"></i>
                 <span>Your Selection Bucket</span>
             </div>
-            <div style="font-size: 0.7rem; font-weight: 700; color: #059669; background: white; padding: 0.2rem 0.6rem; border-radius: 4px; border: 1px solid #bbf7d0;">
-                <span id="bucket-count">0</span> Assets
+            <div style="display: flex; gap: 1rem; align-items: center;">
+                <div class="selection-stats" style="background: #059669; color: white; padding: 0.3rem 0.8rem; border-radius: 6px; font-weight: 800; font-size: 0.75rem;">
+                    Bucket: <span id="bucket-count">0</span> Assets
+                </div>
             </div>
         </div>
         <div id="bucket-empty-msg" style="padding: 2rem; text-align: center; color: #94a3b8; font-weight: 700;">
@@ -863,10 +866,14 @@ function toggleSite(id) {
     const idx = selectedSites.findIndex(s => s.id === id);
     if (idx === -1) {
         const city = row.dataset.city;
+        const state = row.dataset.state;
+        const type = row.dataset.type;
+        const illumination = row.dataset.illumination;
+        const thumbnail = row.dataset.thumbnail;
         const siteCode = row.dataset.code;
         const area = row.querySelector('.location-area') ? row.querySelector('.location-area').innerText : '';
 
-        selectedSites.push({ id, name, cardRate: rate, purchaseRate: prate, saleRate: rate, owner, sqft, city, siteCode, area });
+        selectedSites.push({ id, name, cardRate: rate, purchaseRate: prate, saleRate: rate, owner, sqft, city, state, type, illumination, thumbnail, siteCode, area });
         if(row) row.classList.add('selected');
         if(chk) chk.checked = true;
         if(input) input.disabled = false;
@@ -924,9 +931,12 @@ function updateBucketUI() {
     `;
 
     selectedSites.forEach((site, index) => {
-        // Find the original row to get all data if needed, or use the site object
+        const previewHtml = site.thumbnail 
+            ? `<img src="../../uploads/sites/${site.thumbnail}" class="site-thumb" style="width: 100px; height: 65px; border-radius: 12px; object-fit: cover; border: 1px solid #e2e8f0; box-shadow: 0 4px 10px rgba(0,0,0,0.05);">`
+            : `<div style="width: 100px; height: 65px; border-radius: 12px; background: #f8fafc; border: 1px dashed #e2e8f0; display: flex; align-items: center; justify-content: center; font-size: 0.7rem; color: #94a3b8; font-weight: 700;">No Img</div>`;
+
         html += `
-            <tr class="site-row selected" style="background: white; transition: all 0.2s;">
+            <tr class="site-row selected" style="background: white; transition: all 0.2s;" id="bucket-row-${site.id}">
                 <td class="sno-cell" style="padding: 1.5rem 1rem; font-weight: 700; color: #64748b;">${index + 1}</td>
                 
                 <td style="padding: 1.5rem 1rem; text-align: center;">
@@ -936,41 +946,43 @@ function updateBucketUI() {
                 </td>
 
                 <td style="padding: 1.5rem 1rem;">
-                    <div style="width: 100px; height: 65px; border-radius: 12px; background: #f8fafc; border: 1px dashed #e2e8f0; display: flex; align-items: center; justify-content: center; font-size: 0.7rem; color: #94a3b8; font-weight: 700;">Img</div>
+                    ${previewHtml}
                 </td>
 
                 <td style="padding: 1.5rem 1rem;">
                     <div style="font-weight: 800; color: #1e293b; font-size: 0.9rem; margin-bottom: 2px;">${site.city}</div>
-                    <div style="color: #ef4444; font-size: 0.75rem; font-weight: 700; letter-spacing: 0.02em;">${site.siteCode}</div>
+                    <div style="color: #f97316; font-size: 0.75rem; font-weight: 800; letter-spacing: 0.02em;">${site.siteCode}</div>
                 </td>
 
                 <td style="padding: 1.5rem 1rem;">
-                    <div style="font-weight: 800; color: #1e293b; font-size: 0.95rem; margin-bottom: 2px;">${site.name}</div>
-                    <div style="font-size: 0.75rem; color: #64748b; font-weight: 600; margin-bottom: 0.5rem;">${site.area || ''}</div>
+                    <div style="font-weight: 800; color: #1e293b; font-size: 0.9rem; margin-bottom: 4px;">${site.name}</div>
+                    <div style="font-size: 0.7rem; color: #64748b; font-weight: 700; margin-bottom: 0.75rem;"> ${site.city}</div>
                     <div style="display: flex; gap: 0.4rem; align-items: center;">
-                        <span style="background: #ecfdf5; color: #059669; padding: 0.15rem 0.5rem; border-radius: 4px; font-size: 0.6rem; font-weight: 800; text-transform: uppercase;">SITE</span>
-                        <span style="color: #94a3b8; font-size: 0.6rem; font-weight: 700;">• ${site.owner}</span>
+                        <span style="background: #ecfdf5; color: #059669; padding: 0.2rem 0.6rem; border-radius: 6px; font-size: 0.6rem; font-weight: 800; text-transform: uppercase;">${site.type}</span>
+                        <span style="background: #f1f5f9; color: #475569; padding: 0.2rem 0.6rem; border-radius: 6px; font-size: 0.6rem; font-weight: 800; text-transform: uppercase;">${site.illumination}</span>
+                        <span style="background: #f1f5f9; color: #475569; padding: 0.2rem 0.6rem; border-radius: 6px; font-size: 0.6rem; font-weight: 800; text-transform: uppercase;">${site.owner}</span>
                     </div>
                 </td>
 
                 <td style="padding: 1.5rem 1rem;">
-                    <div style="font-weight: 800; color: #1e293b; font-size: 0.9rem; margin-bottom: 2px;">${site.sqft} SQFT</div>
+                    <div style="font-weight: 800; color: #1e293b; font-size: 0.9rem; margin-bottom: 2px;">${site.sqft.toLocaleString()} SQFT</div>
                 </td>
 
                 <td style="padding: 1.5rem 1rem;">
-                    <div style="font-weight: 800; color: #64748b; font-size: 0.8rem;">₹${site.cardRate.toLocaleString()}</div>
+                    <div style="font-weight: 800; color: #64748b; font-size: 0.8rem;">CARD: ₹${site.cardRate.toLocaleString()}</div>
                 </td>
 
                 <td style="padding: 1.5rem 1rem;">
+                    <div style="font-size: 0.65rem; color: var(--primary); font-weight: 800; margin-bottom: 4px; text-transform: uppercase;">Offer Rate</div>
                     <input type="number" class="p-input bucket-rate-input" 
                            value="${site.saleRate}" 
                            oninput="updateSitePrice('${site.id}', this.value)"
-                           style="width: 100px; height: 32px; font-size: 0.85rem; font-weight: 800; border-radius: 8px; border: 1px solid #e2e8f0; padding: 0 0.5rem; color: var(--primary);">
+                           style="width: 100px; height: 32px; font-size: 0.85rem; font-weight: 800; border-radius: 8px; border: 1px solid #e2e8f0; padding: 0 0.5rem; color: #1e293b;">
                 </td>
 
                 <td style="padding: 1.5rem 1rem; text-align: right;">
                     <div style="font-size: 0.65rem; color: #64748b; font-weight: 800; margin-bottom: 4px; text-transform: uppercase;">Total</div>
-                    <div class="total-cell" style="font-weight: 900; color: var(--primary); font-size: 1rem;">₹${site.saleRate.toLocaleString()}</div>
+                    <div class="total-cell" style="font-weight: 900; color: var(--primary); font-size: 0.95rem;">₹${site.saleRate.toLocaleString()}</div>
                 </td>
             </tr>
         `;
@@ -986,16 +998,23 @@ function updateSitePrice(id, val) {
         const rate = parseFloat(val) || 0;
         selectedSites[idx].saleRate = rate;
         
-        // Update Bucket Total Cell for this row
-        const bucketRows = document.querySelectorAll('#bucket-list tr');
-        bucketRows.forEach(row => {
-            // We can identify the row by its content or better yet, add an ID to bucket rows
-            // For now, let's just find the row that has the toggleSite(id) button
-            if (row.innerHTML.includes(`toggleSite('${id}')`)) {
-                const totalCell = row.querySelector('td:last-child div');
-                if (totalCell) totalCell.innerText = '₹' + rate.toLocaleString();
-            }
-        });
+        // 1. Update main table input if it exists
+        const mainRow = document.getElementById('row-' + id);
+        if (mainRow) {
+            const mainInput = mainRow.querySelector('.sale-rate-input');
+            if (mainInput && mainInput.value !== val) mainInput.value = val;
+            const mainTotal = mainRow.querySelector('.total-cell');
+            if (mainTotal) mainTotal.innerText = '₹' + rate.toLocaleString();
+        }
+
+        // 2. Update bucket row total
+        const bucketRow = document.getElementById('bucket-row-' + id);
+        if (bucketRow) {
+            const bucketInput = bucketRow.querySelector('.bucket-rate-input');
+            if (bucketInput && bucketInput.value !== val) bucketInput.value = val;
+            const bucketTotal = bucketRow.querySelector('.total-cell');
+            if (bucketTotal) bucketTotal.innerText = '₹' + rate.toLocaleString();
+        }
 
         recalcAll();
     }
