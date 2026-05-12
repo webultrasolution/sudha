@@ -72,7 +72,7 @@ if ($mode === 'direct') {
 } else if ($mode === 'saved_po') {
     // Fetch Items from po_items
     $itemSql = "
-        SELECT pi.*, s.site_code, s.location, s.city, s.width, s.height, s.light_type, s.hsn_code, s.vendor_gst, s.type as media_type
+        SELECT pi.*, pi.cost as purchase_amount, s.site_code, s.location, s.city, s.width, s.height, s.light_type, s.hsn_code, s.vendor_gst, s.type as media_type
         FROM po_items pi
         JOIN sites s ON pi.site_id = s.id
         WHERE pi.po_id = ?
@@ -298,6 +298,9 @@ $company_signature = getSetting('company_signature', 'signature.png');
             <?php 
             $net_total = 0;
             foreach ($items as $idx => $item): 
+                // Normalize purchase amount
+                $item['purchase_amount'] = floatval($item['purchase_amount'] ?? 0);
+
                 // Override with custom rate if in direct mode
                 if ($mode === 'direct' && isset($custom_rates[$item['id']])) {
                     $item['purchase_amount'] = floatval($custom_rates[$item['id']]);
