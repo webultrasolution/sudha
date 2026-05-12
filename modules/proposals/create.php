@@ -870,10 +870,12 @@ function toggleSite(id) {
         const type = row.dataset.type;
         const illumination = row.dataset.illumination;
         const thumbnail = row.dataset.thumbnail;
+        const width = row.dataset.width;
+        const height = row.dataset.height;
         const siteCode = row.dataset.code;
         const area = row.querySelector('.location-area') ? row.querySelector('.location-area').innerText : '';
 
-        selectedSites.push({ id, name, cardRate: rate, purchaseRate: prate, saleRate: rate, owner, sqft, city, state, type, illumination, thumbnail, siteCode, area });
+        selectedSites.push({ id, name, cardRate: rate, purchaseRate: prate, saleRate: rate, owner, sqft, city, state, type, illumination, thumbnail, width, height, siteCode, area });
         if(row) row.classList.add('selected');
         if(chk) chk.checked = true;
         if(input) input.disabled = false;
@@ -965,7 +967,8 @@ function updateBucketUI() {
                 </td>
 
                 <td style="padding: 1.5rem 1rem;">
-                    <div style="font-weight: 800; color: #1e293b; font-size: 0.9rem; margin-bottom: 2px;">${site.sqft.toLocaleString()} SQFT</div>
+                    <div style="font-weight: 800; color: #1e293b; font-size: 0.9rem; margin-bottom: 2px;">${site.width}' x ${site.height}'</div>
+                    <div style="font-size: 0.75rem; color: #94a3b8; font-weight: 700;">${site.sqft.toLocaleString()} SQFT</div>
                 </td>
 
                 <td style="padding: 1.5rem 1rem;">
