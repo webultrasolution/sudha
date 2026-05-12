@@ -177,7 +177,7 @@ $sizes = $pdo->query("SELECT DISTINCT CONCAT(width, 'x', height) as size FROM si
             <div style="display: grid; grid-template-columns: 2fr 1fr 1fr 1fr 1fr 1fr; gap: 0.5rem; margin-bottom: 0.5rem; align-items: flex-end;">
                 <div class="form-group" style="margin-bottom: 0;">
                     <label style="font-size: 0.55rem; font-weight: 900; color: var(--secondary); margin-bottom: 0.2rem; text-transform: uppercase;">Search Site / Code / Area</label>
-                    <input type="text" id="site-search" class="p-input" placeholder="Type to search..." oninput="filterSites()" style="height: 30px; font-size: 0.75rem;">
+                    <input type="text" id="site-search" class="p-input" placeholder="Search by Site Name, Code, Location, City, State, Media..." oninput="filterSites()" style="height: 30px; font-size: 0.75rem;">
                 </div>
                 <div class="form-group" style="margin-bottom: 0;">
                     <label style="font-size: 0.55rem; font-weight: 900; color: var(--secondary); margin-bottom: 0.2rem; text-transform: uppercase;">Media</label>
@@ -1179,9 +1179,19 @@ function filterSites() {
         if (city && row.dataset.city !== city) show = false;
         if (size && row.dataset.size !== size) show = false;
         
-        // Text Search (only if search field exists)
+        // Comprehensive Search (All Fields)
         if (q) {
-            const rowText = (row.dataset.name + ' ' + row.dataset.code + ' ' + row.dataset.location + ' ' + row.dataset.city).toLowerCase();
+            const rowText = (
+                row.dataset.name + ' ' + 
+                row.dataset.code + ' ' + 
+                row.dataset.location + ' ' + 
+                row.dataset.city + ' ' + 
+                row.dataset.state + ' ' + 
+                row.dataset.type + ' ' + 
+                row.dataset.illumination + ' ' + 
+                row.dataset.vendorName + ' ' + 
+                row.dataset.size
+            ).toLowerCase();
             if (!rowText.includes(q)) show = false;
         }
 
