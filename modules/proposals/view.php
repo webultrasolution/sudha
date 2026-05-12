@@ -28,7 +28,7 @@ if (!$p) { echo "<div class='card'>Proposal not found.</div>"; include_once __DI
 
 // Fetch Items with full site details
 $stmtItems = $pdo->prepare("
-    SELECT pi.*, s.site_code, s.name as site_name, s.location, s.city, s.type as media_type, s.owner_type, 
+    SELECT pi.*, s.site_code, s.name as site_name, s.location, s.city, s.state as site_state, s.type as media_type, s.owner_type, 
            s.width, s.height, s.light_type, s.card_rate as site_card_rate, s.available_from, s.purchase_rate as master_purchase,
            v.name as vendor_name
     FROM proposal_items pi
@@ -225,7 +225,7 @@ $taMarkupPct = ($taCost > 0) ? ($taMarkup / $taCost) * 100 : 0;
                     </div>
                 </td>
                 <td>
-                    <div style="font-weight: 800; color: #1e293b;"><?php echo $item['city']; ?></div>
+                    <div style="font-weight: 800; color: #1e293b;"><?php echo $item['city']; ?>, <?php echo $item['site_state']; ?></div>
                     <div style="font-size: 0.75rem; color: #f97316; font-weight: 800;"><?php echo $item['site_code']; ?></div>
                 </td>
                 <td>
