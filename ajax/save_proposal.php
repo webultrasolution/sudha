@@ -85,7 +85,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         logActivity('generated a new proposal', 'proposals', $proposalId, "Proposal Number: $propNum");
 
         // 3. Insert Items
-        $stmtItem = $pdo->prepare("INSERT INTO proposal_items (proposal_id, site_id, sale_rate, purchase_rate, margin_pct, amount) VALUES (?, ?, ?, ?, ?, ?)");
+        $stmtItem = $pdo->prepare("INSERT INTO proposal_items (proposal_id, site_id, sale_rate, purchase_rate, margin_pct, amount, selected_image) VALUES (?, ?, ?, ?, ?, ?, ?)");
         foreach ($data['selectedSites'] as $site) {
             $pRate = floatval($site['purchaseRate']);
             $sRate = floatval($site['saleRate']);
@@ -97,7 +97,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 $sRate,
                 $pRate,
                 $margin,
-                $sRate
+                $sRate,
+                $site['thumbnail'] ?? null
             ]);
         }
 

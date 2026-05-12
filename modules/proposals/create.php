@@ -289,7 +289,7 @@ $sizes = $pdo->query("SELECT DISTINCT CONCAT(width, 'x', height) as size FROM si
                             ?>
                                 <div style="position: relative; width: 80px; height: 50px;">
                                     <img src="<?php echo BASE_URL; ?>uploads/sites/<?php echo $s['thumbnail']; ?>" 
-                                         onclick="openLightboxSlider('<?php echo htmlspecialchars($s['all_images']); ?>')" 
+                                         onclick="openLightboxSlider('<?php echo htmlspecialchars($s['all_images']); ?>', '<?php echo $s['id']; ?>')" 
                                          class="site-thumb" 
                                          style="width: 100%; height: 100%; border-radius: 8px; object-fit: cover; border: 1px solid #e2e8f0; cursor: pointer; transition: transform 0.2s;">
                                     <?php if ($imgCount > 1): ?>
@@ -965,7 +965,7 @@ function updateBucketUI() {
         const previewHtml = site.thumbnail 
             ? ` <div style="position: relative; width: 80px; height: 50px;">
                     <img src="<?php echo BASE_URL; ?>uploads/sites/${site.thumbnail}" 
-                         onclick="openLightboxSlider('${site.allImages}')" 
+                         onclick="openLightboxSlider('${site.allImages}', '${site.id}')" 
                          class="site-thumb" 
                          style="width: 100%; height: 100%; border-radius: 8px; object-fit: cover; border: 1px solid #e2e8f0; cursor: pointer; transition: transform 0.2s;">
                     ${imgCount > 1 ? `
@@ -1318,8 +1318,9 @@ let currentImages = [];
 let currentImgIndex = 0;
 const baseUrl = "<?php echo BASE_URL; ?>uploads/sites/";
 
-function openLightboxSlider(imageString) {
+function openLightboxSlider(imageString, siteId) {
     if (!imageString) return;
+    window.currentLightboxSiteId = siteId;
     currentImages = imageString.split(',');
     currentImgIndex = 0;
     
@@ -1342,6 +1343,38 @@ function updateSliderImage() {
         if(lbBadge) {
             lbBadge.innerText = (currentImgIndex + 1) + " / " + currentImages.length;
             lbBadge.style.display = currentImages.length > 1 ? 'block' : 'none';
+        }
+    }
+}
+
+function setPrimaryImage(e) {
+    if(e) e.stopPropagation();
+    const newThumb = currentImages[currentImgIndex];
+    if(window.currentLightboxSiteId) {
+        const id = window.currentLightboxSiteId;
+        const idx = selectedSites.findIndex(s => s.id === id);
+        if(idx !== -1) {
+            selectedSites[idx].thumbnail = newThumb;
+            
+            updateBucketUI();
+            
+            const row = document.getElementById('row-' + id);
+            if(row) {
+                const img = row.querySelector('.site-thumb');
+                if(img) img.src = baseUrl + newThumb;
+            }
+            
+            Swal.fire({
+                icon: 'success',
+                title: 'Primary Image Set',
+                text: 'This image will be used in your proposal.',
+                timer: 1500,
+                showConfirmButton: false,
+                toast: true,
+                position: 'top-end'
+            });
+        } else {
+            Swal.fire('Note', 'Please select this asset first to set its primary image.', 'info');
         }
     }
 }
@@ -1385,6 +1418,12 @@ document.addEventListener('keydown', function(e) {
 
         <div style="position: relative;">
             <img id="lightbox-img" src="" style="max-width: 100%; max-height: 85vh; border-radius: 16px; box-shadow: 0 30px 60px rgba(0,0,0,0.8); border: 2px solid rgba(255,255,255,0.15);">
+            
+            <!-- Select as Primary Button -->
+            <button onclick="setPrimaryImage(event)" style="position: absolute; top: 20px; left: 20px; background: var(--primary); color: white; border: none; padding: 0.6rem 1.2rem; border-radius: 10px; font-weight: 800; font-size: 0.8rem; cursor: pointer; display: flex; align-items: center; gap: 0.5rem; box-shadow: 0 10px 20px rgba(13, 148, 136, 0.3); transition: all 0.2s;">
+                <i class="fas fa-check-circle"></i> Use as Primary Photo
+            </button>
+
             <!-- Image Counter Badge -->
             <div id="lightbox-badge" style="position: absolute; bottom: 20px; left: 50%; transform: translateX(-50%); background: rgba(0,0,0,0.7); color: white; padding: 6px 16px; border-radius: 50px; font-weight: 800; font-size: 0.85rem; backdrop-filter: blur(5px); border: 1px solid rgba(255,255,255,0.2);"></div>
         </div>
