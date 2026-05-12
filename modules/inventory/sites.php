@@ -221,7 +221,10 @@ $vendors = $pdo->query("SELECT id, name FROM partners WHERE type = 'vendor' ORDE
                         <div style="font-size: 0.7rem; color: #94a3b8; text-transform: uppercase; font-weight: 600;">
                             <span class="media-badge <?php echo strtolower($s['type']); ?>"><?php echo $s['type']; ?></span> • 
                             <?php echo $s['light_type']; ?> • 
-                            <span style="color: var(--primary);"><?php echo $s['owner_type']; ?></span>
+                            <span style="color: var(--primary); font-weight: 700;">
+                                <?php echo $s['owner_type']; ?>
+                                <?php if ($s['owner_type'] === 'TA' && !empty($s['vendor_name'])) echo " - " . htmlspecialchars($s['vendor_name']); ?>
+                            </span>
                         </div>
                     </td>
                     <td data-label="Size">

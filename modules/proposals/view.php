@@ -29,9 +29,11 @@ if (!$p) { echo "<div class='card'>Proposal not found.</div>"; include_once __DI
 // Fetch Items with full site details
 $stmtItems = $pdo->prepare("
     SELECT pi.*, s.site_code, s.location, s.city, s.type as media_type, s.owner_type, 
-           s.width, s.height, s.light_type, s.card_rate as site_card_rate, s.available_from, s.purchase_rate as master_purchase
+           s.width, s.height, s.light_type, s.card_rate as site_card_rate, s.available_from, s.purchase_rate as master_purchase,
+           v.name as vendor_name
     FROM proposal_items pi
     JOIN sites s ON pi.site_id = s.id
+    LEFT JOIN partners v ON s.vendor_id = v.id
     WHERE pi.proposal_id = ?
 ");
 $stmtItems->execute([$id]);
@@ -213,7 +215,11 @@ $taMarkupPct = ($taCost > 0) ? ($taMarkup / $taCost) * 100 : 0;
                 <td>
                     <div style="font-weight: 700; color: #334155; margin-bottom: 2px; white-space: normal; line-height: 1.4;"><?php echo $item['location']; ?></div>
                     <div style="font-size: 0.7rem; color: #94a3b8; text-transform: uppercase; font-weight: 600;">
-                        <?php echo $item['media_type']; ?> • <?php echo $item['light_type']; ?> • <span class="badge-type"><?php echo $item['owner_type']; ?></span>
+                        <?php echo $item['media_type']; ?> • <?php echo $item['light_type']; ?> • 
+                        <span class="badge-type">
+                            <?php echo $item['owner_type']; ?>
+                            <?php if ($item['owner_type'] === 'TA' && $item['vendor_name']) echo " - " . htmlspecialchars($item['vendor_name']); ?>
+                        </span>
                     </div>
                 </td>
                 <td>
