@@ -33,26 +33,23 @@ $sizes = $pdo->query("SELECT DISTINCT CONCAT(width, 'x', height) as size FROM si
 ?>
 
 <div class="proposal-full-wrapper">
-    <!-- WIZARD HEADER -->
-    <div class="wizard-header" style="max-width: 600px; margin: 0 auto 1.5rem auto; display: flex; align-items: center; justify-content: space-between; position: relative;">
-        <!-- Connecting Line -->
-        <div style="position: absolute; top: 22.5px; left: 10%; right: 10%; height: 4px; background: #e2e8f0; z-index: 1; transform: translateY(-50%); border-radius: 4px;"></div>
-        <div id="wizard-progress-line" style="position: absolute; top: 22.5px; left: 10%; width: 0%; height: 4px; background: var(--primary); z-index: 1; transform: translateY(-50%); transition: width 0.4s ease; border-radius: 4px;"></div>
-        
-        <!-- Step 1 -->
-        <div id="step-tab-1" class="wizard-step active" style="position: relative; z-index: 2; display: flex; flex-direction: column; align-items: center; gap: 0.75rem; background: #f8fafc; padding: 0 1rem;">
-            <div class="step-circle" style="width: 45px; height: 45px; border-radius: 50%; background: var(--primary); color: white; display: flex; align-items: center; justify-content: center; font-weight: 800; font-size: 1.25rem; border: 4px solid #f8fafc; box-shadow: 0 0 0 3px var(--primary); transition: all 0.4s cubic-bezier(0.4, 0, 0.2, 1);">
-                1
+    <!-- Wizard Progress Tracker (Condensed) -->
+    <div style="display: flex; justify-content: center; align-items: center; margin-bottom: 1.5rem; background: white; padding: 0.6rem; border-radius: 12px; box-shadow: 0 2px 10px rgba(0,0,0,0.03); max-width: 400px; margin-left: auto; margin-right: auto;">
+        <div style="display: flex; align-items: center; gap: 1rem;">
+            <div id="tab-indicator-1" style="display: flex; flex-direction: column; align-items: center; gap: 0.2rem;">
+                <div style="width: 24px; height: 24px; background: #059669; color: white; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 0.7rem; border: 2px solid white; box-shadow: 0 0 0 2px #059669;"><i class="fas fa-check"></i></div>
+                <span style="font-size: 0.55rem; font-weight: 800; color: #059669; text-transform: uppercase;">Details</span>
             </div>
-            <span class="step-label" style="font-weight: 800; color: var(--primary); font-size: 0.85rem; text-transform: uppercase; letter-spacing: 0.05em; transition: all 0.3s;">Client & Details</span>
-        </div>
-
-        <!-- Step 2 -->
-        <div id="step-tab-2" class="wizard-step" style="position: relative; z-index: 2; display: flex; flex-direction: column; align-items: center; gap: 0.75rem; background: #f8fafc; padding: 0 1rem;">
-            <div class="step-circle" style="width: 45px; height: 45px; border-radius: 50%; background: white; color: #94a3b8; display: flex; align-items: center; justify-content: center; font-weight: 800; font-size: 1.25rem; border: 4px solid #f8fafc; box-shadow: 0 0 0 3px #e2e8f0; transition: all 0.4s cubic-bezier(0.4, 0, 0.2, 1);">
-                2
+            <div style="width: 30px; height: 2px; background: #e2e8f0;"></div>
+            <div id="tab-indicator-2" style="display: flex; flex-direction: column; align-items: center; gap: 0.2rem; opacity: 0.4;">
+                <div style="width: 24px; height: 24px; background: #cbd5e1; color: white; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 0.7rem; font-weight: 800;">2</div>
+                <span style="font-size: 0.55rem; font-weight: 800; color: #64748b; text-transform: uppercase;">Assets</span>
             </div>
-            <span class="step-label" style="font-weight: 700; color: #94a3b8; font-size: 0.85rem; text-transform: uppercase; letter-spacing: 0.05em; transition: all 0.3s;">Assets & Pricing</span>
+            <div style="width: 30px; height: 2px; background: #e2e8f0;"></div>
+            <div id="tab-indicator-3" style="display: flex; flex-direction: column; align-items: center; gap: 0.2rem; opacity: 0.4;">
+                <div style="width: 24px; height: 24px; background: #cbd5e1; color: white; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 0.7rem; font-weight: 800;">3</div>
+                <span style="font-size: 0.55rem; font-weight: 800; color: #64748b; text-transform: uppercase;">Finish</span>
+            </div>
         </div>
     </div>
 
@@ -132,42 +129,41 @@ $sizes = $pdo->query("SELECT DISTINCT CONCAT(width, 'x', height) as size FROM si
     </div>
 </div>
 
-<!-- STEP 2: Media Selection & Search -->
-<div id="step-2" style="display: none;">
-    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1.5rem;">
-        <button class="btn btn-secondary" onclick="goToStep1()" style="background: white; border: 1px solid #e2e8f0; padding: 0.6rem 1.2rem; border-radius: 8px; font-weight: 700; cursor: pointer; color: #475569; display: flex; align-items: center; gap: 0.5rem;">
-            <i class="fas fa-arrow-left"></i> Back to Details
-        </button>
-        <div style="font-size: 1.1rem; font-weight: 800; color: var(--secondary);">Step 2: Search & Select Media Assets</div>
-    </div>
 
-    <!-- Media Search Section (Now in Step 2) -->
-    <div class="p-panel" style="margin-bottom: 1.5rem; border-left: 4px solid var(--primary);">
-        <div style="font-size: 0.75rem; font-weight: 800; color: var(--primary); text-transform: uppercase; margin-bottom: 1rem; display: flex; align-items: center; gap: 0.5rem;">
-            <i class="fas fa-search"></i> Media Search Criteria
-        </div>
-        
-        <div class="media-search-grid">
+    <!-- STEP 2: Media Selection & Search -->
+    <div id="step-2" style="display: none;">
+        <div class="p-panel" style="margin-bottom: 1rem; padding: 0.75rem;">
+            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 0.75rem; border-bottom: 1px solid #f1f5f9; padding-bottom: 0.5rem;">
+                <div style="display: flex; align-items: center; gap: 1rem;">
+                    <button onclick="goToStep1()" class="btn btn-secondary" style="height: 28px; padding: 0 0.6rem; font-size: 0.7rem; border-radius: 6px;">
+                        <i class="fas fa-arrow-left"></i> Back
+                    </button>
+                    <span style="font-weight: 900; color: var(--primary); font-size: 0.75rem; text-transform: uppercase; letter-spacing: 0.05em;">Search Criteria</span>
+                </div>
+                <div style="font-size: 0.65rem; color: #94a3b8; font-weight: 700;">STEP 2: ASSETS & STRATEGY</div>
+            </div>
+            
+            <div class="media-search-grid">
             <!-- Ownership & Availability -->
-            <div class="search-row" style="margin-bottom: 1.5rem; display: flex; gap: 3rem; align-items: flex-end;">
+            <div class="search-row" style="margin-bottom: 1rem; display: flex; gap: 2rem; align-items: flex-end;">
                 <div class="search-group">
-                    <label style="font-size: 0.75rem; font-weight: 800; color: var(--secondary); margin-bottom: 0.75rem; display: block; text-transform: uppercase;">Ownership Type</label>
-                    <div class="radio-group">
-                        <label><input type="radio" name="ownership" value="all" checked onchange="filterSites()"> All</label>
-                        <label><input type="radio" name="ownership" value="HA" onchange="filterSites()"> Self (HA)</label>
-                        <label><input type="radio" name="ownership" value="TA" onchange="filterSites()"> Vendor (TA)</label>
+                    <label style="font-size: 0.6rem; font-weight: 900; color: var(--secondary); margin-bottom: 0.4rem; display: block; text-transform: uppercase;">Ownership</label>
+                    <div class="radio-group" style="gap: 1rem;">
+                        <label style="font-size: 0.75rem;"><input type="radio" name="ownership" value="all" checked onchange="filterSites()"> All</label>
+                        <label style="font-size: 0.75rem;"><input type="radio" name="ownership" value="HA" onchange="filterSites()"> Self</label>
+                        <label style="font-size: 0.75rem;"><input type="radio" name="ownership" value="TA" onchange="filterSites()"> Vendor</label>
                     </div>
                 </div>
                 <div class="search-group">
-                    <label style="font-size: 0.75rem; font-weight: 800; color: var(--secondary); margin-bottom: 0.75rem; display: block; text-transform: uppercase;">Availability</label>
-                    <div class="radio-group">
-                        <label><input type="radio" name="availability" value="available" checked onchange="filterSites()"> Available Only</label>
-                        <label><input type="radio" name="availability" value="all" onchange="filterSites()"> All Media</label>
+                    <label style="font-size: 0.6rem; font-weight: 900; color: var(--secondary); margin-bottom: 0.4rem; display: block; text-transform: uppercase;">Availability</label>
+                    <div class="radio-group" style="gap: 1rem;">
+                        <label style="font-size: 0.75rem;"><input type="radio" name="availability" value="available" checked onchange="filterSites()"> Available</label>
+                        <label style="font-size: 0.75rem;"><input type="radio" name="availability" value="all" onchange="filterSites()"> All</label>
                     </div>
                 </div>
-                <div id="vendor-filter-group" class="search-group" style="display: none; min-width: 200px;">
-                    <label style="font-size: 0.75rem; font-weight: 800; color: var(--secondary); margin-bottom: 0.75rem; display: block; text-transform: uppercase;">Select Vendor</label>
-                    <select id="filter-vendor" class="p-input" onchange="filterSites()" style="height: 38px;">
+                <div id="vendor-filter-group" class="search-group" style="display: none; min-width: 180px;">
+                    <label style="font-size: 0.6rem; font-weight: 900; color: var(--secondary); margin-bottom: 0.4rem; display: block; text-transform: uppercase;">Vendor</label>
+                    <select id="filter-vendor" class="p-input" onchange="filterSites()" style="height: 30px; font-size: 0.75rem;">
                         <option value="">All Vendors</option>
                         <?php foreach($vendors as $v): ?>
                             <option value="<?php echo $v['id']; ?>"><?php echo $v['name']; ?></option>
@@ -177,43 +173,43 @@ $sizes = $pdo->query("SELECT DISTINCT CONCAT(width, 'x', height) as size FROM si
             </div>
 
             <!-- Search Criteria -->
-            <div style="display: grid; grid-template-columns: 2fr 1fr 1fr 1fr 1fr 1fr; gap: 0.75rem; margin-bottom: 1rem; align-items: flex-end;">
+            <div style="display: grid; grid-template-columns: 2fr 1fr 1fr 1fr 1fr 1fr; gap: 0.5rem; margin-bottom: 0.5rem; align-items: flex-end;">
                 <div class="form-group" style="margin-bottom: 0;">
-                    <label style="font-size: 0.65rem; font-weight: 800; color: var(--secondary); margin-bottom: 0.3rem; text-transform: uppercase;">Search Site / Code / Area</label>
-                    <input type="text" id="site-search" class="p-input" placeholder="Type to search..." oninput="filterSites()" style="height: 34px; font-size: 0.75rem;">
+                    <label style="font-size: 0.55rem; font-weight: 900; color: var(--secondary); margin-bottom: 0.2rem; text-transform: uppercase;">Search Site / Code / Area</label>
+                    <input type="text" id="site-search" class="p-input" placeholder="Type to search..." oninput="filterSites()" style="height: 30px; font-size: 0.75rem;">
                 </div>
                 <div class="form-group" style="margin-bottom: 0;">
-                    <label style="font-size: 0.65rem; font-weight: 800; color: var(--secondary); margin-bottom: 0.3rem; text-transform: uppercase;">Media Type</label>
-                    <select id="media_type" class="p-input" onchange="filterSites()" style="height: 34px; font-size: 0.75rem;">
-                        <option value="">All Media</option>
+                    <label style="font-size: 0.55rem; font-weight: 900; color: var(--secondary); margin-bottom: 0.2rem; text-transform: uppercase;">Media</label>
+                    <select id="media_type" class="p-input" onchange="filterSites()" style="height: 30px; font-size: 0.75rem;">
+                        <option value="">All</option>
                         <?php foreach($mediaTypes as $mt): ?> <option value="<?php echo $mt; ?>"><?php echo $mt; ?></option> <?php endforeach; ?>
                     </select>
                 </div>
                 <div class="form-group" style="margin-bottom: 0;">
-                    <label style="font-size: 0.65rem; font-weight: 800; color: var(--secondary); margin-bottom: 0.3rem; text-transform: uppercase;">State</label>
-                    <select id="filter-state" class="p-input" onchange="filterSites()" style="height: 34px; font-size: 0.75rem;">
-                        <option value="">All States</option>
+                    <label style="font-size: 0.55rem; font-weight: 900; color: var(--secondary); margin-bottom: 0.2rem; text-transform: uppercase;">State</label>
+                    <select id="filter-state" class="p-input" onchange="filterSites()" style="height: 30px; font-size: 0.75rem;">
+                        <option value="">All</option>
                         <?php foreach($states as $s): ?> <option value="<?php echo $s; ?>"><?php echo $s; ?></option> <?php endforeach; ?>
                     </select>
                 </div>
                 <div class="form-group" style="margin-bottom: 0;">
-                    <label style="font-size: 0.65rem; font-weight: 800; color: var(--secondary); margin-bottom: 0.3rem; text-transform: uppercase;">City</label>
-                    <select id="filter-city" class="p-input" onchange="filterSites()" style="height: 34px; font-size: 0.75rem;">
-                        <option value="">All Cities</option>
+                    <label style="font-size: 0.55rem; font-weight: 900; color: var(--secondary); margin-bottom: 0.2rem; text-transform: uppercase;">City</label>
+                    <select id="filter-city" class="p-input" onchange="filterSites()" style="height: 30px; font-size: 0.75rem;">
+                        <option value="">All</option>
                         <?php foreach($cities as $c): ?> <option value="<?php echo $c; ?>"><?php echo $c; ?></option> <?php endforeach; ?>
                     </select>
                 </div>
                 <div class="form-group" style="margin-bottom: 0;">
-                    <label style="font-size: 0.65rem; font-weight: 800; color: var(--secondary); margin-bottom: 0.3rem; text-transform: uppercase;">Light</label>
-                    <select id="light_type" class="p-input" onchange="filterSites()" style="height: 34px; font-size: 0.75rem;">
-                        <option value="">All Types</option>
+                    <label style="font-size: 0.55rem; font-weight: 900; color: var(--secondary); margin-bottom: 0.2rem; text-transform: uppercase;">Light</label>
+                    <select id="light_type" class="p-input" onchange="filterSites()" style="height: 30px; font-size: 0.75rem;">
+                        <option value="">All</option>
                         <?php foreach($illuminations as $il): ?> <option value="<?php echo $il; ?>"><?php echo $il; ?></option> <?php endforeach; ?>
                     </select>
                 </div>
                 <div class="form-group" style="margin-bottom: 0;">
-                    <label style="font-size: 0.65rem; font-weight: 800; color: var(--secondary); margin-bottom: 0.3rem; text-transform: uppercase;">Size</label>
-                    <select id="filter-size" class="p-input" onchange="filterSites()" style="height: 34px; font-size: 0.75rem;">
-                        <option value="">All Sizes</option>
+                    <label style="font-size: 0.55rem; font-weight: 900; color: var(--secondary); margin-bottom: 0.2rem; text-transform: uppercase;">Size</label>
+                    <select id="filter-size" class="p-input" onchange="filterSites()" style="height: 30px; font-size: 0.75rem;">
+                        <option value="">All</option>
                         <?php foreach($sizes as $sz): ?> <option value="<?php echo $sz; ?>"><?php echo $sz; ?></option> <?php endforeach; ?>
                     </select>
                 </div>
@@ -227,10 +223,12 @@ $sizes = $pdo->query("SELECT DISTINCT CONCAT(width, 'x', height) as size FROM si
             <div style="display: flex; align-items: center; gap: 1rem;">
                 <span>Select Assets Based on Your Criteria</span>
             </div>
-            <div style="display: flex; gap: 1rem; align-items: center;">
-                <div class="selection-stats" style="background: var(--primary); color: white; padding: 0.3rem 0.8rem; border-radius: 6px; font-weight: 800; font-size: 0.75rem;">
-                    Selected: <span id="selected-count">0</span> sites
-                </div>
+            <div class="header-right" style="display: flex; gap: 1rem; align-items: center;">
+                <button onclick="openBucket()" id="bucket-toggle-btn" style="background: #ecfdf5; color: #059669; border: 1px solid #d1fae5; padding: 0.5rem 1rem; border-radius: 10px; font-weight: 800; font-size: 0.85rem; cursor: pointer; display: flex; align-items: center; gap: 0.6rem; transition: all 0.2s;">
+                    <i class="fas fa-shopping-basket"></i>
+                    Selected: <span id="selected-count" style="background: #059669; color: white; padding: 0.1rem 0.5rem; border-radius: 4px; font-size: 0.75rem;">0</span>
+                </button>
+                <a href="index.php" class="btn btn-secondary" style="border-radius: 10px; height: 38px; display: flex; align-items: center;"><i class="fas fa-times"></i></a>
             </div>
         </div>
 
@@ -346,24 +344,30 @@ $sizes = $pdo->query("SELECT DISTINCT CONCAT(width, 'x', height) as size FROM si
         </div>
     </div>
 
-    <!-- SELECTION BUCKET (Cart View) -->
-    <div id="selection-bucket-panel" class="p-panel" style="margin-bottom: 2rem; border-top: 4px solid #059669; display: none;">
-        <div class="p-header" style="display: flex; justify-content: space-between; align-items: center;">
+    <!-- SELECTION BUCKET (Slide-out Drawer) -->
+    <div id="bucket-backdrop" onclick="closeBucket()" style="position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.4); backdrop-filter: blur(4px); z-index: 2000; display: none;"></div>
+    <div id="selection-bucket-panel" style="position: fixed; top: 0; right: -850px; width: 850px; height: 100%; background: white; z-index: 2001; box-shadow: -10px 0 30px rgba(0,0,0,0.1); transition: all 0.4s cubic-bezier(0.4, 0, 0.2, 1); display: flex; flex-direction: column;">
+        <div class="p-header" style="display: flex; justify-content: space-between; align-items: center; padding: 1.5rem; background: #059669; color: white; border: none; margin: 0;">
             <div style="display: flex; align-items: center; gap: 1rem;">
-                <i class="fas fa-shopping-basket"></i>
-                <span>Your Selection Bucket</span>
+                <i class="fas fa-shopping-basket" style="font-size: 1.2rem;"></i>
+                <span style="font-size: 1.1rem; color: white;">Selection Review</span>
             </div>
             <div style="display: flex; gap: 1rem; align-items: center;">
-                <div class="selection-stats" style="background: #059669; color: white; padding: 0.3rem 0.8rem; border-radius: 6px; font-weight: 800; font-size: 0.75rem;">
-                    Bucket: <span id="bucket-count">0</span> Assets
+                <div class="selection-stats" style="background: rgba(255,255,255,0.2); color: white; padding: 0.3rem 0.8rem; border-radius: 6px; font-weight: 800; font-size: 0.75rem;">
+                    <span id="bucket-count">0</span> Assets Selected
                 </div>
+                <button onclick="closeBucket()" style="background: rgba(0,0,0,0.1); border: none; color: white; width: 32px; height: 32px; border-radius: 8px; cursor: pointer; font-size: 1.2rem;">&times;</button>
             </div>
         </div>
-        <div id="bucket-empty-msg" style="padding: 2rem; text-align: center; color: #94a3b8; font-weight: 700;">
-            <i class="fas fa-info-circle" style="margin-right: 0.5rem;"></i> No assets selected yet.
+        <div id="bucket-empty-msg" style="padding: 4rem 2rem; text-align: center; color: #94a3b8; font-weight: 700;">
+            <i class="fas fa-shopping-cart" style="font-size: 3rem; margin-bottom: 1rem; display: block; opacity: 0.3;"></i>
+            Your bucket is empty. Select assets from the main list.
         </div>
-        <div id="bucket-list" style="padding: 1.5rem;">
-            <!-- Selected items will be injected here via JS -->
+        <div id="bucket-list" style="flex: 1; overflow-y: auto; padding: 1rem;">
+            <!-- Selected items injected here -->
+        </div>
+        <div style="padding: 1.5rem; border-top: 1px solid #e2e8f0; background: #f8fafc;">
+            <button onclick="closeBucket()" class="btn btn-primary" style="width: 100%; height: 45px; border-radius: 10px; font-weight: 800;">CONTINUE SELECTION</button>
         </div>
     </div>
 
@@ -886,6 +890,23 @@ function toggleSite(id) {
     
     updateBucketUI();
     recalcAll();
+    
+    // Auto open drawer on first selection if closed
+    if (selectedSites.length === 1 && idx === -1) {
+        openBucket();
+    }
+}
+
+function openBucket() {
+    document.getElementById('selection-bucket-panel').style.right = '0';
+    document.getElementById('bucket-backdrop').style.display = 'block';
+    document.body.style.overflow = 'hidden'; // Prevent background scroll
+}
+
+function closeBucket() {
+    document.getElementById('selection-bucket-panel').style.right = '-850px';
+    document.getElementById('bucket-backdrop').style.display = 'none';
+    document.body.style.overflow = '';
 }
 
 function updateBucketUI() {
@@ -895,14 +916,13 @@ function updateBucketUI() {
     const bucketCount = document.getElementById('bucket-count');
     
     if (selectedSites.length === 0) {
-        bucketPanel.style.display = 'none';
-        emptyMsg.style.display = 'block';
+        document.getElementById('bucket-empty-msg').style.display = 'block';
         bucketList.innerHTML = '';
+        bucketCount.innerText = '0';
         return;
     }
     
-    bucketPanel.style.display = 'block';
-    emptyMsg.style.display = 'none';
+    document.getElementById('bucket-empty-msg').style.display = 'none';
     bucketCount.innerText = selectedSites.length;
     
     let html = `
