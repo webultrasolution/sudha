@@ -15,11 +15,13 @@ if ($bookingId) {
 
 // Fetch Operations (Site-wise execution)
 $stmt = $pdo->prepare("
-    SELECT op.*, s.name as site_name, s.site_code, s.location, s.type as site_type, p.name as client_name, b.id as booking_id
+    SELECT op.*, s.name as site_name, s.site_code, s.location, s.type as site_type, s.owner_type, 
+           p.name as client_name, b.id as booking_id, v.name as vendor_name
     FROM operations op
     JOIN sites s ON op.site_id = s.id
     JOIN bookings b ON op.booking_id = b.id
     JOIN partners p ON b.client_id = p.id
+    LEFT JOIN partners v ON s.vendor_id = v.id
     $where
     ORDER BY op.id DESC
 ");
@@ -58,6 +60,10 @@ $mounters = $pdo->query("SELECT id, full_name FROM users WHERE role = 'operation
                     <div style="font-weight: 700; color: #1e293b;"><?php echo $op['site_name']; ?></div>
                     <div style="font-size: 0.7rem; color: #94a3b8; font-weight: 600; text-transform: uppercase;">
                         Code: <?php echo $op['site_code']; ?> • <?php echo $op['location']; ?>
+                    </div>
+                    <div style="font-size: 0.65rem; color: #475569; font-weight: 800; margin-top: 4px; text-transform: uppercase; background: #f1f5f9; padding: 2px 6px; border-radius: 4px; display: inline-block;">
+                        <?php echo $op['owner_type']; ?>
+                        <?php if ($op['owner_type'] === 'TA' && $op['vendor_name']) echo " - " . htmlspecialchars($op['vendor_name']); ?>
                     </div>
                 </td>
                 <td>

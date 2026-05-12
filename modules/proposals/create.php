@@ -270,6 +270,7 @@ $sizes = $pdo->query("SELECT DISTINCT CONCAT(width, 'x', height) as size FROM si
                         data-prate="<?php echo $s['purchase_rate']; ?>" 
                         data-owner="<?php echo $s['owner_type']; ?>"
                         data-vendor="<?php echo $s['vendor_id']; ?>"
+                        data-vendor-name="<?php echo htmlspecialchars($s['vendor_name'] ?? ''); ?>"
                         data-width="<?php echo $s['width']; ?>"
                         data-height="<?php echo $s['height']; ?>"
                         data-size="<?php echo $s['width'] . 'x' . $s['height']; ?>"
@@ -302,7 +303,10 @@ $sizes = $pdo->query("SELECT DISTINCT CONCAT(width, 'x', height) as size FROM si
                             <div style="display: flex; gap: 0.4rem; align-items: center;">
                                 <span style="background: #ecfdf5; color: #059669; padding: 0.2rem 0.6rem; border-radius: 6px; font-size: 0.6rem; font-weight: 800; text-transform: uppercase;"><?php echo $s['type']; ?></span>
                                 <span style="background: #f1f5f9; color: #475569; padding: 0.2rem 0.6rem; border-radius: 6px; font-size: 0.6rem; font-weight: 800; text-transform: uppercase;"><?php echo $s['light_type']; ?></span>
-                                <span style="background: #f1f5f9; color: #475569; padding: 0.2rem 0.6rem; border-radius: 6px; font-size: 0.6rem; font-weight: 800; text-transform: uppercase;"><?php echo $s['owner_type']; ?></span>
+                                <span style="background: #f1f5f9; color: #475569; padding: 0.2rem 0.6rem; border-radius: 6px; font-size: 0.6rem; font-weight: 800; text-transform: uppercase;">
+                                    <?php echo $s['owner_type']; ?>
+                                    <?php if ($s['owner_type'] === 'TA' && $s['vendor_name']) echo " - " . htmlspecialchars($s['vendor_name']); ?>
+                                </span>
                             </div>
                         </td>
 
@@ -872,10 +876,11 @@ function toggleSite(id) {
         const thumbnail = row.dataset.thumbnail;
         const width = row.dataset.width;
         const height = row.dataset.height;
+        const vendorName = row.dataset.vendorName;
         const siteCode = row.dataset.code;
         const area = row.querySelector('.location-area') ? row.querySelector('.location-area').innerText : '';
 
-        selectedSites.push({ id, name, cardRate: rate, purchaseRate: prate, saleRate: rate, owner, sqft, city, state, type, illumination, thumbnail, width, height, siteCode, area });
+        selectedSites.push({ id, name, cardRate: rate, purchaseRate: prate, saleRate: rate, owner, sqft, city, state, type, illumination, thumbnail, width, height, vendorName, siteCode, area });
         if(row) row.classList.add('selected');
         if(chk) chk.checked = true;
         if(input) input.disabled = false;
@@ -962,7 +967,9 @@ function updateBucketUI() {
                     <div style="display: flex; gap: 0.4rem; align-items: center;">
                         <span style="background: #ecfdf5; color: #059669; padding: 0.2rem 0.6rem; border-radius: 6px; font-size: 0.6rem; font-weight: 800; text-transform: uppercase;">${site.type}</span>
                         <span style="background: #f1f5f9; color: #475569; padding: 0.2rem 0.6rem; border-radius: 6px; font-size: 0.6rem; font-weight: 800; text-transform: uppercase;">${site.illumination}</span>
-                        <span style="background: #f1f5f9; color: #475569; padding: 0.2rem 0.6rem; border-radius: 6px; font-size: 0.6rem; font-weight: 800; text-transform: uppercase;">${site.owner}</span>
+                        <span style="background: #f1f5f9; color: #475569; padding: 0.2rem 0.6rem; border-radius: 6px; font-size: 0.6rem; font-weight: 800; text-transform: uppercase;">
+                            ${site.owner}${site.owner === 'TA' && site.vendorName ? ' - ' + site.vendorName : ''}
+                        </span>
                     </div>
                 </td>
 
