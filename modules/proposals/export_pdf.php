@@ -30,15 +30,14 @@ $items = $pdo->prepare("
 $items->execute([$id]);
 $items = $items->fetchAll();
 
-// Fetch All Images for the visual plan
+// Fetch All Images for the visual plan (One per site)
 $images_stmt = $pdo->prepare("
     SELECT pi.*, s.site_code, s.location, s.city as site_city, s.type as site_type, s.width, s.height, s.light_type,
-    si.filename as image
+    COALESCE(pi.selected_image, (SELECT filename FROM site_images WHERE site_id = s.id LIMIT 1)) as image
     FROM proposal_items pi
     JOIN sites s ON pi.site_id = s.id
-    JOIN site_images si ON s.id = si.site_id
     WHERE pi.proposal_id = ?
-    ORDER BY pi.id ASC, si.is_primary DESC
+    ORDER BY pi.id ASC
 ");
 $images_stmt->execute([$id]);
 $visual_data = $images_stmt->fetchAll();
