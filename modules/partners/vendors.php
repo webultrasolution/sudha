@@ -280,7 +280,7 @@ function editVendor(v) {
     document.getElementById('vendorModal').style.display = 'block';
 }
 
-function addGstRow(data = {gstin: '', city: '', district: '', state: ''}) {
+function addGstRow(data = {gstin: '', city: '', district: '', state: '', pan: '', address: ''}) {
     const container = document.getElementById('gst_rows_list');
     const rowId = 'row_' + Date.now() + Math.random().toString(36).substr(2, 5);
     
@@ -291,11 +291,16 @@ function addGstRow(data = {gstin: '', city: '', district: '', state: ''}) {
             </button>
             <div class="form-group" style="margin-bottom: 0;">
                 <label style="font-size: 0.7rem; color: #64748b; font-weight: 700; text-transform: uppercase; letter-spacing: 0.025em;">GSTIN</label>
-                <input type="text" name="gst_rows[${rowId}][gstin]" value="${data.gstin}" placeholder="GSTIN" style="padding: 0.5rem; font-size: 0.85rem; border-color: #f1f5f9; background: #f8fafc;">
+                <div style="display: flex; gap: 4px;">
+                    <input type="text" name="gst_rows[${rowId}][gstin]" id="gstin_${rowId}" value="${data.gstin || ''}" placeholder="GSTIN" style="padding: 0.5rem; font-size: 0.85rem; border-color: #f1f5f9; background: #f8fafc; flex: 1;">
+                    <button type="button" onclick="fetchBranchGSTDetails('${rowId}')" style="padding: 0 8px; background: #64748b; color: white; border: none; border-radius: 4px; cursor: pointer;">
+                        <i class="fas fa-sync-alt" id="loader_${rowId}"></i>
+                    </button>
+                </div>
             </div>
             <div class="form-group" style="margin-bottom: 0;">
                 <label style="font-size: 0.7rem; color: #64748b; font-weight: 700; text-transform: uppercase; letter-spacing: 0.025em;">State</label>
-                <select name="gst_rows[${rowId}][state]" style="padding: 0.5rem; font-size: 0.85rem; border-color: #f1f5f9; background: #f8fafc;">
+                <select name="gst_rows[${rowId}][state]" id="state_${rowId}" style="padding: 0.5rem; font-size: 0.85rem; border-color: #f1f5f9; background: #f8fafc;">
                     <option value="">Select State</option>
                     <?php foreach ($indian_states as $s): ?>
                         <option value="<?php echo $s; ?>" ${data.state === '<?php echo $s; ?>' ? 'selected' : ''}><?php echo $s; ?></option>
@@ -304,11 +309,19 @@ function addGstRow(data = {gstin: '', city: '', district: '', state: ''}) {
             </div>
             <div class="form-group" style="margin-bottom: 0;">
                 <label style="font-size: 0.7rem; color: #64748b; font-weight: 700; text-transform: uppercase; letter-spacing: 0.025em;">City</label>
-                <input type="text" name="gst_rows[${rowId}][city]" value="${data.city}" placeholder="City" style="padding: 0.5rem; font-size: 0.85rem; border-color: #f1f5f9; background: #f8fafc;">
+                <input type="text" name="gst_rows[${rowId}][city]" id="city_${rowId}" value="${data.city || ''}" placeholder="City" style="padding: 0.5rem; font-size: 0.85rem; border-color: #f1f5f9; background: #f8fafc;">
             </div>
             <div class="form-group" style="margin-bottom: 0;">
                 <label style="font-size: 0.7rem; color: #64748b; font-weight: 700; text-transform: uppercase; letter-spacing: 0.025em;">District</label>
-                <input type="text" name="gst_rows[${rowId}][district]" value="${data.district}" placeholder="District" style="padding: 0.5rem; font-size: 0.85rem; border-color: #f1f5f9; background: #f8fafc;">
+                <input type="text" name="gst_rows[${rowId}][district]" id="district_${rowId}" value="${data.district || ''}" placeholder="District" style="padding: 0.5rem; font-size: 0.85rem; border-color: #f1f5f9; background: #f8fafc;">
+            </div>
+            <div class="form-group" style="margin-bottom: 0; grid-column: span 2;">
+                <label style="font-size: 0.7rem; color: #64748b; font-weight: 700; text-transform: uppercase; letter-spacing: 0.025em;">Full Address</label>
+                <textarea name="gst_rows[${rowId}][address]" id="address_${rowId}" rows="2" placeholder="Branch Address" style="padding: 0.5rem; font-size: 0.85rem; border-color: #f1f5f9; background: #f8fafc; resize: vertical;">${data.address || ''}</textarea>
+            </div>
+            <div class="form-group" style="margin-bottom: 0; grid-column: span 2;">
+                <label style="font-size: 0.7rem; color: #64748b; font-weight: 700; text-transform: uppercase; letter-spacing: 0.025em;">PAN Number</label>
+                <input type="text" name="gst_rows[${rowId}][pan]" id="pan_${rowId}" value="${data.pan || ''}" placeholder="PAN (Extracted from GSTIN)" style="padding: 0.5rem; font-size: 0.85rem; border-color: #f1f5f9; background: #f8fafc; font-family: monospace;">
             </div>
         </div>
     `;
@@ -447,6 +460,49 @@ async function fetchGSTDetails() {
     } catch (error) {
         console.error('GST Fetch Error:', error);
         document.getElementById('f_pan').value = gstin.substring(2, 12);
+        Swal.fire('Error', 'Failed to connect to GST API. PAN extracted from GSTIN.', 'warning');
+    } finally {
+        loader.classList.remove('fa-spin');
+    }
+}
+
+async function fetchBranchGSTDetails(rowId) {
+    const gstin = document.getElementById(`gstin_${rowId}`).value.trim();
+    if (gstin.length !== 15) {
+        Swal.fire('Invalid GSTIN', 'Please enter a valid 15-digit GSTIN for this branch.', 'error');
+        return;
+    }
+
+    const loader = document.getElementById(`loader_${rowId}`);
+    loader.classList.add('fa-spin');
+    
+    try {
+        const response = await fetch(`../../ajax/fetch_gst.php?gstin=${gstin}`);
+        const result = await response.json();
+        
+        // Auto-extract PAN from GSTIN regardless of API success
+        if (gstin.length >= 12) {
+            document.getElementById(`pan_${rowId}`).value = gstin.substring(2, 12);
+        }
+
+        if (result.success) {
+            if (result.data.city) document.getElementById(`city_${rowId}`).value = result.data.city;
+            if (result.data.state) document.getElementById(`state_${rowId}`).value = result.data.state;
+            if (result.data.district) document.getElementById(`district_${rowId}`).value = result.data.district;
+            if (result.data.address) document.getElementById(`address_${rowId}`).value = result.data.address;
+            
+            Swal.fire({
+                icon: 'success',
+                title: 'Branch Data Fetched',
+                text: 'Location details, address, and PAN populated.',
+                timer: 1000,
+                showConfirmButton: false
+            });
+        } else {
+            Swal.fire('Info', result.message || 'Could not fetch full branch details, but PAN has been extracted.', 'info');
+        }
+    } catch (error) {
+        console.error('Branch GST Fetch Error:', error);
         Swal.fire('Error', 'Failed to connect to GST API. PAN extracted from GSTIN.', 'warning');
     } finally {
         loader.classList.remove('fa-spin');

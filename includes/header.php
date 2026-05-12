@@ -2,6 +2,7 @@
 include_once __DIR__ . '/../config/db.php';
 include_once __DIR__ . '/functions.php';
 checkAuth();
+$activeEntity = getActiveEntity();
 ?>
 <!DOCTYPE html>
 <html lang="en">
@@ -20,7 +21,11 @@ checkAuth();
     <?php if (!isset($hideSidebar) || !$hideSidebar): ?>
     <div class="sidebar">
         <div class="sidebar-brand">
-            <img src="<?php echo BASE_URL; ?>assets/img/LOGO.png" alt="Sudha Creative" class="sidebar-logo">
+            <?php if ($activeEntity && $activeEntity['logo']): ?>
+                <img src="<?php echo BASE_URL; ?>assets/images/<?php echo $activeEntity['logo']; ?>" alt="<?php echo htmlspecialchars($activeEntity['name']); ?>" class="sidebar-logo">
+            <?php else: ?>
+                <img src="<?php echo BASE_URL; ?>assets/img/LOGO.png" alt="Sudha Creative" class="sidebar-logo">
+            <?php endif; ?>
         </div>
         <ul class="nav-menu">
             <li class="nav-item">
@@ -68,13 +73,14 @@ checkAuth();
             
             <!-- Tools & Insights Submenu -->
             <li class="nav-item has-submenu">
-                <a href="#" class="nav-link submenu-toggle <?php echo in_array($activePage, ['reports', 'resources', 'photofactory']) ? 'active submenu-open' : ''; ?>">
+                <a href="#" class="nav-link submenu-toggle <?php echo in_array($activePage, ['reports', 'resources', 'photofactory', 'entities', 'settings']) ? 'active submenu-open' : ''; ?>">
                     <i class="fas fa-chart-line"></i> <span>Tools & Insights</span> <i class="fas fa-chevron-down toggle-icon" style="margin-left: auto; font-size: 0.8rem;"></i>
                 </a>
-                <ul class="submenu" style="<?php echo in_array($activePage, ['reports', 'resources', 'photofactory']) ? 'display: block;' : 'display: none;'; ?>">
+                <ul class="submenu" style="<?php echo in_array($activePage, ['reports', 'resources', 'photofactory', 'entities', 'settings']) ? 'display: block;' : 'display: none;'; ?>">
                     <li><a href="<?php echo BASE_URL; ?>modules/reports/reports.php" class="<?php echo $activePage == 'reports' ? 'active-sub' : ''; ?>"><i class="fas fa-chart-pie"></i> Reports</a></li>
                     <?php if (hasRole('admin')): ?>
                         <li><a href="<?php echo BASE_URL; ?>modules/admin/settings.php" class="<?php echo $activePage == 'settings' ? 'active-sub' : ''; ?>"><i class="fas fa-cog"></i> Admin Settings</a></li>
+                        <li><a href="<?php echo BASE_URL; ?>modules/admin/entities.php" class="<?php echo $activePage == 'entities' ? 'active-sub' : ''; ?>"><i class="fas fa-layer-group"></i> Multi Content</a></li>
                     <?php endif; ?>
                     <?php if (($_SESSION['user_role'] ?? '') === 'admin'): ?>
                         <li><a href="<?php echo BASE_URL; ?>modules/users/index.php" class="<?php echo $activePage == 'users' ? 'active-sub' : ''; ?>"><i class="fas fa-users-cog"></i> User Management</a></li>
@@ -138,7 +144,23 @@ checkAuth();
                 <?php endif; ?>
                 <h1 style="font-size: 1.25rem; font-weight: 800; color: #0f172a; margin: 0;"><?php echo isset($pageTitle) ? $pageTitle : 'Dashboard'; ?></h1>
             </div>
-            <div class="user-info hide-mobile">
+            <div class="user-info hide-mobile" style="display: flex; align-items: center; gap: 1.5rem;">
+                <!-- Content Switcher -->
+                <?php
+                $allEntities = $pdo->query("SELECT id, name FROM entities")->fetchAll();
+                if (count($allEntities) > 1):
+                ?>
+                <div class="entity-switcher" style="position: relative;">
+                    <select onchange="window.location.href='?set_entity=' + this.value" style="background: #f1f5f9; border: 1px solid #e2e8f0; padding: 0.4rem 1rem; border-radius: 8px; font-size: 0.8rem; font-weight: 700; color: #475569; cursor: pointer;">
+                        <?php foreach ($allEntities as $e): ?>
+                            <option value="<?php echo $e['id']; ?>" <?php echo ($_SESSION['active_entity_id'] ?? '') == $e['id'] ? 'selected' : ''; ?>>
+                                <?php echo htmlspecialchars($e['name']); ?>
+                            </option>
+                        <?php endforeach; ?>
+                    </select>
+                </div>
+                <?php endif; ?>
+                
                 <span style="font-weight: 600; color: #64748b;">Welcome, <?php echo $_SESSION['user_name'] ?? 'Guest'; ?></span>
             </div>
         </div>
