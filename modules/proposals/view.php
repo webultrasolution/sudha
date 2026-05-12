@@ -28,7 +28,7 @@ if (!$p) { echo "<div class='card'>Proposal not found.</div>"; include_once __DI
 
 // Fetch Items with full site details
 $stmtItems = $pdo->prepare("
-    SELECT pi.*, s.site_code, s.location, s.city, s.type as media_type, s.owner_type, 
+    SELECT pi.*, s.site_code, s.name as site_name, s.location, s.city, s.type as media_type, s.owner_type, 
            s.width, s.height, s.light_type, s.card_rate as site_card_rate, s.available_from, s.purchase_rate as master_purchase,
            v.name as vendor_name
     FROM proposal_items pi
@@ -213,18 +213,20 @@ $taMarkupPct = ($taCost > 0) ? ($taMarkup / $taCost) * 100 : 0;
             <tr>
                 <td><input type="checkbox" class="item-checkbox" value="<?php echo $item['id']; ?>" checked style="cursor: pointer;"></td>
                 <td>
-                    <div style="font-weight: 700; color: #334155; margin-bottom: 2px; white-space: normal; line-height: 1.4;"><?php echo $item['location']; ?></div>
-                    <div style="font-size: 0.7rem; color: #94a3b8; text-transform: uppercase; font-weight: 600;">
-                        <?php echo $item['media_type']; ?> • <?php echo $item['light_type']; ?> • 
-                        <span class="badge-type">
+                    <div style="font-weight: 800; color: #1e293b; margin-bottom: 2px;"><?php echo $item['site_name']; ?></div>
+                    <div style="font-size: 0.75rem; color: #64748b; margin-bottom: 6px;"><?php echo $item['location']; ?></div>
+                    <div style="display: flex; gap: 0.4rem; align-items: center;">
+                        <span style="background: #ecfdf5; color: #059669; padding: 0.2rem 0.6rem; border-radius: 6px; font-size: 0.6rem; font-weight: 800; text-transform: uppercase;"><?php echo $item['media_type']; ?></span>
+                        <span style="background: #f1f5f9; color: #475569; padding: 0.2rem 0.6rem; border-radius: 6px; font-size: 0.6rem; font-weight: 800; text-transform: uppercase;"><?php echo $item['light_type']; ?></span>
+                        <span style="background: #f1f5f9; color: #475569; padding: 0.2rem 0.6rem; border-radius: 6px; font-size: 0.6rem; font-weight: 800; text-transform: uppercase;">
                             <?php echo $item['owner_type']; ?>
                             <?php if ($item['owner_type'] === 'TA' && $item['vendor_name']) echo " - " . htmlspecialchars($item['vendor_name']); ?>
                         </span>
                     </div>
                 </td>
                 <td>
-                    <div style="font-weight: 700; color: #1e293b;"><?php echo $item['city']; ?></div>
-                    <div style="font-size: 0.7rem; color: #94a3b8; font-weight: 600;"><?php echo $item['site_code']; ?></div>
+                    <div style="font-weight: 800; color: #1e293b;"><?php echo $item['city']; ?></div>
+                    <div style="font-size: 0.75rem; color: #f97316; font-weight: 800;"><?php echo $item['site_code']; ?></div>
                 </td>
                 <td>
                     <div style="font-weight: 700; color: #475569;"><?php echo $item['width']; ?>' x <?php echo $item['height']; ?>'</div>
