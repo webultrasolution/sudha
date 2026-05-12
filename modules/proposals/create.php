@@ -17,6 +17,7 @@ $sitesQuery = "
     SELECT 
         s.*, 
         p.name as vendor_name,
+        (SELECT GROUP_CONCAT(filename) FROM site_images WHERE site_id = s.id) as all_images,
         (SELECT filename FROM site_images WHERE site_id = s.id LIMIT 1) as thumbnail 
     FROM sites s 
     LEFT JOIN partners p ON s.vendor_id = p.id
@@ -272,6 +273,7 @@ $sizes = $pdo->query("SELECT DISTINCT CONCAT(width, 'x', height) as size FROM si
                         data-height="<?php echo $s['height']; ?>"
                         data-size="<?php echo $s['width'] . 'x' . $s['height']; ?>"
                         data-thumbnail="<?php echo $s['thumbnail'] ?? ''; ?>"
+                        data-images="<?php echo $s['all_images'] ?? ''; ?>"
                         data-sqft="<?php echo $sqft; ?>">
                         
                         <td class="sno-cell" style="padding: 0.6rem 1rem; font-weight: 700; color: #64748b;"><?php echo $sno++; ?></td>
@@ -281,8 +283,21 @@ $sizes = $pdo->query("SELECT DISTINCT CONCAT(width, 'x', height) as size FROM si
                         </td>
 
                         <td style="padding: 0.6rem 1rem;">
-                            <?php if (!empty($s['thumbnail'])): ?>
-                                <img src="<?php echo BASE_URL; ?>uploads/sites/<?php echo $s['thumbnail']; ?>" onclick="openLightbox(this.src)" class="site-thumb" style="width: 80px; height: 50px; border-radius: 8px; object-fit: cover; border: 1px solid #e2e8f0; cursor: pointer; transition: transform 0.2s;">
+                            <?php if (!empty($s['thumbnail'])): 
+                                $imgList = explode(',', $s['all_images'] ?? '');
+                                $imgCount = count($imgList);
+                            ?>
+                                <div style="position: relative; width: 80px; height: 50px;">
+                                    <img src="<?php echo BASE_URL; ?>uploads/sites/<?php echo $s['thumbnail']; ?>" 
+                                         onclick="openLightboxSlider('<?php echo htmlspecialchars($s['all_images']); ?>')" 
+                                         class="site-thumb" 
+                                         style="width: 100%; height: 100%; border-radius: 8px; object-fit: cover; border: 1px solid #e2e8f0; cursor: pointer; transition: transform 0.2s;">
+                                    <?php if ($imgCount > 1): ?>
+                                        <div style="position: absolute; bottom: 4px; right: 4px; background: rgba(0,0,0,0.7); color: white; font-size: 0.55rem; padding: 2px 5px; border-radius: 4px; font-weight: 800; backdrop-filter: blur(2px);">
+                                            <i class="fas fa-images"></i> <?php echo $imgCount; ?>
+                                        </div>
+                                    <?php endif; ?>
+                                </div>
                             <?php else: ?>
                                 <div style="width: 80px; height: 50px; border-radius: 8px; background: #f8fafc; border: 1px dashed #e2e8f0; display: flex; align-items: center; justify-content: center; font-size: 0.6rem; color: #94a3b8; font-weight: 700;">No Img</div>
                             <?php endif; ?>
@@ -1283,30 +1298,89 @@ function goToStep1() {
     document.getElementById('wizard-progress-line').style.width = '0%';
 }
 
-// Lightbox Functions
-function openLightbox(src) {
-    console.log("Opening Lightbox for:", src);
+// Lightbox & Slider Logic
+let currentImages = [];
+let currentImgIndex = 0;
+const baseUrl = "<?php echo BASE_URL; ?>uploads/sites/";
+
+function openLightboxSlider(imageString) {
+    if (!imageString) return;
+    currentImages = imageString.split(',');
+    currentImgIndex = 0;
+    
+    updateSliderImage();
+    
     const lb = document.getElementById('simple-lightbox');
-    const lbImg = document.getElementById('lightbox-img');
-    if(lb && lbImg) {
-        lbImg.src = src;
+    if(lb) {
         lb.style.display = 'flex';
-    } else {
-        console.error("Lightbox elements not found");
+        // Show/Hide Nav Buttons
+        const navs = document.querySelectorAll('.slider-nav');
+        navs.forEach(n => n.style.display = currentImages.length > 1 ? 'flex' : 'none');
     }
+}
+
+function updateSliderImage() {
+    const lbImg = document.getElementById('lightbox-img');
+    const lbBadge = document.getElementById('lightbox-badge');
+    if(lbImg) {
+        lbImg.src = baseUrl + currentImages[currentImgIndex];
+        if(lbBadge) {
+            lbBadge.innerText = (currentImgIndex + 1) + " / " + currentImages.length;
+            lbBadge.style.display = currentImages.length > 1 ? 'block' : 'none';
+        }
+    }
+}
+
+function nextSlide(e) {
+    if(e) e.stopPropagation();
+    currentImgIndex = (currentImgIndex + 1) % currentImages.length;
+    updateSliderImage();
+}
+
+function prevSlide(e) {
+    if(e) e.stopPropagation();
+    currentImgIndex = (currentImgIndex - 1 + currentImages.length) % currentImages.length;
+    updateSliderImage();
 }
 
 function closeLightbox() {
     const lb = document.getElementById('simple-lightbox');
     if(lb) lb.style.display = 'none';
 }
+
+// Keyboard Support
+document.addEventListener('keydown', function(e) {
+    const lb = document.getElementById('simple-lightbox');
+    if(lb && lb.style.display === 'flex') {
+        if(e.key === 'ArrowRight') nextSlide();
+        if(e.key === 'ArrowLeft') prevSlide();
+        if(e.key === 'Escape') closeLightbox();
+    }
+});
 </script>
 
 <!-- Simple Lightbox HTML -->
-<div id="simple-lightbox" onclick="closeLightbox()" style="position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.9); z-index: 9999; display: none; align-items: center; justify-content: center; backdrop-filter: blur(8px);">
-    <div style="position: relative; max-width: 90%; max-height: 90%;">
-        <img id="lightbox-img" src="" style="max-width: 100%; max-height: 90vh; border-radius: 12px; box-shadow: 0 20px 50px rgba(0,0,0,0.5); border: 4px solid white;">
-        <div style="position: absolute; top: -40px; right: 0; color: white; font-size: 2rem; cursor: pointer;">&times;</div>
+<div id="simple-lightbox" onclick="closeLightbox()" style="position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.95); z-index: 9999; display: none; align-items: center; justify-content: center; backdrop-filter: blur(10px);">
+    <div style="position: relative; max-width: 90%; max-height: 90%; display: flex; align-items: center; justify-content: center;" onclick="event.stopPropagation()">
+        
+        <!-- Prev Button -->
+        <button class="slider-nav" onclick="prevSlide(event)" style="position: absolute; left: -80px; background: rgba(255,255,255,0.1); color: white; border: 1px solid rgba(255,255,255,0.2); width: 50px; height: 50px; border-radius: 50%; display: flex; align-items: center; justify-content: center; cursor: pointer; font-size: 1.5rem; transition: all 0.3s; z-index: 10001;">
+            <i class="fas fa-chevron-left"></i>
+        </button>
+
+        <div style="position: relative;">
+            <img id="lightbox-img" src="" style="max-width: 100%; max-height: 85vh; border-radius: 16px; box-shadow: 0 30px 60px rgba(0,0,0,0.8); border: 2px solid rgba(255,255,255,0.15);">
+            <!-- Image Counter Badge -->
+            <div id="lightbox-badge" style="position: absolute; bottom: 20px; left: 50%; transform: translateX(-50%); background: rgba(0,0,0,0.7); color: white; padding: 6px 16px; border-radius: 50px; font-weight: 800; font-size: 0.85rem; backdrop-filter: blur(5px); border: 1px solid rgba(255,255,255,0.2);"></div>
+        </div>
+
+        <!-- Next Button -->
+        <button class="slider-nav" onclick="nextSlide(event)" style="position: absolute; right: -80px; background: rgba(255,255,255,0.1); color: white; border: 1px solid rgba(255,255,255,0.2); width: 50px; height: 50px; border-radius: 50%; display: flex; align-items: center; justify-content: center; cursor: pointer; font-size: 1.5rem; transition: all 0.3s; z-index: 10001;">
+            <i class="fas fa-chevron-right"></i>
+        </button>
+
+        <!-- Close Button -->
+        <div onclick="closeLightbox()" style="position: absolute; top: -60px; right: -60px; color: white; font-size: 2.5rem; cursor: pointer; opacity: 0.6; transition: opacity 0.2s;" onmouseover="this.style.opacity=1" onmouseout="this.style.opacity=0.6">&times;</div>
     </div>
 </div>
 <?php include_once __DIR__ . '/../../includes/footer.php'; ?>
