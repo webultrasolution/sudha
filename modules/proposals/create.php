@@ -368,68 +368,53 @@ $sizes = $pdo->query("SELECT DISTINCT CONCAT(width, 'x', height) as size FROM si
     </div>
 
     <!-- Bottom: Configuration Grid -->
-    <div class="proposal-bottom-grid" style="grid-template-columns: 1fr 1fr; display: grid; gap: 1.5rem;">
-        <!-- Pricing Controls -->
-        <div class="p-panel">
-            <div class="p-header"> Pricing & Costs</div>
-            <div class="form-grid">
-                <div class="form-group">
-                    <label>Discount (%)</label>
-                    <input type="number" id="global_discount" value="0" class="p-input" oninput="recalcAll()" style="height: 34px;">
-                </div>
-                <div class="form-group">
-                    <label>Markup (%)</label>
-                    <input type="number" id="global_markup" value="0" class="p-input" oninput="recalcAll()" style="height: 34px;">
-                </div>
+    <!-- Sleek Horizontal Action Bar -->
+    <div class="proposal-action-bar" style="position: sticky; bottom: 0; background: white; border-top: 2px solid var(--primary); padding: 0.5rem 1rem; display: flex; align-items: center; justify-content: space-between; gap: 1.5rem; margin-top: 1rem; box-shadow: 0 -10px 25px rgba(0,0,0,0.05); z-index: 1000; border-radius: 12px 12px 0 0;">
+        <!-- Inputs Group -->
+        <div style="display: flex; gap: 1rem; align-items: center;">
+            <div style="display: flex; align-items: center; gap: 0.5rem;">
+                <label style="font-size: 0.65rem; font-weight: 800; color: #64748b; text-transform: uppercase;">Disc %</label>
+                <input type="number" id="global_discount" value="0" class="p-input" oninput="recalcAll()" style="width: 60px; height: 28px; font-size: 0.8rem; padding: 0 0.4rem;">
             </div>
-            <div class="form-grid" style="margin-top: 1rem;">
-                <div class="form-group">
-                    <label>Printing (₹)</label>
-                    <input type="number" id="print_cost" value="0" class="p-input" oninput="recalcAll()" style="height: 34px;">
-                </div>
-                <div class="form-group">
-                    <label>Mounting (₹)</label>
-                    <input type="number" id="mount_cost" value="0" class="p-input" oninput="recalcAll()" style="height: 34px;">
-                </div>
+            <div style="display: flex; align-items: center; gap: 0.5rem;">
+                <label style="font-size: 0.65rem; font-weight: 800; color: #64748b; text-transform: uppercase;">Mark %</label>
+                <input type="number" id="global_markup" value="0" class="p-input" oninput="recalcAll()" style="width: 60px; height: 28px; font-size: 0.8rem; padding: 0 0.4rem;">
+            </div>
+            <div style="width: 1px; height: 20px; background: #e2e8f0;"></div>
+            <div style="display: flex; align-items: center; gap: 0.5rem;">
+                <label style="font-size: 0.65rem; font-weight: 800; color: #64748b; text-transform: uppercase;">Print ₹</label>
+                <input type="number" id="print_cost" value="0" class="p-input" oninput="recalcAll()" style="width: 80px; height: 28px; font-size: 0.8rem; padding: 0 0.4rem;">
+            </div>
+            <div style="display: flex; align-items: center; gap: 0.5rem;">
+                <label style="font-size: 0.65rem; font-weight: 800; color: #64748b; text-transform: uppercase;">Mount ₹</label>
+                <input type="number" id="mount_cost" value="0" class="p-input" oninput="recalcAll()" style="width: 80px; height: 28px; font-size: 0.8rem; padding: 0 0.4rem;">
+            </div>
+            <div style="width: 1px; height: 20px; background: #e2e8f0;"></div>
+            <div style="display: flex; align-items: center; gap: 0.5rem;">
+                <label style="font-size: 0.6rem; font-weight: 800; color: #64748b; text-transform: uppercase;">Tax</label>
+                <select id="tax-type" class="p-input" onchange="recalcAll()" style="width: 90px; height: 28px; font-size: 0.65rem; padding: 0 0.25rem;">
+                    <option value="igst">IGST 18%</option>
+                    <option value="cgst_sgst">CGST/SGST</option>
+                </select>
             </div>
         </div>
 
-        <!-- Final Summary -->
-        <div class="p-panel summary-box" style="background: #f8fafc; display: flex; flex-direction: column;">
-            <div class="p-header"> Summary</div>
-            <div style="flex: 1;">
-                <div class="stat-row">
-                    <span>Sites Selected:</span>
-                    <span id="selected-count-btm" style="font-weight: 800;">0</span>
-                </div>
-                <div class="stat-row">
-                    <span>Display Cost:</span>
-                    <span id="sum-display-btm">₹0</span>
-                </div>
-                
-                <div style="border-top: 1px dashed #e2e8f0; padding-top: 1rem; margin-top: 1rem;">
-                    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 0.75rem;">
-                        <span style="font-size: 0.75rem; font-weight: 700; color: var(--secondary);">TAX TYPE</span>
-                        <select id="tax-type" class="p-input" onchange="recalcAll()" style="width: 140px; height: 28px; font-size: 0.7rem; padding: 0 0.4rem; border-radius: 6px;">
-                            <option value="igst">IGST (18%)</option>
-                            <option value="cgst_sgst">CGST/SGST (9%+9%)</option>
-                        </select>
-                    </div>
-                    <div id="tax-breakdown">
-                        <div class="stat-row">
-                            <span>GST (18%):</span>
-                            <span id="sum-tax-btm">₹0</span>
-                        </div>
-                    </div>
-                </div>
-
-                <div class="grand-total" style="border-top: 2px solid #e2e8f0; padding-top: 0.75rem; margin-top: 0.5rem; color: var(--primary); font-weight: 900;">
-                    <div style="font-size: 0.65rem; color: var(--secondary); margin-bottom: 0.1rem;">GRAND TOTAL</div>
-                    <div id="sum-grand-btm" style="font-size: 1.5rem;">₹0</div>
-                </div>
+        <!-- Totals & CTA Group -->
+        <div style="display: flex; align-items: center; gap: 2rem;">
+            <div style="display: flex; flex-direction: column; align-items: flex-end;">
+                <div style="font-size: 0.55rem; color: #64748b; font-weight: 800; text-transform: uppercase; letter-spacing: 0.05em;">Total Display</div>
+                <div id="sum-display-btm" style="font-weight: 700; color: #1e293b; font-size: 0.9rem;">₹0</div>
             </div>
-            <button class="btn btn-primary" onclick="saveProposal()" style="width: 100%; margin-top: 0.75rem; height: 40px; border-radius: 8px; font-weight: 800; font-size: 0.85rem;">
-                GENERATE PROPOSAL
+            <div style="display: flex; flex-direction: column; align-items: flex-end;" id="tax-breakdown">
+                <div style="font-size: 0.55rem; color: #64748b; font-weight: 800; text-transform: uppercase; letter-spacing: 0.05em;">GST (18%)</div>
+                <div id="sum-tax-btm" style="font-weight: 700; color: #1e293b; font-size: 0.9rem;">₹0</div>
+            </div>
+            <div style="background: #f0fdfa; padding: 0.4rem 1rem; border-radius: 8px; border: 1px solid #ccfbf1; text-align: right;">
+                <div style="font-size: 0.6rem; color: var(--primary); font-weight: 900; text-transform: uppercase; letter-spacing: 0.05em; margin-bottom: -2px;">Grand Total</div>
+                <div id="sum-grand-btm" style="font-size: 1.3rem; font-weight: 900; color: var(--primary);">₹0</div>
+            </div>
+            <button class="btn btn-primary" onclick="saveProposal()" style="height: 42px; padding: 0 1.5rem; border-radius: 8px; font-weight: 900; font-size: 0.85rem; text-transform: uppercase; box-shadow: 0 4px 12px rgba(13, 148, 136, 0.25);">
+                <i class="fas fa-file-invoice" style="margin-right: 0.5rem;"></i> Generate Proposal
             </button>
         </div>
     </div>
