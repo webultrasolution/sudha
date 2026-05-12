@@ -287,11 +287,11 @@ $sizes = $pdo->query("SELECT DISTINCT CONCAT(width, 'x', height) as size FROM si
                                 $imgList = explode(',', $s['all_images'] ?? '');
                                 $imgCount = count($imgList);
                             ?>
-                                <div style="position: relative; width: 80px; height: 50px;">
+                                <div style="position: relative; width: 150px; height: 95px;">
                                     <img src="<?php echo BASE_URL; ?>uploads/sites/<?php echo $s['thumbnail']; ?>" 
                                          onclick="openLightboxSlider('<?php echo htmlspecialchars($s['all_images']); ?>', '<?php echo $s['id']; ?>')" 
                                          class="site-thumb" 
-                                         style="width: 100%; height: 100%; border-radius: 8px; object-fit: cover; border: 1px solid #e2e8f0; cursor: pointer; transition: transform 0.2s;">
+                                         style="width: 100%; height: 100%; border-radius: 12px; object-fit: cover; border: 1px solid #e2e8f0; cursor: pointer; transition: transform 0.2s; box-shadow: 0 4px 6px rgba(0,0,0,0.05);">
                                     <?php if ($imgCount > 1): ?>
                                         <div style="position: absolute; bottom: 4px; right: 4px; background: rgba(0,0,0,0.7); color: white; font-size: 0.55rem; padding: 2px 5px; border-radius: 4px; font-weight: 800; backdrop-filter: blur(2px);">
                                             <i class="fas fa-images"></i> <?php echo $imgCount; ?>
@@ -617,7 +617,7 @@ $sizes = $pdo->query("SELECT DISTINCT CONCAT(width, 'x', height) as size FROM si
 <script>
 let selectedSites = [];
 let currentPage = 1;
-let pageSize = 10;
+let pageSize = 6;
 
 function handleClientChange() {
     const select = document.getElementById('client_id');
@@ -963,18 +963,23 @@ function updateBucketUI() {
         const imgCount = imgList.length;
 
         const previewHtml = site.thumbnail 
-            ? ` <div style="position: relative; width: 80px; height: 50px;">
+            ? ` <div style="position: relative; width: 150px; height: 95px;">
                     <img src="<?php echo BASE_URL; ?>uploads/sites/${site.thumbnail}" 
                          onclick="openLightboxSlider('${site.allImages}', '${site.id}')" 
                          class="site-thumb" 
-                         style="width: 100%; height: 100%; border-radius: 8px; object-fit: cover; border: 1px solid #e2e8f0; cursor: pointer; transition: transform 0.2s;">
+                         style="width: 100%; height: 100%; border-radius: 12px; object-fit: cover; border: 1px solid ${site.isCustomized ? '#059669' : '#e2e8f0'}; cursor: pointer; transition: transform 0.2s; box-shadow: 0 4px 6px rgba(0,0,0,0.05);">
+                    ${site.isCustomized ? `
+                        <div style="position: absolute; top: -6px; right: -6px; background: #059669; color: white; width: 22px; height: 22px; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 0.75rem; border: 2px solid white; box-shadow: 0 4px 8px rgba(0,0,0,0.15); z-index: 10;">
+                            <i class="fas fa-check"></i>
+                        </div>
+                    ` : ''}
                     ${imgCount > 1 ? `
-                        <div style="position: absolute; bottom: 4px; right: 4px; background: rgba(0,0,0,0.7); color: white; font-size: 0.5rem; padding: 1px 4px; border-radius: 3px; font-weight: 800; backdrop-filter: blur(2px);">
+                        <div style="position: absolute; bottom: 8px; right: 8px; background: rgba(0,0,0,0.8); color: white; font-size: 0.65rem; padding: 3px 8px; border-radius: 6px; font-weight: 800; backdrop-filter: blur(4px); border: 1px solid rgba(255,255,255,0.1);">
                             <i class="fas fa-images"></i> ${imgCount}
                         </div>
                     ` : ''}
                 </div>`
-            : `<div style="width: 80px; height: 50px; border-radius: 8px; background: #f8fafc; border: 1px dashed #e2e8f0; display: flex; align-items: center; justify-content: center; font-size: 0.6rem; color: #94a3b8; font-weight: 700;">No Img</div>`;
+            : `<div style="width: 150px; height: 95px; border-radius: 12px; background: #f8fafc; border: 1px dashed #e2e8f0; display: flex; align-items: center; justify-content: center; font-size: 0.75rem; color: #94a3b8; font-weight: 700;">No Image</div>`;
 
         html += `
             <tr class="site-row selected" style="background: white; transition: all 0.2s;" id="bucket-row-${site.id}">
@@ -1334,7 +1339,6 @@ function openLightboxSlider(imageString, siteId) {
         navs.forEach(n => n.style.display = currentImages.length > 1 ? 'flex' : 'none');
     }
 }
-
 function updateSliderImage() {
     const lbImg = document.getElementById('lightbox-img');
     const lbBadge = document.getElementById('lightbox-badge');
@@ -1343,6 +1347,21 @@ function updateSliderImage() {
         if(lbBadge) {
             lbBadge.innerText = (currentImgIndex + 1) + " / " + currentImages.length;
             lbBadge.style.display = currentImages.length > 1 ? 'block' : 'none';
+        }
+
+        // Update Button State
+        const btn = document.getElementById('primary-btn');
+        if(btn && window.currentLightboxSiteId) {
+            const idx = selectedSites.findIndex(s => s.id === window.currentLightboxSiteId);
+            const isPrimary = (idx !== -1 && selectedSites[idx].thumbnail === currentImages[currentImgIndex]);
+            
+            if(isPrimary) {
+                btn.innerHTML = '<i class="fas fa-check-double"></i> Selected as Primary';
+                btn.style.background = '#059669';
+            } else {
+                btn.innerHTML = '<i class="fas fa-check-circle"></i> Use as Primary Photo';
+                btn.style.background = 'var(--primary)';
+            }
         }
     }
 }
@@ -1355,15 +1374,26 @@ function setPrimaryImage(e) {
         const idx = selectedSites.findIndex(s => s.id === id);
         if(idx !== -1) {
             selectedSites[idx].thumbnail = newThumb;
+            selectedSites[idx].isCustomized = true;
             
             updateBucketUI();
             
             const row = document.getElementById('row-' + id);
             if(row) {
                 const img = row.querySelector('.site-thumb');
-                if(img) img.src = baseUrl + newThumb;
+                if(img) {
+                    img.src = baseUrl + newThumb;
+                    img.style.border = '2px solid #059669';
+                }
             }
             
+            // Update button text in lightbox
+            const btn = document.getElementById('primary-btn');
+            if(btn) {
+                btn.innerHTML = '<i class="fas fa-check-double"></i> Selected as Primary';
+                btn.style.background = '#059669';
+            }
+
             Swal.fire({
                 icon: 'success',
                 title: 'Primary Image Set',
@@ -1420,7 +1450,7 @@ document.addEventListener('keydown', function(e) {
             <img id="lightbox-img" src="" style="max-width: 100%; max-height: 85vh; border-radius: 16px; box-shadow: 0 30px 60px rgba(0,0,0,0.8); border: 2px solid rgba(255,255,255,0.15);">
             
             <!-- Select as Primary Button -->
-            <button onclick="setPrimaryImage(event)" style="position: absolute; top: 20px; left: 20px; background: var(--primary); color: white; border: none; padding: 0.6rem 1.2rem; border-radius: 10px; font-weight: 800; font-size: 0.8rem; cursor: pointer; display: flex; align-items: center; gap: 0.5rem; box-shadow: 0 10px 20px rgba(13, 148, 136, 0.3); transition: all 0.2s;">
+            <button id="primary-btn" onclick="setPrimaryImage(event)" style="position: absolute; top: 20px; left: 20px; background: var(--primary); color: white; border: none; padding: 0.6rem 1.2rem; border-radius: 10px; font-weight: 800; font-size: 0.8rem; cursor: pointer; display: flex; align-items: center; gap: 0.5rem; box-shadow: 0 10px 20px rgba(13, 148, 136, 0.3); transition: all 0.2s;">
                 <i class="fas fa-check-circle"></i> Use as Primary Photo
             </button>
 
