@@ -957,13 +957,13 @@ function updateBucketUI() {
                 </td>
 
                 <td style="padding: 1.5rem 1rem;">
-                    <div style="font-weight: 800; color: #1e293b; font-size: 0.9rem; margin-bottom: 2px;">${site.city}</div>
+                    <div style="font-weight: 800; color: #1e293b; font-size: 0.9rem; margin-bottom: 2px;">${site.city}, ${site.state}</div>
                     <div style="color: #f97316; font-size: 0.75rem; font-weight: 800; letter-spacing: 0.02em;">${site.siteCode}</div>
                 </td>
 
                 <td style="padding: 1.5rem 1rem;">
-                    <div style="font-weight: 800; color: #1e293b; font-size: 0.9rem; margin-bottom: 4px;">${site.name}</div>
-                    <div style="font-size: 0.7rem; color: #64748b; font-weight: 700; margin-bottom: 0.75rem;"> ${site.city}</div>
+                    <div style="font-weight: 800; color: #1e293b; font-size: 0.9rem; margin-bottom: 2px;">${site.name}</div>
+                    <div style="font-size: 0.75rem; color: #64748b; margin-bottom: 6px;">${site.location}</div>
                     <div style="display: flex; gap: 0.4rem; align-items: center;">
                         <span style="background: #ecfdf5; color: #059669; padding: 0.2rem 0.6rem; border-radius: 6px; font-size: 0.6rem; font-weight: 800; text-transform: uppercase;">${site.type}</span>
                         <span style="background: #f1f5f9; color: #475569; padding: 0.2rem 0.6rem; border-radius: 6px; font-size: 0.6rem; font-weight: 800; text-transform: uppercase;">${site.illumination}</span>
