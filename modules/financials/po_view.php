@@ -7,10 +7,11 @@ $poId = isset($_GET['id']) ? intval($_GET['id']) : 0;
 
 $po = $pdo->prepare("
     SELECT po.*, v.name as vendor_name, v.address as v_address, v.gstin as v_gstin, v.phone as v_phone,
-           c.display_name as camp_name, c.project_id as proj_id
+           COALESCE(c.display_name, po.campaign_name) as camp_name, 
+           COALESCE(c.project_id, 'Direct') as proj_id
     FROM purchase_orders po
     JOIN partners v ON po.vendor_id = v.id
-    JOIN campaigns c ON po.campaign_id = c.id
+    LEFT JOIN campaigns c ON po.campaign_id = c.id
     WHERE po.id = ?
 ");
 $po->execute([$poId]);
@@ -31,89 +32,110 @@ $attachments->execute([$poId]);
 $poAttachments = $attachments->fetchAll();
 ?>
 
+<div style="display: flex; justify-content: flex-end; margin-bottom: 1rem;" class="no-print">
+    <button onclick="window.print()" class="btn btn-primary" style="background: #0f172a; border-radius: 8px; padding: 0.75rem 1.5rem; font-weight: 800;">
+        <i class="fas fa-print"></i> PRINT PURCHASE ORDER
+    </button>
+</div>
+
 <div style="display: grid; grid-template-columns: 3fr 1fr; gap: 2rem;">
-    <div class="card" id="po-print-area">
-        <div style="display: flex; justify-content: space-between; border-bottom: 2px solid #f1f5f9; padding-bottom: 1.5rem; margin-bottom: 1.5rem;">
-            <div>
-                <h1 style="color: var(--primary); margin: 0;">PURCHASE ORDER</h1>
-                <p style="color: var(--secondary); margin-top: 0.25rem;">#<?php echo $poData['po_number']; ?></p>
+    <div class="card" id="po-print-area" style="padding: 0; border: 1px solid #000; overflow: hidden; border-radius: 0;">
+        <!-- Header / Letterhead -->
+        <?php 
+        $company_letterhead = getSetting('company_letterhead');
+        if ($company_letterhead): ?>
+            <img src="<?php echo BASE_URL; ?>assets/images/<?php echo $company_letterhead; ?>" style="width: 100%; height: auto; display: block; border-bottom: 1px solid #000;">
+        <?php else: ?>
+            <div style="text-align: center; padding: 1rem; border-bottom: 1px solid #000; background: #f8fafc;">
+                <h2 style="margin: 0; text-transform: uppercase;"><?php echo getSetting('company_name'); ?></h2>
+                <p style="margin: 0; font-size: 0.8rem;"><?php echo getSetting('company_address'); ?></p>
             </div>
-            <div style="text-align: right;">
-                <button class="btn btn-primary" onclick="window.print()">
-                    <i class="fas fa-print"></i> Print PO
-                </button>
-            </div>
-        </div>
+        <?php endif; ?>
 
-        <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 3rem; margin-bottom: 2rem;">
-            <div>
-                <h4 style="text-transform: uppercase; font-size: 0.75rem; color: #94a3b8; margin-bottom: 0.5rem;">Vendor / Supplier</h4>
-                <div style="font-weight: 700; font-size: 1.1rem;"><?php echo $poData['vendor_name']; ?></div>
-                <div style="color: #475569; margin-top: 0.25rem;"><?php echo $poData['v_address']; ?></div>
-                <div style="margin-top: 0.5rem; font-size: 0.875rem;">
-                    <strong>GSTIN:</strong> <?php echo $poData['v_gstin']; ?><br>
-                    <strong>Phone:</strong> <?php echo $poData['v_phone']; ?>
+        <div style="padding: 1.5rem;">
+            <!-- Info Grid -->
+            <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 2rem; border-bottom: 1px solid #000; padding-bottom: 1.5rem; margin-bottom: 1.5rem;">
+                <div>
+                    <h4 style="text-decoration: underline; font-style: italic; font-size: 0.9rem; margin-bottom: 0.5rem;">Supplier / Vendor:</h4>
+                    <div style="font-weight: 800; font-size: 1.1rem; color: #000;"><?php echo $poData['vendor_name']; ?></div>
+                    <div style="color: #475569; margin-top: 0.25rem; font-size: 0.85rem;"><?php echo $poData['v_address']; ?></div>
+                    <div style="margin-top: 0.5rem; font-size: 0.85rem;">
+                        <strong>GSTIN:</strong> <?php echo $poData['v_gstin']; ?><br>
+                        <strong>Phone:</strong> <?php echo $poData['v_phone']; ?>
+                    </div>
+                </div>
+                <div style="border-left: 1px solid #e2e8f0; padding-left: 2rem;">
+                    <div style="display: flex; margin-bottom: 4px;">
+                        <span style="width: 100px; font-weight: 600;">PO Number</span><span style="margin: 0 10px;">:</span>
+                        <span style="font-weight: 800; color: #000;"><?php echo $poData['po_number']; ?></span>
+                    </div>
+                    <div style="display: flex; margin-bottom: 4px;">
+                        <span style="width: 100px; font-weight: 600;">PO Date</span><span style="margin: 0 10px;">:</span>
+                        <span><?php echo date('d M Y', strtotime($poData['po_date'])); ?></span>
+                    </div>
+                    <div style="display: flex; margin-bottom: 4px;">
+                        <span style="width: 100px; font-weight: 600;">Campaign</span><span style="margin: 0 10px;">:</span>
+                        <span style="font-weight: 700;"><?php echo $poData['camp_name']; ?></span>
+                    </div>
+                    <div style="display: flex; margin-bottom: 4px;">
+                        <span style="width: 100px; font-weight: 600;">Project ID</span><span style="margin: 0 10px;">:</span>
+                        <span style="color: var(--secondary);"><?php echo $poData['proj_id']; ?></span>
+                    </div>
+                    <div style="display: flex; margin-top: 10px;">
+                        <span style="width: 100px; font-weight: 600;">Status</span><span style="margin: 0 10px;">:</span>
+                        <span class="status-badge <?php echo $poData['status']; ?>"><?php echo strtoupper($poData['status']); ?></span>
+                    </div>
                 </div>
             </div>
-            <div style="text-align: right;">
-                <h4 style="text-transform: uppercase; font-size: 0.75rem; color: #94a3b8; margin-bottom: 0.5rem;">PO Details</h4>
-                <div style="font-size: 0.9375rem;">
-                    <strong>Date:</strong> <?php echo date('d M Y', strtotime($poData['po_date'])); ?><br>
-                    <strong>Campaign:</strong> <?php echo $poData['camp_name']; ?> (<?php echo $poData['proj_id']; ?>)<br>
-                    <strong>Status:</strong> <span class="status-badge <?php echo $poData['status']; ?>"><?php echo strtoupper($poData['status']); ?></span>
+
+            <!-- Table -->
+            <div style="background: #f1f5f9; padding: 0.5rem; text-align: center; font-weight: 800; letter-spacing: 2px; margin-bottom: 1rem; border: 1px solid #e2e8f0;">PURCHASE ORDER DETAILS</div>
+            <table class="table" style="border: 1px solid #e2e8f0;">
+                <thead style="background: #f8fafc;">
+                    <tr>
+                        <th style="border-right: 1px solid #e2e8f0;">Description</th>
+                        <th style="border-right: 1px solid #e2e8f0;">Period</th>
+                        <th style="border-right: 1px solid #e2e8f0;">Rate</th>
+                        <th style="text-align: right;">Amount</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <?php foreach ($poItems as $item): ?>
+                    <tr>
+                        <td style="border-right: 1px solid #e2e8f0;">
+                            <div style="font-weight: 700; color: #000;"><?php echo $item['site_code']; ?></div>
+                            <div style="font-size: 0.75rem; color: #64748b;"><?php echo $item['location']; ?></div>
+                        </td>
+                        <td style="border-right: 1px solid #e2e8f0; font-size: 0.8rem;">
+                            <?php echo date('d/m/y', strtotime($item['start_date'])); ?> - <?php echo date('d/m/y', strtotime($item['end_date'])); ?>
+                        </td>
+                        <td style="border-right: 1px solid #e2e8f0; font-weight: 600;"><?php echo formatCurrency($item['monthly_rate']); ?></td>
+                        <td style="text-align: right; font-weight: 700; color: #000;"><?php echo formatCurrency($item['cost']); ?></td>
+                    </tr>
+                    <?php endforeach; ?>
+                </tbody>
+                <tfoot>
+                    <tr style="background: #f8fafc; font-weight: 700;">
+                        <td colspan="3" style="text-align: right; padding: 0.75rem; border-right: 1px solid #e2e8f0;">Subtotal (Taxable):</td>
+                        <td style="text-align: right;"><?php echo formatCurrency($poData['po_amount']); ?></td>
+                    </tr>
+                    <tr style="background: #f8fafc; font-weight: 700;">
+                        <td colspan="3" style="text-align: right; padding: 0.75rem; border-right: 1px solid #e2e8f0;">GST (18%):</td>
+                        <td style="text-align: right;"><?php echo formatCurrency($poData['cgst_amount'] + $poData['sgst_amount']); ?></td>
+                    </tr>
+                    <tr style="background: #eff6ff; font-weight: 900; font-size: 1.1rem; color: #1e3a8a;">
+                        <td colspan="3" style="text-align: right; padding: 1rem; border-right: 1px solid #e2e8f0; border-top: 2px solid #1e3a8a;">GRAND TOTAL:</td>
+                        <td style="text-align: right; border-top: 2px solid #1e3a8a;"><?php echo formatCurrency($poData['total_amount']); ?></td>
+                    </tr>
+                </tfoot>
+            </table>
+
+            <?php if(!empty($poData['remarks'])): ?>
+                <div style="margin-top: 1.5rem; padding: 1rem; background: #fffbeb; border: 1px dashed #f59e0b; border-radius: 8px;">
+                    <div style="font-weight: 800; font-size: 0.75rem; text-transform: uppercase; color: #92400e; margin-bottom: 0.5rem;">Remarks / Special Instructions</div>
+                    <div style="font-style: italic; color: #000;"><?php echo nl2br(htmlspecialchars($poData['remarks'])); ?></div>
                 </div>
-            </div>
-        </div>
-
-        <table class="table" style="margin-top: 2rem;">
-            <thead>
-                <tr style="background: #f8fafc;">
-                    <th>Description</th>
-                    <th>Period</th>
-                    <th>Monthly Rate</th>
-                    <th style="text-align: right;">Amount</th>
-                </tr>
-            </thead>
-            <tbody>
-                <?php foreach ($poItems as $item): ?>
-                <tr>
-                    <td>
-                        <div style="font-weight: 600;"><?php echo $item['site_code']; ?></div>
-                        <div style="font-size: 0.75rem; color: var(--secondary);"><?php echo $item['location']; ?></div>
-                    </td>
-                    <td><?php echo date('d/m/y', strtotime($item['start_date'])); ?> - <?php echo date('d/m/y', strtotime($item['end_date'])); ?></td>
-                    <td><?php echo formatCurrency($item['monthly_rate']); ?></td>
-                    <td style="text-align: right; font-weight: 600;"><?php echo formatCurrency($item['cost']); ?></td>
-                </tr>
-                <?php endforeach; ?>
-            </tbody>
-            <tfoot>
-                <tr>
-                    <td colspan="3" style="text-align: right; padding-top: 1.5rem; font-weight: 600;">Subtotal:</td>
-                    <td style="text-align: right; padding-top: 1.5rem;"><?php echo formatCurrency($poData['po_amount']); ?></td>
-                </tr>
-                <tr>
-                    <td colspan="3" style="text-align: right; font-weight: 600;">CGST (9%):</td>
-                    <td style="text-align: right;"><?php echo formatCurrency($poData['cgst_amount']); ?></td>
-                </tr>
-                <tr>
-                    <td colspan="3" style="text-align: right; font-weight: 600;">SGST (9%):</td>
-                    <td style="text-align: right;"><?php echo formatCurrency($poData['sgst_amount']); ?></td>
-                </tr>
-                <tr style="font-size: 1.125rem; font-weight: 800; color: var(--primary);">
-                    <td colspan="3" style="text-align: right; border-top: 2px solid #e2e8f0; padding-top: 1rem;">GRAND TOTAL:</td>
-                    <td style="text-align: right; border-top: 2px solid #e2e8f0; padding-top: 1rem;"><?php echo formatCurrency($poData['total_amount']); ?></td>
-                </tr>
-            </tfoot>
-        </table>
-
-        <div style="margin-top: 4rem; border-top: 1px solid #f1f5f9; padding-top: 2rem; font-size: 0.8rem; color: #94a3b8;">
-            <p><strong>Terms & Conditions:</strong></p>
-            <ol style="padding-left: 1.25rem; margin-top: 0.5rem;">
-                <li>Payment will be processed within 30 days of invoice receipt.</li>
-                <li>Subject to quality of service (QoS) verification.</li>
-                <li>All site photos must be uploaded to the portal upon mounting.</li>
-            </ol>
+            <?php endif; ?>
         </div>
     </div>
 

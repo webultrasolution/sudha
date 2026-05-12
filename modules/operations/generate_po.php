@@ -5,12 +5,26 @@ include_once __DIR__ . '/../../includes/functions.php';
 // Prevent timezone warnings
 date_default_timezone_set('Asia/Kolkata');
 
-$booking_id = isset($_GET['booking_id']) ? intval($_GET['booking_id']) : 0;
-$proposal_id = isset($_GET['proposal_id']) ? intval($_GET['proposal_id']) : 0;
-$vendor_id = isset($_GET['vendor_id']) ? intval($_GET['vendor_id']) : 0;
+$po_id = isset($_GET['po_id']) ? intval($_GET['po_id']) : 0;
 $mode = $_GET['mode'] ?? '';
 
-if (!$vendor_id) {
+// 1. If PO ID is provided, fetch everything from DB (Works for Direct POs saved to DB)
+if ($po_id) {
+    $stmtB = $pdo->prepare("
+        SELECT po.*, c.name as client_name, po.campaign_name as campaign_name, po.po_number as proposal_number
+        FROM purchase_orders po
+        LEFT JOIN partners c ON po.customer_id = c.id
+        WHERE po.id = ?
+    ");
+    $stmtB->execute([$po_id]);
+    $b = $stmtB->fetch();
+    
+    if (!$b) die("Purchase Order not found.");
+    $vendor_id = $b['vendor_id'];
+    $mode = 'saved_po'; // Internal mode for logic below
+}
+
+if (!$vendor_id && $mode !== 'saved_po') {
     die("Invalid request: Vendor ID is required.");
 }
 
@@ -24,8 +38,18 @@ $vendor_gst_filter = $_GET['vendor_gst'] ?? '';
 
 if ($mode === 'direct') {
     // Standalone mode: uses provided data instead of DB records
+    $client_id = isset($_GET['client_id']) ? intval($_GET['client_id']) : 0;
+    $client_name = 'Direct Client';
+    if ($client_id) {
+        $stmtC = $pdo->prepare("SELECT name FROM partners WHERE id = ?");
+        $stmtC->execute([$client_id]);
+        $client_name = $stmtC->fetchColumn() ?: 'Direct Client';
+    }
+
     $b = [
         'campaign_name' => $_GET['campaign_name'] ?? 'Direct Campaign',
+        'client_name' => $client_name,
+        'remark' => $_GET['remark'] ?? '',
         'start_date' => $_GET['start_date'] ?? date('Y-m-d'),
         'end_date' => $_GET['end_date'] ?? date('Y-m-d', strtotime('+1 month')),
         'proposal_number' => 'DPO-' . date('ymd') . '-' . rand(10, 99)
@@ -45,8 +69,20 @@ if ($mode === 'direct') {
 
     // Get custom rates if any
     $custom_rates = $_GET['rates'] ?? [];
+} else if ($mode === 'saved_po') {
+    // Fetch Items from po_items
+    $itemSql = "
+        SELECT pi.*, s.site_code, s.location, s.city, s.width, s.height, s.light_type, s.hsn_code, s.vendor_gst, s.type as media_type
+        FROM po_items pi
+        JOIN sites s ON pi.site_id = s.id
+        WHERE pi.po_id = ?
+    ";
+    $itemParams = [$po_id];
 } else {
     // Normal mode: Fetch from Booking or Proposal
+    $booking_id = isset($_GET['booking_id']) ? intval($_GET['booking_id']) : 0;
+    $proposal_id = isset($_GET['proposal_id']) ? intval($_GET['proposal_id']) : 0;
+    
     if ($booking_id) {
         $stmtB = $pdo->prepare("
             SELECT b.*, c.name as client_name, p.campaign_name, p.proposal_number, p.id as prop_id
@@ -109,7 +145,8 @@ $items = $stmtItems->fetchAll();
 // Safe PO Numbering
 $po_id = !empty($b['id']) ? $b['id'] : 0;
 $po_ref = ($po_id > 0) ? str_pad((string)$po_id, 3, '0', STR_PAD_LEFT) : ($b['proposal_number'] ?? 'DPO-' . date('His'));
-$po_number = "PO/" . date('y', strtotime($b['start_date'])) . "-" . date('y', strtotime($b['start_date'] . ' +1 year')) . "/" . $po_ref;
+$ref_date = $b['start_date'] ?? $b['po_date'] ?? date('Y-m-d');
+$po_number = "PO/" . date('y', strtotime($ref_date)) . "-" . date('y', strtotime($ref_date . ' +1 year')) . "/" . $po_ref;
 $po_date = date('d-m-Y');
 
 // Company Settings
@@ -223,9 +260,14 @@ $company_signature = getSetting('company_signature', 'signature.png');
             <div class="info-row">
                 <span class="info-label">Campaign</span>
                 <span class="info-sep">:</span>
-                <span class="info-value"><?php echo $b['campaign_name']; ?></span>
+                <span class="info-value"><strong><?php echo $b['campaign_name']; ?></strong></span>
             </div>
-            <div class="info-row" style="margin-top: 10px;">
+            <div class="info-row">
+                <span class="info-label">Client</span>
+                <span class="info-sep">:</span>
+                <span class="info-value"><?php echo $b['client_name']; ?></span>
+            </div>
+            <div class="info-row" style="margin-top: 5px;">
                 <span class="info-label">Buyer PAN</span>
                 <span class="info-sep">:</span>
                 <span class="info-value"><?php echo $company_pan; ?></span>
@@ -312,6 +354,13 @@ $company_signature = getSetting('company_signature', 'signature.png');
     </div>
 
     <div style="padding: 10px; border-top: 1px solid #000; font-size: 9px;">
+        <?php if(!empty($b['remark'])): ?>
+            <div style="margin-bottom: 8px;">
+                <div style="font-weight: bold; text-decoration: underline; margin-bottom: 2px;">REMARKS / NOTES:</div>
+                <div style="font-style: italic; background: #fdfaea; padding: 5px; border: 1px dashed #e2e8f0;"><?php echo nl2br(htmlspecialchars($b['remark'])); ?></div>
+            </div>
+        <?php endif; ?>
+
         <div style="font-weight: bold; text-decoration: underline; margin-bottom: 3px;">Terms & Conditions:</div>
         <ol style="margin: 0; padding-left: 15px;">
             <li>Flex mounting and cleaning will be free of cost as per standard agreement.</li>

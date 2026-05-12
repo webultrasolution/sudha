@@ -109,3 +109,9 @@ Stack trace:
 [11-May-2026 23:09:40 Europe/Berlin] PHP Warning:  Undefined variable $pMode in D:\xampp\htdocs\easy-outdoor-crm\modules\financials\client_ledger.php on line 75
 [11-May-2026 23:09:43 Europe/Berlin] PHP Warning:  Undefined variable $pMode in D:\xampp\htdocs\easy-outdoor-crm\modules\financials\client_ledger.php on line 75
 [11-May-2026 23:09:56 Europe/Berlin] PHP Warning:  Undefined variable $pMode in D:\xampp\htdocs\easy-outdoor-crm\modules\financials\client_ledger.php on line 75
+[13-May-2026 02:32:14 Asia/Kolkata] PHP Warning:  Undefined array key "start_date" in D:\xampp\htdocs\easy-outdoor-crm\modules\operations\generate_po.php on line 148
+[13-May-2026 02:32:14 Asia/Kolkata] PHP Deprecated:  strtotime(): Passing null to parameter #1 ($datetime) of type string is deprecated in D:\xampp\htdocs\easy-outdoor-crm\modules\operations\generate_po.php on line 148
+[13-May-2026 02:32:14 Asia/Kolkata] PHP Warning:  Undefined array key "start_date" in D:\xampp\htdocs\easy-outdoor-crm\modules\operations\generate_po.php on line 148
+[13-May-2026 02:32:14 Asia/Kolkata] PHP Warning:  Undefined array key "purchase_amount" in D:\xampp\htdocs\easy-outdoor-crm\modules\operations\generate_po.php on line 305
+[13-May-2026 02:32:14 Asia/Kolkata] PHP Warning:  Undefined array key "purchase_amount" in D:\xampp\htdocs\easy-outdoor-crm\modules\operations\generate_po.php on line 327
+[13-May-2026 02:32:14 Asia/Kolkata] PHP Deprecated:  number_format(): Passing null to parameter #1 ($num) of type float is deprecated in D:\xampp\htdocs\easy-outdoor-crm\modules\operations\generate_po.php on line 327
