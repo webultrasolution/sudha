@@ -878,9 +878,10 @@ function toggleSite(id) {
         const height = row.dataset.height;
         const vendorName = row.dataset.vendorName;
         const siteCode = row.dataset.code;
+        const location = row.dataset.location;
         const area = row.querySelector('.location-area') ? row.querySelector('.location-area').innerText : '';
 
-        selectedSites.push({ id, name, cardRate: rate, purchaseRate: prate, saleRate: rate, owner, sqft, city, state, type, illumination, thumbnail, width, height, vendorName, siteCode, area });
+        selectedSites.push({ id, name, cardRate: rate, purchaseRate: prate, saleRate: rate, owner, sqft, city, state, type, illumination, thumbnail, width, height, vendorName, siteCode, area, location });
         if(row) row.classList.add('selected');
         if(chk) chk.checked = true;
         if(input) input.disabled = false;
