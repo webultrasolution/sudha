@@ -6,6 +6,7 @@ include_once __DIR__ . '/../../includes/functions.php';
 date_default_timezone_set('Asia/Kolkata');
 
 $po_id = isset($_GET['po_id']) ? intval($_GET['po_id']) : 0;
+$vendor_id = isset($_GET['vendor_id']) ? intval($_GET['vendor_id']) : 0;
 $mode = $_GET['mode'] ?? '';
 
 // 1. If PO ID is provided, fetch everything from DB (Works for Direct POs saved to DB)
