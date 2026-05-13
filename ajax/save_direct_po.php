@@ -23,6 +23,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         $external_po = $data['external_po'] ?? '';
         $contact_person = $data['contact_person'] ?? '';
         $remarks = $data['remark'] ?? '';
+        $billing_gstin = $data['billing_gstin'] ?? '';
+        $tax_type = $data['tax_type'] ?? 'igst';
         $start_date = $data['start_date'] ?? date('Y-m-d');
         $end_date = $data['end_date'] ?? date('Y-m-d', strtotime('+1 month'));
         $status = $data['status'] ?? 'active';
@@ -62,15 +64,20 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             $vSubtotal = 0;
             foreach ($vItems as $item) $vSubtotal += $item['rate'];
             
-            $cgst = $vSubtotal * 0.09;
-            $sgst = $vSubtotal * 0.09;
-            $vGrandTotal = $vSubtotal + $cgst + $sgst;
+            $cgst = 0; $sgst = 0; $igst = 0;
+            if ($tax_type === 'cgst_sgst') {
+                $cgst = $vSubtotal * 0.09;
+                $sgst = $vSubtotal * 0.09;
+            } else {
+                $igst = $vSubtotal * 0.18;
+            }
+            $vGrandTotal = $vSubtotal + $cgst + $sgst + $igst;
             
             $poNum = 'PO-' . date('Ymd') . '-' . rand(100, 999);
             
             $stmtPO = $pdo->prepare("
-                INSERT INTO purchase_orders (vendor_id, customer_id, employee_id, campaign_name, brand_name, external_po, po_number, po_date, po_amount, cgst_amount, sgst_amount, total_amount, status, remarks) 
-                VALUES (?, ?, ?, ?, ?, ?, ?, CURDATE(), ?, ?, ?, ?, 'approved', ?)
+                INSERT INTO purchase_orders (vendor_id, customer_id, employee_id, campaign_name, brand_name, external_po, po_number, po_date, po_amount, cgst_amount, sgst_amount, igst_amount, total_amount, status, remarks) 
+                VALUES (?, ?, ?, ?, ?, ?, ?, CURDATE(), ?, ?, ?, ?, ?, 'approved', ?)
             ");
             $stmtPO->execute([
                 $vid,
@@ -83,6 +90,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 $vSubtotal,
                 $cgst,
                 $sgst,
+                $igst,
                 $vGrandTotal,
                 $remarks
             ]);
@@ -112,8 +120,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         $overallGrand = $overallSubtotal + $overallTax;
 
         $stmtBooking = $pdo->prepare("
-            INSERT INTO bookings (client_id, campaign_name, brand_name, external_po, contact_person, start_date, end_date, total_amount, tax_amount, grand_total, status) 
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            INSERT INTO bookings (client_id, campaign_name, brand_name, external_po, contact_person, billing_gstin, tax_type, start_date, end_date, total_amount, tax_amount, grand_total, status) 
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
         ");
         $stmtBooking->execute([
             $client_id,
@@ -121,6 +129,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             $brand_name,
             $external_po,
             $contact_person,
+            $billing_gstin,
+            $tax_type,
             $start_date,
             $end_date,
             $overallSubtotal,

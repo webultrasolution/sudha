@@ -1235,6 +1235,7 @@ function saveProposal() {
     const data = {
         clientId,
         selectedGstin,
+        taxType: document.getElementById('tax-type').value,
         startDate: start,
         endDate: end,
         campaignName,
