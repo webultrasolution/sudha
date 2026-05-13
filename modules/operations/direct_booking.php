@@ -95,106 +95,81 @@ $sizes = $pdo->query("SELECT DISTINCT CONCAT(width, 'x', height) as size FROM si
 
     <!-- STEP 2 -->
     <div id="step-2" style="display: none;">
-        <div class="p-panel" style="margin-bottom: 1rem; padding: 0.75rem;">
-            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 0.75rem; border-bottom: 1px solid #f1f5f9; padding-bottom: 0.5rem;">
+        <div class="p-panel" style="margin-bottom: 1rem; padding: 1.5rem;">
+            <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 1.5rem; border-bottom: 1px solid #f1f5f9; padding-bottom: 1rem;">
                 <div style="display: flex; align-items: center; gap: 1rem;">
-                    <button onclick="goToStep1()" class="btn btn-secondary" style="height: 28px; padding: 0 0.6rem; font-size: 0.7rem; border-radius: 6px;">
+                    <button onclick="goToStep1()" class="btn btn-secondary" style="height: 38px; border-radius: 8px; display: flex; align-items: center; gap: 0.5rem; font-weight: 800; padding: 0 1.2rem; background: #f1f5f9; border: 1px solid #e2e8f0; color: #475569; box-shadow: 0 2px 4px rgba(0,0,0,0.02);">
                         <i class="fas fa-arrow-left"></i> Back
                     </button>
-                    <span style="font-weight: 900; color: var(--primary); font-size: 0.75rem; text-transform: uppercase;">Inventory Search</span>
+                    <h3 style="margin: 0; color: #0d9488; font-weight: 800; font-size: 1rem; text-transform: uppercase; letter-spacing: 0.05em;">Search Criteria</h3>
+                </div>
+                <div style="font-size: 0.65rem; font-weight: 800; color: #94a3b8; text-transform: uppercase;">Step 2: Assets & Strategy</div>
+            </div>
+
+            <div style="display: flex; gap: 3rem; margin-bottom: 1rem; align-items: center;">
+                <div class="search-group">
+                    <label style="font-size: 0.6rem; font-weight: 900; color: #94a3b8; text-transform: uppercase; margin-bottom: 0.5rem; display: block;">Ownership</label>
+                    <div class="radio-group" style="gap: 1.5rem; display: flex;">
+                        <label style="font-size: 0.8rem; font-weight: 700; color: #475569; display: flex; align-items: center; gap: 0.4rem; cursor: pointer;"><input type="radio" name="ownership" value="all" checked onchange="fetchSites(1)" style="width: 18px; height: 18px; accent-color: #0d9488;"> All</label>
+                        <label style="font-size: 0.8rem; font-weight: 700; color: #475569; display: flex; align-items: center; gap: 0.4rem; cursor: pointer;"><input type="radio" name="ownership" value="HA" onchange="fetchSites(1)" style="width: 18px; height: 18px; accent-color: #0d9488;"> Self</label>
+                        <label style="font-size: 0.8rem; font-weight: 700; color: #475569; display: flex; align-items: center; gap: 0.4rem; cursor: pointer;"><input type="radio" name="ownership" value="TA" onchange="fetchSites(1)" style="width: 18px; height: 18px; accent-color: #0d9488;"> Vendor</label>
+                    </div>
+                </div>
+                <div class="search-group">
+                    <label style="font-size: 0.6rem; font-weight: 900; color: #94a3b8; text-transform: uppercase; margin-bottom: 0.5rem; display: block;">Availability</label>
+                    <div class="radio-group" style="gap: 1.5rem; display: flex;">
+                        <label style="font-size: 0.8rem; font-weight: 700; color: #475569; display: flex; align-items: center; gap: 0.4rem; cursor: pointer;"><input type="radio" name="availability" value="available" checked onchange="fetchSites(1)" style="width: 18px; height: 18px; accent-color: #0d9488;"> Available</label>
+                        <label style="font-size: 0.8rem; font-weight: 700; color: #475569; display: flex; align-items: center; gap: 0.4rem; cursor: pointer;"><input type="radio" name="availability" value="all" onchange="fetchSites(1)" style="width: 18px; height: 18px; accent-color: #0d9488;"> All</label>
+                    </div>
+                </div>
+                <div id="vendor-filter-group" class="search-group" style="display: none; min-width: 200px;">
+                    <label style="font-size: 0.6rem; font-weight: 900; color: #94a3b8; text-transform: uppercase; margin-bottom: 0.5rem; display: block;">Vendor</label>
+                    <select id="filter-vendor" class="p-input" onchange="fetchSites(1)" style="height: 38px; font-size: 0.85rem; background: #fff; border: 1px solid #cbd5e1; border-radius: 8px;">
+                        <option value="">All Vendors</option>
+                        <?php foreach($vendors as $v): ?> <option value="<?php echo $v['id']; ?>"><?php echo $v['name']; ?></option> <?php endforeach; ?>
+                    </select>
                 </div>
             </div>
-            
-            <div class="media-search-grid">
-                <div class="search-row" style="margin-bottom: 1rem; display: flex; gap: 2rem; align-items: flex-end;">
-                    <div class="search-group">
-                        <label>Ownership</label>
-                        <div class="radio-group" style="gap: 1rem; display: flex;">
-                            <label><input type="radio" name="ownership" value="all" checked onchange="fetchSites(1)"> All</label>
-                            <label><input type="radio" name="ownership" value="HA" onchange="fetchSites(1)"> Self</label>
-                            <label><input type="radio" name="ownership" value="TA" onchange="fetchSites(1)"> Vendor</label>
-                        </div>
-                    </div>
-                    <div class="search-group">
-                        <label>Availability</label>
-                        <div class="radio-group" style="gap: 1rem; display: flex;">
-                            <label><input type="radio" name="availability" value="available" checked onchange="fetchSites(1)"> Available</label>
-                            <label><input type="radio" name="availability" value="all" onchange="fetchSites(1)"> All</label>
-                        </div>
-                    </div>
-                    <div class="search-group" style="flex: 1;">
-                        <label>Search Site / Code</label>
-                        <input type="text" id="site-search" class="p-input" placeholder="Search..." oninput="fetchSites(1)" style="height: 30px;">
-                    </div>
-                </div>
 
-                <div style="display: grid; grid-template-columns: repeat(5, 1fr); gap: 1rem;">
-                    <div class="form-group" style="margin-bottom: 0;">
-                        <label style="font-size: 0.6rem; font-weight: 800; color: #94a3b8; text-transform: uppercase; margin-bottom: 0.3rem; display: block;">Media Type</label>
-                        <select id="media_type" class="p-input" onchange="fetchSites(1)" style="height: 38px; font-size: 0.8rem; background: #f8fafc; border: 1px solid #e2e8f0;">
-                            <option value="">All Media</option>
-                            <?php foreach($mediaTypes as $mt): ?> <option value="<?php echo $mt; ?>"><?php echo $mt; ?></option> <?php endforeach; ?>
-                        </select>
-                    </div>
-                    <div class="form-group" style="margin-bottom: 0;">
-                        <label style="font-size: 0.6rem; font-weight: 800; color: #94a3b8; text-transform: uppercase; margin-bottom: 0.3rem; display: block;">State</label>
-                        <select id="filter-state" class="p-input" onchange="fetchSites(1)" style="height: 38px; font-size: 0.8rem; background: #f8fafc; border: 1px solid #e2e8f0;">
-                            <option value="">All States</option>
-                            <?php foreach($states as $s): ?> <option value="<?php echo $s; ?>"><?php echo $s; ?></option> <?php endforeach; ?>
-                        </select>
-                    </div>
-                    <div class="form-group" style="margin-bottom: 0;">
-                        <label style="font-size: 0.6rem; font-weight: 800; color: #94a3b8; text-transform: uppercase; margin-bottom: 0.3rem; display: block;">City</label>
-                        <select id="filter-city" class="p-input" onchange="fetchSites(1)" style="height: 38px; font-size: 0.8rem; background: #f8fafc; border: 1px solid #e2e8f0;">
-                            <option value="">All Cities</option>
-                            <?php foreach($cities as $c): ?> <option value="<?php echo $c; ?>"><?php echo $c; ?></option> <?php endforeach; ?>
-                        </select>
-                    </div>
-                    <div class="search-group" id="vendor-filter-group" style="display: none; min-width: 180px;">
-                        <label style="font-size: 0.6rem; font-weight: 800; color: #94a3b8; text-transform: uppercase; margin-bottom: 0.3rem; display: block;">Vendor</label>
-                        <select id="filter-vendor" class="p-input" onchange="fetchSites(1)" style="height: 38px; font-size: 0.8rem; background: #f8fafc; border: 1px solid #e2e8f0;">
-                            <option value="">All Vendors</option>
-                            <?php foreach($vendors as $v): ?> <option value="<?php echo $v['id']; ?>"><?php echo $v['name']; ?></option> <?php endforeach; ?>
-                        </select>
-                    </div>
+            <div style="display: grid; grid-template-columns: 2.5fr 1fr 1fr 1fr 1fr 1fr; gap: 0.75rem; align-items: flex-end;">
+                <div class="form-group" style="margin-bottom: 0;">
+                    <label style="font-size: 0.55rem; font-weight: 900; color: #94a3b8; text-transform: uppercase; margin-bottom: 0.4rem; display: block;">Search Site / Code / Area</label>
+                    <input type="text" id="site-search" class="p-input" placeholder="Search by Site Name, Code, Location, City, State..." oninput="fetchSites(1)" style="height: 38px; font-size: 0.85rem; background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 8px;">
                 </div>
-
-                <div style="display: grid; grid-template-columns: repeat(5, 1fr); gap: 1rem; margin-top: 1rem; border-top: 1px solid #f1f5f9; padding-top: 1rem;">
-                    <div class="form-group" style="margin-bottom: 0;">
-                        <label style="font-size: 0.6rem; font-weight: 800; color: #94a3b8; text-transform: uppercase; margin-bottom: 0.3rem; display: block;">Media Type</label>
-                        <select id="media_type" class="p-input" onchange="fetchSites(1)" style="height: 38px; font-size: 0.8rem; background: #f8fafc; border: 1px solid #e2e8f0;">
-                            <option value="">All Media</option>
-                            <?php foreach($mediaTypes as $mt): ?> <option value="<?php echo $mt; ?>"><?php echo $mt; ?></option> <?php endforeach; ?>
-                        </select>
-                    </div>
-                    <div class="form-group" style="margin-bottom: 0;">
-                        <label style="font-size: 0.6rem; font-weight: 800; color: #94a3b8; text-transform: uppercase; margin-bottom: 0.3rem; display: block;">State</label>
-                        <select id="filter-state" class="p-input" onchange="fetchSites(1)" style="height: 38px; font-size: 0.8rem; background: #f8fafc; border: 1px solid #e2e8f0;">
-                            <option value="">All States</option>
-                            <?php foreach($states as $s): ?> <option value="<?php echo $s; ?>"><?php echo $s; ?></option> <?php endforeach; ?>
-                        </select>
-                    </div>
-                    <div class="form-group" style="margin-bottom: 0;">
-                        <label style="font-size: 0.6rem; font-weight: 800; color: #94a3b8; text-transform: uppercase; margin-bottom: 0.3rem; display: block;">City</label>
-                        <select id="filter-city" class="p-input" onchange="fetchSites(1)" style="height: 38px; font-size: 0.8rem; background: #f8fafc; border: 1px solid #e2e8f0;">
-                            <option value="">All Cities</option>
-                            <?php foreach($cities as $c): ?> <option value="<?php echo $c; ?>"><?php echo $c; ?></option> <?php endforeach; ?>
-                        </select>
-                    </div>
-                    <div class="form-group" style="margin-bottom: 0;">
-                        <label style="font-size: 0.6rem; font-weight: 800; color: #94a3b8; text-transform: uppercase; margin-bottom: 0.3rem; display: block;">Light</label>
-                        <select id="light_type" class="p-input" onchange="fetchSites(1)" style="height: 38px; font-size: 0.8rem; background: #f8fafc; border: 1px solid #e2e8f0;">
-                            <option value="">All Types</option>
-                            <?php foreach($illuminations as $il): ?> <option value="<?php echo $il; ?>"><?php echo $il; ?></option> <?php endforeach; ?>
-                        </select>
-                    </div>
-                    <div class="form-group" style="margin-bottom: 0;">
-                        <label style="font-size: 0.6rem; font-weight: 800; color: #94a3b8; text-transform: uppercase; margin-bottom: 0.3rem; display: block;">Size</label>
-                        <select id="filter-size" class="p-input" onchange="fetchSites(1)" style="height: 38px; font-size: 0.8rem; background: #f8fafc; border: 1px solid #e2e8f0;">
-                            <option value="">All Sizes</option>
-                            <?php foreach($sizes as $sz): ?> <option value="<?php echo $sz; ?>"><?php echo $sz; ?></option> <?php endforeach; ?>
-                        </select>
-                    </div>
+                <div class="form-group" style="margin-bottom: 0;">
+                    <label style="font-size: 0.55rem; font-weight: 900; color: #94a3b8; text-transform: uppercase; margin-bottom: 0.4rem; display: block;">Media</label>
+                    <select id="media_type" class="p-input" onchange="fetchSites(1)" style="height: 38px; font-size: 0.85rem; background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 8px;">
+                        <option value="">All</option>
+                        <?php foreach($mediaTypes as $mt): ?> <option value="<?php echo $mt; ?>"><?php echo $mt; ?></option> <?php endforeach; ?>
+                    </select>
+                </div>
+                <div class="form-group" style="margin-bottom: 0;">
+                    <label style="font-size: 0.55rem; font-weight: 900; color: #94a3b8; text-transform: uppercase; margin-bottom: 0.4rem; display: block;">State</label>
+                    <select id="filter-state" class="p-input" onchange="fetchSites(1)" style="height: 38px; font-size: 0.85rem; background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 8px;">
+                        <option value="">All</option>
+                        <?php foreach($states as $s): ?> <option value="<?php echo $s; ?>"><?php echo $s; ?></option> <?php endforeach; ?>
+                    </select>
+                </div>
+                <div class="form-group" style="margin-bottom: 0;">
+                    <label style="font-size: 0.55rem; font-weight: 900; color: #94a3b8; text-transform: uppercase; margin-bottom: 0.4rem; display: block;">City</label>
+                    <select id="filter-city" class="p-input" onchange="fetchSites(1)" style="height: 38px; font-size: 0.85rem; background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 8px;">
+                        <option value="">All</option>
+                        <?php foreach($cities as $c): ?> <option value="<?php echo $c; ?>"><?php echo $c; ?></option> <?php endforeach; ?>
+                    </select>
+                </div>
+                <div class="form-group" style="margin-bottom: 0;">
+                    <label style="font-size: 0.55rem; font-weight: 900; color: #94a3b8; text-transform: uppercase; margin-bottom: 0.4rem; display: block;">Light</label>
+                    <select id="light_type" class="p-input" onchange="fetchSites(1)" style="height: 38px; font-size: 0.85rem; background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 8px;">
+                        <option value="">All</option>
+                        <?php foreach($illuminations as $il): ?> <option value="<?php echo $il; ?>"><?php echo $il; ?></option> <?php endforeach; ?>
+                    </select>
+                </div>
+                <div class="form-group" style="margin-bottom: 0;">
+                    <label style="font-size: 0.55rem; font-weight: 900; color: #94a3b8; text-transform: uppercase; margin-bottom: 0.4rem; display: block;">Size</label>
+                    <select id="filter-size" class="p-input" onchange="fetchSites(1)" style="height: 38px; font-size: 0.85rem; background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 8px;">
+                        <option value="">All</option>
+                        <?php foreach($sizes as $sz): ?> <option value="<?php echo $sz; ?>"><?php echo $sz; ?></option> <?php endforeach; ?>
+                    </select>
                 </div>
             </div>
         </div>
