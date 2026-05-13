@@ -128,27 +128,42 @@ $sizes = $pdo->query("SELECT DISTINCT CONCAT(width, 'x', height) as size FROM si
                     </div>
                 </div>
 
-                <div style="display: grid; grid-template-columns: 1fr 1fr 1fr 1fr 1fr; gap: 0.5rem;">
-                    <select id="media_type" class="p-input" onchange="fetchSites(1)" style="height: 30px; font-size: 0.75rem;">
-                        <option value="">All Media</option>
-                        <?php foreach($mediaTypes as $mt): ?> <option value="<?php echo $mt; ?>"><?php echo $mt; ?></option> <?php endforeach; ?>
-                    </select>
-                    <select id="filter-state" class="p-input" onchange="fetchSites(1)" style="height: 30px; font-size: 0.75rem;">
-                        <option value="">All States</option>
-                        <?php foreach($states as $s): ?> <option value="<?php echo $s; ?>"><?php echo $s; ?></option> <?php endforeach; ?>
-                    </select>
-                    <select id="filter-city" class="p-input" onchange="fetchSites(1)" style="height: 30px; font-size: 0.75rem;">
-                        <option value="">All Cities</option>
-                        <?php foreach($cities as $c): ?> <option value="<?php echo $c; ?>"><?php echo $c; ?></option> <?php endforeach; ?>
-                    </select>
-                    <select id="filter-vendor" class="p-input" onchange="fetchSites(1)" style="height: 30px; font-size: 0.75rem;">
-                        <option value="">All Vendors</option>
-                        <?php foreach($vendors as $v): ?> <option value="<?php echo $v['id']; ?>"><?php echo $v['name']; ?></option> <?php endforeach; ?>
-                    </select>
-                    <select id="filter-size" class="p-input" onchange="fetchSites(1)" style="height: 30px; font-size: 0.75rem;">
-                        <option value="">All Sizes</option>
-                        <?php foreach($sizes as $sz): ?> <option value="<?php echo $sz; ?>"><?php echo $sz; ?></option> <?php endforeach; ?>
-                    </select>
+                <div style="display: grid; grid-template-columns: repeat(5, 1fr); gap: 1rem;">
+                    <div class="form-group" style="margin-bottom: 0;">
+                        <label style="font-size: 0.6rem; font-weight: 800; color: #94a3b8; text-transform: uppercase; margin-bottom: 0.3rem; display: block;">Media Type</label>
+                        <select id="media_type" class="p-input" onchange="fetchSites(1)" style="height: 38px; font-size: 0.8rem; background: #f8fafc; border: 1px solid #e2e8f0;">
+                            <option value="">All Media</option>
+                            <?php foreach($mediaTypes as $mt): ?> <option value="<?php echo $mt; ?>"><?php echo $mt; ?></option> <?php endforeach; ?>
+                        </select>
+                    </div>
+                    <div class="form-group" style="margin-bottom: 0;">
+                        <label style="font-size: 0.6rem; font-weight: 800; color: #94a3b8; text-transform: uppercase; margin-bottom: 0.3rem; display: block;">State</label>
+                        <select id="filter-state" class="p-input" onchange="fetchSites(1)" style="height: 38px; font-size: 0.8rem; background: #f8fafc; border: 1px solid #e2e8f0;">
+                            <option value="">All States</option>
+                            <?php foreach($states as $s): ?> <option value="<?php echo $s; ?>"><?php echo $s; ?></option> <?php endforeach; ?>
+                        </select>
+                    </div>
+                    <div class="form-group" style="margin-bottom: 0;">
+                        <label style="font-size: 0.6rem; font-weight: 800; color: #94a3b8; text-transform: uppercase; margin-bottom: 0.3rem; display: block;">City</label>
+                        <select id="filter-city" class="p-input" onchange="fetchSites(1)" style="height: 38px; font-size: 0.8rem; background: #f8fafc; border: 1px solid #e2e8f0;">
+                            <option value="">All Cities</option>
+                            <?php foreach($cities as $c): ?> <option value="<?php echo $c; ?>"><?php echo $c; ?></option> <?php endforeach; ?>
+                        </select>
+                    </div>
+                    <div class="form-group" style="margin-bottom: 0;">
+                        <label style="font-size: 0.6rem; font-weight: 800; color: #94a3b8; text-transform: uppercase; margin-bottom: 0.3rem; display: block;">Vendor</label>
+                        <select id="filter-vendor" class="p-input" onchange="fetchSites(1)" style="height: 38px; font-size: 0.8rem; background: #f8fafc; border: 1px solid #e2e8f0;">
+                            <option value="">All Vendors</option>
+                            <?php foreach($vendors as $v): ?> <option value="<?php echo $v['id']; ?>"><?php echo $v['name']; ?></option> <?php endforeach; ?>
+                        </select>
+                    </div>
+                    <div class="form-group" style="margin-bottom: 0;">
+                        <label style="font-size: 0.6rem; font-weight: 800; color: #94a3b8; text-transform: uppercase; margin-bottom: 0.3rem; display: block;">Size</label>
+                        <select id="filter-size" class="p-input" onchange="fetchSites(1)" style="height: 38px; font-size: 0.8rem; background: #f8fafc; border: 1px solid #e2e8f0;">
+                            <option value="">All Sizes</option>
+                            <?php foreach($sizes as $sz): ?> <option value="<?php echo $sz; ?>"><?php echo $sz; ?></option> <?php endforeach; ?>
+                        </select>
+                    </div>
                 </div>
             </div>
         </div>
@@ -166,14 +181,17 @@ $sizes = $pdo->query("SELECT DISTINCT CONCAT(width, 'x', height) as size FROM si
                     <i class="fas fa-spinner fa-spin" style="font-size: 2rem; color: var(--primary);"></i>
                     <span style="margin-top: 1rem; font-weight: 700; color: #64748b;">Loading Sites...</span>
                 </div>
-                <table class="crs-table selection-table" style="width: 100%;">
+                <table class="crs-table selection-table" style="width: 100%; border-collapse: separate; border-spacing: 0 0.5rem;">
                     <thead>
-                        <tr>
-                            <th style="width: 50px;">ACT</th>
-                            <th style="width: 100px;">PREVIEW</th>
-                            <th>SITE DETAIL</th>
-                            <th>VENDOR</th>
-                            <th style="text-align: right;">PURCHASE RATE</th>
+                        <tr style="border-bottom: 2px solid #f1f5f9;">
+                            <th style="width: 40px; padding: 0.8rem 1rem;">#</th>
+                            <th style="width: 50px; padding: 0.8rem 1rem; text-align:center;"><i class="far fa-check-square"></i></th>
+                            <th style="width: 100px; padding: 0.8rem 1rem;">PREVIEW</th>
+                            <th style="padding: 0.8rem 1rem;">CITY / CODE</th>
+                            <th style="padding: 0.8rem 1rem;">ASSET DETAILS</th>
+                            <th style="padding: 0.8rem 1rem;">SIZE</th>
+                            <th style="padding: 0.8rem 1rem; text-align:right;">OFFER RATE</th>
+                            <th style="padding: 0.8rem 1rem; text-align: right;">TOTAL</th>
                         </tr>
                     </thead>
                     <tbody id="asset-body">
@@ -207,14 +225,14 @@ $sizes = $pdo->query("SELECT DISTINCT CONCAT(width, 'x', height) as size FROM si
 
     <!-- Bucket Drawer -->
     <div id="bucket-backdrop" onclick="closeBucket()" style="position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.4); backdrop-filter: blur(4px); z-index: 2000; display: none;"></div>
-    <div id="selection-bucket-panel" style="position: fixed; top: 0; right: -1400px; width: 800px; max-width: 95vw; height: 100%; background: white; z-index: 2001; box-shadow: -10px 0 30px rgba(0,0,0,0.1); transition: all 0.4s; display: flex; flex-direction: column;">
+    <div id="selection-bucket-panel" style="position: fixed; top: 0; right: -1400px; width: 1200px; max-width: 95vw; height: 100%; background: white; z-index: 2001; box-shadow: -10px 0 30px rgba(0,0,0,0.1); transition: all 0.4s; display: flex; flex-direction: column;">
         <div class="p-header" style="padding: 1.5rem; background: var(--primary); color: white; margin: 0; display: flex; justify-content: space-between; align-items: center;">
-            <span>Review Selected Assets</span>
+            <div style="display: flex; align-items: center; gap: 1rem;"><i class="fas fa-shopping-basket"></i> Review Selected Assets</div>
             <button onclick="closeBucket()" style="background: none; border: none; color: white; font-size: 1.5rem; cursor: pointer;">&times;</button>
         </div>
         <div id="bucket-list" style="flex: 1; overflow-y: auto; padding: 1rem;"></div>
         <div style="padding: 1rem; border-top: 1px solid #e2e8f0; background: #f8fafc;">
-            <button onclick="closeBucket()" class="btn btn-primary" style="width: 100%; height: 45px; border-radius: 10px;">CONTINUE SELECTION</button>
+            <button onclick="closeBucket()" class="btn btn-primary" style="width: 100%; height: 45px; border-radius: 10px; font-weight: 800;">CONTINUE SELECTION</button>
         </div>
     </div>
 </div>
@@ -239,12 +257,11 @@ $sizes = $pdo->query("SELECT DISTINCT CONCAT(width, 'x', height) as size FROM si
 .form-grid { display: grid; gap: 1rem; }
 .form-group label { display: block; font-size: 0.7rem; font-weight: 800; color: var(--secondary); margin-bottom: 0.4rem; text-transform: uppercase; }
 .p-input { width: 100%; padding: 0.6rem; border: 1px solid #e2e8f0; border-radius: 8px; font-weight: 600; font-size: 0.85rem; }
-.crs-table th { font-size: 0.65rem; color: #64748b; text-transform: uppercase; padding: 0.75rem 1rem; text-align: left; background: #f8fafc; border-bottom: 1px solid #e2e8f0; }
-.crs-table td { padding: 0.75rem 1rem; border-bottom: 1px solid #f1f5f9; font-size: 0.85rem; }
+.crs-table th { font-size: 0.65rem; color: #64748b; text-transform: uppercase; padding: 1rem; text-align: left; background: #f8fafc; border-bottom: 1px solid #e2e8f0; }
+.crs-table td { padding: 1rem; border-bottom: 1px solid #f1f5f9; font-size: 0.85rem; vertical-align: middle; }
 .site-row.selected { background: #f0fdfa !important; }
 .pg-btn { min-width: 32px; height: 32px; border: 1px solid #e2e8f0; background: white; border-radius: 8px; cursor: pointer; font-weight: 700; font-size: 0.75rem; }
 .pg-btn.active { background: var(--primary); color: white; border-color: var(--primary); }
-.review-item { display: flex; justify-content: space-between; align-items: center; padding: 0.75rem; background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 10px; margin-bottom: 0.5rem; }
 </style>
 
 <script>
@@ -253,6 +270,7 @@ let currentPage = 1;
 let totalSites = 0;
 const pageSize = 10;
 const baseUrl = "<?php echo BASE_URL; ?>";
+const imgBaseUrl = "../../uploads/sites/";
 
 function calculateEndDate() {
     const startStr = document.getElementById('start_date').value;
@@ -333,26 +351,53 @@ function renderSites(sites) {
     body.innerHTML = '';
     
     if (sites.length === 0) {
-        body.innerHTML = '<tr><td colspan="5" style="text-align:center; padding:3rem; color:#94a3b8;">No sites found matching criteria.</td></tr>';
+        body.innerHTML = '<tr><td colspan="8" style="text-align:center; padding:3rem; color:#94a3b8;">No sites found matching criteria.</td></tr>';
         return;
     }
 
-    sites.forEach(s => {
-        const isSelected = selectedSites.some(ss => ss.id == s.id);
-        const thumb = s.thumbnail ? `${baseUrl}uploads/sites/${s.thumbnail}` : 'https://via.placeholder.com/100x60?text=No+Img';
+    sites.forEach((s, i) => {
+        const selectedSite = selectedSites.find(ss => ss.id == s.id);
+        const isSelected = !!selectedSite;
+        const currentRate = isSelected ? selectedSite.rate : parseFloat(s.purchase_rate);
+        
+        const thumb = s.thumbnail ? imgBaseUrl + s.thumbnail : 'https://via.placeholder.com/150x95?text=No+Img';
+        const startIdx = (currentPage - 1) * pageSize + i + 1;
         
         const row = document.createElement('tr');
         row.className = 'site-row' + (isSelected ? ' selected' : '');
+        row.id = 'row-' + s.id;
+        row.style.background = 'white';
         row.innerHTML = `
-            <td style="text-align:center;"><input type="checkbox" ${isSelected ? 'checked' : ''} onclick="toggleSite(${s.id}, '${s.name.replace(/'/g, "\\'")}', ${s.purchase_rate}, '${s.site_code}', '${s.location.replace(/'/g, "\\'")}', ${s.vendor_id}, '${s.thumbnail || ''}', '${s.city || ''}')"></td>
-            <td><img src="${thumb}" style="width:80px; height:50px; object-fit:cover; border-radius:6px;"></td>
-            <td>
-                <div style="font-weight:800; color:#1e293b;">${s.city || ''} <span style="color:#f97316;">${s.site_code}</span></div>
-                <div style="font-size:0.75rem; font-weight:700;">${s.name}</div>
-                <div style="font-size:0.65rem; color:#64748b;">${s.location}</div>
+            <td style="font-weight:700; color:#64748b; padding:1rem;">${startIdx}</td>
+            <td style="text-align:center; padding:1rem;"><input type="checkbox" ${isSelected ? 'checked' : ''} onclick="toggleSite(${s.id}, '${s.name.replace(/'/g, "\\'")}', ${currentRate}, '${s.site_code}', '${s.location.replace(/'/g, "\\'")}', ${s.vendor_id}, '${s.thumbnail || ''}', '${s.city || ''}', ${s.card_rate || 0}, '${s.width || 0}x${s.height || 0}', '${s.type || ''}', '${s.light_type || ''}', '${s.owner_type || ''}', '${s.vendor_name || ''}')" style="width:18px; height:18px; accent-color:var(--primary);"></td>
+            <td style="padding:1rem;"><img src="${thumb}" style="width:120px; height:75px; object-fit:cover; border-radius:10px; box-shadow:0 4px 6px rgba(0,0,0,0.05); border:1px solid #e2e8f0;"></td>
+            <td style="padding:1rem;">
+                <div style="font-weight:800; color:#1e293b; font-size:0.8rem; margin-bottom:1px;">${s.city || ''}</div>
+                <div style="color:#f97316; font-size:0.65rem; font-weight:800; text-transform:uppercase;">${s.site_code}</div>
             </td>
-            <td style="font-size:0.75rem; font-weight:700; color:#475569;">${s.vendor_name || 'N/A'}</td>
-            <td style="text-align:right; font-weight:900; color:var(--primary);">₹${parseFloat(s.purchase_rate).toLocaleString()}</td>
+            <td style="padding:1rem;">
+                <div style="font-weight:800; color:#1e293b; font-size:0.8rem; margin-bottom:1px;">${s.name}</div>
+                <div style="font-size:0.65rem; color:#64748b; margin-bottom:4px; line-height:1.1;">${s.location}</div>
+                <div style="display:flex; gap:0.3rem; align-items:center;">
+                    <span style="background:#ecfdf5; color:#059669; padding:0.1rem 0.4rem; border-radius:4px; font-size:0.55rem; font-weight:800; text-transform:uppercase;">${s.type}</span>
+                    <span style="background:#f1f5f9; color:#475569; padding:0.1rem 0.4rem; border-radius:4px; font-size:0.55rem; font-weight:800; text-transform:uppercase;">${s.light_type}</span>
+                    <span style="background:#f1f5f9; color:#475569; padding:0.1rem 0.4rem; border-radius:4px; font-size:0.55rem; font-weight:800; text-transform:uppercase;">
+                        ${s.owner_type}${s.owner_type === 'TA' && s.vendor_name ? ' - ' + s.vendor_name : ''}
+                    </span>
+                </div>
+            </td>
+            <td style="padding:1rem;">
+                <div style="font-weight:800; color:#1e293b; font-size:0.8rem; margin-bottom:1px;">${s.width}' x ${s.height}'</div>
+                <div style="font-size:0.65rem; color:#94a3b8; font-weight:700;">${(s.width*s.height).toLocaleString()} SQFT</div>
+            </td>
+            <td style="padding:1rem; text-align:right;">
+                <div style="font-size:0.65rem; color:var(--primary); font-weight:800; margin-bottom:4px; text-transform:uppercase;">Offer Rate</div>
+                <input type="number" class="p-input offer-rate-input" value="${currentRate}" oninput="updateSitePrice(${s.id}, this.value)" style="width:100px; height:32px; text-align:right; font-weight:900; color:var(--primary); padding:0 0.5rem; border-radius:8px; border: 1px solid #e2e8f0;">
+            </td>
+            <td style="padding:1.5rem 1rem; text-align:right;">
+                <div style="font-size:0.65rem; color:#64748b; font-weight:800; margin-bottom:4px; text-transform:uppercase;">Total</div>
+                <div class="total-cell" style="font-weight:900; color:var(--primary); font-size:0.95rem;">₹${currentRate.toLocaleString()}</div>
+            </td>
         `;
         body.appendChild(row);
     });
@@ -382,10 +427,10 @@ function renderPagination(total) {
     }
 }
 
-function toggleSite(id, name, rate, code, location, vendor, thumbnail = '', city = '') {
+function toggleSite(id, name, rate, code, location, vendor, thumbnail = '', city = '', card_rate = 0, size = '', type = '', light_type = '', owner_type = '', vendor_name = '') {
     const idx = selectedSites.findIndex(s => s.id == id);
     if (idx === -1) {
-        selectedSites.push({ id, name, rate, code, location, vendor, thumbnail, city });
+        selectedSites.push({ id, name, rate, code, location, vendor, thumbnail, city, card_rate, size, type, light_type, owner_type, vendor_name });
     } else {
         selectedSites.splice(idx, 1);
     }
@@ -422,6 +467,8 @@ function updateBucketUI() {
                     <th style="width: 100px;">PREVIEW</th>
                     <th>CITY / CODE</th>
                     <th>ASSET DETAILS</th>
+                    <th>SIZE</th>
+                    <th>PRICING</th>
                     <th style="text-align:right;">OFFER RATE</th>
                     <th style="text-align:right;">TOTAL</th>
                 </tr>
@@ -431,7 +478,8 @@ function updateBucketUI() {
 
     selectedSites.forEach((s, i) => {
         const rate = parseFloat(s.rate) || 0;
-        const thumb = s.thumbnail ? `${baseUrl}uploads/sites/${s.thumbnail}` : 'https://via.placeholder.com/100x60?text=No+Img';
+        const thumb = s.thumbnail ? imgBaseUrl + s.thumbnail : 'https://via.placeholder.com/150x95?text=No+Img';
+        const cardRate = parseFloat(s.card_rate || 0);
         
         html += `
             <tr class="site-row selected" style="background: white;">
@@ -441,19 +489,36 @@ function updateBucketUI() {
                         <i class="fas fa-trash-alt" style="font-size:0.75rem;"></i>
                     </button>
                 </td>
-                <td><img src="${thumb}" style="width:80px; height:50px; object-fit:cover; border-radius:8px;"></td>
+                <td><img src="${thumb}" style="width:120px; height:75px; object-fit:cover; border-radius:10px; box-shadow:0 4px 6px rgba(0,0,0,0.05); border:1px solid #e2e8f0;"></td>
                 <td>
-                    <div style="font-weight:800; color:#1e293b; font-size:0.8rem;">${s.city || 'N/A'}</div>
+                    <div style="font-weight:800; color:#1e293b; font-size:0.8rem; margin-bottom:1px;">${s.city || ''}</div>
                     <div style="color:#f97316; font-size:0.65rem; font-weight:800;">${s.code}</div>
                 </td>
                 <td>
-                    <div style="font-weight:800; color:#1e293b; font-size:0.8rem;">${s.name}</div>
-                    <div style="font-size:0.65rem; color:#64748b;">${s.location}</div>
+                    <div style="font-weight:800; color:#1e293b; font-size:0.8rem; margin-bottom:1px;">${s.name}</div>
+                    <div style="font-size:0.65rem; color:#64748b; margin-bottom:4px; line-height:1.1;">${s.location}</div>
+                    <div style="display:flex; gap:0.3rem; align-items:center;">
+                        <span style="background:#ecfdf5; color:#059669; padding:0.1rem 0.4rem; border-radius:4px; font-size:0.55rem; font-weight:800; text-transform:uppercase;">${s.type}</span>
+                        <span style="background:#f1f5f9; color:#475569; padding:0.1rem 0.4rem; border-radius:4px; font-size:0.55rem; font-weight:800; text-transform:uppercase;">${s.light_type}</span>
+                        <span style="background:#f1f5f9; color:#475569; padding:0.1rem 0.4rem; border-radius:4px; font-size:0.55rem; font-weight:800; text-transform:uppercase;">
+                            ${s.owner_type}${s.owner_type === 'TA' && s.vendor_name ? ' - ' + s.vendor_name : ''}
+                        </span>
+                    </div>
+                </td>
+                <td>
+                    <div style="font-weight:800; color:#1e293b; font-size:0.8rem; margin-bottom:1px;">${s.size}</div>
+                </td>
+                <td>
+                    <div style="font-weight:800; color:#64748b; font-size:0.8rem;">CARD: ₹${cardRate.toLocaleString()}</div>
                 </td>
                 <td style="text-align:right;">
-                    <input type="number" class="p-input" value="${rate}" oninput="updateSitePrice(${s.id}, this.value)" style="width:90px; height:30px; text-align:right; font-weight:900; color:var(--primary); padding:0 0.4rem; border-radius:6px;">
+                    <div style="font-size:0.65rem; color:var(--primary); font-weight:800; margin-bottom:4px; text-transform:uppercase;">Offer Rate</div>
+                    <input type="number" class="p-input" value="${rate}" oninput="updateSitePrice(${s.id}, this.value)" style="width:100px; height:32px; text-align:right; font-weight:900; color:var(--primary); padding:0 0.5rem; border-radius:8px; border: 1px solid #e2e8f0;">
                 </td>
-                <td style="text-align:right; font-weight:900; color:var(--primary); font-size:0.95rem;">₹${rate.toLocaleString()}</td>
+                <td style="text-align:right;">
+                    <div style="font-size:0.65rem; color:#64748b; font-weight:800; margin-bottom:4px; text-transform:uppercase;">Total</div>
+                    <div style="font-weight:900; color:var(--primary); font-size:0.95rem;">₹${rate.toLocaleString()}</div>
+                </td>
             </tr>
         `;
     });
@@ -463,11 +528,20 @@ function updateBucketUI() {
 }
 
 function updateSitePrice(id, val) {
+    const rate = parseFloat(val) || 0;
     const idx = selectedSites.findIndex(s => s.id == id);
     if (idx !== -1) {
-        selectedSites[idx].rate = parseFloat(val) || 0;
+        selectedSites[idx].rate = rate;
+        
+        // Update main table if row exists
+        const mainRow = document.getElementById('row-' + id);
+        if (mainRow) {
+            const totalCell = mainRow.querySelector('.total-cell');
+            if (totalCell) totalCell.innerText = '₹' + rate.toLocaleString();
+            // Also update the checkbox's onclick argument if needed, but it's easier to just keep selectedSites as source of truth
+        }
+
         recalcAll();
-        // Update table text locally without full re-render for performance
         updateBucketUI(); 
     }
 }
