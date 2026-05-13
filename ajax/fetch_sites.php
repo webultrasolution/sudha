@@ -60,7 +60,8 @@ $query = "
         s.id, s.site_code, s.name, s.location, s.city, s.state, s.type, s.light_type, 
         s.width, s.height, s.card_rate, s.purchase_rate, s.owner_type, s.vendor_id, s.status,
         p.name as vendor_name,
-        (SELECT filename FROM site_images WHERE site_id = s.id LIMIT 1) as thumbnail 
+        (SELECT filename FROM site_images WHERE site_id = s.id LIMIT 1) as thumbnail,
+        (SELECT GROUP_CONCAT(filename) FROM site_images WHERE site_id = s.id) as all_images 
     FROM sites s 
     LEFT JOIN partners p ON s.vendor_id = p.id
     WHERE $whereClause

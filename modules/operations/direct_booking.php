@@ -369,8 +369,8 @@ function renderSites(sites) {
         row.style.background = 'white';
         row.innerHTML = `
             <td style="font-weight:700; color:#64748b; padding:1rem;">${startIdx}</td>
-            <td style="text-align:center; padding:1rem;"><input type="checkbox" ${isSelected ? 'checked' : ''} onclick="toggleSite(${s.id}, '${s.name.replace(/'/g, "\\'")}', ${currentRate}, '${s.site_code}', '${s.location.replace(/'/g, "\\'")}', ${s.vendor_id}, '${s.thumbnail || ''}', '${s.city || ''}', ${s.card_rate || 0}, '${s.width || 0}x${s.height || 0}', '${s.type || ''}', '${s.light_type || ''}', '${s.owner_type || ''}', '${s.vendor_name || ''}')" style="width:18px; height:18px; accent-color:var(--primary);"></td>
-            <td style="padding:1rem;"><img src="${thumb}" style="width:120px; height:75px; object-fit:cover; border-radius:10px; box-shadow:0 4px 6px rgba(0,0,0,0.05); border:1px solid #e2e8f0;"></td>
+            <td style="text-align:center; padding:1rem;"><input type="checkbox" ${isSelected ? 'checked' : ''} onclick="toggleSite(${s.id}, '${s.name.replace(/'/g, "\\'")}', ${currentRate}, '${s.site_code}', '${s.location.replace(/'/g, "\\'")}', ${s.vendor_id}, '${s.thumbnail || ''}', '${s.city || ''}', ${s.card_rate || 0}, '${s.width || 0}x${s.height || 0}', '${s.type || ''}', '${s.light_type || ''}', '${s.owner_type || ''}', '${s.vendor_name || ''}', '${s.all_images || ''}')" style="width:18px; height:18px; accent-color:var(--primary);"></td>
+            <td style="padding:1rem;"><img src="${thumb}" onclick="openLightboxSlider('${s.all_images || ''}')" style="width:120px; height:75px; object-fit:cover; border-radius:10px; box-shadow:0 4px 6px rgba(0,0,0,0.05); border:1px solid #e2e8f0; cursor:pointer;"></td>
             <td style="padding:1rem;">
                 <div style="font-weight:800; color:#1e293b; font-size:0.8rem; margin-bottom:1px;">${s.city || ''}</div>
                 <div style="color:#f97316; font-size:0.65rem; font-weight:800; text-transform:uppercase;">${s.site_code}</div>
@@ -396,41 +396,17 @@ function renderSites(sites) {
             </td>
             <td style="padding:1.5rem 1rem; text-align:right;">
                 <div style="font-size:0.65rem; color:#64748b; font-weight:800; margin-bottom:4px; text-transform:uppercase;">Total</div>
-                <div class="total-cell" style="font-weight:900; color:var(--primary); font-size:0.95rem;">₹${currentRate.toLocaleString()}</div>
+                <div class="total-cell" style="font-weight:900; color:var(--primary); font-size:1.1rem;">₹${currentRate.toLocaleString()}</div>
             </td>
         `;
         body.appendChild(row);
     });
 }
 
-function renderPagination(total) {
-    const pgNum = document.getElementById('pg-numbers');
-    pgNum.innerHTML = '';
-    const totalPages = Math.ceil(total / pageSize);
-    
-    const start = (currentPage - 1) * pageSize + 1;
-    const end = Math.min(currentPage * pageSize, total);
-    document.getElementById('pg-info').innerText = `Showing ${total ? start : 0} to ${end} of ${total} sites`;
-
-    for (let i = 1; i <= totalPages; i++) {
-        if (i === 1 || i === totalPages || (i >= currentPage - 2 && i <= currentPage + 2)) {
-            const btn = document.createElement('button');
-            btn.innerText = i;
-            btn.className = 'pg-btn' + (i === currentPage ? ' active' : '');
-            btn.onclick = () => fetchSites(i);
-            pgNum.appendChild(btn);
-        } else if (i === currentPage - 3 || i === currentPage + 3) {
-            const span = document.createElement('span');
-            span.innerText = '...';
-            pgNum.appendChild(span);
-        }
-    }
-}
-
-function toggleSite(id, name, rate, code, location, vendor, thumbnail = '', city = '', card_rate = 0, size = '', type = '', light_type = '', owner_type = '', vendor_name = '') {
+function toggleSite(id, name, rate, code, location, vendor, thumbnail = '', city = '', card_rate = 0, size = '', type = '', light_type = '', owner_type = '', vendor_name = '', all_images = '') {
     const idx = selectedSites.findIndex(s => s.id == id);
     if (idx === -1) {
-        selectedSites.push({ id, name, rate, code, location, vendor, thumbnail, city, card_rate, size, type, light_type, owner_type, vendor_name });
+        selectedSites.push({ id, name, rate, code, location, vendor, thumbnail, city, card_rate, size, type, light_type, owner_type, vendor_name, all_images });
     } else {
         selectedSites.splice(idx, 1);
     }
@@ -489,7 +465,7 @@ function updateBucketUI() {
                         <i class="fas fa-trash-alt" style="font-size:0.75rem;"></i>
                     </button>
                 </td>
-                <td><img src="${thumb}" style="width:120px; height:75px; object-fit:cover; border-radius:10px; box-shadow:0 4px 6px rgba(0,0,0,0.05); border:1px solid #e2e8f0;"></td>
+                <td><img src="${thumb}" onclick="openLightboxSlider('${s.all_images || ''}')" style="width:120px; height:75px; object-fit:cover; border-radius:10px; box-shadow:0 4px 6px rgba(0,0,0,0.05); border:1px solid #e2e8f0; cursor:pointer;"></td>
                 <td>
                     <div style="font-weight:800; color:#1e293b; font-size:0.8rem; margin-bottom:1px;">${s.city || ''}</div>
                     <div style="color:#f97316; font-size:0.65rem; font-weight:800;">${s.code}</div>
@@ -611,6 +587,69 @@ function saveDirectBooking() {
         }
     });
 }
+// Lightbox & Slider Logic
+let currentImages = [];
+let currentImgIndex = 0;
+
+function openLightboxSlider(imageString) {
+    if (!imageString) return;
+    currentImages = imageString.split(',');
+    currentImgIndex = 0;
+    updateSliderImage();
+    const lb = document.getElementById('simple-lightbox');
+    if(lb) {
+        lb.style.display = 'flex';
+        const navs = document.querySelectorAll('.slider-nav');
+        navs.forEach(n => n.style.display = currentImages.length > 1 ? 'flex' : 'none');
+    }
+}
+function updateSliderImage() {
+    const lbImg = document.getElementById('lightbox-img');
+    const lbBadge = document.getElementById('lightbox-badge');
+    if(lbImg) {
+        lbImg.src = imgBaseUrl + currentImages[currentImgIndex];
+        if(lbBadge) {
+            lbBadge.innerText = (currentImgIndex + 1) + " / " + currentImages.length;
+            lbBadge.style.display = currentImages.length > 1 ? 'block' : 'none';
+        }
+    }
+}
+function nextSlide(e) { if(e) e.stopPropagation(); currentImgIndex = (currentImgIndex + 1) % currentImages.length; updateSliderImage(); }
+function prevSlide(e) { if(e) e.stopPropagation(); currentImgIndex = (currentImgIndex - 1 + currentImages.length) % currentImages.length; updateSliderImage(); }
+function closeLightbox() { const lb = document.getElementById('simple-lightbox'); if(lb) lb.style.display = 'none'; }
+
+document.addEventListener('keydown', function(e) {
+    const lb = document.getElementById('simple-lightbox');
+    if(lb && lb.style.display === 'flex') {
+        if(e.key === 'ArrowRight') nextSlide();
+        if(e.key === 'ArrowLeft') prevSlide();
+        if(e.key === 'Escape') closeLightbox();
+    }
+});
 </script>
+
+<!-- Simple Lightbox HTML -->
+<div id="simple-lightbox" onclick="closeLightbox()" style="position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.95); z-index: 9999; display: none; align-items: center; justify-content: center; backdrop-filter: blur(10px);">
+    <div style="position: relative; max-width: 90%; max-height: 90%; display: flex; align-items: center; justify-content: center;" onclick="event.stopPropagation()">
+        <!-- Prev Button -->
+        <button class="slider-nav" onclick="prevSlide(event)" style="position: absolute; left: -80px; background: rgba(255,255,255,0.1); color: white; border: 1px solid rgba(255,255,255,0.2); width: 50px; height: 50px; border-radius: 50%; display: flex; align-items: center; justify-content: center; cursor: pointer; font-size: 1.5rem; transition: all 0.3s; z-index: 10001;">
+            <i class="fas fa-chevron-left"></i>
+        </button>
+
+        <div style="position: relative;">
+            <img id="lightbox-img" src="" style="max-width: 100%; max-height: 85vh; border-radius: 16px; box-shadow: 0 30px 60px rgba(0,0,0,0.8); border: 2px solid rgba(255,255,255,0.15);">
+            <!-- Image Counter Badge -->
+            <div id="lightbox-badge" style="position: absolute; bottom: 20px; left: 50%; transform: translateX(-50%); background: rgba(0,0,0,0.7); color: white; padding: 6px 16px; border-radius: 50px; font-weight: 800; font-size: 0.85rem; backdrop-filter: blur(5px); border: 1px solid rgba(255,255,255,0.2);"></div>
+        </div>
+
+        <!-- Next Button -->
+        <button class="slider-nav" onclick="nextSlide(event)" style="position: absolute; right: -80px; background: rgba(255,255,255,0.1); color: white; border: 1px solid rgba(255,255,255,0.2); width: 50px; height: 50px; border-radius: 50%; display: flex; align-items: center; justify-content: center; cursor: pointer; font-size: 1.5rem; transition: all 0.3s; z-index: 10001;">
+            <i class="fas fa-chevron-right"></i>
+        </button>
+
+        <!-- Close Button -->
+        <div onclick="closeLightbox()" style="position: absolute; top: -60px; right: -60px; color: white; font-size: 2.5rem; cursor: pointer; opacity: 0.6; transition: opacity 0.2s;" onmouseover="this.style.opacity=1" onmouseout="this.style.opacity=0.6">&times;</div>
+    </div>
+</div>
 
 <?php include_once __DIR__ . '/../../includes/footer.php'; ?>
