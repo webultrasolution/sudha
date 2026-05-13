@@ -357,19 +357,28 @@ $company_signature = getSetting('company_signature', 'signature.png');
     </div>
 
     <div style="padding: 10px; border-top: 1px solid #000; font-size: 9px;">
-        <?php if(!empty($b['remark'])): ?>
-            <div style="margin-bottom: 8px;">
-                <div style="font-weight: bold; text-decoration: underline; margin-bottom: 2px;">REMARKS / NOTES:</div>
-                <div style="font-style: italic; background: #fdfaea; padding: 5px; border: 1px dashed #e2e8f0;"><?php echo nl2br(htmlspecialchars($b['remark'])); ?></div>
-            </div>
-        <?php endif; ?>
-
-        <div style="font-weight: bold; text-decoration: underline; margin-bottom: 3px;">Terms & Conditions:</div>
-        <ol style="margin: 0; padding-left: 15px;">
-            <li>Flex mounting and cleaning will be free of cost as per standard agreement.</li>
-            <li>Filing of GSTR-1 within time is mandatory for payment processing.</li>
-            <li>Non-illumination of lit sites will lead to deduction on pro-rata basis.</li>
-            <li>Contract period starts from the date of physical display verification.</li>
+        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 5px;">
+            <div style="font-weight: bold; text-decoration: underline; font-size: 10px;">Terms & Conditions</div>
+            <div style="font-weight: bold; color: #cc0000; font-size: 11px;">Filing of GSTR-1 within time is mandatory for acceptance of Invoice.</div>
+        </div>
+        <ol style="margin: 0; padding-left: 15px; line-height: 1.2;">
+            <li>Flex mounting will be Free of Cost</li>
+            <li>Kindly take proper care while mounting the vinyl & make sure there should be no wrinkles seen on the above hoarding. In case of execution being not proper resulting in poor quality of Flex/Vinyl mounting the same should be remounted free of cost within 24 hours. Penalty of display charges will be deducted on prorata basis for every day delayed.</li>
+            <li>In case of non illumination of Lit sites display charge will be deducted on prorata basis for everyday of non illuminous.</li>
+            <li>The media should be maintained by the contractor in good condition throughout the contract period.</li>
+            <li>We reserves the right to discontinue or cancel the booking midway of display period.</li>
+            <li>We reserves the right to accept or reject the quality of the job executed.</li>
+            <li>Please arrange to send four sets of High Resolution Photographs (Two Long view & Two Close view).</li>
+            <li>The contract period will start from the date of display.</li>
+            <li>For the print jobs the printer will have to give free replacement of print for any prints found fading or not as per given specification immediately.</li>
+            <li>Any deviation from the specification given above will not be payable.</li>
+            <li><strong>All Bills should carry our purchase order copy.</strong></li>
+            <li><strong>Required 2 Nos Bill For Payment Processing.</strong></li>
+            <li><strong>Raise Your Bill In favor Of: Art Cottage Advertising Pvt. Ltd., H.B Road, Opp Baba Digital Lab Ranchi – 834001.</strong></li>
+            <li><strong>GSTIN Number : 20AAICA1626K1Z1</strong></li>
+            <li>State Code : 20</li>
+            <li>State Name : Jharkhand</li>
+            <li>Place of supply : Jharkhand</li>
         </ol>
     </div>
 
