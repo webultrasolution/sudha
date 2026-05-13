@@ -29,7 +29,7 @@ $pType = $partner['type']; // 'client' or 'vendor'
 // Fetch all Bills (Debits)
 if ($pType == 'client') {
     $stmtInv = $pdo->prepare("
-        SELECT id, 'invoice' as type, i.created_at as date, invoice_number as ref, i.total_amount as debit, 0 as credit 
+        SELECT i.id, 'invoice' as type, i.created_at as date, i.invoice_number as ref, i.total_amount as debit, 0 as credit 
         FROM invoices i
         JOIN bookings b ON i.booking_id = b.id
         WHERE b.client_id = ?
