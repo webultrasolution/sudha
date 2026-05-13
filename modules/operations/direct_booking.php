@@ -252,7 +252,7 @@ $sizes = $pdo->query("SELECT DISTINCT CONCAT(width, 'x', height) as size FROM si
                     <div id="sum-grand-btm" style="font-size: 1.3rem; font-weight: 900; color: var(--primary);">₹0</div>
                 </div>
                 <button class="btn btn-primary" onclick="saveDirectBooking()" id="submitBtn" style="height: 42px; padding: 0 1.5rem; border-radius: 8px; font-weight: 900;">
-                    GENERATE BOOKING & POs
+                    GENERATE BOOKING
                 </button>
             </div>
         </div>
@@ -762,11 +762,11 @@ function saveDirectBooking() {
         body: JSON.stringify(data)
     }).then(r => r.json()).then(res => {
         if (res.success) {
-            Swal.fire('Success', 'Booking and POs generated!', 'success').then(() => window.location.href = 'bookings.php');
+            Swal.fire('Success', 'Booking  generated!', 'success').then(() => window.location.href = 'bookings.php');
             if(res.po_id) window.open('generate_po.php?po_id=' + res.po_id, '_blank');
         } else {
             Swal.fire('Error', res.message, 'error');
-            btn.disabled = false; btn.innerHTML = 'GENERATE BOOKING & POs';
+            btn.disabled = false; btn.innerHTML = 'GENERATE BOOKING';
         }
     });
 }

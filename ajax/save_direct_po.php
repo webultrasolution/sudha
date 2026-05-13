@@ -140,10 +140,23 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         ]);
         $bookingId = $pdo->lastInsertId();
 
-        // 4. Create Operational Tasks
+        // 4. Create Operational Tasks & Booking Items
         $stmtOps = $pdo->prepare("INSERT INTO operations (booking_id, site_id, status) VALUES (?, ?, 'pending')");
+        $stmtBI = $pdo->prepare("INSERT INTO booking_items (booking_id, site_id, start_date, end_date, days, purchase_amount, amount) VALUES (?, ?, ?, ?, ?, ?, ?)");
+        
         foreach ($data['site_ids'] as $sid) {
             $stmtOps->execute([$bookingId, $sid]);
+            
+            $rate = floatval($data['rates'][$sid] ?? 0);
+            $stmtBI->execute([
+                $bookingId,
+                $sid,
+                $start_date,
+                $end_date,
+                30,
+                $rate, // purchase_amount (assuming same as rate for direct)
+                $rate  // amount (sale rate)
+            ]);
         }
 
         logActivity('generated a direct booking and purchase order(s)', 'bookings', $bookingId, "Booking ID: $bookingId, Multiple POs generated.");
