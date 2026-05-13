@@ -268,7 +268,7 @@ $sizes = $pdo->query("SELECT DISTINCT CONCAT(width, 'x', height) as size FROM si
 let selectedSites = [];
 let currentPage = 1;
 let totalSites = 0;
-const pageSize = 10;
+const pageSize = 6;
 const baseUrl = "<?php echo BASE_URL; ?>";
 const imgBaseUrl = "../../uploads/sites/";
 
@@ -366,9 +366,23 @@ function renderSites(sites) {
         const currentRate = isSelected ? selectedSite.rate : parseFloat(s.purchase_rate);
         
         const thumb = s.thumbnail ? imgBaseUrl + s.thumbnail : 'https://via.placeholder.com/150x95?text=No+Img';
+        const imgList = (s.all_images || "").split(',').filter(img => img.trim() !== "");
+        const imgCount = imgList.length;
         const startIdx = (currentPage - 1) * pageSize + i + 1;
         const cardRate = parseFloat(s.card_rate || 0);
         
+        const previewHtml = s.thumbnail 
+            ? `<div style="position: relative; width: 150px; height: 95px;">
+                    <img src="${thumb}" onclick="openLightboxSlider('${s.all_images || ''}', ${s.id})" 
+                         style="width: 100%; height: 100%; border-radius: 12px; object-fit: cover; border: 1px solid ${isSelected ? '#059669' : '#e2e8f0'}; cursor: pointer; transition: transform 0.2s; box-shadow: 0 4px 6px rgba(0,0,0,0.05);">
+                    ${imgCount > 1 ? `
+                        <div style="position: absolute; bottom: 8px; right: 8px; background: rgba(0,0,0,0.8); color: white; font-size: 0.65rem; padding: 3px 8px; border-radius: 6px; font-weight: 800; backdrop-filter: blur(4px); border: 1px solid rgba(255,255,255,0.1);">
+                            <i class="fas fa-images"></i> ${imgCount}
+                        </div>
+                    ` : ''}
+               </div>`
+            : `<div style="width: 150px; height: 95px; border-radius: 12px; background: #f8fafc; border: 1px dashed #e2e8f0; display: flex; align-items: center; justify-content: center; font-size: 0.75rem; color: #94a3b8; font-weight: 700;">No Image</div>`;
+
         const row = document.createElement('tr');
         row.className = 'site-row' + (isSelected ? ' selected' : '');
         row.id = 'row-' + s.id;
@@ -376,7 +390,7 @@ function renderSites(sites) {
         row.innerHTML = `
             <td style="font-weight:700; color:#64748b; padding:1rem;">${startIdx}</td>
             <td style="text-align:center; padding:1rem;"><input type="checkbox" ${isSelected ? 'checked' : ''} onclick="toggleSite(${s.id}, '${s.name.replace(/'/g, "\\'")}', ${currentRate}, '${s.site_code}', '${s.location.replace(/'/g, "\\'")}', ${s.vendor_id}, '${s.thumbnail || ''}', '${s.city || ''}', ${cardRate}, '${s.width}x${s.height}', '${s.type}', '${s.light_type}', '${s.owner_type}', '${s.vendor_name}', '${s.all_images || ''}')" style="width:18px; height:18px; accent-color:var(--primary);"></td>
-            <td style="padding:1rem;"><img src="${thumb}" onclick="openLightboxSlider('${s.all_images || ''}', ${s.id})" style="width:120px; height:75px; object-fit:cover; border-radius:10px; box-shadow:0 4px 6px rgba(0,0,0,0.05); border:1px solid #e2e8f0; cursor:pointer;"></td>
+            <td style="padding:1rem;">${previewHtml}</td>
             <td style="padding:1rem;">
                 <div style="font-weight:800; color:#1e293b; font-size:0.8rem; margin-bottom:1px;">${s.city || ''}</div>
                 <div style="color:#f97316; font-size:0.65rem; font-weight:800; text-transform:uppercase;">${s.site_code}</div>
@@ -462,16 +476,30 @@ function updateBucketUI() {
         const rate = parseFloat(s.rate) || 0;
         const thumb = s.thumbnail ? imgBaseUrl + s.thumbnail : 'https://via.placeholder.com/150x95?text=No+Img';
         const cardRate = parseFloat(s.card_rate || 0);
-        
+        const imgList = (s.all_images || "").split(',').filter(img => img.trim() !== "");
+        const imgCount = imgList.length;
+
+        const previewHtml = s.thumbnail 
+            ? `<div style="position: relative; width: 150px; height: 95px;">
+                    <img src="${thumb}" onclick="openLightboxSlider('${s.all_images || ''}', ${s.id})" 
+                         style="width: 100%; height: 100%; border-radius: 12px; object-fit: cover; border: 1px solid #e2e8f0; cursor: pointer; transition: transform 0.2s; box-shadow: 0 4px 6px rgba(0,0,0,0.05);">
+                    ${imgCount > 1 ? `
+                        <div style="position: absolute; bottom: 8px; right: 8px; background: rgba(0,0,0,0.8); color: white; font-size: 0.65rem; padding: 3px 8px; border-radius: 6px; font-weight: 800; backdrop-filter: blur(4px); border: 1px solid rgba(255,255,255,0.1);">
+                            <i class="fas fa-images"></i> ${imgCount}
+                        </div>
+                    ` : ''}
+               </div>`
+            : `<div style="width: 150px; height: 95px; border-radius: 12px; background: #f8fafc; border: 1px dashed #e2e8f0; display: flex; align-items: center; justify-content: center; font-size: 0.75rem; color: #94a3b8; font-weight: 700;">No Image</div>`;
+
         html += `
             <tr class="site-row selected" style="background: white;">
-                <td style="font-weight:700; color:#64748b;">${i + 1}</td>
-                <td style="text-align:center;">
+                <td style="font-weight:700; color:#64748b; padding:1rem;">${i + 1}</td>
+                <td style="text-align:center; padding:1rem;">
                     <button onclick="toggleSite(${s.id})" style="background:#fee2e2; color:#ef4444; border:none; width:28px; height:28px; border-radius:6px; cursor:pointer; display:flex; align-items:center; justify-content:center;">
                         <i class="fas fa-trash-alt" style="font-size:0.75rem;"></i>
                     </button>
                 </td>
-                <td><img src="${thumb}" onclick="openLightboxSlider('${s.all_images || ''}', ${s.id})" style="width:120px; height:75px; object-fit:cover; border-radius:10px; box-shadow:0 4px 6px rgba(0,0,0,0.05); border:1px solid #e2e8f0; cursor:pointer;"></td>
+                <td style="padding:1rem;">${previewHtml}</td>
                 <td>
                     <div style="font-weight:800; color:#1e293b; font-size:0.8rem; margin-bottom:1px;">${s.city || ''}</div>
                     <div style="color:#f97316; font-size:0.65rem; font-weight:800;">${s.code}</div>
