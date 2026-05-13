@@ -307,8 +307,13 @@ function goToStep1() {
 }
 
 function goToStep2() {
-    if (!document.getElementById('client_id').value || !document.getElementById('campaign_name').value) {
-        return Swal.fire('Required', 'Please fill Campaign Name and Client.', 'warning');
+    const client = document.getElementById('client_id').value;
+    const campaign = document.getElementById('campaign_name').value;
+    const start = document.getElementById('start_date').value;
+    const end = document.getElementById('end_date').value;
+
+    if (!client || !campaign || !start || !end) {
+        return Swal.fire('Required', 'Please fill Campaign Name, Client, and Booking Dates.', 'warning');
     }
     document.getElementById('step-1').style.display = 'none';
     document.getElementById('step-2').style.display = 'block';
@@ -362,6 +367,7 @@ function renderSites(sites) {
         
         const thumb = s.thumbnail ? imgBaseUrl + s.thumbnail : 'https://via.placeholder.com/150x95?text=No+Img';
         const startIdx = (currentPage - 1) * pageSize + i + 1;
+        const cardRate = parseFloat(s.card_rate || 0);
         
         const row = document.createElement('tr');
         row.className = 'site-row' + (isSelected ? ' selected' : '');
