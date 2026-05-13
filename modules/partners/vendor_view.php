@@ -26,7 +26,7 @@ $pos->execute([$id]);
 $pos = $pos->fetchAll();
 
 // Fetch Payment Summary
-$payments = $pdo->prepare("SELECT SUM(amount) FROM payments WHERE entity_id = ? AND type = 'payable'");
+$payments = $pdo->prepare("SELECT SUM(amount) FROM payments WHERE partner_id = ? AND type = 'debit'");
 $payments->execute([$id]);
 $totalPaid = $payments->fetchColumn() ?: 0;
 

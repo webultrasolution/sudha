@@ -48,7 +48,7 @@ $partners = $stmt->fetchAll();
                     $totalBilled = $stmtBilled->fetchColumn() ?: 0;
 
                     // Total Paid by Client (Receivables)
-                    $stmtPaid = $pdo->prepare("SELECT SUM(amount) FROM payments WHERE entity_id = ? AND type = 'receivable'");
+                    $stmtPaid = $pdo->prepare("SELECT SUM(amount) FROM payments WHERE partner_id = ? AND type = 'credit'");
                     $stmtPaid->execute([$p['id']]);
                     $totalPaid = $stmtPaid->fetchColumn() ?: 0;
                 } else {
@@ -58,7 +58,7 @@ $partners = $stmt->fetchAll();
                     $totalBilled = $stmtBilled->fetchColumn() ?: 0;
 
                     // Total Paid to Vendor (Payables)
-                    $stmtPaid = $pdo->prepare("SELECT SUM(amount) FROM payments WHERE entity_id = ? AND type = 'payable'");
+                    $stmtPaid = $pdo->prepare("SELECT SUM(amount) FROM payments WHERE partner_id = ? AND type = 'debit'");
                     $stmtPaid->execute([$p['id']]);
                     $totalPaid = $stmtPaid->fetchColumn() ?: 0;
                 }
