@@ -1,4 +1,5 @@
 <?php
 include_once __DIR__ . '/../config/db.php';
-$stmt = $pdo->query("DESCRIBE purchase_orders");
-print_r($stmt->fetchAll(PDO::FETCH_ASSOC));
+$stmt = $pdo->query("SHOW CREATE TABLE invoices");
+$res = $stmt->fetch();
+print_r($res);
