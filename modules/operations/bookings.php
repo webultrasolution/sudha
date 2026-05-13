@@ -47,6 +47,7 @@ $bookings = $pdo->query("
                 <th>Booking ID</th>
                 <th style="width: 100px;">Type</th>
                 <th>Proposal #</th>
+                <th>Campaign / Brand</th>
                 <th>Client</th>
                 <th>Period</th>
                 <th>Execution Status</th>
@@ -73,9 +74,23 @@ $bookings = $pdo->query("
                             <span class="badge" style="background: #f0fdf4; color: #15803d; font-size: 0.65rem; font-weight: 800; border: 1px solid #dcfce7; padding: 0.2rem 0.5rem; border-radius: 4px; text-transform: uppercase;">System</span>
                         <?php endif; ?>
                     </td>
-                    <td style="font-weight: 600; color: #64748b;"><?php echo !empty($b['proposal_number']) ? $b['proposal_number'] : '<span style="color: #cbd5e1; font-weight: 400;">N/A</span>'; ?></td>
+                    <td style="font-weight: 600; color: #64748b;">
+                        <?php if (!empty($b['proposal_number'])): ?>
+                            <?php echo $b['proposal_number']; ?>
+                        <?php elseif (!empty($b['external_po'])): ?>
+                            <span style="color: #0d9488; font-size: 0.75rem;"><i class="fas fa-tag"></i> <?php echo $b['external_po']; ?></span>
+                        <?php else: ?>
+                            <span style="color: #cbd5e1; font-weight: 400;">N/A</span>
+                        <?php endif; ?>
+                    </td>
+                    <td>
+                        <div style="font-weight: 700; color: #1e293b;"><?php echo $b['campaign_name']; ?></div>
+                        <?php if (!empty($b['brand_name'])): ?>
+                            <div style="font-size: 0.7rem; color: #64748b; font-weight: 600; text-transform: uppercase;"><?php echo $b['brand_name']; ?></div>
+                        <?php endif; ?>
+                    </td>
                     <td><?php echo $b['client_name']; ?></td>
-                    <td style="font-size: 0.875rem;">
+                    <td style="font-size: 0.875rem; white-space: nowrap;">
                         <?php echo date('d M', strtotime($b['start_date'])); ?> - <?php echo date('d M Y', strtotime($b['end_date'])); ?>
                     </td>
                     <td>

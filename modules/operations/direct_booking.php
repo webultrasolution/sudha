@@ -1,211 +1,542 @@
 <?php
-include_once __DIR__ . '/../../config/db.php';
-include_once __DIR__ . '/../../includes/functions.php';
-
-$vendor_id = isset($_GET['vendor_id']) ? intval($_GET['vendor_id']) : 0;
-$vendor = null;
-if ($vendor_id) {
-    // Fetch Vendor Info
-    $stmtV = $pdo->prepare("SELECT * FROM partners WHERE id = ? AND type = 'vendor'");
-    $stmtV->execute([$vendor_id]);
-    $vendor = $stmtV->fetch();
-}
-
-// Fetch All Vendors for selection
-$allVendors = $pdo->query("SELECT id, name FROM partners WHERE type = 'vendor' ORDER BY name ASC")->fetchAll();
-
-$sites = [];
-if ($vendor) {
-    // Fetch Vendor Sites
-    $stmtS = $pdo->prepare("SELECT * FROM sites WHERE vendor_id = ? ORDER BY city ASC, location ASC");
-    $stmtS->execute([$vendor_id]);
-    $sites = $stmtS->fetchAll();
-}
-
-// Fetch Clients (Include vendors as they might be the client for direct bookings)
-$clients = $pdo->query("SELECT id, name, type FROM partners ORDER BY name ASC")->fetchAll();
-
 $activePage = 'direct_booking';
-$pageTitle = 'Direct Booking';
+$pageTitle = 'Create Direct Booking';
+$hideSidebar = true;
 include_once __DIR__ . '/../../includes/header.php';
+
+// Fetch initial data for filters only
+$clients = $pdo->query("SELECT id, name, city, contact_person FROM partners WHERE type = 'client' ORDER BY name ASC")->fetchAll();
+$vendors = $pdo->query("SELECT id, name FROM partners WHERE type = 'vendor' ORDER BY name ASC")->fetchAll();
+
+$cities = $pdo->query("SELECT DISTINCT city FROM sites WHERE city IS NOT NULL AND city != '' ORDER BY city")->fetchAll(PDO::FETCH_COLUMN);
+$states = $pdo->query("SELECT DISTINCT state FROM sites WHERE state IS NOT NULL AND state != '' ORDER BY state")->fetchAll(PDO::FETCH_COLUMN);
+$mediaTypes = $pdo->query("SELECT DISTINCT type FROM sites WHERE type IS NOT NULL AND type != '' ORDER BY type")->fetchAll(PDO::FETCH_COLUMN);
+$illuminations = $pdo->query("SELECT DISTINCT light_type FROM sites WHERE light_type IS NOT NULL AND light_type != '' ORDER BY light_type")->fetchAll(PDO::FETCH_COLUMN);
+$sizes = $pdo->query("SELECT DISTINCT CONCAT(width, 'x', height) as size FROM sites WHERE width IS NOT NULL AND height IS NOT NULL AND width != '' AND height != '' ORDER BY width, height")->fetchAll(PDO::FETCH_COLUMN);
 ?>
 
-<?php if (!$vendor): ?>
-    <div class="card" style="margin-bottom: 2rem; padding: 3rem; text-align: center; border: 2px dashed #e2e8f0; background: #f8fafc;">
-        <i class="fas fa-truck-loading" style="font-size: 3rem; color: #cbd5e1; margin-bottom: 1rem;"></i>
-        <h2 style="margin-top: 0; color: #1e293b;">Select Vendor for Direct Booking</h2>
-        <p style="color: #64748b; margin-bottom: 2rem;">Please choose a vendor to load their sites and generate a direct booking/PO.</p>
-        <div style="max-width: 450px; margin: 0 auto;">
-            <select onchange="if(this.value) window.location.href='?vendor_id=' + this.value" style="width: 100%; padding: 1rem; border: 1px solid #cbd5e1; border-radius: 10px; font-size: 1rem; font-weight: 600; box-shadow: 0 4px 6px -1px rgba(0,0,0,0.05); cursor: pointer; appearance: none; background: #fff url('data:image/svg+xml;charset=US-ASCII,%3Csvg%20xmlns%3D%22http%3A//www.w3.org/2000/svg%22%20width%3D%22292.4%22%20height%3D%22292.4%22%3E%3Cpath%20fill%3D%22%2364748B%22%20d%3D%22M287%2069.4a17.6%2017.6%200%200%200-13-5.4H18.4c-5%200-9.3%201.8-12.9%205.4A17.6%2017.6%200%200%200%200%2082.2c0%205%201.8%209.3%205.4%2012.9l128%20127.9c3.6%203.6%207.8%205.4%2012.8%205.4s9.2-1.8%2012.8-5.4L287%2095c3.5-3.5%205.4-7.8%205.4-12.8%200-5-1.9-9.2-5.5-12.8z%22/%3E%3C/svg%3E') no-repeat right 1rem center; background-size: 0.8rem auto;">
-                <option value="">-- Choose Vendor --</option>
-                <?php foreach ($allVendors as $v): ?>
-                    <option value="<?php echo $v['id']; ?>"><?php echo $v['name']; ?></option>
-                <?php endforeach; ?>
-            </select>
+<div class="proposal-full-wrapper">
+    <!-- Wizard Progress Tracker -->
+    <div style="display: flex; justify-content: center; align-items: center; margin-bottom: 1.5rem; background: white; padding: 0.6rem; border-radius: 12px; box-shadow: 0 2px 10px rgba(0,0,0,0.03); max-width: 400px; margin-left: auto; margin-right: auto;">
+        <div style="display: flex; align-items: center; gap: 1rem;">
+            <div id="step-tab-1" style="display: flex; flex-direction: column; align-items: center; gap: 0.2rem;">
+                <div class="step-circle" style="width: 24px; height: 24px; background: #059669; color: white; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 0.7rem; border: 2px solid white; box-shadow: 0 0 0 2px #059669;"><i class="fas fa-check"></i></div>
+                <span class="step-label" style="font-size: 0.55rem; font-weight: 800; color: #059669; text-transform: uppercase;">Details</span>
+            </div>
+            <div style="width: 30px; height: 2px; background: #e2e8f0; position: relative; margin-top: -12px;">
+                <div id="wizard-progress-line" style="position: absolute; left: 0; top: 0; height: 100%; width: 0%; background: #059669; transition: width 0.4s;"></div>
+            </div>
+            <div id="step-tab-2" style="display: flex; flex-direction: column; align-items: center; gap: 0.2rem;">
+                <div class="step-circle" style="width: 24px; height: 24px; background: #fff; color: #94a3b8; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 0.7rem; font-weight: 800; border: 2px solid white; box-shadow: 0 0 0 2px #e2e8f0;">2</div>
+                <span class="step-label" style="font-size: 0.55rem; font-weight: 800; color: #94a3b8; text-transform: uppercase;">Assets</span>
+            </div>
         </div>
     </div>
-<?php else: ?>
-<div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 2rem;">
-    <div>
-        <h1 style="font-size: 1.5rem; font-weight: 800; color: #0f172a; margin: 0;">Direct Booking</h1>
-        <p style="color: #64748b; margin: 0; font-size: 0.9rem;">Generate a PO for <strong><?php echo $vendor['name']; ?></strong> without creating a proposal.</p>
+
+    <!-- STEP 1 -->
+    <div id="step-1">
+        <div class="p-panel" style="max-width: 1100px; margin: 0 auto 1.5rem auto;">
+            <div class="p-header">Campaign Details & Duration</div>
+            
+            <div class="form-grid" style="grid-template-columns: 1fr 1fr 1fr; margin-bottom: 1rem;">
+                <div class="form-group">
+                    <label>Campaign Name <span style="color:red;">*</span></label>
+                    <input type="text" id="campaign_name" class="p-input" placeholder="e.g. Summer Sale 2024" style="height: 38px;">
+                </div>
+                <div class="form-group">
+                    <label style="display: flex; justify-content: space-between; align-items: center;">
+                        <span>Company / Client <span style="color:red;">*</span></span>
+                        <button type="button" class="btn-text" onclick="openClientModal()" style="font-size: 0.7rem; color: var(--primary); background: none; border: none; cursor: pointer; padding: 0;">
+                            <i class="fas fa-plus-circle"></i> New
+                        </button>
+                    </label>
+                    <select id="client_id" class="p-input" style="height: 38px;" onchange="handleClientChange()">
+                        <option value="">-- Choose Client --</option>
+                        <?php foreach ($clients as $c): ?>
+                            <option value="<?php echo $c['id']; ?>" data-contact="<?php echo htmlspecialchars($c['contact_person'] ?? ''); ?>">
+                                <?php echo $c['name']; ?> <?php echo $c['city'] ? "({$c['city']})" : ""; ?>
+                            </option>
+                        <?php endforeach; ?>
+                    </select>
+                </div>
+                <div class="form-group">
+                    <label>Contact Person</label>
+                    <input type="text" id="contact_person" class="p-input" placeholder="Full Name" style="height: 38px;">
+                </div>
+            </div>
+
+            <div class="form-grid" style="grid-template-columns: 1fr 1fr 1fr;">
+                <div class="form-group">
+                    <label>From Date</label>
+                    <input type="date" id="start_date" class="p-input" style="height: 38px;" value="<?php echo date('Y-m-d'); ?>" onchange="calculateEndDate()">
+                </div>
+                <div class="form-group">
+                    <label>To Date</label>
+                    <input type="date" id="end_date" class="p-input" style="height: 38px;" value="<?php echo date('Y-m-d', strtotime('+1 month')); ?>" onchange="calculateTotalDays()">
+                </div>
+                <div class="form-group">
+                    <label>Total Days</label>
+                    <input type="number" id="total_days" class="p-input" placeholder="Days" style="height: 38px;" oninput="calculateEndDate()">
+                </div>
+            </div>
+            
+            <div class="form-group" style="margin-top: 1.5rem;">
+                <label>Internal Remarks</label>
+                <textarea id="remark" class="p-input" rows="2" placeholder="Notes for this booking..."></textarea>
+            </div>
+        </div>
+
+        <div style="display: flex; justify-content: flex-end; margin: 2rem auto; max-width: 1100px;">
+            <button class="btn btn-primary" onclick="goToStep2()" style="width: 250px; height: 48px; border-radius: 12px; font-weight: 800; font-size: 0.95rem;">
+                Next Step: Select Assets <i class="fas fa-arrow-right" style="margin-left: 0.75rem;"></i>
+            </button>
+        </div>
     </div>
-    <div style="display: flex; gap: 0.75rem;">
-        <select onchange="window.location.href='?vendor_id=' + this.value" style="padding: 0.5rem 1rem; border: 1px solid #e2e8f0; border-radius: 8px; font-weight: 600; font-size: 0.85rem; color: #475569; cursor: pointer;">
-            <?php foreach ($allVendors as $v): ?>
-                <option value="<?php echo $v['id']; ?>" <?php echo $v['id'] == $vendor_id ? 'selected' : ''; ?>><?php echo $v['name']; ?></option>
-            <?php endforeach; ?>
-        </select>
-        <a href="../partners/vendors.php" class="btn" style="background: #f1f5f9; color: #475569;"><i class="fas fa-arrow-left"></i> Back to Vendors</a>
+
+    <!-- STEP 2 -->
+    <div id="step-2" style="display: none;">
+        <div class="p-panel" style="margin-bottom: 1rem; padding: 0.75rem;">
+            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 0.75rem; border-bottom: 1px solid #f1f5f9; padding-bottom: 0.5rem;">
+                <div style="display: flex; align-items: center; gap: 1rem;">
+                    <button onclick="goToStep1()" class="btn btn-secondary" style="height: 28px; padding: 0 0.6rem; font-size: 0.7rem; border-radius: 6px;">
+                        <i class="fas fa-arrow-left"></i> Back
+                    </button>
+                    <span style="font-weight: 900; color: var(--primary); font-size: 0.75rem; text-transform: uppercase;">Inventory Search</span>
+                </div>
+            </div>
+            
+            <div class="media-search-grid">
+                <div class="search-row" style="margin-bottom: 1rem; display: flex; gap: 2rem; align-items: flex-end;">
+                    <div class="search-group">
+                        <label>Ownership</label>
+                        <div class="radio-group" style="gap: 1rem; display: flex;">
+                            <label><input type="radio" name="ownership" value="all" checked onchange="fetchSites(1)"> All</label>
+                            <label><input type="radio" name="ownership" value="HA" onchange="fetchSites(1)"> Self</label>
+                            <label><input type="radio" name="ownership" value="TA" onchange="fetchSites(1)"> Vendor</label>
+                        </div>
+                    </div>
+                    <div class="search-group">
+                        <label>Availability</label>
+                        <div class="radio-group" style="gap: 1rem; display: flex;">
+                            <label><input type="radio" name="availability" value="available" checked onchange="fetchSites(1)"> Available</label>
+                            <label><input type="radio" name="availability" value="all" onchange="fetchSites(1)"> All</label>
+                        </div>
+                    </div>
+                    <div class="search-group" style="flex: 1;">
+                        <label>Search Site / Code</label>
+                        <input type="text" id="site-search" class="p-input" placeholder="Search..." oninput="fetchSites(1)" style="height: 30px;">
+                    </div>
+                </div>
+
+                <div style="display: grid; grid-template-columns: 1fr 1fr 1fr 1fr 1fr; gap: 0.5rem;">
+                    <select id="media_type" class="p-input" onchange="fetchSites(1)" style="height: 30px; font-size: 0.75rem;">
+                        <option value="">All Media</option>
+                        <?php foreach($mediaTypes as $mt): ?> <option value="<?php echo $mt; ?>"><?php echo $mt; ?></option> <?php endforeach; ?>
+                    </select>
+                    <select id="filter-state" class="p-input" onchange="fetchSites(1)" style="height: 30px; font-size: 0.75rem;">
+                        <option value="">All States</option>
+                        <?php foreach($states as $s): ?> <option value="<?php echo $s; ?>"><?php echo $s; ?></option> <?php endforeach; ?>
+                    </select>
+                    <select id="filter-city" class="p-input" onchange="fetchSites(1)" style="height: 30px; font-size: 0.75rem;">
+                        <option value="">All Cities</option>
+                        <?php foreach($cities as $c): ?> <option value="<?php echo $c; ?>"><?php echo $c; ?></option> <?php endforeach; ?>
+                    </select>
+                    <select id="filter-vendor" class="p-input" onchange="fetchSites(1)" style="height: 30px; font-size: 0.75rem;">
+                        <option value="">All Vendors</option>
+                        <?php foreach($vendors as $v): ?> <option value="<?php echo $v['id']; ?>"><?php echo $v['name']; ?></option> <?php endforeach; ?>
+                    </select>
+                    <select id="filter-size" class="p-input" onchange="fetchSites(1)" style="height: 30px; font-size: 0.75rem;">
+                        <option value="">All Sizes</option>
+                        <?php foreach($sizes as $sz): ?> <option value="<?php echo $sz; ?>"><?php echo $sz; ?></option> <?php endforeach; ?>
+                    </select>
+                </div>
+            </div>
+        </div>
+
+        <div class="p-panel" id="asset-plan-panel" style="margin-bottom: 2rem;">
+            <div class="p-header" style="display: flex; justify-content: space-between; align-items: center;">
+                <span>Select Assets</span>
+                <button onclick="openBucket()" style="background: #ecfdf5; color: #059669; border: 1px solid #d1fae5; padding: 0.4rem 1rem; border-radius: 8px; font-weight: 800; font-size: 0.8rem; cursor: pointer;">
+                    Selected: <span id="selected-count">0</span>
+                </button>
+            </div>
+
+            <div style="min-height: 400px; position: relative;">
+                <div id="loading-overlay" style="display: none; position: absolute; inset: 0; background: rgba(255,255,255,0.7); z-index: 20; align-items: center; justify-content: center; flex-direction: column;">
+                    <i class="fas fa-spinner fa-spin" style="font-size: 2rem; color: var(--primary);"></i>
+                    <span style="margin-top: 1rem; font-weight: 700; color: #64748b;">Loading Sites...</span>
+                </div>
+                <table class="crs-table selection-table" style="width: 100%;">
+                    <thead>
+                        <tr>
+                            <th style="width: 50px;">ACT</th>
+                            <th style="width: 100px;">PREVIEW</th>
+                            <th>SITE DETAIL</th>
+                            <th>VENDOR</th>
+                            <th style="text-align: right;">PURCHASE RATE</th>
+                        </tr>
+                    </thead>
+                    <tbody id="asset-body">
+                        <!-- Dynamic Content -->
+                    </tbody>
+                </table>
+            </div>
+
+            <div class="pagination-wrap" style="padding: 1rem; display: flex; justify-content: space-between; align-items: center; background: #f8fafc; border-top: 1px solid #e2e8f0;">
+                <div id="pg-info" style="font-size: 0.75rem; font-weight: 700; color: #64748b;">Showing 0 to 0 of 0 sites</div>
+                <div id="pg-numbers" style="display: flex; gap: 0.25rem;"></div>
+            </div>
+        </div>
+
+        <div class="proposal-action-bar" style="position: sticky; bottom: 0; background: white; border-top: 2px solid var(--primary); padding: 0.75rem 1.5rem; display: flex; align-items: center; justify-content: space-between; z-index: 1000; border-radius: 12px 12px 0 0; box-shadow: 0 -10px 25px rgba(0,0,0,0.05);">
+            <div style="display: flex; gap: 1.5rem; align-items: center; width: 100%; justify-content: flex-end;">
+                <div style="text-align: right;">
+                    <div style="font-size: 0.6rem; color: #64748b; font-weight: 800; text-transform: uppercase;">Subtotal</div>
+                    <div id="sum-display-btm" style="font-weight: 700; color: #1e293b; font-size: 0.9rem;">₹0</div>
+                </div>
+                <div style="text-align: right;">
+                    <div style="font-size: 0.6rem; color: var(--primary); font-weight: 900; text-transform: uppercase;">Grand Total (Inc. 18% GST)</div>
+                    <div id="sum-grand-btm" style="font-size: 1.3rem; font-weight: 900; color: var(--primary);">₹0</div>
+                </div>
+                <button class="btn btn-primary" onclick="saveDirectBooking()" id="submitBtn" style="height: 42px; padding: 0 1.5rem; border-radius: 8px; font-weight: 900;">
+                    GENERATE BOOKING & POs
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Bucket Drawer -->
+    <div id="bucket-backdrop" onclick="closeBucket()" style="position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.4); backdrop-filter: blur(4px); z-index: 2000; display: none;"></div>
+    <div id="selection-bucket-panel" style="position: fixed; top: 0; right: -1400px; width: 800px; max-width: 95vw; height: 100%; background: white; z-index: 2001; box-shadow: -10px 0 30px rgba(0,0,0,0.1); transition: all 0.4s; display: flex; flex-direction: column;">
+        <div class="p-header" style="padding: 1.5rem; background: var(--primary); color: white; margin: 0; display: flex; justify-content: space-between; align-items: center;">
+            <span>Review Selected Assets</span>
+            <button onclick="closeBucket()" style="background: none; border: none; color: white; font-size: 1.5rem; cursor: pointer;">&times;</button>
+        </div>
+        <div id="bucket-list" style="flex: 1; overflow-y: auto; padding: 1rem;"></div>
+        <div style="padding: 1rem; border-top: 1px solid #e2e8f0; background: #f8fafc;">
+            <button onclick="closeBucket()" class="btn btn-primary" style="width: 100%; height: 45px; border-radius: 10px;">CONTINUE SELECTION</button>
+        </div>
     </div>
 </div>
 
-<form action="generate_po.php" method="GET" target="_blank">
-    <input type="hidden" name="vendor_id" value="<?php echo $vendor_id; ?>">
-    <!-- We will send a special flag 'direct=1' to generate_po.php -->
-    <input type="hidden" name="mode" value="direct">
-
-    <div class="card" style="margin-bottom: 1.5rem; padding: 1.5rem; border-radius: 12px; border: 1px solid #e2e8f0;">
-        <h4 style="margin-top: 0; margin-bottom: 1rem; color: #1e293b; font-size: 1rem;">1. Campaign Details</h4>
-        <div style="display: grid; grid-template-columns: 2fr 2fr 1fr 1fr; gap: 1rem;">
-            <div class="form-group">
-                <label style="display: block; font-size: 0.8rem; font-weight: 700; color: #64748b; margin-bottom: 0.5rem; text-transform: uppercase;">Campaign Name</label>
-                <input type="text" name="campaign_name" placeholder="e.g. Summer Sale 2024" style="width: 100%; padding: 0.75rem; border: 1px solid #cbd5e1; border-radius: 8px; font-weight: 600;">
-            </div>
-            <div class="form-group">
-                <label style="display: block; font-size: 0.8rem; font-weight: 700; color: #64748b; margin-bottom: 0.5rem; text-transform: uppercase;">Select Client</label>
-                <select name="client_id" style="width: 100%; padding: 0.75rem; border: 1px solid #cbd5e1; border-radius: 8px; font-weight: 600; appearance: none; background: #fff url('data:image/svg+xml;charset=US-ASCII,%3Csvg%20xmlns%3D%22http%3A//www.w3.org/2000/svg%22%20width%3D%22292.4%22%20height%3D%22292.4%22%3E%3Cpath%20fill%3D%22%2364748B%22%20d%3D%22M287%2069.4a17.6%2017.6%200%200%200-13-5.4H18.4c-5%200-9.3%201.8-12.9%205.4A17.6%2017.6%200%200%200%200%2082.2c0%205%201.8%209.3%205.4%2012.9l128%20127.9c3.6%203.6%207.8%205.4%2012.8%205.4s9.2-1.8%2012.8-5.4L287%2095c3.5-3.5%205.4-7.8%205.4-12.8%200-5-1.9-9.2-5.5-12.8z%22/%3E%3C/svg%3E') no-repeat right 0.75rem center; background-size: 0.65rem auto;">
-                    <option value="">-- Choose Client (Optional) --</option>
-                    <?php foreach($clients as $c): ?>
-                        <option value="<?php echo $c['id']; ?>" <?php echo ($vendor && $c['id'] == $vendor['id']) ? 'selected' : ''; ?>>
-                            <?php echo $c['name']; ?> <?php echo ($c['type'] == 'vendor' ? '(Vendor)' : ''); ?>
-                        </option>
-                    <?php endforeach; ?>
-                </select>
-            </div>
-            <div class="form-group">
-                <label style="display: block; font-size: 0.8rem; font-weight: 700; color: #64748b; margin-bottom: 0.5rem; text-transform: uppercase;">Start Date</label>
-                <input type="date" name="start_date" value="<?php echo date('Y-m-d'); ?>" required style="width: 100%; padding: 0.75rem; border: 1px solid #cbd5e1; border-radius: 8px;">
-            </div>
-            <div class="form-group">
-                <label style="display: block; font-size: 0.8rem; font-weight: 700; color: #64748b; margin-bottom: 0.5rem; text-transform: uppercase;">End Date</label>
-                <input type="date" name="end_date" value="<?php echo date('Y-m-d', strtotime('+1 month')); ?>" required style="width: 100%; padding: 0.75rem; border: 1px solid #cbd5e1; border-radius: 8px;">
-            </div>
-        </div>
-        <div class="form-group" style="margin-top: 1rem;">
-            <label style="display: block; font-size: 0.8rem; font-weight: 700; color: #64748b; margin-bottom: 0.5rem; text-transform: uppercase;">Remarks</label>
-            <textarea name="remark" placeholder="Enter any additional notes for this PO..." style="width: 100%; padding: 0.75rem; border: 1px solid #cbd5e1; border-radius: 8px; font-weight: 600; min-height: 60px; font-family: inherit;"></textarea>
+<div id="clientModal" class="modal-overlay" style="display: none; position: fixed; inset: 0; background: rgba(0,0,0,0.5); z-index: 5000; align-items: center; justify-content: center;">
+    <div class="card" style="width: 90%; max-width: 500px; padding: 2rem; border-radius: 20px;">
+        <h3 style="margin-top: 0; font-weight: 800; border-bottom: 1px solid #f1f5f9; padding-bottom: 0.5rem;">New Client</h3>
+        <div class="form-group" style="margin-bottom: 1rem;"><label>Company Name</label><input type="text" id="new_client_name" class="p-input"></div>
+        <div class="form-group" style="margin-bottom: 1rem;"><label>Contact Person</label><input type="text" id="new_client_contact" class="p-input"></div>
+        <div class="form-group" style="margin-bottom: 1.5rem;"><label>City</label><input type="text" id="new_client_city" class="p-input"></div>
+        <div style="display: flex; justify-content: flex-end; gap: 1rem;">
+            <button class="btn" onclick="closeClientModal()">Cancel</button>
+            <button class="btn btn-primary" onclick="submitQuickClient()">Save & Select</button>
         </div>
     </div>
+</div>
 
-    <div class="card" style="padding: 0; border-radius: 12px; overflow: hidden; border: 1px solid #e2e8f0;">
-        <div style="padding: 1.25rem; background: #f8fafc; border-bottom: 1px solid #e2e8f0; display: flex; justify-content: space-between; align-items: center;">
-            <h4 style="margin: 0; color: #1e293b; font-size: 1rem;">2. Select Sites for PO</h4>
-            <span style="font-size: 0.75rem; color: #64748b; font-weight: 600;">Only sites assigned to this vendor are listed.</span>
-        </div>
-        <table class="table" style="margin-bottom: 0;">
-            <thead style="background: #f1f5f9;">
-                <tr>
-                    <th style="width: 40px; text-align: center;"><input type="checkbox" id="selectAll" style="transform: scale(1.2); cursor: pointer;"></th>
-                    <th>Site Code</th>
-                    <th>Location / City</th>
-                    <th>Size</th>
-                    <th>Light</th>
-                    <th style="width: 150px;">Purchase Rate (₹)</th>
-                </tr>
-            </thead>
-            <tbody>
-                <?php foreach ($sites as $s): ?>
-                <tr>
-                    <td style="text-align: center;"><input type="checkbox" name="site_ids[]" value="<?php echo $s['id']; ?>" class="site-check" style="transform: scale(1.2); cursor: pointer;"></td>
-                    <td style="font-weight: 700; color: var(--primary);"><?php echo $s['site_code']; ?></td>
-                    <td>
-                        <div style="font-weight: 700; color: #1e293b;"><?php echo $s['location']; ?></div>
-                        <div style="font-size: 0.7rem; color: #64748b; font-weight: 600;"><?php echo $s['city']; ?></div>
-                    </td>
-                    <td><?php echo $s['width'] . "' x " . $s['height'] . "'"; ?></td>
-                    <td><span style="font-size: 0.7rem; font-weight: 800; color: #94a3b8;"><?php echo $s['light_type']; ?></span></td>
-                    <td>
-                        <input type="number" name="rates[<?php echo $s['id']; ?>]" value="<?php echo $s['purchase_rate']; ?>" style="width: 100%; padding: 0.4rem; border: 1px solid #e2e8f0; border-radius: 4px; font-weight: 700; color: #0f172a;">
-                    </td>
-                </tr>
-                <?php endforeach; ?>
-            </tbody>
-        </table>
-    </div>
-
-    <div style="margin-top: 2rem; text-align: right; background: white; padding: 1.5rem; border-radius: 12px; border: 1px solid #e2e8f0; box-shadow: 0 10px 15px -3px rgba(0,0,0,0.05);">
-        <button type="button" onclick="saveAndGeneratePO()" class="btn btn-primary" style="padding: 1rem 2rem; font-size: 1rem; font-weight: 800; background: #0f172a; border: none; border-radius: 10px; box-shadow: 0 4px 6px -1px rgba(15, 23, 42, 0.3);">
-            <i class="fas fa-file-pdf"></i> Generate & Save Purchase Order
-        </button>
-    </div>
-</form>
+<style>
+.proposal-full-wrapper { padding: 2rem; background: #f8fafc; min-height: 100vh; }
+.p-panel { background: white; border-radius: 12px; padding: 1.5rem; border: 1px solid #e2e8f0; box-shadow: 0 4px 6px -1px rgba(0,0,0,0.05); }
+.p-header { font-weight: 800; font-size: 0.95rem; color: var(--primary); margin-bottom: 1.25rem; border-bottom: 2px solid #f1f5f9; padding-bottom: 0.75rem; }
+.form-grid { display: grid; gap: 1rem; }
+.form-group label { display: block; font-size: 0.7rem; font-weight: 800; color: var(--secondary); margin-bottom: 0.4rem; text-transform: uppercase; }
+.p-input { width: 100%; padding: 0.6rem; border: 1px solid #e2e8f0; border-radius: 8px; font-weight: 600; font-size: 0.85rem; }
+.crs-table th { font-size: 0.65rem; color: #64748b; text-transform: uppercase; padding: 0.75rem 1rem; text-align: left; background: #f8fafc; border-bottom: 1px solid #e2e8f0; }
+.crs-table td { padding: 0.75rem 1rem; border-bottom: 1px solid #f1f5f9; font-size: 0.85rem; }
+.site-row.selected { background: #f0fdfa !important; }
+.pg-btn { min-width: 32px; height: 32px; border: 1px solid #e2e8f0; background: white; border-radius: 8px; cursor: pointer; font-weight: 700; font-size: 0.75rem; }
+.pg-btn.active { background: var(--primary); color: white; border-color: var(--primary); }
+.review-item { display: flex; justify-content: space-between; align-items: center; padding: 0.75rem; background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 10px; margin-bottom: 0.5rem; }
+</style>
 
 <script>
-document.getElementById('selectAll').addEventListener('change', function(e) {
-    document.querySelectorAll('.site-check').forEach(cb => cb.checked = e.target.checked);
-});
+let selectedSites = [];
+let currentPage = 1;
+let totalSites = 0;
+const pageSize = 10;
+const baseUrl = "<?php echo BASE_URL; ?>";
 
-function saveAndGeneratePO() {
-    const siteChecks = document.querySelectorAll('.site-check:checked');
-    if (siteChecks.length === 0) {
-        Swal.fire('Selection Required', 'Please select at least one site to generate a PO.', 'warning');
+function calculateEndDate() {
+    const startStr = document.getElementById('start_date').value;
+    const days = parseInt(document.getElementById('total_days').value);
+    if (startStr && !isNaN(days) && days > 0) {
+        const startDate = new Date(startStr);
+        const endDate = new Date(startDate);
+        endDate.setDate(startDate.getDate() + days - 1);
+        document.getElementById('end_date').value = endDate.toISOString().split('T')[0];
+    }
+}
+
+function calculateTotalDays() {
+    const startStr = document.getElementById('start_date').value;
+    const endStr = document.getElementById('end_date').value;
+    if (startStr && endStr) {
+        const start = new Date(startStr);
+        const end = new Date(endStr);
+        const diffDays = Math.ceil((end - start) / (1000 * 60 * 60 * 24)) + 1;
+        document.getElementById('total_days').value = diffDays > 0 ? diffDays : 0;
+    }
+}
+
+function handleClientChange() {
+    const select = document.getElementById('client_id');
+    if (select.selectedIndex <= 0) { document.getElementById('contact_person').value = ''; return; }
+    document.getElementById('contact_person').value = select.options[select.selectedIndex].dataset.contact || '';
+}
+
+function goToStep1() {
+    document.getElementById('step-2').style.display = 'none';
+    document.getElementById('step-1').style.display = 'block';
+    document.getElementById('wizard-progress-line').style.width = '0%';
+}
+
+function goToStep2() {
+    if (!document.getElementById('client_id').value || !document.getElementById('campaign_name').value) {
+        return Swal.fire('Required', 'Please fill Campaign Name and Client.', 'warning');
+    }
+    document.getElementById('step-1').style.display = 'none';
+    document.getElementById('step-2').style.display = 'block';
+    document.getElementById('wizard-progress-line').style.width = '100%';
+    fetchSites(1);
+}
+
+function fetchSites(page = 1) {
+    currentPage = page;
+    const overlay = document.getElementById('loading-overlay');
+    overlay.style.display = 'flex';
+
+    const params = new URLSearchParams({
+        page: page,
+        limit: pageSize,
+        q: document.getElementById('site-search').value,
+        media: document.getElementById('media_type').value,
+        state: document.getElementById('filter-state').value,
+        city: document.getElementById('filter-city').value,
+        vendor: document.getElementById('filter-vendor').value,
+        size: document.getElementById('filter-size').value,
+        availability: document.querySelector('input[name="availability"]:checked').value,
+        ownership: document.querySelector('input[name="ownership"]:checked').value
+    });
+
+    fetch(`../../ajax/fetch_sites.php?${params.toString()}`)
+    .then(r => r.json())
+    .then(res => {
+        overlay.style.display = 'none';
+        if (!res.success) return;
+        
+        totalSites = res.total;
+        renderSites(res.sites);
+        renderPagination(res.total);
+    });
+}
+
+function renderSites(sites) {
+    const body = document.getElementById('asset-body');
+    body.innerHTML = '';
+    
+    if (sites.length === 0) {
+        body.innerHTML = '<tr><td colspan="5" style="text-align:center; padding:3rem; color:#94a3b8;">No sites found matching criteria.</td></tr>';
         return;
     }
 
-    const formData = {
-        vendor_id: <?php echo $vendor_id; ?>,
-        client_id: document.querySelector('select[name="client_id"]').value,
-        campaign_name: document.querySelector('input[name="campaign_name"]').value,
-        start_date: document.querySelector('input[name="start_date"]').value,
-        end_date: document.querySelector('input[name="end_date"]').value,
-        remark: document.querySelector('textarea[name="remark"]').value,
-        site_ids: Array.from(siteChecks).map(cb => cb.value),
-        rates: {}
-    };
+    sites.forEach(s => {
+        const isSelected = selectedSites.some(ss => ss.id == s.id);
+        const thumb = s.thumbnail ? `${baseUrl}uploads/sites/${s.thumbnail}` : 'https://via.placeholder.com/100x60?text=No+Img';
+        
+        const row = document.createElement('tr');
+        row.className = 'site-row' + (isSelected ? ' selected' : '');
+        row.innerHTML = `
+            <td style="text-align:center;"><input type="checkbox" ${isSelected ? 'checked' : ''} onclick="toggleSite(${s.id}, '${s.name.replace(/'/g, "\\'")}', ${s.purchase_rate}, '${s.site_code}', '${s.location.replace(/'/g, "\\'")}', ${s.vendor_id}, '${s.thumbnail || ''}', '${s.city || ''}')"></td>
+            <td><img src="${thumb}" style="width:80px; height:50px; object-fit:cover; border-radius:6px;"></td>
+            <td>
+                <div style="font-weight:800; color:#1e293b;">${s.city || ''} <span style="color:#f97316;">${s.site_code}</span></div>
+                <div style="font-size:0.75rem; font-weight:700;">${s.name}</div>
+                <div style="font-size:0.65rem; color:#64748b;">${s.location}</div>
+            </td>
+            <td style="font-size:0.75rem; font-weight:700; color:#475569;">${s.vendor_name || 'N/A'}</td>
+            <td style="text-align:right; font-weight:900; color:var(--primary);">₹${parseFloat(s.purchase_rate).toLocaleString()}</td>
+        `;
+        body.appendChild(row);
+    });
+}
 
-    formData.site_ids.forEach(sid => {
-        formData.rates[sid] = document.querySelector(`input[name="rates[${sid}]"]`).value;
+function renderPagination(total) {
+    const pgNum = document.getElementById('pg-numbers');
+    pgNum.innerHTML = '';
+    const totalPages = Math.ceil(total / pageSize);
+    
+    const start = (currentPage - 1) * pageSize + 1;
+    const end = Math.min(currentPage * pageSize, total);
+    document.getElementById('pg-info').innerText = `Showing ${total ? start : 0} to ${end} of ${total} sites`;
+
+    for (let i = 1; i <= totalPages; i++) {
+        if (i === 1 || i === totalPages || (i >= currentPage - 2 && i <= currentPage + 2)) {
+            const btn = document.createElement('button');
+            btn.innerText = i;
+            btn.className = 'pg-btn' + (i === currentPage ? ' active' : '');
+            btn.onclick = () => fetchSites(i);
+            pgNum.appendChild(btn);
+        } else if (i === currentPage - 3 || i === currentPage + 3) {
+            const span = document.createElement('span');
+            span.innerText = '...';
+            pgNum.appendChild(span);
+        }
+    }
+}
+
+function toggleSite(id, name, rate, code, location, vendor, thumbnail = '', city = '') {
+    const idx = selectedSites.findIndex(s => s.id == id);
+    if (idx === -1) {
+        selectedSites.push({ id, name, rate, code, location, vendor, thumbnail, city });
+    } else {
+        selectedSites.splice(idx, 1);
+    }
+    document.getElementById('selected-count').innerText = selectedSites.length;
+    updateBucketUI();
+    recalcAll();
+    
+    // Update row visual locally
+    const row = document.querySelector(`.site-row input[onclick*="toggleSite(${id}"]`)?.closest('tr');
+    if (row) {
+        row.classList.toggle('selected', idx === -1);
+        const chk = row.querySelector('input[type="checkbox"]');
+        if (chk) chk.checked = (idx === -1);
+    }
+}
+
+function updateBucketUI() {
+    const list = document.getElementById('bucket-list');
+    if (!list) return;
+
+    document.getElementById('selected-count').innerText = selectedSites.length;
+    
+    if (selectedSites.length === 0) {
+        list.innerHTML = '<div style="text-align:center; padding:4rem 2rem; color:#94a3b8;"><i class="fas fa-shopping-basket" style="font-size:3rem; opacity:0.2; margin-bottom:1rem; display:block;"></i>No sites selected yet.</div>';
+        return;
+    }
+
+    let html = `
+        <table class="crs-table selection-table" style="width: 100%; border-collapse: separate; border-spacing: 0 0.5rem;">
+            <thead>
+                <tr style="border-bottom: 2px solid #f1f5f9;">
+                    <th style="width: 40px;">#</th>
+                    <th style="width: 50px; text-align:center;">ACT</th>
+                    <th style="width: 100px;">PREVIEW</th>
+                    <th>CITY / CODE</th>
+                    <th>ASSET DETAILS</th>
+                    <th style="text-align:right;">OFFER RATE</th>
+                    <th style="text-align:right;">TOTAL</th>
+                </tr>
+            </thead>
+            <tbody>
+    `;
+
+    selectedSites.forEach((s, i) => {
+        const rate = parseFloat(s.rate) || 0;
+        const thumb = s.thumbnail ? `${baseUrl}uploads/sites/${s.thumbnail}` : 'https://via.placeholder.com/100x60?text=No+Img';
+        
+        html += `
+            <tr class="site-row selected" style="background: white;">
+                <td style="font-weight:700; color:#64748b;">${i + 1}</td>
+                <td style="text-align:center;">
+                    <button onclick="toggleSite(${s.id})" style="background:#fee2e2; color:#ef4444; border:none; width:28px; height:28px; border-radius:6px; cursor:pointer; display:flex; align-items:center; justify-content:center;">
+                        <i class="fas fa-trash-alt" style="font-size:0.75rem;"></i>
+                    </button>
+                </td>
+                <td><img src="${thumb}" style="width:80px; height:50px; object-fit:cover; border-radius:8px;"></td>
+                <td>
+                    <div style="font-weight:800; color:#1e293b; font-size:0.8rem;">${s.city || 'N/A'}</div>
+                    <div style="color:#f97316; font-size:0.65rem; font-weight:800;">${s.code}</div>
+                </td>
+                <td>
+                    <div style="font-weight:800; color:#1e293b; font-size:0.8rem;">${s.name}</div>
+                    <div style="font-size:0.65rem; color:#64748b;">${s.location}</div>
+                </td>
+                <td style="text-align:right;">
+                    <input type="number" class="p-input" value="${rate}" oninput="updateSitePrice(${s.id}, this.value)" style="width:90px; height:30px; text-align:right; font-weight:900; color:var(--primary); padding:0 0.4rem; border-radius:6px;">
+                </td>
+                <td style="text-align:right; font-weight:900; color:var(--primary); font-size:0.95rem;">₹${rate.toLocaleString()}</td>
+            </tr>
+        `;
     });
 
-    const btn = event.currentTarget;
-    btn.disabled = true;
-    btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Saving PO...';
+    html += `</tbody></table>`;
+    list.innerHTML = html;
+}
+
+function updateSitePrice(id, val) {
+    const idx = selectedSites.findIndex(s => s.id == id);
+    if (idx !== -1) {
+        selectedSites[idx].rate = parseFloat(val) || 0;
+        recalcAll();
+        // Update table text locally without full re-render for performance
+        updateBucketUI(); 
+    }
+}
+
+function recalcAll() {
+    const subtotal = selectedSites.reduce((acc, s) => acc + s.rate, 0);
+    const tax = subtotal * 0.18;
+    document.getElementById('sum-display-btm').innerText = '₹' + subtotal.toLocaleString();
+    document.getElementById('sum-grand-btm').innerText = '₹' + (subtotal + tax).toLocaleString();
+}
+
+function openBucket() { document.getElementById('selection-bucket-panel').style.right = '0'; document.getElementById('bucket-backdrop').style.display = 'block'; }
+function closeBucket() { document.getElementById('selection-bucket-panel').style.right = '-1400px'; document.getElementById('bucket-backdrop').style.display = 'none'; }
+
+function openClientModal() { document.getElementById('clientModal').style.display = 'flex'; }
+function closeClientModal() { document.getElementById('clientModal').style.display = 'none'; }
+
+function submitQuickClient() {
+    const name = document.getElementById('new_client_name').value;
+    const contact = document.getElementById('new_client_contact').value;
+    const city = document.getElementById('new_client_city').value;
+    if (!name) return Swal.fire('Error', 'Company Name is required', 'error');
+    fetch('../../ajax/quick_save_partner.php', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ type: 'client', name, contact_person: contact, city })
+    }).then(r => r.json()).then(res => {
+        if (res.success) {
+            const select = document.getElementById('client_id');
+            const opt = new Option(name, res.id);
+            opt.dataset.contact = contact;
+            opt.selected = true;
+            select.add(opt);
+            document.getElementById('contact_person').value = contact;
+            closeClientModal();
+        }
+    });
+}
+
+function saveDirectBooking() {
+    if (selectedSites.length === 0) return Swal.fire('Error', 'Select at least one site', 'error');
+    const btn = document.getElementById('submitBtn');
+    btn.disabled = true; btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> SAVING...';
+
+    const data = {
+        client_id: document.getElementById('client_id').value,
+        campaign_name: document.getElementById('campaign_name').value,
+        contact_person: document.getElementById('contact_person').value,
+        start_date: document.getElementById('start_date').value,
+        end_date: document.getElementById('end_date').value,
+        remark: document.getElementById('remark').value,
+        site_ids: selectedSites.map(s => s.id),
+        rates: selectedSites.reduce((acc, s) => { acc[s.id] = s.rate; return acc; }, {})
+    };
 
     fetch('../../ajax/save_direct_po.php', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(formData)
-    })
-    .then(r => r.json())
-    .then(res => {
-        if(res.success) {
-            Swal.fire({
-                icon: 'success',
-                title: 'PO Generated & Saved',
-                text: 'Purchase Order #' + res.po_number + ' has been saved to your records.',
-                timer: 2000,
-                showConfirmButton: false
-            }).then(() => {
-                // Open PDF in new tab
-                window.open(`generate_po.php?po_id=${res.po_id}`, '_blank');
-                // Redirect to Booking list
-                window.location.href = 'bookings.php';
-            });
+        body: JSON.stringify(data)
+    }).then(r => r.json()).then(res => {
+        if (res.success) {
+            Swal.fire('Success', 'Booking and POs generated!', 'success').then(() => window.location.href = 'bookings.php');
+            if(res.po_id) window.open('generate_po.php?po_id=' + res.po_id, '_blank');
         } else {
             Swal.fire('Error', res.message, 'error');
-            btn.disabled = false;
-            btn.innerHTML = '<i class="fas fa-file-pdf"></i> Generate & Save Purchase Order';
+            btn.disabled = false; btn.innerHTML = 'GENERATE BOOKING & POs';
         }
-    })
-    .catch(err => {
-        console.error(err);
-        Swal.fire('Error', 'Something went wrong while saving.', 'error');
-        btn.disabled = false;
-        btn.innerHTML = '<i class="fas fa-file-pdf"></i> Generate & Save Purchase Order';
     });
 }
 </script>
 
-<?php endif; ?>
 <?php include_once __DIR__ . '/../../includes/footer.php'; ?>
