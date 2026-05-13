@@ -41,7 +41,7 @@ $sizes = $pdo->query("SELECT DISTINCT CONCAT(width, 'x', height) as size FROM si
             <div class="form-grid" style="grid-template-columns: 1fr 1fr 1fr; margin-bottom: 1rem;">
                 <div class="form-group">
                     <label>Campaign Name <span style="color:red;">*</span></label>
-                    <input type="text" id="campaign_name" class="p-input" placeholder="e.g. Summer Sale 2024" style="height: 38px;">
+                    <input type="text" id="campaign_name" class="p-input" placeholder="e.g. Summer Sale 2024" style="height: 38px;" required>
                 </div>
                 <div class="form-group">
                     <label style="display: flex; justify-content: space-between; align-items: center;">
@@ -50,7 +50,7 @@ $sizes = $pdo->query("SELECT DISTINCT CONCAT(width, 'x', height) as size FROM si
                             <i class="fas fa-plus-circle"></i> New
                         </button>
                     </label>
-                    <select id="client_id" class="p-input" style="height: 38px;" onchange="handleClientChange()">
+                    <select id="client_id" class="p-input" style="height: 38px;" onchange="handleClientChange()" required>
                         <option value="">-- Choose Client --</option>
                         <?php foreach ($clients as $c): ?>
                             <option value="<?php echo $c['id']; ?>" data-contact="<?php echo htmlspecialchars($c['contact_person'] ?? ''); ?>">
@@ -67,12 +67,12 @@ $sizes = $pdo->query("SELECT DISTINCT CONCAT(width, 'x', height) as size FROM si
 
             <div class="form-grid" style="grid-template-columns: 1fr 1fr 1fr;">
                 <div class="form-group">
-                    <label>From Date</label>
-                    <input type="date" id="start_date" class="p-input" style="height: 38px;" value="<?php echo date('Y-m-d'); ?>" onchange="calculateEndDate()">
+                    <label>From Date <span style="color:red;">*</span></label>
+                    <input type="date" id="start_date" class="p-input" style="height: 38px;" value="<?php echo date('Y-m-d'); ?>" onchange="calculateEndDate()" required>
                 </div>
                 <div class="form-group">
-                    <label>To Date</label>
-                    <input type="date" id="end_date" class="p-input" style="height: 38px;" value="<?php echo date('Y-m-d', strtotime('+1 month')); ?>" onchange="calculateTotalDays()">
+                    <label>To Date <span style="color:red;">*</span></label>
+                    <input type="date" id="end_date" class="p-input" style="height: 38px;" value="<?php echo date('Y-m-d', strtotime('+1 month')); ?>" onchange="calculateTotalDays()" required>
                 </div>
                 <div class="form-group">
                     <label>Total Days</label>
