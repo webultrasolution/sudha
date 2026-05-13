@@ -59,6 +59,24 @@ $sizes = $pdo->query("SELECT DISTINCT CONCAT(width, 'x', height) as size FROM si
                         <?php endforeach; ?>
                     </select>
                 </div>
+                <!-- GST Selection for Group Companies -->
+                <div id="gst_selection_container" style="display: none; grid-column: span 3; margin-top: 0.5rem; background: #f0fdfa; padding: 1rem; border-radius: 12px; border: 1px solid #ccfbf1; box-shadow: inset 0 2px 4px rgba(0,0,0,0.05); margin-bottom: 1rem;">
+                    <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 0.75rem;">
+                        <label style="color: var(--primary); font-weight: 800; font-size: 0.7rem; margin-bottom: 0; display: block; text-transform: uppercase;">
+                            <i class="fas fa-id-card"></i> Billing GSTIN / State Selection
+                        </label>
+                        <span id="gst_count_badge" style="background: var(--primary); color: white; font-size: 0.65rem; padding: 2px 8px; border-radius: 50px; font-weight: 700;"></span>
+                    </div>
+                    <div style="display: flex; gap: 1rem;">
+                        <select id="selected_gstin" class="p-input" style="flex: 1; height: 38px; border-color: #5eead4; background: white;" onchange="handleGstSelectionChange()">
+                            <!-- Dynamic Options -->
+                        </select>
+                        <div id="gst_details_preview" style="flex: 2; background: white; border: 1px solid #ccfbf1; border-radius: 6px; padding: 0.5rem; font-size: 0.75rem; color: #0f766e; display: flex; align-items: center; gap: 0.5rem;">
+                            <i class="fas fa-map-marker-alt"></i>
+                            <span id="gst_preview_text">Select a GSTIN to see location details</span>
+                        </div>
+                    </div>
+                </div>
                 <div class="form-group">
                     <label>Contact Person</label>
                     <input type="text" id="contact_person" class="p-input" placeholder="Full Name" style="height: 38px;">
@@ -214,12 +232,23 @@ $sizes = $pdo->query("SELECT DISTINCT CONCAT(width, 'x', height) as size FROM si
 
         <div class="proposal-action-bar" style="position: sticky; bottom: 0; background: white; border-top: 2px solid var(--primary); padding: 0.75rem 1.5rem; display: flex; align-items: center; justify-content: space-between; z-index: 1000; border-radius: 12px 12px 0 0; box-shadow: 0 -10px 25px rgba(0,0,0,0.05);">
             <div style="display: flex; gap: 1.5rem; align-items: center; width: 100%; justify-content: flex-end;">
+                <div style="display: flex; align-items: center; gap: 0.5rem; margin-right: 1rem;">
+                    <label style="font-size: 0.6rem; font-weight: 800; color: #64748b; text-transform: uppercase;">Tax Type</label>
+                    <select id="tax-type" class="p-input" onchange="recalcAll()" style="width: 110px; height: 32px; font-size: 0.7rem; padding: 0 0.4rem; border-radius: 6px;">
+                        <option value="igst">IGST 18%</option>
+                        <option value="cgst_sgst">CGST/SGST</option>
+                    </select>
+                </div>
                 <div style="text-align: right;">
                     <div style="font-size: 0.6rem; color: #64748b; font-weight: 800; text-transform: uppercase;">Subtotal</div>
                     <div id="sum-display-btm" style="font-weight: 700; color: #1e293b; font-size: 0.9rem;">₹0</div>
                 </div>
+                <div style="text-align: right;" id="tax-breakdown-container">
+                    <div style="font-size: 0.6rem; color: #64748b; font-weight: 800; text-transform: uppercase;">GST (18%)</div>
+                    <div id="sum-tax-btm" style="font-weight: 700; color: #1e293b; font-size: 0.9rem;">₹0</div>
+                </div>
                 <div style="text-align: right;">
-                    <div style="font-size: 0.6rem; color: var(--primary); font-weight: 900; text-transform: uppercase;">Grand Total (Inc. 18% GST)</div>
+                    <div style="font-size: 0.6rem; color: var(--primary); font-weight: 900; text-transform: uppercase;">Grand Total</div>
                     <div id="sum-grand-btm" style="font-size: 1.3rem; font-weight: 900; color: var(--primary);">₹0</div>
                 </div>
                 <button class="btn btn-primary" onclick="saveDirectBooking()" id="submitBtn" style="height: 42px; padding: 0 1.5rem; border-radius: 8px; font-weight: 900;">
@@ -302,8 +331,87 @@ function calculateTotalDays() {
 
 function handleClientChange() {
     const select = document.getElementById('client_id');
-    if (select.selectedIndex <= 0) { document.getElementById('contact_person').value = ''; return; }
-    document.getElementById('contact_person').value = select.options[select.selectedIndex].dataset.contact || '';
+    const clientId = select.value;
+    const contact = select.options[select.selectedIndex].dataset.contact;
+    document.getElementById('contact_person').value = contact || '';
+
+    const gstContainer = document.getElementById('gst_selection_container');
+    const gstSelect = document.getElementById('selected_gstin');
+    const gstBadge = document.getElementById('gst_count_badge');
+    const gstPreview = document.getElementById('gst_preview_text');
+
+    if (!clientId) {
+        gstContainer.style.display = 'none';
+        return;
+    }
+
+    // Fetch Full Client Details via AJAX
+    fetch(`../../ajax/get_partner_details.php?id=${clientId}`)
+    .then(r => r.json())
+    .then(res => {
+        if (res.success) {
+            const p = res.data;
+            gstSelect.innerHTML = '';
+            
+            // Show for all clients who have GST info, but following proposal creator logic:
+            if (p.business_type !== 'Group of Companies') {
+                gstContainer.style.display = 'none';
+                return;
+            }
+
+            let gsts = [];
+            // Add primary GST if exists
+            if (p.gstin) {
+                gsts.push({ gstin: p.gstin, state: 'Primary', city: '', district: '', address: 'Main Address' });
+            }
+
+            // Parse additional GSTs
+            if (p.additional_gst) {
+                try {
+                    const extra = JSON.parse(p.additional_gst);
+                    if (Array.isArray(extra)) {
+                        gsts = gsts.concat(extra);
+                    } else if (typeof extra === 'object') {
+                        gsts = gsts.concat(Object.values(extra));
+                    }
+                } catch(e) { console.error("GST Parse Error", e); }
+            }
+
+            if (gsts.length > 0) {
+                gstContainer.style.display = 'grid';
+                gstBadge.innerText = `${gsts.length} GST Records Found`;
+                
+                gsts.forEach((g, idx) => {
+                    const opt = document.createElement('option');
+                    opt.value = g.gstin;
+                    opt.text = `${g.gstin} - ${g.state || ''} ${g.city ? '(' + g.city + ')' : ''}`;
+                    opt.dataset.details = JSON.stringify(g);
+                    gstSelect.add(opt);
+                });
+                
+                handleGstSelectionChange(); // Update preview for first option
+            } else {
+                gstContainer.style.display = 'none';
+            }
+        } else {
+            gstContainer.style.display = 'none';
+        }
+    });
+}
+
+function handleGstSelectionChange() {
+    const select = document.getElementById('selected_gstin');
+    const preview = document.getElementById('gst_preview_text');
+    
+    if (select.selectedIndex === -1) return;
+    
+    const data = JSON.parse(select.options[select.selectedIndex].dataset.details);
+    let text = "";
+    if (data.address) text += data.address;
+    if (data.city) text += (text ? ", " : "") + data.city;
+    if (data.state) text += (text ? ", " : "") + data.state;
+    
+    preview.innerText = text || "No specific location details";
 }
 
 function goToStep1() {
@@ -569,9 +677,37 @@ function updateSitePrice(id, val) {
 
 function recalcAll() {
     const subtotal = selectedSites.reduce((acc, s) => acc + s.rate, 0);
-    const tax = subtotal * 0.18;
-    document.getElementById('sum-display-btm').innerText = '₹' + subtotal.toLocaleString();
-    document.getElementById('sum-grand-btm').innerText = '₹' + (subtotal + tax).toLocaleString();
+    const taxType = document.getElementById('tax-type').value;
+    const totalTax = subtotal * 0.18;
+    const grand = subtotal + totalTax;
+
+    document.getElementById('sum-display-btm').innerText = '₹' + subtotal.toLocaleString(undefined, {minimumFractionDigits: 2, maximumFractionDigits: 2});
+    
+    const taxContainer = document.getElementById('tax-breakdown-container');
+    if (taxType === 'cgst_sgst') {
+        const halfTax = totalTax / 2;
+        taxContainer.innerHTML = `
+            <div style="display: flex; gap: 1rem;">
+                <div style="text-align: right;">
+                    <div style="font-size: 0.55rem; color: #64748b; font-weight: 800; text-transform: uppercase;">CGST (9%)</div>
+                    <div style="font-weight: 700; color: #1e293b; font-size: 0.8rem;">₹${halfTax.toLocaleString(undefined, {minimumFractionDigits: 2, maximumFractionDigits: 2})}</div>
+                </div>
+                <div style="text-align: right;">
+                    <div style="font-size: 0.55rem; color: #64748b; font-weight: 800; text-transform: uppercase;">SGST (9%)</div>
+                    <div style="font-weight: 700; color: #1e293b; font-size: 0.8rem;">₹${halfTax.toLocaleString(undefined, {minimumFractionDigits: 2, maximumFractionDigits: 2})}</div>
+                </div>
+            </div>
+        `;
+    } else {
+        taxContainer.innerHTML = `
+            <div style="text-align: right;">
+                <div style="font-size: 0.6rem; color: #64748b; font-weight: 800; text-transform: uppercase;">IGST (18%)</div>
+                <div id="sum-tax-btm" style="font-weight: 700; color: #1e293b; font-size: 0.9rem;">₹${totalTax.toLocaleString(undefined, {minimumFractionDigits: 2, maximumFractionDigits: 2})}</div>
+            </div>
+        `;
+    }
+
+    document.getElementById('sum-grand-btm').innerText = '₹' + grand.toLocaleString(undefined, {minimumFractionDigits: 2, maximumFractionDigits: 2});
 }
 
 function openBucket() { document.getElementById('selection-bucket-panel').style.right = '0'; document.getElementById('bucket-backdrop').style.display = 'block'; }
@@ -614,6 +750,8 @@ function saveDirectBooking() {
         start_date: document.getElementById('start_date').value,
         end_date: document.getElementById('end_date').value,
         remark: document.getElementById('remark').value,
+        billing_gstin: document.getElementById('selected_gstin')?.value || '',
+        tax_type: document.getElementById('tax-type').value,
         site_ids: selectedSites.map(s => s.id),
         rates: selectedSites.reduce((acc, s) => { acc[s.id] = s.rate; return acc; }, {})
     };
