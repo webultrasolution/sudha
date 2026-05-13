@@ -17,11 +17,12 @@ if (!$data || empty($data['name']) || empty($data['type'])) {
 }
 
 try {
-    $stmt = $pdo->prepare("INSERT INTO partners (type, name, contact_person, phone, email, created_at) VALUES (?, ?, ?, ?, ?, NOW())");
+    $stmt = $pdo->prepare("INSERT INTO partners (type, name, contact_person, city, phone, email, created_at) VALUES (?, ?, ?, ?, ?, ?, NOW())");
     $stmt->execute([
         $data['type'],
         $data['name'],
-        $data['contact'] ?? '',
+        $data['contact_person'] ?? ($data['contact'] ?? ''),
+        $data['city'] ?? '',
         $data['phone'] ?? '',
         $data['email'] ?? ''
     ]);

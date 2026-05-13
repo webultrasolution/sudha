@@ -108,6 +108,16 @@ function requireRole($roles) {
 
 
 /**
+ * Check if user is logged in
+ */
+function isLoggedIn() {
+    if (session_status() === PHP_SESSION_NONE) {
+        session_start();
+    }
+    return isset($_SESSION['user_id']);
+}
+
+/**
  * Auth Middleware
  */
 function checkAuth() {

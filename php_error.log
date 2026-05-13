@@ -118,3 +118,11 @@ Stack trace:
 [13-May-2026 02:43:10 Asia/Kolkata] PHP Warning:  Undefined array key "purchase_amount" in D:\xampp\htdocs\easy-outdoor-crm\modules\operations\generate_po.php on line 306
 [13-May-2026 02:43:10 Asia/Kolkata] PHP Warning:  Undefined array key "purchase_amount" in D:\xampp\htdocs\easy-outdoor-crm\modules\operations\generate_po.php on line 328
 [13-May-2026 02:43:10 Asia/Kolkata] PHP Deprecated:  number_format(): Passing null to parameter #1 ($num) of type float is deprecated in D:\xampp\htdocs\easy-outdoor-crm\modules\operations\generate_po.php on line 328
+[13-May-2026 20:19:19 Europe/Berlin] PHP Fatal error:  Uncaught Error: Call to undefined function isLoggedIn() in D:\xampp\htdocs\easy-outdoor-crm\ajax\fetch_sites.php:7
+Stack trace:
+#0 {main}
+  thrown in D:\xampp\htdocs\easy-outdoor-crm\ajax\fetch_sites.php on line 7
+[13-May-2026 20:19:44 Europe/Berlin] PHP Fatal error:  Uncaught Error: Call to undefined function isLoggedIn() in D:\xampp\htdocs\easy-outdoor-crm\ajax\fetch_sites.php:7
+Stack trace:
+#0 {main}
+  thrown in D:\xampp\htdocs\easy-outdoor-crm\ajax\fetch_sites.php on line 7
