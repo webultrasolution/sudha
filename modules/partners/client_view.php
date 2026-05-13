@@ -36,7 +36,7 @@ $totalInvoiced = $pdo->prepare("
 $totalInvoiced->execute([$id]);
 $totalInvoiced = $totalInvoiced->fetchColumn() ?: 0;
 
-$totalPaid = $pdo->prepare("SELECT SUM(amount) FROM payments WHERE entity_id = ? AND type = 'receivable'");
+$totalPaid = $pdo->prepare("SELECT SUM(amount) FROM payments WHERE partner_id = ? AND type = 'credit'");
 $totalPaid->execute([$id]);
 $totalPaid = $totalPaid->fetchColumn() ?: 0;
 ?>
