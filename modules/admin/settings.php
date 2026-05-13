@@ -127,6 +127,16 @@ include_once __DIR__ . '/../../includes/header.php';
                         <label>Bank Account Details (for Invoices)</label>
                         <textarea name="company_bank_details" rows="3" placeholder="Account Name, Bank Name, A/c No, IFSC..."><?php echo htmlspecialchars($settings['company_bank_details'] ?? ''); ?></textarea>
                     </div>
+
+                    <div class="form-group">
+                        <label style="color: #ef4444;">PO Important Note (Red Box)</label>
+                        <textarea name="po_important_note" rows="2"><?php echo htmlspecialchars($settings['po_important_note'] ?? ''); ?></textarea>
+                    </div>
+
+                    <div class="form-group">
+                        <label>Purchase Order Terms & Conditions</label>
+                        <textarea name="po_terms" rows="10"><?php echo htmlspecialchars($settings['po_terms'] ?? ''); ?></textarea>
+                    </div>
                 </div>
             </div>
 

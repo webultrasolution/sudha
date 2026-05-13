@@ -246,10 +246,9 @@ $gst = calculateGST($subtotal, $isInterState);
     <div class="footer">
         <div class="footer-left">
             <div style="font-weight: bold; text-decoration: underline; margin-bottom: 5px;">Bank Details:</div>
-            <p style="margin: 2px 0;">A/C Name: <?php echo $company_name; ?></p>
-            <p style="margin: 2px 0;">Bank: STATE BANK OF INDIA</p>
-            <p style="margin: 2px 0;">A/C No: 1234567890123</p>
-            <p style="margin: 2px 0;">IFSC: SBIN0000123</p>
+            <div style="line-height: 1.4;">
+                <?php echo nl2br(getSetting('company_bank_details', "A/C Name: $company_name\nBank: STATE BANK OF INDIA\nA/C No: 1234567890123\nIFSC: SBIN0000123")); ?>
+            </div>
         </div>
         <div class="footer-right">
             <div>For <strong><?php echo $company_name; ?></strong></div>

@@ -19,7 +19,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
         $vendor_id = intval($data['vendor_id']);
         $client_id = (!empty($data['client_id'])) ? intval($data['client_id']) : null;
-        $campaign_name = $data['campaign_name'] ?? 'Direct PO';
+        $campaign_name = $data['campaign_name'] ?? 'Direct Booking';
         $remarks = $data['remark'] ?? '';
         $start_date = $data['start_date'] ?? date('Y-m-d');
         $end_date = $data['end_date'] ?? date('Y-m-d', strtotime('+1 month'));
@@ -75,7 +75,29 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             ]);
         }
 
-        logActivity('generated a direct purchase order', 'purchase_orders', $poId, "PO Number: $poNum");
+        // 4. Create Booking (Direct)
+        $stmtBooking = $pdo->prepare("
+            INSERT INTO bookings (client_id, campaign_name, start_date, end_date, total_amount, tax_amount, grand_total, status) 
+            VALUES (?, ?, ?, ?, ?, ?, ?, 'active')
+        ");
+        $stmtBooking->execute([
+            $client_id,
+            $campaign_name,
+            $start_date,
+            $end_date,
+            $subtotal,
+            ($cgst + $sgst),
+            $grandTotal
+        ]);
+        $bookingId = $pdo->lastInsertId();
+
+        // 5. Create Operational Tasks
+        $stmtOps = $pdo->prepare("INSERT INTO operations (booking_id, site_id, status) VALUES (?, ?, 'pending')");
+        foreach ($data['site_ids'] as $sid) {
+            $stmtOps->execute([$bookingId, $sid]);
+        }
+
+        logActivity('generated a direct booking and purchase order', 'bookings', $bookingId, "Booking ID: $bookingId, PO Number: $poNum");
 
         $pdo->commit();
         echo json_encode(['success' => true, 'po_id' => $poId, 'po_number' => $poNum]);
