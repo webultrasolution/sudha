@@ -150,11 +150,42 @@ $sizes = $pdo->query("SELECT DISTINCT CONCAT(width, 'x', height) as size FROM si
                             <?php foreach($cities as $c): ?> <option value="<?php echo $c; ?>"><?php echo $c; ?></option> <?php endforeach; ?>
                         </select>
                     </div>
-                    <div class="form-group" style="margin-bottom: 0;">
+                    <div class="search-group" id="vendor-filter-group" style="display: none; min-width: 180px;">
                         <label style="font-size: 0.6rem; font-weight: 800; color: #94a3b8; text-transform: uppercase; margin-bottom: 0.3rem; display: block;">Vendor</label>
                         <select id="filter-vendor" class="p-input" onchange="fetchSites(1)" style="height: 38px; font-size: 0.8rem; background: #f8fafc; border: 1px solid #e2e8f0;">
                             <option value="">All Vendors</option>
                             <?php foreach($vendors as $v): ?> <option value="<?php echo $v['id']; ?>"><?php echo $v['name']; ?></option> <?php endforeach; ?>
+                        </select>
+                    </div>
+                </div>
+
+                <div style="display: grid; grid-template-columns: repeat(5, 1fr); gap: 1rem; margin-top: 1rem; border-top: 1px solid #f1f5f9; padding-top: 1rem;">
+                    <div class="form-group" style="margin-bottom: 0;">
+                        <label style="font-size: 0.6rem; font-weight: 800; color: #94a3b8; text-transform: uppercase; margin-bottom: 0.3rem; display: block;">Media Type</label>
+                        <select id="media_type" class="p-input" onchange="fetchSites(1)" style="height: 38px; font-size: 0.8rem; background: #f8fafc; border: 1px solid #e2e8f0;">
+                            <option value="">All Media</option>
+                            <?php foreach($mediaTypes as $mt): ?> <option value="<?php echo $mt; ?>"><?php echo $mt; ?></option> <?php endforeach; ?>
+                        </select>
+                    </div>
+                    <div class="form-group" style="margin-bottom: 0;">
+                        <label style="font-size: 0.6rem; font-weight: 800; color: #94a3b8; text-transform: uppercase; margin-bottom: 0.3rem; display: block;">State</label>
+                        <select id="filter-state" class="p-input" onchange="fetchSites(1)" style="height: 38px; font-size: 0.8rem; background: #f8fafc; border: 1px solid #e2e8f0;">
+                            <option value="">All States</option>
+                            <?php foreach($states as $s): ?> <option value="<?php echo $s; ?>"><?php echo $s; ?></option> <?php endforeach; ?>
+                        </select>
+                    </div>
+                    <div class="form-group" style="margin-bottom: 0;">
+                        <label style="font-size: 0.6rem; font-weight: 800; color: #94a3b8; text-transform: uppercase; margin-bottom: 0.3rem; display: block;">City</label>
+                        <select id="filter-city" class="p-input" onchange="fetchSites(1)" style="height: 38px; font-size: 0.8rem; background: #f8fafc; border: 1px solid #e2e8f0;">
+                            <option value="">All Cities</option>
+                            <?php foreach($cities as $c): ?> <option value="<?php echo $c; ?>"><?php echo $c; ?></option> <?php endforeach; ?>
+                        </select>
+                    </div>
+                    <div class="form-group" style="margin-bottom: 0;">
+                        <label style="font-size: 0.6rem; font-weight: 800; color: #94a3b8; text-transform: uppercase; margin-bottom: 0.3rem; display: block;">Light</label>
+                        <select id="light_type" class="p-input" onchange="fetchSites(1)" style="height: 38px; font-size: 0.8rem; background: #f8fafc; border: 1px solid #e2e8f0;">
+                            <option value="">All Types</option>
+                            <?php foreach($illuminations as $il): ?> <option value="<?php echo $il; ?>"><?php echo $il; ?></option> <?php endforeach; ?>
                         </select>
                     </div>
                     <div class="form-group" style="margin-bottom: 0;">
@@ -326,28 +357,33 @@ function fetchSites(page = 1) {
     const overlay = document.getElementById('loading-overlay');
     overlay.style.display = 'flex';
 
-    const params = new URLSearchParams({
-        page: page,
-        limit: pageSize,
-        q: document.getElementById('site-search').value,
-        media: document.getElementById('media_type').value,
-        state: document.getElementById('filter-state').value,
-        city: document.getElementById('filter-city').value,
-        vendor: document.getElementById('filter-vendor').value,
-        size: document.getElementById('filter-size').value,
-        availability: document.querySelector('input[name="availability"]:checked').value,
-        ownership: document.querySelector('input[name="ownership"]:checked').value
-    });
+    const q = document.getElementById('site-search').value;
+    const media = document.getElementById('media_type').value;
+    const state = document.getElementById('filter-state').value;
+    const city = document.getElementById('filter-city').value;
+    const ownership = document.querySelector('input[name="ownership"]:checked').value;
+    const availability = document.querySelector('input[name="availability"]:checked').value;
+    const vendor = document.getElementById('filter-vendor').value;
+    const size = document.getElementById('filter-size').value;
+    const light = document.getElementById('light_type').value;
 
-    fetch(`../../ajax/fetch_sites.php?${params.toString()}`)
+    // Show/Hide Vendor Filter Group
+    const vendorGroup = document.getElementById('vendor-filter-group');
+    if (vendorGroup) {
+        vendorGroup.style.display = (ownership === 'TA') ? 'block' : 'none';
+    }
+
+    const url = `../../ajax/fetch_sites.php?page=${page}&limit=${pageSize}&q=${encodeURIComponent(q)}&media=${encodeURIComponent(media)}&state=${encodeURIComponent(state)}&city=${encodeURIComponent(city)}&availability=${availability}&ownership=${ownership}&vendor=${vendor}&size=${encodeURIComponent(size)}&light=${encodeURIComponent(light)}`;
+
+    fetch(url)
     .then(r => r.json())
     .then(res => {
         overlay.style.display = 'none';
-        if (!res.success) return;
-        
-        totalSites = res.total;
-        renderSites(res.sites);
-        renderPagination(res.total);
+        if (res.success) {
+            totalSites = res.total;
+            renderSites(res.sites);
+            renderPagination(res.total);
+        }
     });
 }
 
