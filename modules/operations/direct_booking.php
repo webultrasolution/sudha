@@ -369,8 +369,8 @@ function renderSites(sites) {
         row.style.background = 'white';
         row.innerHTML = `
             <td style="font-weight:700; color:#64748b; padding:1rem;">${startIdx}</td>
-            <td style="text-align:center; padding:1rem;"><input type="checkbox" ${isSelected ? 'checked' : ''} onclick="toggleSite(${s.id}, '${s.name.replace(/'/g, "\\'")}', ${currentRate}, '${s.site_code}', '${s.location.replace(/'/g, "\\'")}', ${s.vendor_id}, '${s.thumbnail || ''}', '${s.city || ''}', ${s.card_rate || 0}, '${s.width || 0}x${s.height || 0}', '${s.type || ''}', '${s.light_type || ''}', '${s.owner_type || ''}', '${s.vendor_name || ''}', '${s.all_images || ''}')" style="width:18px; height:18px; accent-color:var(--primary);"></td>
-            <td style="padding:1rem;"><img src="${thumb}" onclick="openLightboxSlider('${s.all_images || ''}')" style="width:120px; height:75px; object-fit:cover; border-radius:10px; box-shadow:0 4px 6px rgba(0,0,0,0.05); border:1px solid #e2e8f0; cursor:pointer;"></td>
+            <td style="text-align:center; padding:1rem;"><input type="checkbox" ${isSelected ? 'checked' : ''} onclick="toggleSite(${s.id}, '${s.name.replace(/'/g, "\\'")}', ${currentRate}, '${s.site_code}', '${s.location.replace(/'/g, "\\'")}', ${s.vendor_id}, '${s.thumbnail || ''}', '${s.city || ''}', ${cardRate}, '${s.width}x${s.height}', '${s.type}', '${s.light_type}', '${s.owner_type}', '${s.vendor_name}', '${s.all_images || ''}')" style="width:18px; height:18px; accent-color:var(--primary);"></td>
+            <td style="padding:1rem;"><img src="${thumb}" onclick="openLightboxSlider('${s.all_images || ''}', ${s.id})" style="width:120px; height:75px; object-fit:cover; border-radius:10px; box-shadow:0 4px 6px rgba(0,0,0,0.05); border:1px solid #e2e8f0; cursor:pointer;"></td>
             <td style="padding:1rem;">
                 <div style="font-weight:800; color:#1e293b; font-size:0.8rem; margin-bottom:1px;">${s.city || ''}</div>
                 <div style="color:#f97316; font-size:0.65rem; font-weight:800; text-transform:uppercase;">${s.site_code}</div>
@@ -465,7 +465,7 @@ function updateBucketUI() {
                         <i class="fas fa-trash-alt" style="font-size:0.75rem;"></i>
                     </button>
                 </td>
-                <td><img src="${thumb}" onclick="openLightboxSlider('${s.all_images || ''}')" style="width:120px; height:75px; object-fit:cover; border-radius:10px; box-shadow:0 4px 6px rgba(0,0,0,0.05); border:1px solid #e2e8f0; cursor:pointer;"></td>
+                <td><img src="${thumb}" onclick="openLightboxSlider('${s.all_images || ''}', ${s.id})" style="width:120px; height:75px; object-fit:cover; border-radius:10px; box-shadow:0 4px 6px rgba(0,0,0,0.05); border:1px solid #e2e8f0; cursor:pointer;"></td>
                 <td>
                     <div style="font-weight:800; color:#1e293b; font-size:0.8rem; margin-bottom:1px;">${s.city || ''}</div>
                     <div style="color:#f97316; font-size:0.65rem; font-weight:800;">${s.code}</div>
@@ -591,8 +591,9 @@ function saveDirectBooking() {
 let currentImages = [];
 let currentImgIndex = 0;
 
-function openLightboxSlider(imageString) {
+function openLightboxSlider(imageString, siteId) {
     if (!imageString) return;
+    window.currentLightboxSiteId = siteId;
     currentImages = imageString.split(',');
     currentImgIndex = 0;
     updateSliderImage();
@@ -612,8 +613,61 @@ function updateSliderImage() {
             lbBadge.innerText = (currentImgIndex + 1) + " / " + currentImages.length;
             lbBadge.style.display = currentImages.length > 1 ? 'block' : 'none';
         }
+
+        // Update Button State
+        const btn = document.getElementById('primary-btn');
+        if(btn && window.currentLightboxSiteId) {
+            const idx = selectedSites.findIndex(s => s.id == window.currentLightboxSiteId);
+            const isPrimary = (idx !== -1 && selectedSites[idx].thumbnail === currentImages[currentImgIndex]);
+            
+            if(isPrimary) {
+                btn.innerHTML = '<i class="fas fa-check-double"></i> Selected as Primary';
+                btn.style.background = '#059669';
+            } else {
+                btn.innerHTML = '<i class="fas fa-check-circle"></i> Use as Primary Photo';
+                btn.style.background = 'var(--primary)';
+            }
+        }
     }
 }
+
+function setPrimaryImage(e) {
+    if(e) e.stopPropagation();
+    const newThumb = currentImages[currentImgIndex];
+    if(window.currentLightboxSiteId) {
+        const id = window.currentLightboxSiteId;
+        const idx = selectedSites.findIndex(s => s.id == id);
+        if(idx !== -1) {
+            selectedSites[idx].thumbnail = newThumb;
+            
+            updateBucketUI();
+            
+            // Update row image in main table if it exists
+            const row = document.getElementById('row-' + id);
+            if(row) {
+                const img = row.querySelector('img[onclick*="openLightboxSlider"]');
+                if(img) {
+                    img.src = imgBaseUrl + newThumb;
+                    img.style.border = '2px solid #059669';
+                }
+            }
+            
+            updateSliderImage(); // Refresh button state
+
+            Swal.fire({
+                icon: 'success',
+                title: 'Primary Image Set',
+                timer: 1000,
+                showConfirmButton: false,
+                toast: true,
+                position: 'top-end'
+            });
+        } else {
+            Swal.fire('Note', 'Please select this asset first to set its primary image.', 'info');
+        }
+    }
+}
+
 function nextSlide(e) { if(e) e.stopPropagation(); currentImgIndex = (currentImgIndex + 1) % currentImages.length; updateSliderImage(); }
 function prevSlide(e) { if(e) e.stopPropagation(); currentImgIndex = (currentImgIndex - 1 + currentImages.length) % currentImages.length; updateSliderImage(); }
 function closeLightbox() { const lb = document.getElementById('simple-lightbox'); if(lb) lb.style.display = 'none'; }
@@ -638,6 +692,12 @@ document.addEventListener('keydown', function(e) {
 
         <div style="position: relative;">
             <img id="lightbox-img" src="" style="max-width: 100%; max-height: 85vh; border-radius: 16px; box-shadow: 0 30px 60px rgba(0,0,0,0.8); border: 2px solid rgba(255,255,255,0.15);">
+            
+            <!-- Select as Primary Button -->
+            <button id="primary-btn" onclick="setPrimaryImage(event)" style="position: absolute; top: 20px; left: 20px; background: var(--primary); color: white; border: none; padding: 0.6rem 1.2rem; border-radius: 10px; font-weight: 800; font-size: 0.8rem; cursor: pointer; display: flex; align-items: center; gap: 0.5rem; box-shadow: 0 10px 20px rgba(0,0,0,0.3); transition: all 0.2s;">
+                <i class="fas fa-check-circle"></i> Use as Primary Photo
+            </button>
+
             <!-- Image Counter Badge -->
             <div id="lightbox-badge" style="position: absolute; bottom: 20px; left: 50%; transform: translateX(-50%); background: rgba(0,0,0,0.7); color: white; padding: 6px 16px; border-radius: 50px; font-weight: 800; font-size: 0.85rem; backdrop-filter: blur(5px); border: 1px solid rgba(255,255,255,0.2);"></div>
         </div>
