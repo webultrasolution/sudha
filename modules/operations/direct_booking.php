@@ -3,38 +3,61 @@ include_once __DIR__ . '/../../config/db.php';
 include_once __DIR__ . '/../../includes/functions.php';
 
 $vendor_id = isset($_GET['vendor_id']) ? intval($_GET['vendor_id']) : 0;
-if (!$vendor_id) {
-    header("Location: ../partners/vendors.php"); exit;
+$vendor = null;
+if ($vendor_id) {
+    // Fetch Vendor Info
+    $stmtV = $pdo->prepare("SELECT * FROM partners WHERE id = ? AND type = 'vendor'");
+    $stmtV->execute([$vendor_id]);
+    $vendor = $stmtV->fetch();
 }
 
-// Fetch Vendor Info
-$stmtV = $pdo->prepare("SELECT * FROM partners WHERE id = ? AND type = 'vendor'");
-$stmtV->execute([$vendor_id]);
-$vendor = $stmtV->fetch();
+// Fetch All Vendors for selection
+$allVendors = $pdo->query("SELECT id, name FROM partners WHERE type = 'vendor' ORDER BY name ASC")->fetchAll();
 
-if (!$vendor) {
-    die("Vendor not found.");
+$sites = [];
+if ($vendor) {
+    // Fetch Vendor Sites
+    $stmtS = $pdo->prepare("SELECT * FROM sites WHERE vendor_id = ? ORDER BY city ASC, location ASC");
+    $stmtS->execute([$vendor_id]);
+    $sites = $stmtS->fetchAll();
 }
 
-// Fetch Vendor Sites
-$stmtS = $pdo->prepare("SELECT * FROM sites WHERE vendor_id = ? ORDER BY city ASC, location ASC");
-$stmtS->execute([$vendor_id]);
-$sites = $stmtS->fetchAll();
+// Fetch Clients (Include vendors as they might be the client for direct bookings)
+$clients = $pdo->query("SELECT id, name, type FROM partners ORDER BY name ASC")->fetchAll();
 
-// Fetch Clients
-$clients = $pdo->query("SELECT id, name FROM partners WHERE type = 'client' ORDER BY name ASC")->fetchAll();
-
-$activePage = 'vendors';
-$pageTitle = 'Direct PO Generator';
+$activePage = 'direct_booking';
+$pageTitle = 'Direct Booking';
 include_once __DIR__ . '/../../includes/header.php';
 ?>
 
+<?php if (!$vendor): ?>
+    <div class="card" style="margin-bottom: 2rem; padding: 3rem; text-align: center; border: 2px dashed #e2e8f0; background: #f8fafc;">
+        <i class="fas fa-truck-loading" style="font-size: 3rem; color: #cbd5e1; margin-bottom: 1rem;"></i>
+        <h2 style="margin-top: 0; color: #1e293b;">Select Vendor for Direct Booking</h2>
+        <p style="color: #64748b; margin-bottom: 2rem;">Please choose a vendor to load their sites and generate a direct booking/PO.</p>
+        <div style="max-width: 450px; margin: 0 auto;">
+            <select onchange="if(this.value) window.location.href='?vendor_id=' + this.value" style="width: 100%; padding: 1rem; border: 1px solid #cbd5e1; border-radius: 10px; font-size: 1rem; font-weight: 600; box-shadow: 0 4px 6px -1px rgba(0,0,0,0.05); cursor: pointer; appearance: none; background: #fff url('data:image/svg+xml;charset=US-ASCII,%3Csvg%20xmlns%3D%22http%3A//www.w3.org/2000/svg%22%20width%3D%22292.4%22%20height%3D%22292.4%22%3E%3Cpath%20fill%3D%22%2364748B%22%20d%3D%22M287%2069.4a17.6%2017.6%200%200%200-13-5.4H18.4c-5%200-9.3%201.8-12.9%205.4A17.6%2017.6%200%200%200%200%2082.2c0%205%201.8%209.3%205.4%2012.9l128%20127.9c3.6%203.6%207.8%205.4%2012.8%205.4s9.2-1.8%2012.8-5.4L287%2095c3.5-3.5%205.4-7.8%205.4-12.8%200-5-1.9-9.2-5.5-12.8z%22/%3E%3C/svg%3E') no-repeat right 1rem center; background-size: 0.8rem auto;">
+                <option value="">-- Choose Vendor --</option>
+                <?php foreach ($allVendors as $v): ?>
+                    <option value="<?php echo $v['id']; ?>"><?php echo $v['name']; ?></option>
+                <?php endforeach; ?>
+            </select>
+        </div>
+    </div>
+<?php else: ?>
 <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 2rem;">
     <div>
-        <h1 style="font-size: 1.5rem; font-weight: 800; color: #0f172a; margin: 0;">Direct Purchase Order</h1>
+        <h1 style="font-size: 1.5rem; font-weight: 800; color: #0f172a; margin: 0;">Direct Booking</h1>
         <p style="color: #64748b; margin: 0; font-size: 0.9rem;">Generate a PO for <strong><?php echo $vendor['name']; ?></strong> without creating a proposal.</p>
     </div>
-    <a href="../partners/vendors.php" class="btn" style="background: #f1f5f9; color: #475569;"><i class="fas fa-arrow-left"></i> Back to Vendors</a>
+    <div style="display: flex; gap: 0.75rem;">
+        <select onchange="window.location.href='?vendor_id=' + this.value" style="padding: 0.5rem 1rem; border: 1px solid #e2e8f0; border-radius: 8px; font-weight: 600; font-size: 0.85rem; color: #475569; cursor: pointer;">
+            <?php foreach ($allVendors as $v): ?>
+                <option value="<?php echo $v['id']; ?>" <?php echo $v['id'] == $vendor_id ? 'selected' : ''; ?>><?php echo $v['name']; ?></option>
+            <?php endforeach; ?>
+        </select>
+        <a href="../partners/vendors.php" class="btn" style="background: #f1f5f9; color: #475569;"><i class="fas fa-arrow-left"></i> Back to Vendors</a>
+    </div>
 </div>
 
 <form action="generate_po.php" method="GET" target="_blank">
@@ -54,7 +77,9 @@ include_once __DIR__ . '/../../includes/header.php';
                 <select name="client_id" style="width: 100%; padding: 0.75rem; border: 1px solid #cbd5e1; border-radius: 8px; font-weight: 600; appearance: none; background: #fff url('data:image/svg+xml;charset=US-ASCII,%3Csvg%20xmlns%3D%22http%3A//www.w3.org/2000/svg%22%20width%3D%22292.4%22%20height%3D%22292.4%22%3E%3Cpath%20fill%3D%22%2364748B%22%20d%3D%22M287%2069.4a17.6%2017.6%200%200%200-13-5.4H18.4c-5%200-9.3%201.8-12.9%205.4A17.6%2017.6%200%200%200%200%2082.2c0%205%201.8%209.3%205.4%2012.9l128%20127.9c3.6%203.6%207.8%205.4%2012.8%205.4s9.2-1.8%2012.8-5.4L287%2095c3.5-3.5%205.4-7.8%205.4-12.8%200-5-1.9-9.2-5.5-12.8z%22/%3E%3C/svg%3E') no-repeat right 0.75rem center; background-size: 0.65rem auto;">
                     <option value="">-- Choose Client (Optional) --</option>
                     <?php foreach($clients as $c): ?>
-                        <option value="<?php echo $c['id']; ?>"><?php echo $c['name']; ?></option>
+                        <option value="<?php echo $c['id']; ?>" <?php echo ($vendor && $c['id'] == $vendor['id']) ? 'selected' : ''; ?>>
+                            <?php echo $c['name']; ?> <?php echo ($c['type'] == 'vendor' ? '(Vendor)' : ''); ?>
+                        </option>
                     <?php endforeach; ?>
                 </select>
             </div>
@@ -164,8 +189,8 @@ function saveAndGeneratePO() {
             }).then(() => {
                 // Open PDF in new tab
                 window.open(`generate_po.php?po_id=${res.po_id}`, '_blank');
-                // Redirect to PO list
-                window.location.href = '../financials/purchase_orders.php';
+                // Redirect to Booking list
+                window.location.href = 'bookings.php';
             });
         } else {
             Swal.fire('Error', res.message, 'error');
@@ -182,4 +207,5 @@ function saveAndGeneratePO() {
 }
 </script>
 
+<?php endif; ?>
 <?php include_once __DIR__ . '/../../includes/footer.php'; ?>

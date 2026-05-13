@@ -167,6 +167,7 @@ $bookedSites = $pdo->query("SELECT COUNT(*) FROM sites WHERE status = 'booked'")
             <h5>Quick Links</h5>
             <div class="quick-links">
                 <a href="modules/proposals/create.php"><i class="fas fa-plus"></i> New Proposal</a>
+                <a href="modules/operations/direct_booking.php"><i class="fas fa-plus-circle"></i> Direct Booking</a>
                 <a href="modules/inventory/sites.php"><i class="fas fa-th"></i> Inventory</a>
             </div>
         </div>
