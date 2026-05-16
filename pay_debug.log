@@ -1,0 +1,28 @@
+2026-05-16 23:46:06 - POST: Array
+(
+    [client_id] => 4
+    [amount] => 1000
+    [payment_date] => 2026-05-16
+    [reference_no] => 
+    [payment_mode] => Cash
+    [doc_id] => 2
+    [type] => receivable
+)
+
+INSERT Success. ID: 1
+Updating Invoice: 2
+Invoice Updated to partially_paid
+2026-05-16 23:46:23 - POST: Array
+(
+    [client_id] => 4
+    [amount] => 222
+    [payment_date] => 2026-05-16
+    [reference_no] => 222
+    [payment_mode] => Cash
+    [doc_id] => 2
+    [type] => receivable
+)
+
+INSERT Success. ID: 2
+Updating Invoice: 2
+Invoice Updated to partially_paid
