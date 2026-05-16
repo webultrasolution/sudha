@@ -54,7 +54,7 @@ $sites = $pdo->query("SELECT id, name, site_code, width, height, vendor_id FROM 
     <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1.5rem;">
         <h2 style="font-size: 1.25rem;">Printing PO</h2>
         <button class="btn btn-primary" onclick="openModal()">
-            <i class="fas fa-plus"></i> Add New Rate
+            <i class="fas fa-plus"></i> Add New Printing PO 
         </button>
     </div>
 
