@@ -32,6 +32,10 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             $displayCost += $sRate;
             $totalSQFT += floatval($site['sqft']);
             
+            // Add per-site printing cost to overall printCost if not already summed
+            $pTotal = floatval($site['printing_total'] ?? 0);
+            $printCost += $pTotal;
+
             $markupVal = $sRate - $pRate;
             if ($site['owner'] === 'HA') $haMarkup += $markupVal;
             else $taMarkup += $markupVal;
@@ -86,7 +90,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         logActivity('generated a new proposal', 'proposals', $proposalId, "Proposal Number: $propNum");
 
         // 3. Insert Items
-        $stmtItem = $pdo->prepare("INSERT INTO proposal_items (proposal_id, site_id, sale_rate, purchase_rate, margin_pct, amount, selected_image) VALUES (?, ?, ?, ?, ?, ?, ?)");
+        $stmtItem = $pdo->prepare("INSERT INTO proposal_items (proposal_id, site_id, sale_rate, purchase_rate, margin_pct, amount, selected_image, printing_vendor_id, printing_rate, printing_amount) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)");
         foreach ($data['selectedSites'] as $site) {
             $pRate = floatval($site['purchaseRate']);
             $sRate = floatval($site['saleRate']);
@@ -99,7 +103,10 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 $pRate,
                 $margin,
                 $sRate,
-                $site['thumbnail'] ?? null
+                $site['thumbnail'] ?? null,
+                $site['printing_vendor_id'] ?? null,
+                $site['printing_rate'] ?? 0,
+                $site['printing_total'] ?? 0
             ]);
         }
 

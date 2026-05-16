@@ -31,6 +31,8 @@ $mediaTypes = $pdo->query("SELECT DISTINCT type FROM sites WHERE type IS NOT NUL
 $illuminations = $pdo->query("SELECT DISTINCT light_type FROM sites WHERE light_type IS NOT NULL AND light_type != '' ORDER BY light_type")->fetchAll(PDO::FETCH_COLUMN);
 $genres = $pdo->query("SELECT DISTINCT genre FROM sites WHERE genre IS NOT NULL AND genre != '' ORDER BY genre")->fetchAll(PDO::FETCH_COLUMN);
 $sizes = $pdo->query("SELECT DISTINCT CONCAT(width, 'x', height) as size FROM sites WHERE width IS NOT NULL AND height IS NOT NULL AND width != '' AND height != '' ORDER BY width, height")->fetchAll(PDO::FETCH_COLUMN);
+$printingVendors = $pdo->query("SELECT id, name FROM partners WHERE type = 'vendor' ORDER BY name ASC")->fetchAll();
+$printingRates = $pdo->query("SELECT * FROM vendor_printing_rates")->fetchAll(PDO::FETCH_ASSOC);
 ?>
 
 <div class="proposal-full-wrapper">
@@ -618,6 +620,10 @@ $sizes = $pdo->query("SELECT DISTINCT CONCAT(width, 'x', height) as size FROM si
 let selectedSites = [];
 let currentPage = 1;
 let pageSize = 6;
+const baseUrl = "<?php echo BASE_URL; ?>";
+const imgBaseUrl = "<?php echo BASE_URL; ?>uploads/sites/";
+const printingVendors = <?php echo json_encode($printingVendors); ?>;
+const printingRates = <?php echo json_encode($printingRates); ?>;
 
 function handleClientChange() {
     const select = document.getElementById('client_id');
@@ -858,6 +864,16 @@ function submitQuickClient() {
     });
 }
 
+function getBestPrintingRate(siteId, mediaType) {
+    // 1. Try to find rate for THIS SITE
+    let rate = printingRates.find(r => r.site_id == siteId);
+    if (rate) return rate;
+    
+    // 2. Try to find rate for THIS MEDIA
+    rate = printingRates.find(r => !r.site_id && r.media_type === mediaType);
+    return rate || null;
+}
+
 function toggleSite(id) {
     const row = document.getElementById('row-' + id);
     const chk = row.querySelector('.asset-chk');
@@ -868,12 +884,12 @@ function toggleSite(id) {
     const prate = parseFloat(row.dataset.prate);
     const owner = row.dataset.owner;
     const sqft = parseFloat(row.dataset.sqft);
+    const type = row.dataset.type;
 
     const idx = selectedSites.findIndex(s => s.id === id);
     if (idx === -1) {
         const city = row.dataset.city;
         const state = row.dataset.state;
-        const type = row.dataset.type;
         const illumination = row.dataset.illumination;
         const thumbnail = row.dataset.thumbnail;
         const width = row.dataset.width;
@@ -882,10 +898,20 @@ function toggleSite(id) {
         const siteCode = row.dataset.code;
         const location = row.dataset.location;
         const area = row.querySelector('.location-area') ? row.querySelector('.location-area').innerText : '';
-
         const allImages = row.dataset.images;
 
-        selectedSites.push({ id, name, cardRate: rate, purchaseRate: prate, saleRate: rate, owner, sqft, city, state, type, illumination, thumbnail, allImages, width, height, vendorName, siteCode, area, location });
+        // Find default Printing PO
+        const bestRate = getBestPrintingRate(id, type);
+        const pVendor = bestRate ? bestRate.vendor_id : null;
+        const pRate = bestRate ? parseFloat(bestRate.rate_per_sqft) : 0;
+        const pTotal = pRate * sqft;
+
+        selectedSites.push({ 
+            id, name, cardRate: rate, purchaseRate: prate, saleRate: rate, owner, sqft, city, state, type, illumination, thumbnail, allImages, width, height, vendorName, siteCode, area, location,
+            printing_vendor_id: pVendor,
+            printing_rate: pRate,
+            printing_total: pTotal
+        });
         if(row) row.classList.add('selected');
         if(chk) chk.checked = true;
         if(input) input.disabled = false;
@@ -924,6 +950,19 @@ function closeBucket() {
     document.body.style.overflow = '';
 }
 
+function updatePrintingInfo(id, vendorId, rateVal) {
+    const idx = selectedSites.findIndex(s => s.id === id);
+    if (idx !== -1) {
+        selectedSites[idx].printing_vendor_id = vendorId;
+        selectedSites[idx].printing_rate = parseFloat(rateVal) || 0;
+        selectedSites[idx].printing_total = selectedSites[idx].printing_rate * selectedSites[idx].sqft;
+        
+        // Update the total cell in bucket for printing if needed, but recalcAll handles global sum
+        recalcAll();
+        updateBucketUI();
+    }
+}
+
 function updateBucketUI() {
     const bucketPanel = document.getElementById('selection-bucket-panel');
     const bucketList = document.getElementById('bucket-list');
@@ -946,12 +985,13 @@ function updateBucketUI() {
                 <tr style="border-bottom: 2px solid #f1f5f9;">
                     <th style="width: 40px; padding: 0.8rem 1rem;">#</th>
                     <th style="width: 50px; padding: 0.8rem 1rem;">ACT</th>
-                    <th style="width: 100px; padding: 0.8rem 1rem;">PREVIEW</th>
+                    <th style="width: 80px; padding: 0.8rem 1rem;">PREVIEW</th>
                     <th style="padding: 0.8rem 1rem;">CITY / CODE</th>
                     <th style="padding: 0.8rem 1rem;">ASSET DETAILS</th>
                     <th style="padding: 0.8rem 1rem;">SIZE</th>
+                    <th style="padding: 0.8rem 1rem;">PRINTING</th>
                     <th style="padding: 0.8rem 1rem;">PRICING</th>
-                    <th style="padding: 0.8rem 1rem;">OFFER RATE</th>
+                    <th style="padding: 0.8rem 1rem; text-align: right;">OFFER RATE</th>
                     <th style="padding: 0.8rem 1rem; text-align: right;">TOTAL</th>
                 </tr>
             </thead>
@@ -959,79 +999,74 @@ function updateBucketUI() {
     `;
 
     selectedSites.forEach((site, index) => {
-        const imgList = (site.allImages || "").split(',').filter(i => i.trim() !== "");
+        const thumb = site.thumbnail ? '<?php echo BASE_URL; ?>uploads/sites/' + site.thumbnail : 'https://via.placeholder.com/150x95?text=No+Img';
+        const imgList = (site.allImages || "").split(',').filter(img => img.trim() !== "");
         const imgCount = imgList.length;
 
-        const previewHtml = site.thumbnail 
-            ? ` <div style="position: relative; width: 150px; height: 95px;">
-                    <img src="<?php echo BASE_URL; ?>uploads/sites/${site.thumbnail}" 
-                         onclick="openLightboxSlider('${site.allImages}', '${site.id}')" 
-                         class="site-thumb" 
-                         style="width: 100%; height: 100%; border-radius: 12px; object-fit: cover; border: 1px solid ${site.isCustomized ? '#059669' : '#e2e8f0'}; cursor: pointer; transition: transform 0.2s; box-shadow: 0 4px 6px rgba(0,0,0,0.05);">
-                    ${site.isCustomized ? `
-                        <div style="position: absolute; top: -6px; right: -6px; background: #059669; color: white; width: 22px; height: 22px; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 0.75rem; border: 2px solid white; box-shadow: 0 4px 8px rgba(0,0,0,0.15); z-index: 10;">
-                            <i class="fas fa-check"></i>
-                        </div>
-                    ` : ''}
-                    ${imgCount > 1 ? `
-                        <div style="position: absolute; bottom: 8px; right: 8px; background: rgba(0,0,0,0.8); color: white; font-size: 0.65rem; padding: 3px 8px; border-radius: 6px; font-weight: 800; backdrop-filter: blur(4px); border: 1px solid rgba(255,255,255,0.1);">
-                            <i class="fas fa-images"></i> ${imgCount}
-                        </div>
-                    ` : ''}
-                </div>`
-            : `<div style="width: 150px; height: 95px; border-radius: 12px; background: #f8fafc; border: 1px dashed #e2e8f0; display: flex; align-items: center; justify-content: center; font-size: 0.75rem; color: #94a3b8; font-weight: 700;">No Image</div>`;
+        // Printing Dropdown
+        let pOptions = '<option value="">Select Vendor</option>';
+        if (typeof printingVendors !== 'undefined') {
+            printingVendors.forEach(v => {
+                const selected = v.id == site.printing_vendor_id ? 'selected' : '';
+                pOptions += `<option value="${v.id}" ${selected}>${v.name}</option>`;
+            });
+        }
 
         html += `
-            <tr class="site-row selected" style="background: white; transition: all 0.2s;" id="bucket-row-${site.id}">
-                <td class="sno-cell" style="padding: 0.6rem 1rem; font-weight: 700; color: #64748b;">${index + 1}</td>
-                
-                <td style="padding: 0.6rem 1rem; text-align: center;">
-                    <button onclick="toggleSite('${site.id}')" style="background: #fee2e2; color: #ef4444; border: none; width: 28px; height: 28px; border-radius: 6px; cursor: pointer; display: flex; align-items: center; justify-content: center; transition: all 0.2s;">
+            <tr id="bucket-row-${site.id}" class="site-row selected" style="background: white;">
+                <td style="font-weight: 700; color: #64748b; padding: 0.6rem 1rem;">${index + 1}</td>
+                <td style="padding: 0.6rem 1rem;">
+                    <button onclick="toggleSite('${site.id}')" style="background: #fee2e2; color: #ef4444; border: none; width: 28px; height: 28px; border-radius: 6px; cursor: pointer; display: flex; align-items: center; justify-content: center;">
                         <i class="fas fa-trash-alt" style="font-size: 0.75rem;"></i>
                     </button>
                 </td>
-
                 <td style="padding: 0.6rem 1rem;">
-                    ${previewHtml}
+                    <div style="position: relative; width: 80px; height: 50px;">
+                        <img src="${thumb}" onclick="openLightboxSlider('${site.allImages}', '${site.id}')" 
+                             class="site-thumb"
+                             style="width: 100%; height: 100%; border-radius: 8px; object-fit: cover; border: 1px solid #e2e8f0; cursor: pointer; transition: transform 0.2s;">
+                        ${imgCount > 1 ? `<div style="position: absolute; bottom: 4px; right: 4px; background: rgba(0,0,0,0.8); color: white; font-size: 0.55rem; padding: 2px 5px; border-radius: 4px; font-weight: 800;"><i class="fas fa-images"></i> ${imgCount}</div>` : ''}
+                    </div>
                 </td>
-
                 <td style="padding: 0.6rem 1rem;">
                     <div style="font-weight: 800; color: #1e293b; font-size: 0.8rem; margin-bottom: 1px;">${site.city}</div>
                     <div style="color: #f97316; font-size: 0.65rem; font-weight: 800;">${site.siteCode}</div>
                 </td>
-
                 <td style="padding: 0.6rem 1rem;">
                     <div style="font-weight: 800; color: #1e293b; font-size: 0.8rem; margin-bottom: 1px;">${site.name}</div>
                     <div style="font-size: 0.65rem; color: #64748b; margin-bottom: 4px; line-height: 1.1;">${site.location}</div>
                     <div style="display: flex; gap: 0.3rem; align-items: center;">
                         <span style="background: #ecfdf5; color: #059669; padding: 0.1rem 0.4rem; border-radius: 4px; font-size: 0.55rem; font-weight: 800; text-transform: uppercase;">${site.type}</span>
-                        <span style="background: #f1f5f9; color: #475569; padding: 0.1rem 0.4rem; border-radius: 4px; font-size: 0.55rem; font-weight: 800; text-transform: uppercase;">${site.illumination}</span>
-                        <span style="background: #f1f5f9; color: #475569; padding: 0.1rem 0.4rem; border-radius: 4px; font-size: 0.55rem; font-weight: 800; text-transform: uppercase;">
-                            ${site.owner}${site.owner === 'TA' && site.vendorName ? ' - ' + site.vendorName : ''}
-                        </span>
                     </div>
                 </td>
-
                 <td style="padding: 0.6rem 1rem;">
                     <div style="font-weight: 800; color: #1e293b; font-size: 0.8rem; margin-bottom: 1px;">${site.width}' x ${site.height}'</div>
                     <div style="font-size: 0.65rem; color: #94a3b8; font-weight: 700;">${site.sqft.toLocaleString()} SQFT</div>
                 </td>
-
-                <td style="padding: 1.5rem 1rem;">
-                    <div style="font-weight: 800; color: #64748b; font-size: 0.8rem;">CARD: ₹${site.cardRate.toLocaleString()}</div>
+                <td style="padding: 0.6rem 1rem;">
+                    <select onchange="updatePrintingInfo('${site.id}', this.value, document.getElementById('p_rate_${site.id}').value)" 
+                            style="width: 120px; font-size: 0.7rem; padding: 0.3rem; border-radius: 6px; border: 1px solid #e2e8f0; margin-bottom: 4px;">
+                        ${pOptions}
+                    </select>
+                    <div style="display: flex; align-items: center; gap: 0.3rem;">
+                        <span style="font-size: 0.6rem; color: #64748b;">Rate:</span>
+                        <input type="number" id="p_rate_${site.id}" value="${site.printing_rate}" 
+                               oninput="updatePrintingInfo('${site.id}', document.getElementById('bucket-row-${site.id}').querySelector('select').value, this.value)"
+                               style="width: 60px; height: 24px; font-size: 0.7rem; border-radius: 4px; border: 1px solid #e2e8f0; padding: 0 0.3rem;">
+                    </div>
+                    <div style="font-size: 0.65rem; font-weight: 800; color: var(--primary); margin-top: 2px;">₹${(site.printing_total || 0).toLocaleString()}</div>
                 </td>
-
-                <td style="padding: 1.5rem 1rem;">
-                    <div style="font-size: 0.65rem; color: var(--primary); font-weight: 800; margin-bottom: 4px; text-transform: uppercase;">Offer Rate</div>
+                <td style="padding: 0.6rem 1rem;">
+                    <div style="font-weight: 800; color: #64748b; font-size: 0.7rem;">CARD: ₹${site.cardRate.toLocaleString()}</div>
+                </td>
+                <td style="padding: 0.6rem 1rem;">
                     <input type="number" class="p-input bucket-rate-input" 
                            value="${site.saleRate}" 
                            oninput="updateSitePrice('${site.id}', this.value)"
-                           style="width: 100px; height: 32px; font-size: 0.85rem; font-weight: 800; border-radius: 8px; border: 1px solid #e2e8f0; padding: 0 0.5rem; color: #1e293b;">
+                           style="width: 80px; height: 32px; font-size: 0.8rem; font-weight: 800; border-radius: 8px; border: 1px solid #e2e8f0; padding: 0 0.4rem; color: #1e293b;">
                 </td>
-
-                <td style="padding: 1.5rem 1rem; text-align: right;">
-                    <div style="font-size: 0.65rem; color: #64748b; font-weight: 800; margin-bottom: 4px; text-transform: uppercase;">Total</div>
-                    <div class="total-cell" style="font-weight: 900; color: var(--primary); font-size: 0.95rem;">₹${site.saleRate.toLocaleString()}</div>
+                <td style="padding: 0.6rem 1rem; text-align: right;">
+                    <div class="total-cell" style="font-weight: 900; color: var(--primary); font-size: 0.9rem;">₹${site.saleRate.toLocaleString()}</div>
                 </td>
             </tr>
         `;
@@ -1265,13 +1300,17 @@ function saveProposal() {
     });
 }
 
+function goToStep1() {
+    document.getElementById('step-2').style.display = 'none';
+    document.getElementById('step-1').style.display = 'block';
+    if(document.getElementById('step-3')) document.getElementById('step-3').style.display = 'none';
+    updateStepUI(1);
+    if(document.getElementById('wizard-progress-line')) document.getElementById('wizard-progress-line').style.width = '0%';
+}
+
 function goToStep2() {
     const campaignName = document.getElementById('campaign_name').value;
     const clientId = document.getElementById('client_id').value;
-    const start = document.getElementById('start_date').value;
-    const end = document.getElementById('end_date').value;
-    const mediaType = document.getElementById('media_type').value;
-    const lightType = document.getElementById('light_type').value;
     
     if (!clientId || !campaignName) {
         Swal.fire({
@@ -1285,54 +1324,34 @@ function goToStep2() {
     
     document.getElementById('step-1').style.display = 'none';
     document.getElementById('step-2').style.display = 'block';
+    if(document.getElementById('step-3')) document.getElementById('step-3').style.display = 'none';
     window.scrollTo(0, 0);
-    filterSites(); // Apply filters based on Step 1 criteria
-    
-    // Step 1 styling -> Completed
-    const c1 = document.querySelector('#step-tab-1 .step-circle');
-    c1.innerHTML = '<i class="fas fa-check"></i>';
-    c1.style.background = 'var(--primary)';
-    c1.style.color = 'white';
-    c1.style.boxShadow = '0 0 0 3px var(--primary)';
-    
-    // Step 2 styling -> Active
-    const c2 = document.querySelector('#step-tab-2 .step-circle');
-    c2.style.background = 'var(--primary)';
-    c2.style.color = 'white';
-    c2.style.boxShadow = '0 0 0 3px var(--primary)';
-    
-    document.querySelector('#step-tab-2 .step-label').style.color = 'var(--primary)';
-    document.querySelector('#step-tab-2 .step-label').style.fontWeight = '800';
-    
-    // Progress Line
-    document.getElementById('wizard-progress-line').style.width = '100%';
+    filterSites();
+    updateStepUI(2);
+    if(document.getElementById('wizard-progress-line')) document.getElementById('wizard-progress-line').style.width = '50%';
 }
 
-function goToStep1() {
+function goToStep3() {
+    if(selectedSites.length === 0) {
+        Swal.fire('Error', 'Please select at least one site to review', 'error');
+        return;
+    }
+    document.getElementById('step-1').style.display = 'none';
     document.getElementById('step-2').style.display = 'none';
-    document.getElementById('step-1').style.display = 'block';
-    
-    // Step 1 styling -> Active
-    const c1 = document.querySelector('#step-tab-1 .step-circle');
-    c1.innerHTML = '1';
-    
-    // Step 2 styling -> Inactive
-    const c2 = document.querySelector('#step-tab-2 .step-circle');
-    c2.style.background = 'white';
-    c2.style.color = '#94a3b8';
-    c2.style.boxShadow = '0 0 0 3px #e2e8f0';
-    
-    document.querySelector('#step-tab-2 .step-label').style.color = '#94a3b8';
-    document.querySelector('#step-tab-2 .step-label').style.fontWeight = '700';
-    
-    // Progress Line
-    document.getElementById('wizard-progress-line').style.width = '0%';
+    if(document.getElementById('step-3')) document.getElementById('step-3').style.display = 'block';
+    updateStepUI(3);
+    if(document.getElementById('wizard-progress-line')) document.getElementById('wizard-progress-line').style.width = '100%';
+}
+
+function updateStepUI(step) {
+    if(document.getElementById('tab-indicator-1')) document.getElementById('tab-indicator-1').style.opacity = step >= 1 ? '1' : '0.4';
+    if(document.getElementById('tab-indicator-2')) document.getElementById('tab-indicator-2').style.opacity = step >= 2 ? '1' : '0.4';
+    if(document.getElementById('tab-indicator-3')) document.getElementById('tab-indicator-3').style.opacity = step >= 3 ? '1' : '0.4';
 }
 
 // Lightbox & Slider Logic
 let currentImages = [];
 let currentImgIndex = 0;
-const baseUrl = "<?php echo BASE_URL; ?>uploads/sites/";
 
 function openLightboxSlider(imageString, siteId) {
     if (!imageString) return;

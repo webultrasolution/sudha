@@ -114,7 +114,9 @@ $indian_states = ["Andhra Pradesh", "Arunachal Pradesh", "Assam", "Bihar", "Chha
                 <td><span class="badge" style="background: #e0f2fe; color: #0369a1; padding: 0.25rem 0.5rem; border-radius: 4px; font-weight: 600;"><?php echo $v['site_count']; ?> Sites</span></td>
                 <td><?php echo $v['city']; ?>, <?php echo $v['state']; ?></td>
                 <td>
-                    <a href="../operations/direct_booking.php?vendor_id=<?php echo $v['id']; ?>" class="btn-icon btn-view" title="Direct Booking (No Proposal)"><i class="fas fa-file-signature"></i></a>
+                    <a href="manage_vendor_po.php?vendor_id=<?php echo $v['id']; ?>" class="btn-icon" style="background: #ccfbf1; color: var(--primary);" title="Create Purchase Order"><i class="fas fa-file-invoice-dollar"></i></a>
+                    <a href="printing_rates.php?vendor_id=<?php echo $v['id']; ?>" class="btn-icon" style="background: #e0e7ff; color: #4f46e5;" title="Printing PO Rates"><i class="fas fa-print"></i></a>
+                    <!-- <a href="../operations/direct_booking.php?vendor_id=<?php echo $v['id']; ?>" class="btn-icon btn-view" title="Direct Booking (No Proposal)"><i class="fas fa-file-signature"></i></a> -->
                     <button class="btn-icon btn-edit" onclick="editVendor(<?php echo htmlspecialchars(json_encode($v)); ?>)" title="Edit"><i class="fas fa-edit"></i></button>
                     <button class="btn-icon btn-delete" onclick="deleteVendor(<?php echo $v['id']; ?>)" title="Delete"><i class="fas fa-trash"></i></button>
                 </td>

@@ -127,8 +127,7 @@ $counts = [
     'Hoarding' => $pdo->query("SELECT COUNT(*) FROM sites WHERE type='Hoarding'")->fetchColumn(),
     'Unipole' => $pdo->query("SELECT COUNT(*) FROM sites WHERE type='Unipole'")->fetchColumn(),
     'Gantry' => $pdo->query("SELECT COUNT(*) FROM sites WHERE type='Gantry'")->fetchColumn(),
-    'BQS' => $pdo->query("SELECT COUNT(*) FROM sites WHERE type='BQS'")->fetchColumn(),
-    'DCP' => $pdo->query("SELECT COUNT(*) FROM sites WHERE type='DCP'")->fetchColumn(),
+    'BQS' => $pdo->query("SELECT COUNT(*) FROM sites WHERE type='BQS'")->fetchColumn()
 ];
 
 // Fetch Sites
@@ -145,7 +144,6 @@ $vendors = $pdo->query("SELECT id, name FROM partners WHERE type = 'vendor' ORDE
     <a href="?media=Unipole" class="tab <?php echo $mediaFilter == 'Unipole' ? 'active' : ''; ?>">Unipole (<?php echo $counts['Unipole']; ?>)</a>
     <a href="?media=Gantry" class="tab <?php echo $mediaFilter == 'Gantry' ? 'active' : ''; ?>">Gantry (<?php echo $counts['Gantry']; ?>)</a>
     <a href="?media=BQS" class="tab <?php echo $mediaFilter == 'BQS' ? 'active' : ''; ?>">BQS (<?php echo $counts['BQS']; ?>)</a>
-    <a href="?media=DCP" class="tab <?php echo $mediaFilter == 'DCP' ? 'active' : ''; ?>">DCP (<?php echo $counts['DCP']; ?>)</a>
 </div>
 
 <div class="card">
