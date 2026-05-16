@@ -29,9 +29,11 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         $end_date = $data['end_date'] ?? date('Y-m-d', strtotime('+1 month'));
         $status = $data['status'] ?? 'active';
 
-        // 1. Group Sites by Vendor
+        // 1. Group Sites by Vendor & Collect Printing Info
         $vendorSites = [];
+        $printingVendorItems = [];
         $overallSubtotal = 0;
+        $overallPrinting = 0;
         
         foreach ($data['site_ids'] as $sid) {
             // Fetch vendor_id for each site
@@ -39,27 +41,38 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             $stmtV->execute([$sid]);
             $vid = $stmtV->fetchColumn();
             
-            if (!$vid) continue;
-            
-            if (!isset($vendorSites[$vid])) {
-                $vendorSites[$vid] = [];
+            if ($vid) {
+                if (!isset($vendorSites[$vid])) $vendorSites[$vid] = [];
+                $rate = floatval($data['rates'][$sid] ?? 0);
+                $vendorSites[$vid][] = ['site_id' => $sid, 'rate' => $rate];
+                $overallSubtotal += $rate;
             }
-            
-            $rate = floatval($data['rates'][$sid] ?? 0);
-            $vendorSites[$vid][] = [
-                'site_id' => $sid,
-                'rate' => $rate
-            ];
-            $overallSubtotal += $rate;
+
+            // Handle Printing Info
+            if (!empty($data['printing_info'][$sid])) {
+                $pInfo = $data['printing_info'][$sid];
+                $pVendorId = intval($pInfo['vendor_id']);
+                if ($pVendorId) {
+                    if (!isset($printingVendorItems[$pVendorId])) $printingVendorItems[$pVendorId] = [];
+                    $pTotal = floatval($pInfo['total']);
+                    $printingVendorItems[$pVendorId][] = [
+                        'site_id' => $sid,
+                        'rate' => floatval($pInfo['rate']),
+                        'total' => $pTotal
+                    ];
+                    $overallPrinting += $pTotal;
+                }
+            }
         }
 
-        if (empty($vendorSites)) {
-            throw new Exception("No valid sites or vendors found.");
+        if (empty($vendorSites) && empty($printingVendorItems)) {
+            throw new Exception("No valid sites or printing info found.");
         }
 
         $lastPoId = 0;
+        $poCount = 0;
 
-        // 2. Create PO for Each Vendor
+        // 2. Create PO for Each Site Vendor
         foreach ($vendorSites as $vid => $vItems) {
             $vSubtotal = 0;
             foreach ($vItems as $item) $vSubtotal += $item['rate'];
@@ -79,85 +92,92 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 INSERT INTO purchase_orders (vendor_id, customer_id, employee_id, campaign_name, brand_name, external_po, po_number, po_date, po_amount, cgst_amount, sgst_amount, igst_amount, total_amount, status, remarks) 
                 VALUES (?, ?, ?, ?, ?, ?, ?, CURDATE(), ?, ?, ?, ?, ?, 'approved', ?)
             ");
-            $stmtPO->execute([
-                $vid,
-                $client_id,
-                $_SESSION['user_id'] ?? 0,
-                $campaign_name,
-                $brand_name,
-                $external_po,
-                $poNum,
-                $vSubtotal,
-                $cgst,
-                $sgst,
-                $igst,
-                $vGrandTotal,
-                $remarks
-            ]);
+            $stmtPO->execute([$vid, $client_id, $_SESSION['user_id'] ?? 0, $campaign_name, $brand_name, $external_po, $poNum, $vSubtotal, $cgst, $sgst, $igst, $vGrandTotal, $remarks]);
             $poId = $pdo->lastInsertId();
-            $lastPoId = $poId; // Store for redirection if single vendor
+            $lastPoId = $poId;
+            $poCount++;
 
-            // Insert PO Items
-            $stmtPOItem = $pdo->prepare("
-                INSERT INTO po_items (po_id, site_id, start_date, end_date, days, monthly_rate, cost) 
-                VALUES (?, ?, ?, ?, ?, ?, ?)
-            ");
+            $stmtPOItem = $pdo->prepare("INSERT INTO po_items (po_id, site_id, start_date, end_date, days, monthly_rate, cost) VALUES (?, ?, ?, ?, ?, ?, ?)");
             foreach ($vItems as $item) {
-                $stmtPOItem->execute([
-                    $poId,
-                    $item['site_id'],
-                    $start_date,
-                    $end_date,
-                    30,
-                    $item['rate'],
-                    $item['rate']
-                ]);
+                $stmtPOItem->execute([$poId, $item['site_id'], $start_date, $end_date, 30, $item['rate'], $item['rate']]);
+            }
+        }
+
+        // 2.5 Create PO for Each Printing Vendor
+        foreach ($printingVendorItems as $pvid => $pItems) {
+            $pSubtotal = 0;
+            foreach ($pItems as $item) $pSubtotal += $item['total'];
+            
+            $cgst = 0; $sgst = 0; $igst = 0;
+            if ($tax_type === 'cgst_sgst') {
+                $cgst = $pSubtotal * 0.09; $sgst = $pSubtotal * 0.09;
+            } else {
+                $igst = $pSubtotal * 0.18;
+            }
+            $pGrandTotal = $pSubtotal + $cgst + $sgst + $igst;
+            
+            $poNum = 'PRT-' . date('Ymd') . '-' . rand(100, 999);
+            
+            $stmtPO = $pdo->prepare("
+                INSERT INTO purchase_orders (vendor_id, customer_id, employee_id, campaign_name, brand_name, external_po, po_number, po_date, po_amount, cgst_amount, sgst_amount, igst_amount, total_amount, status, remarks) 
+                VALUES (?, ?, ?, ?, ?, ?, ?, CURDATE(), ?, ?, ?, ?, ?, 'approved', ?)
+            ");
+            $stmtPO->execute([$pvid, $client_id, $_SESSION['user_id'] ?? 0, $campaign_name, $brand_name, $external_po, $poNum, $pSubtotal, $cgst, $sgst, $igst, $pGrandTotal, "Printing PO: " . $remarks]);
+            $poId = $pdo->lastInsertId();
+            $lastPoId = $poId;
+            $poCount++;
+
+            $stmtPOItem = $pdo->prepare("INSERT INTO po_items (po_id, site_id, start_date, end_date, days, monthly_rate, cost, description) VALUES (?, ?, ?, ?, ?, ?, ?, ?)");
+            foreach ($pItems as $item) {
+                $stmtPOItem->execute([$poId, $item['site_id'], $start_date, $end_date, 30, $item['rate'], $item['total'], "Printing Cost"]);
             }
         }
 
         // 3. Create Single Booking (Direct)
-        $overallTax = $overallSubtotal * 0.18;
-        $overallGrand = $overallSubtotal + $overallTax;
+        $bookingSubtotal = $overallSubtotal + $overallPrinting;
+        $overallTax = $bookingSubtotal * 0.18;
+        $overallGrand = $bookingSubtotal + $overallTax;
 
         $stmtBooking = $pdo->prepare("
-            INSERT INTO bookings (client_id, campaign_name, brand_name, external_po, contact_person, billing_gstin, tax_type, start_date, end_date, total_amount, tax_amount, grand_total, status) 
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            INSERT INTO bookings (client_id, campaign_name, brand_name, external_po, contact_person, billing_gstin, tax_type, start_date, end_date, total_amount, tax_amount, grand_total, printing_cost, status) 
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
         ");
-        $stmtBooking->execute([
-            $client_id,
-            $campaign_name,
-            $brand_name,
-            $external_po,
-            $contact_person,
-            $billing_gstin,
-            $tax_type,
-            $start_date,
-            $end_date,
-            $overallSubtotal,
-            $overallTax,
-            $overallGrand,
-            $status
-        ]);
+        $stmtBooking->execute([$client_id, $campaign_name, $brand_name, $external_po, $contact_person, $billing_gstin, $tax_type, $start_date, $end_date, $bookingSubtotal, $overallTax, $overallGrand, $overallPrinting, $status]);
         $bookingId = $pdo->lastInsertId();
 
         // 4. Create Operational Tasks & Booking Items
         $stmtOps = $pdo->prepare("INSERT INTO operations (booking_id, site_id, status) VALUES (?, ?, 'pending')");
-        $stmtBI = $pdo->prepare("INSERT INTO booking_items (booking_id, site_id, start_date, end_date, days, purchase_amount, amount) VALUES (?, ?, ?, ?, ?, ?, ?)");
+        $stmtBI = $pdo->prepare("INSERT INTO booking_items (booking_id, site_id, start_date, end_date, days, purchase_amount, amount, printing_vendor_id, printing_rate, printing_amount) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)");
         
         foreach ($data['site_ids'] as $sid) {
             $stmtOps->execute([$bookingId, $sid]);
             
             $rate = floatval($data['rates'][$sid] ?? 0);
+            $pInfo = $data['printing_info'][$sid] ?? null;
+
             $stmtBI->execute([
                 $bookingId,
                 $sid,
                 $start_date,
                 $end_date,
                 30,
-                $rate, // purchase_amount (assuming same as rate for direct)
-                $rate  // amount (sale rate)
+                $rate,
+                $rate,
+                $pInfo ? $pInfo['vendor_id'] : null,
+                $pInfo ? $pInfo['rate'] : 0,
+                $pInfo ? $pInfo['total'] : 0
             ]);
         }
+
+        logActivity('generated a direct booking and purchase order(s)', 'bookings', $bookingId, "Booking ID: $bookingId, $poCount POs generated.");
+
+        $pdo->commit();
+        
+        echo json_encode([
+            'success' => true, 
+            'po_id' => ($poCount === 1) ? $lastPoId : null,
+            'message' => "$poCount Purchase Orders generated successfully."
+        ]);
 
         logActivity('generated a direct booking and purchase order(s)', 'bookings', $bookingId, "Booking ID: $bookingId, Multiple POs generated.");
 
