@@ -9,11 +9,22 @@ if (!$partner_id) {
 }
 
 // Fetch Client Invoices
-$invoices = $pdo->prepare("SELECT id, invoice_number, total_amount FROM invoices WHERE booking_id IN (SELECT id FROM bookings WHERE proposal_id IN (SELECT id FROM proposals WHERE client_id = ?)) ORDER BY id DESC");
+$invoices = $pdo->prepare("
+    SELECT i.id, i.invoice_number, i.total_amount 
+    FROM invoices i
+    JOIN bookings b ON i.booking_id = b.id
+    WHERE b.client_id = ? 
+    ORDER BY i.id DESC
+");
 $invoices->execute([$partner_id]);
 
-// Fetch Vendor POs (Proposals/POs assigned to this vendor)
-$pos = $pdo->prepare("SELECT p.id, p.proposal_number as po_number, p.grand_total FROM proposals p WHERE p.id IN (SELECT proposal_id FROM proposal_items WHERE site_id IN (SELECT id FROM sites WHERE vendor_id = ?)) ORDER BY p.id DESC");
+// Fetch Vendor POs
+$pos = $pdo->prepare("
+    SELECT id, po_number, total_amount as grand_total 
+    FROM purchase_orders 
+    WHERE vendor_id = ? 
+    ORDER BY id DESC
+");
 $pos->execute([$partner_id]);
 
 echo json_encode([
