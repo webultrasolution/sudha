@@ -30,19 +30,6 @@ $pType = $partner['type']; // 'client' or 'vendor'
 $ledgerEntries = [];
 
 if ($pType == 'client') {
-    // 1. Fetch Bookings (Proposals)
-    $stmtBook = $pdo->prepare("
-        SELECT id, 'booking' as type, created_at as date, campaign_name as ref, 
-               total_amount as base_amt, tax_amount, grand_total as total_amt, 
-               0 as debit, 0 as credit, status
-        FROM bookings 
-        WHERE client_id = ? AND status != 'cancelled'
-    ");
-    $stmtBook->execute([$partner_id]);
-    $bookings = $stmtBook->fetchAll();
-    foreach ($bookings as $b) {
-        $ledgerEntries[] = $b;
-    }
 
     // 2. Fetch Invoices
     $stmtInv = $pdo->prepare("
@@ -76,7 +63,7 @@ if ($pType == 'client') {
 
 // 3. Fetch Payments
 $pMode = ($pType == 'client') ? 'receivable' : 'payable';
-$dbType = ($pType == 'client') ? 'credit' : 'debit';
+$dbType = ($pType == 'client') ? 'receivable' : 'payable';
 $stmtPay = $pdo->prepare("
     SELECT id, 'payment' as type, payment_date as date, transaction_id as ref, 
            amount as base_amt, 0 as tax_amount, amount as total_amt, 
@@ -100,7 +87,6 @@ $totalContracted = 0;
 $totalInvoiced = 0;
 $totalReceived = 0;
 foreach ($ledgerEntries as $item) {
-    if ($item['type'] === 'booking') $totalContracted += $item['total_amt'];
     if ($item['type'] === 'invoice' || $item['type'] === 'po') $totalInvoiced += $item['total_amt'];
     if ($item['type'] === 'payment') $totalReceived += $item['total_amt'];
 }
@@ -128,11 +114,7 @@ $balance = 0;
 </div>
 
 <!-- Summary Cards -->
-<div style="display: grid; grid-template-columns: repeat(4, 1fr); gap: 1.5rem; margin-bottom: 2rem;">
-    <div class="card" style="padding: 1.25rem; border-left: 4px solid #3b82f6; border-radius: 12px;">
-        <div style="font-size: 0.7rem; font-weight: 800; color: #64748b; text-transform: uppercase;">Total Proposals</div>
-        <div style="font-size: 1.5rem; font-weight: 900; color: #1e293b; margin-top: 0.25rem;"><?php echo formatCurrency($totalContracted); ?></div>
-    </div>
+<div style="display: grid; grid-template-columns: repeat(3, 1fr); gap: 1.5rem; margin-bottom: 2rem;">
     <div class="card" style="padding: 1.25rem; border-left: 4px solid #f59e0b; border-radius: 12px;">
         <div style="font-size: 0.7rem; font-weight: 800; color: #64748b; text-transform: uppercase;">Total Billed</div>
         <div style="font-size: 1.5rem; font-weight: 900; color: #1e293b; margin-top: 0.25rem;"><?php echo formatCurrency($totalInvoiced); ?></div>
@@ -225,8 +207,10 @@ $balance = 0;
         </tbody>
         <tfoot>
             <tr style="background: #f1f5f9; border-top: 2px solid #e2e8f0;">
-                <td colspan="4" style="padding: 1rem; text-align: right; font-weight: 800; color: #475569; text-transform: uppercase;">Closing Balance</td>
-                <td colspan="3" style="padding: 1rem; text-align: right; font-weight: 900; font-size: 1.1rem; color: <?php echo $balance > 0 ? '#e11d48' : '#059669'; ?>;">
+                <td colspan="5" style="padding: 1rem; text-align: right; font-weight: 800; color: #475569; text-transform: uppercase;">Totals & Closing Balance</td>
+                <td style="padding: 1rem; text-align: right; font-weight: 800; color: #1e293b;"><?php echo formatCurrency($totalInvoiced); ?></td>
+                <td style="padding: 1rem; text-align: right; font-weight: 800; color: #059669;"><?php echo formatCurrency($totalReceived); ?></td>
+                <td style="padding: 1rem; text-align: right; font-weight: 900; font-size: 1.1rem; color: <?php echo $balance > 0 ? '#e11d48' : '#059669'; ?>;">
                     <?php echo formatCurrency(abs($balance)); ?> <span style="font-size: 0.8rem; font-weight: 800;"><?php echo $balanceLabel; ?></span>
                 </td>
                 <td class="no-print"></td>
