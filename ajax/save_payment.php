@@ -21,7 +21,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         exit;
     }
 
-    $db_type = ($type === 'receivable') ? 'credit' : 'debit';
+    $db_type = ($type === 'receivable') ? 'receivable' : 'payable';
     $invoice_id = ($type === 'receivable') ? $doc_id : null;
     $proposal_id = ($type === 'payable') ? $doc_id : null;
 
