@@ -61,6 +61,7 @@ $sites = $pdo->query("SELECT id, name, site_code, width, height, vendor_id FROM 
     <table class="table">
         <thead>
             <tr>
+                <th style="width: 40px;"></th>
                 <th>Vendor</th>
                 <th>Site / Dimension</th>
                 <th>Media Type</th>
@@ -71,6 +72,11 @@ $sites = $pdo->query("SELECT id, name, site_code, width, height, vendor_id FROM 
         <tbody>
             <?php foreach ($rates as $r): ?>
             <tr>
+                <td style="text-align: center;">
+                    <a href="../operations/generate_printing_po.php?vendor_id=<?php echo $r['vendor_id']; ?>&rate_ids[]=<?php echo $r['id']; ?>&preview=1" target="_blank" title="Quick PO PDF" style="color: #ef4444; font-size: 1.1rem;">
+                        <i class="fas fa-file-pdf"></i>
+                    </a>
+                </td>
                 <td><strong><?php echo htmlspecialchars($r['vendor_name']); ?></strong></td>
                 <td>
                     <?php if ($r['site_id']): ?>
@@ -98,7 +104,7 @@ $sites = $pdo->query("SELECT id, name, site_code, width, height, vendor_id FROM 
             <?php endforeach; ?>
             <?php if (empty($rates)): ?>
             <tr>
-                <td colspan="5" style="text-align: center; padding: 2rem; color: #94a3b8;">No Printing POs found.</td>
+                <td colspan="6" style="text-align: center; padding: 2rem; color: #94a3b8;">No Printing POs found.</td>
             </tr>
             <?php endif; ?>
         </tbody>
