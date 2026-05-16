@@ -63,7 +63,7 @@ $rates = $pdo->query("
     JOIN partners v ON r.vendor_id = v.id
     LEFT JOIN sites s ON r.site_id = s.id
     $queryWhere
-    GROUP BY r.po_number, r.vendor_id, (CASE WHEN r.po_number IS NULL THEN r.id ELSE 0 END)
+    GROUP BY r.po_number, r.vendor_id, v.name, (CASE WHEN r.po_number IS NULL THEN r.id ELSE 0 END)
     ORDER BY r.id DESC
 ")->fetchAll();
 
