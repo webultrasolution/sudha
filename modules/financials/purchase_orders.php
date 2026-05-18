@@ -9,15 +9,77 @@ if (!hasRole(['admin', 'accounts'])) {
     exit;
 }
 
-// Fetch POs
-$pos = $pdo->query("
-    SELECT po.*, v.name as vendor_name, u.username as creator 
+// Handle Filters
+$selectedVendorId = isset($_GET['vendor_id']) ? intval($_GET['vendor_id']) : 0;
+$selectedType = isset($_GET['type']) ? clean($_GET['type']) : '';
+
+$whereClauses = [];
+$params = [];
+
+if ($selectedVendorId > 0) {
+    $whereClauses[] = "po.vendor_id = ?";
+    $params[] = $selectedVendorId;
+}
+if (!empty($selectedType)) {
+    $whereClauses[] = "po.type = ?";
+    $params[] = $selectedType;
+}
+
+$whereSql = "";
+if (!empty($whereClauses)) {
+    $whereSql = "WHERE " . implode(" AND ", $whereClauses);
+}
+
+// Fetch filtered POs with attachments
+$stmt = $pdo->prepare("
+    SELECT po.*, v.name as vendor_name, u.username as creator,
+           (SELECT GROUP_CONCAT(filename SEPARATOR '||') FROM po_attachments WHERE po_id = po.id) as attachments
     FROM purchase_orders po 
     JOIN partners v ON po.vendor_id = v.id 
     LEFT JOIN users u ON po.employee_id = u.id 
+    $whereSql
     ORDER BY po.id DESC
-")->fetchAll();
+");
+$stmt->execute($params);
+$pos = $stmt->fetchAll();
+
+// Fetch all vendors for filter dropdown
+$vendorsList = $pdo->query("SELECT id, name FROM partners WHERE type = 'vendor' ORDER BY name ASC")->fetchAll();
 ?>
+
+<!-- Filter Bar -->
+<div style="background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 12px; padding: 1.25rem; margin-bottom: 1.5rem;">
+    <form method="GET" style="display: flex; flex-wrap: wrap; gap: 1rem; align-items: flex-end; margin: 0;">
+        <div style="flex: 1; min-width: 220px;">
+            <label style="display: block; font-size: 0.65rem; font-weight: 800; color: #94a3b8; text-transform: uppercase; letter-spacing: 0.05em; margin-bottom: 0.5rem;">Filter by Vendor</label>
+            <select name="vendor_id" style="width: 100%; padding: 0.6rem 0.75rem; border: 1px solid #e2e8f0; border-radius: 10px; font-size: 0.85rem; font-weight: 600; background: white; outline: none; transition: border-color 0.2s;">
+                <option value="">All Vendors</option>
+                <?php foreach ($vendorsList as $v): ?>
+                    <option value="<?php echo $v['id']; ?>" <?php echo $selectedVendorId == $v['id'] ? 'selected' : ''; ?>><?php echo htmlspecialchars($v['name']); ?></option>
+                <?php endforeach; ?>
+            </select>
+        </div>
+        <div style="flex: 1; min-width: 180px;">
+            <label style="display: block; font-size: 0.65rem; font-weight: 800; color: #94a3b8; text-transform: uppercase; letter-spacing: 0.05em; margin-bottom: 0.5rem;">Filter by Type</label>
+            <select name="type" style="width: 100%; padding: 0.6rem 0.75rem; border: 1px solid #e2e8f0; border-radius: 10px; font-size: 0.85rem; font-weight: 600; background: white; outline: none; transition: border-color 0.2s;">
+                <option value="">All Types</option>
+                <option value="rental" <?php echo $selectedType == 'rental' ? 'selected' : ''; ?>>Rental</option>
+                <option value="printing" <?php echo $selectedType == 'printing' ? 'selected' : ''; ?>>Printing</option>
+                <option value="adhoc" <?php echo $selectedType == 'adhoc' ? 'selected' : ''; ?>>Adhoc</option>
+            </select>
+        </div>
+        <div style="display: flex; gap: 0.5rem;">
+            <button type="submit" class="btn btn-primary" style="height: 42px; padding: 0 1.5rem; font-weight: 800; font-size: 0.85rem; border-radius: 10px; display: inline-flex; align-items: center; gap: 6px; box-shadow: 0 4px 12px rgba(13,148,136,0.15);">
+                <i class="fas fa-filter"></i> Filter
+            </button>
+            <?php if ($selectedVendorId > 0 || !empty($selectedType)): ?>
+                <a href="purchase_orders.php" class="btn" style="height: 42px; padding: 0 1.25rem; font-weight: 800; font-size: 0.85rem; border-radius: 10px; background: #e2e8f0; color: #475569; display: inline-flex; align-items: center; gap: 6px; text-decoration: none; border: none; justify-content: center;">
+                    <i class="fas fa-times-circle"></i> Clear
+                </a>
+            <?php endif; ?>
+        </div>
+    </form>
+</div>
 
 <div class="card">
     <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1.5rem;">
@@ -26,6 +88,9 @@ $pos = $pdo->query("
             <i class="fas fa-plus"></i> Create New PO
         </a>
     </div>
+
+    <!-- Single Hidden File Input for AJAX Uploads -->
+    <input type="file" id="po-list-upload-input" style="display: none;" onchange="handlePOUpload(this)" accept=".pdf,.png,.jpg,.jpeg">
 
     <table class="table">
         <thead>
@@ -36,6 +101,7 @@ $pos = $pdo->query("
                 <th>Date</th>
                 <th>Amount</th>
                 <th>Status</th>
+                <th>Invoice Attachments</th>
                 <th>Created By</th>
                 <th>Actions</th>
             </tr>
@@ -53,17 +119,39 @@ $pos = $pdo->query("
                         <?php echo ucfirst($p['status']); ?>
                     </span>
                 </td>
+                <td>
+                    <div style="display: flex; align-items: center; flex-wrap: wrap; gap: 4px;">
+                        <?php 
+                        if (!empty($p['attachments'])): 
+                            $files = explode('||', $p['attachments']);
+                            foreach ($files as $file):
+                                $ext = strtolower(pathinfo($file, PATHINFO_EXTENSION));
+                                $icon = 'fa-file';
+                                if (in_array($ext, ['jpg', 'jpeg', 'png'])) $icon = 'fa-file-image';
+                                if ($ext === 'pdf') $icon = 'fa-file-pdf';
+                        ?>
+                                <a href="../../uploads/pos/<?php echo urlencode($file); ?>" target="_blank" class="attachment-badge" title="<?php echo htmlspecialchars($file); ?>">
+                                    <i class="fas <?php echo $icon; ?>"></i>
+                                </a>
+                        <?php 
+                            endforeach;
+                        endif; 
+                        ?>
+                        <button class="btn-upload-row" onclick="triggerUpload(<?php echo $p['id']; ?>)" title="Upload Invoice/Scan">
+                            <i class="fas fa-cloud-upload-alt"></i> Upload
+                        </button>
+                    </div>
+                </td>
                 <td><?php echo $p['creator']; ?></td>
                 <td>
                     <a href="po_view.php?id=<?php echo $p['id']; ?>" class="btn-icon" title="View"><i class="fas fa-eye"></i></a>
-                    <button class="btn-icon" style="color: var(--primary);" title="Download PDF"><i class="fas fa-file-pdf"></i></button>
-                    <button class="btn-icon" style="color: #ef4444;" onclick="deletePO(<?php echo $p['id']; ?>)" title="Delete PO"><i class="fas fa-trash-alt"></i></button>
+                    <a href="../operations/generate_po.php?po_id=<?php echo $p['id']; ?>" target="_blank" class="btn-icon" style="color: var(--primary);" title="Download PDF"><i class="fas fa-file-pdf"></i></a>
                 </td>
             </tr>
             <?php endforeach; ?>
             <?php if (empty($pos)): ?>
             <tr>
-                <td colspan="8" style="text-align: center; padding: 2rem; color: var(--secondary);">No Purchase Orders found.</td>
+                <td colspan="9" style="text-align: center; padding: 2rem; color: var(--secondary);">No Purchase Orders found.</td>
             </tr>
             <?php endif; ?>
         </tbody>
@@ -76,34 +164,95 @@ $pos = $pdo->query("
 .status-draft { background: #f1f5f9; color: #475569; }
 .status-approved { background: #e0f2fe; color: #0369a1; }
 .status-paid { background: #dcfce7; color: #166534; }
-.btn-icon { background: none; border: none; cursor: pointer; color: var(--secondary); font-size: 1rem; padding: 0.25rem; }
+.btn-icon { background: none; border: none; cursor: pointer; color: var(--secondary); font-size: 1rem; padding: 0.25rem; margin-right: 4px; }
+.btn-icon:hover { color: var(--primary); }
+
+.attachment-badge {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 26px;
+    height: 26px;
+    border-radius: 6px;
+    background: #f1f5f9;
+    color: #475569;
+    font-size: 0.85rem;
+    transition: all 0.2s;
+}
+.attachment-badge:hover {
+    background: #e2e8f0;
+    color: var(--primary);
+    transform: translateY(-1px);
+}
+.btn-upload-row {
+    background: #f0fdf4;
+    color: #166534;
+    border: 1px dashed #bbf7d0;
+    padding: 0.25rem 0.5rem;
+    border-radius: 6px;
+    font-size: 0.75rem;
+    font-weight: 700;
+    cursor: pointer;
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    transition: all 0.2s;
+}
+.btn-upload-row:hover {
+    background: #dcfce7;
+    border-color: #86efac;
+    transform: translateY(-1px);
+}
 </style>
 
 <script>
-function deletePO(id) {
+let activeUploadPoId = null;
+
+function triggerUpload(poId) {
+    activeUploadPoId = poId;
+    document.getElementById('po-list-upload-input').click();
+}
+
+function handlePOUpload(input) {
+    if (!input.files || input.files.length === 0 || !activeUploadPoId) return;
+    
+    const file = input.files[0];
+    const formData = new FormData();
+    formData.append('po_id', activeUploadPoId);
+    formData.append('file', file);
+    
     Swal.fire({
-        title: 'Delete Purchase Order?',
-        text: "Are you sure you want to remove this PO? This cannot be undone.",
-        icon: 'warning',
-        showCancelButton: true,
-        confirmButtonColor: '#ef4444',
-        confirmButtonText: 'Yes, delete it'
-    }).then((result) => {
-        if (result.isConfirmed) {
-            fetch('../../ajax/delete_po.php', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
-                body: `id=${id}`
-            })
-            .then(r => r.json())
-            .then(res => {
-                if(res.success) {
-                    location.reload();
-                } else {
-                    Swal.fire('Error', res.message, 'error');
-                }
-            });
+        title: 'Uploading Document...',
+        text: 'Please wait while the invoice or scan is being processed.',
+        allowOutsideClick: false,
+        didOpen: () => {
+            Swal.showLoading();
         }
+    });
+
+    fetch('../../ajax/upload_po_attachment.php', {
+        method: 'POST',
+        body: formData
+    })
+    .then(r => r.json())
+    .then(res => {
+        if (res.success) {
+            Swal.fire({
+                icon: 'success',
+                title: 'Uploaded Successfully!',
+                text: 'Invoice/Scan attached to PO.',
+                timer: 1500,
+                showConfirmButton: false
+            }).then(() => {
+                location.reload();
+            });
+        } else {
+            Swal.fire('Upload Failed', res.message || 'Error occurred.', 'error');
+        }
+    })
+    .catch(err => {
+        console.error(err);
+        Swal.fire('Error', 'Network error. Please try again.', 'error');
     });
 }
 </script>

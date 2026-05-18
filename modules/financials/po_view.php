@@ -32,9 +32,12 @@ $attachments->execute([$poId]);
 $poAttachments = $attachments->fetchAll();
 ?>
 
-<div style="display: flex; justify-content: flex-end; margin-bottom: 1rem;" class="no-print">
+<div style="display: flex; justify-content: flex-end; gap: 0.75rem; margin-bottom: 1rem;" class="no-print">
+    <a href="../operations/generate_po.php?po_id=<?php echo $poId; ?>" target="_blank" class="btn btn-primary" style="background: #0d9488; border-radius: 8px; padding: 0.75rem 1.5rem; font-weight: 800; text-decoration: none; display: inline-flex; align-items: center; gap: 6px;">
+        <i class="fas fa-file-pdf"></i> Professional PDF
+    </a>
     <button onclick="window.print()" class="btn btn-primary" style="background: #0f172a; border-radius: 8px; padding: 0.75rem 1.5rem; font-weight: 800;">
-        <i class="fas fa-print"></i> PRINT PURCHASE ORDER
+        <i class="fas fa-print"></i> PRINT PAGE
     </button>
 </div>
 
