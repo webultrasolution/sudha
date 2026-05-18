@@ -136,7 +136,7 @@ $indian_states = ["Andhra Pradesh", "Arunachal Pradesh", "Assam", "Bihar", "Chha
                     </span>
                 </td>
                 <td style="text-align: right; white-space: nowrap;">
-                    <a href="../financials/client_ledger.php?client_id=<?php echo $c['id']; ?>" class="btn-icon btn-ledger" title="View Ledger"><i class="fas fa-book"></i></a>
+                    <a href="../financials/partner_ledger.php?partner_id=<?php echo $c['id']; ?>" class="btn-icon btn-ledger" title="View Ledger"><i class="fas fa-book"></i></a>
                     <button class="btn-icon btn-edit" onclick="editClient(<?php echo htmlspecialchars(json_encode($c)); ?>)" title="Edit"><i class="fas fa-edit"></i></button>
                     <button class="btn-icon btn-delete" onclick="deleteClient(<?php echo $c['id']; ?>)" title="Delete"><i class="fas fa-trash"></i></button>
                 </td>

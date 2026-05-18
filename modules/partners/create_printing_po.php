@@ -160,13 +160,23 @@ include_once __DIR__ . '/../../includes/header.php';
                                             </div>
                                         </div>
                                         
-                                        <!-- Availability -->
                                         <div style="display: flex; align-items: center; gap: 0.75rem;">
                                             <label style="font-size: 0.55rem; font-weight: 800; color: #475569; margin: 0; text-transform: uppercase; letter-spacing: 0.025em;">Availability:</label>
                                             <div style="display: flex; gap: 0.75rem;">
                                                 <label style="font-size: 0.65rem; font-weight: 600; display: flex; align-items: center; gap: 4px; cursor: pointer; color: #1e293b; margin: 0;"><input type="radio" name="availability" value="available" checked onchange="filterSitesInModal()" style="width: 12px; height: 12px; accent-color: #0d9488; cursor: pointer;"> Available</label>
                                                 <label style="font-size: 0.65rem; font-weight: 600; display: flex; align-items: center; gap: 4px; cursor: pointer; color: #1e293b; margin: 0;"><input type="radio" name="availability" value="all" onchange="filterSitesInModal()" style="width: 12px; height: 12px; accent-color: #0d9488; cursor: pointer;"> All</label>
                                             </div>
+                                        </div>
+                                        
+                                        <!-- Vendor Dropdown (Hidden by default) -->
+                                        <div id="vendor_filter_group" style="display: none; align-items: center; gap: 0.75rem;">
+                                            <label style="font-size: 0.55rem; font-weight: 800; color: #475569; margin: 0; text-transform: uppercase; letter-spacing: 0.025em;">Vendor:</label>
+                                            <select id="filter_vendor" onchange="filterSitesInModal()" style="padding: 2px 8px; font-size: 0.7rem; border: 1px solid #e2e8f0; border-radius: 4px; background: #fff; font-weight: 600; height: 22px;">
+                                                <option value="">All Vendors</option>
+                                                <?php foreach ($vendors as $v): ?>
+                                                    <option value="<?php echo $v['id']; ?>"><?php echo htmlspecialchars($v['name']); ?></option>
+                                                <?php endforeach; ?>
+                                            </select>
                                         </div>
                                     </div>
                                     
@@ -428,6 +438,12 @@ function filterSitesInModal() {
     const ownershipEl = document.querySelector('input[name="ownership"]:checked');
     const ownership = ownershipEl ? ownershipEl.value : 'all';
     
+    const vendorGroup = document.getElementById('vendor_filter_group');
+    if (vendorGroup) {
+        vendorGroup.style.display = (ownership === 'TA') ? 'flex' : 'none';
+        if (ownership !== 'TA') document.getElementById('filter_vendor').value = '';
+    }
+    
     const availabilityEl = document.querySelector('input[name="availability"]:checked');
     const availability = availabilityEl ? availabilityEl.value : 'all';
     
@@ -437,6 +453,7 @@ function filterSitesInModal() {
     const city = document.getElementById('filter_city').value;
     const light = document.getElementById('filter_light').value;
     const size = document.getElementById('filter_size').value;
+    const vendorId = document.getElementById('filter_vendor') ? document.getElementById('filter_vendor').value : '';
     
     let visibleCount = 0;
     
@@ -450,6 +467,7 @@ function filterSitesInModal() {
         const itemOwner = item.dataset.owner || '';
         const itemStatus = item.dataset.status || '';
         const itemSize = item.dataset.size || '';
+        const itemVendor = item.dataset.vendorId || '';
         
         const matchesSearch = !q || 
             itemCode.includes(q) || 
@@ -466,8 +484,9 @@ function filterSitesInModal() {
         const matchesCity = !city || itemCity.toLowerCase() === city.toLowerCase();
         const matchesLight = !light || itemIllum === light;
         const matchesSize = !size || itemSize === size;
+        const matchesVendor = !vendorId || itemVendor == vendorId;
         
-        if (matchesSearch && matchesOwnership && matchesAvailability && matchesMedia && matchesState && matchesCity && matchesLight && matchesSize) {
+        if (matchesSearch && matchesOwnership && matchesVendor && matchesAvailability && matchesMedia && matchesState && matchesCity && matchesLight && matchesSize) {
             item.style.display = 'flex';
             visibleCount++;
         } else {
@@ -497,6 +516,7 @@ function resetFilters() {
     document.getElementById('filter_city').value = '';
     document.getElementById('filter_light').value = '';
     document.getElementById('filter_size').value = '';
+    if (document.getElementById('filter_vendor')) document.getElementById('filter_vendor').value = '';
     
     filterSitesInModal();
 }

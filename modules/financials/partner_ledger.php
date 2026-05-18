@@ -5,7 +5,7 @@ include_once __DIR__ . '/../../config/db.php';
 include_once __DIR__ . '/../../includes/functions.php';
 include_once __DIR__ . '/../../includes/header.php';
 
-$partner_id = isset($_GET['client_id']) ? intval($_GET['client_id']) : 0;
+$partner_id = isset($_GET['partner_id']) ? intval($_GET['partner_id']) : (isset($_GET['client_id']) ? intval($_GET['client_id']) : 0);
 
 if (!$partner_id) {
     echo "<div class='card'>Invalid Partner ID.</div>";
