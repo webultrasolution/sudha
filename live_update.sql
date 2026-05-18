@@ -37,8 +37,11 @@ ALTER TABLE proposals ADD COLUMN IF NOT EXISTS total_sqft FLOAT DEFAULT 0;
 ALTER TABLE proposals ADD COLUMN IF NOT EXISTS price_per_sqft DECIMAL(15,2) DEFAULT 0.00;
 ALTER TABLE proposals ADD COLUMN IF NOT EXISTS display_cost DECIMAL(15,2) DEFAULT 0.00;
 
--- 4. Update purchase_orders table (Ensure total_amount exists)
+-- 4. Update purchase_orders & bookings table
 ALTER TABLE purchase_orders ADD COLUMN IF NOT EXISTS total_amount DECIMAL(15,2) DEFAULT 0.00 AFTER igst_amount;
+
+ALTER TABLE bookings ADD COLUMN IF NOT EXISTS printing_cost DECIMAL(15,2) DEFAULT 0.00 AFTER grand_total;
+ALTER TABLE bookings ADD COLUMN IF NOT EXISTS mounting_cost DECIMAL(15,2) DEFAULT 0.00 AFTER printing_cost;
 
 -- 5. Create missing tables if they don't exist
 CREATE TABLE IF NOT EXISTS activity_log (
