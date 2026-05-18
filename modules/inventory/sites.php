@@ -104,7 +104,8 @@ if ($mediaFilter !== 'all') {
     $where .= " AND s.type = ?";
     $params[] = $mediaFilter;
 }
-if (!empty($search)) {
+if (!empty($_GET['search'])) {
+    $search = $_GET['search'];
     $where .= " AND (s.site_code LIKE ? OR s.name LIKE ? OR s.location LIKE ? OR s.city LIKE ?)";
     $searchParam = "%$search%";
     $params[] = $searchParam;
@@ -112,14 +113,39 @@ if (!empty($search)) {
     $params[] = $searchParam;
     $params[] = $searchParam;
 }
-if (!empty($_GET['from'])) {
-    $where .= " AND s.available_from <= ?";
-    $params[] = $_GET['from'];
+if (!empty($_GET['availability']) && $_GET['availability'] === 'available') {
+    $where .= " AND s.status = 'available'";
 }
-if (!empty($_GET['to'])) {
-    // Basic logic: if we need it by 'to', it must be available before that date
-    // You might want more complex logic depending on booking overlaps
+if (!empty($_GET['owner']) && $_GET['owner'] !== 'all') {
+    $where .= " AND s.owner_type = ?";
+    $params[] = $_GET['owner'];
 }
+if (!empty($_GET['state'])) {
+    $where .= " AND s.state = ?";
+    $params[] = $_GET['state'];
+}
+if (!empty($_GET['city'])) {
+    $where .= " AND s.city = ?";
+    $params[] = $_GET['city'];
+}
+if (!empty($_GET['light'])) {
+    $where .= " AND s.light_type = ?";
+    $params[] = $_GET['light'];
+}
+if (!empty($_GET['size'])) {
+    $where .= " AND CONCAT(s.width, 'x', s.height) = ?";
+    $params[] = $_GET['size'];
+}
+
+// Query unique values for filters
+$states = $pdo->query("SELECT DISTINCT state FROM sites WHERE state IS NOT NULL AND state != '' ORDER BY state")->fetchAll(PDO::FETCH_COLUMN);
+$cities = $pdo->query("SELECT DISTINCT city FROM sites WHERE city IS NOT NULL AND city != '' ORDER BY city")->fetchAll(PDO::FETCH_COLUMN);
+$light_types = $pdo->query("SELECT DISTINCT light_type FROM sites WHERE light_type IS NOT NULL AND light_type != '' ORDER BY light_type")->fetchAll(PDO::FETCH_COLUMN);
+$sizes = $pdo->query("SELECT DISTINCT CONCAT(width, 'x', height) as size FROM sites WHERE width > 0 AND height > 0 ORDER BY size")->fetchAll(PDO::FETCH_COLUMN);
+$media_types = $pdo->query("SELECT DISTINCT type FROM sites WHERE type IS NOT NULL AND type != '' ORDER BY type")->fetchAll(PDO::FETCH_COLUMN);
+
+// 
+
 
 // Counts for Tabs
 $counts = [
@@ -147,30 +173,83 @@ $vendors = $pdo->query("SELECT id, name FROM partners WHERE type = 'vendor' ORDE
 </div>
 
 <div class="card">
-    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1.5rem; flex-wrap: wrap; gap: 1rem;">
-        <div style="display: flex; gap: 0.75rem; align-items: center; flex-wrap: wrap;">
-            <div class="search-group" style="position: relative;">
-                <i class="fas fa-search" style="position: absolute; left: 12px; top: 50%; transform: translateY(-50%); color: #94a3b8;"></i>
-                <input type="text" id="site-search" placeholder="Search ID, Location, City..." class="p-input" value="<?php echo $search; ?>" style="width: 250px; padding-left: 35px;">
+    <div style="display: flex; justify-content: flex-end; gap: 1rem; margin-bottom: 1rem;">
+        <button class="btn btn-secondary" onclick="openImportModal()" style="background: #f1f5f9; color: #475569; border: 1px solid #e2e8f0;">
+            <i class="fas fa-file-import"></i> Bulk Import
+        </button>
+        <button class="btn btn-primary" onclick="openModal()">
+            <i class="fas fa-plus"></i> Add New Site
+        </button>
+    </div>
+
+    <div style="background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 12px; padding: 1.25rem; margin-bottom: 1.5rem;">
+        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1rem; border-bottom: 1px solid #e2e8f0; padding-bottom: 0.75rem;">
+            <div style="display: flex; align-items: center; gap: 2rem;">
+                <div style="display: flex; align-items: center; gap: 0.5rem; color: #0d9488; font-weight: 800; font-size: 0.85rem; letter-spacing: 0.5px;">
+                    <i class="fas fa-filter"></i> FILTERS
+                </div>
+                
+                <div style="display: flex; align-items: center; gap: 0.75rem; font-size: 0.8rem; font-weight: 700; color: #475569;">
+                    <span style="text-transform: uppercase; font-size: 0.75rem;">Ownership:</span>
+                    <label style="display: flex; align-items: center; gap: 0.25rem; cursor: pointer; color: #0f172a;"><input type="radio" name="owner" value="all" <?php echo empty($_GET['owner']) || $_GET['owner'] === 'all' ? 'checked' : ''; ?> onchange="doSearch()"> All</label>
+                    <label style="display: flex; align-items: center; gap: 0.25rem; cursor: pointer; color: #0f172a;"><input type="radio" name="owner" value="HA" <?php echo ($_GET['owner'] ?? '') === 'HA' ? 'checked' : ''; ?> onchange="doSearch()"> Self</label>
+                    <label style="display: flex; align-items: center; gap: 0.25rem; cursor: pointer; color: #0f172a;"><input type="radio" name="owner" value="TA" <?php echo ($_GET['owner'] ?? '') === 'TA' ? 'checked' : ''; ?> onchange="doSearch()"> Vendor</label>
+                </div>
+                
+                <div style="display: flex; align-items: center; gap: 0.75rem; font-size: 0.8rem; font-weight: 700; color: #475569;">
+                    <span style="text-transform: uppercase; font-size: 0.75rem;">Availability:</span>
+                    <label style="display: flex; align-items: center; gap: 0.25rem; cursor: pointer; color: #0f172a;"><input type="radio" name="availability" value="available" <?php echo ($_GET['availability'] ?? '') === 'available' ? 'checked' : ''; ?> onchange="doSearch()"> Available</label>
+                    <label style="display: flex; align-items: center; gap: 0.25rem; cursor: pointer; color: #0f172a;"><input type="radio" name="availability" value="all" <?php echo empty($_GET['availability']) || $_GET['availability'] === 'all' ? 'checked' : ''; ?> onchange="doSearch()"> All</label>
+                </div>
             </div>
             
-            <div style="display: flex; align-items: center; gap: 0.5rem; background: #fff; padding: 2px 10px; border: 1px solid #cbd5e1; border-radius: 8px;">
-                <span style="font-size: 0.7rem; font-weight: 700; color: #64748b; text-transform: uppercase;">Available Between:</span>
-                <input type="date" id="filter-from" class="p-input" style="border:none; width: 130px; font-size: 0.8rem;" value="<?php echo $_GET['from'] ?? ''; ?>">
-                <span style="color: #cbd5e1;">-</span>
-                <input type="date" id="filter-to" class="p-input" style="border:none; width: 130px; font-size: 0.8rem;" value="<?php echo $_GET['to'] ?? ''; ?>">
+            <div>
+                <button onclick="window.location.href='sites.php'" style="background: none; border: none; color: #ef4444; font-weight: 700; font-size: 0.8rem; cursor: pointer; display: flex; align-items: center; gap: 0.4rem; text-transform: uppercase;">
+                    <i class="fas fa-undo"></i> Reset
+                </button>
             </div>
-
-            <button class="btn btn-primary" onclick="doSearch()" style="padding: 0.6rem 1.5rem;"><i class="fas fa-filter"></i> Apply Filters</button>
-            <button class="btn" onclick="window.location.href='sites.php'" style="background: #f1f5f9; color: #475569;"><i class="fas fa-sync-alt"></i></button>
         </div>
-        <div style="display: flex; gap: 1rem;">
-            <button class="btn btn-secondary" onclick="openImportModal()" style="background: #f1f5f9; color: #475569; border: 1px solid #e2e8f0;">
-                <i class="fas fa-file-import"></i> Bulk Import
-            </button>
-            <button class="btn btn-primary" onclick="openModal()">
-                <i class="fas fa-plus"></i> Add New Site
-            </button>
+        
+        <div style="display: grid; grid-template-columns: 2fr 1fr 1fr 1fr 1fr 1fr; gap: 0.75rem;">
+            <div class="search-group" style="position: relative;">
+                <i class="fas fa-search" style="position: absolute; left: 12px; top: 50%; transform: translateY(-50%); color: #94a3b8;"></i>
+                <input type="text" id="site-search" placeholder="Search by name, code, city..." value="<?php echo htmlspecialchars($search); ?>" style="width: 100%; padding: 0.5rem 0.5rem 0.5rem 35px; border: 1px solid #cbd5e1; border-radius: 6px; font-size: 0.85rem;" onkeypress="if(event.key === 'Enter') doSearch()">
+            </div>
+            
+            <select id="filter-media" style="width: 100%; padding: 0.5rem; border: 1px solid #cbd5e1; border-radius: 6px; font-size: 0.85rem; font-weight: 600; color: #0f172a;" onchange="doSearch()">
+                <option value="all">All Media</option>
+                <?php foreach ($media_types as $m): ?>
+                    <option value="<?php echo htmlspecialchars($m); ?>" <?php echo $mediaFilter === $m ? 'selected' : ''; ?>><?php echo htmlspecialchars($m); ?></option>
+                <?php endforeach; ?>
+            </select>
+            
+            <select id="filter-state" style="width: 100%; padding: 0.5rem; border: 1px solid #cbd5e1; border-radius: 6px; font-size: 0.85rem; font-weight: 600; color: #0f172a;" onchange="doSearch()">
+                <option value="">All States</option>
+                <?php foreach ($states as $st): ?>
+                    <option value="<?php echo htmlspecialchars($st); ?>" <?php echo ($_GET['state'] ?? '') === $st ? 'selected' : ''; ?>><?php echo htmlspecialchars($st); ?></option>
+                <?php endforeach; ?>
+            </select>
+            
+            <select id="filter-city" style="width: 100%; padding: 0.5rem; border: 1px solid #cbd5e1; border-radius: 6px; font-size: 0.85rem; font-weight: 600; color: #0f172a;" onchange="doSearch()">
+                <option value="">All Cities</option>
+                <?php foreach ($cities as $c): ?>
+                    <option value="<?php echo htmlspecialchars($c); ?>" <?php echo ($_GET['city'] ?? '') === $c ? 'selected' : ''; ?>><?php echo htmlspecialchars($c); ?></option>
+                <?php endforeach; ?>
+            </select>
+            
+            <select id="filter-light" style="width: 100%; padding: 0.5rem; border: 1px solid #cbd5e1; border-radius: 6px; font-size: 0.85rem; font-weight: 600; color: #0f172a;" onchange="doSearch()">
+                <option value="">All Lights</option>
+                <?php foreach ($light_types as $lt): ?>
+                    <option value="<?php echo htmlspecialchars($lt); ?>" <?php echo ($_GET['light'] ?? '') === $lt ? 'selected' : ''; ?>><?php echo htmlspecialchars($lt); ?></option>
+                <?php endforeach; ?>
+            </select>
+            
+            <select id="filter-size" style="width: 100%; padding: 0.5rem; border: 1px solid #cbd5e1; border-radius: 6px; font-size: 0.85rem; font-weight: 600; color: #0f172a;" onchange="doSearch()">
+                <option value="">All Sizes</option>
+                <?php foreach ($sizes as $sz): ?>
+                    <option value="<?php echo htmlspecialchars($sz); ?>" <?php echo ($_GET['size'] ?? '') === $sz ? 'selected' : ''; ?>><?php echo htmlspecialchars($sz); ?></option>
+                <?php endforeach; ?>
+            </select>
         </div>
     </div>
 
@@ -524,9 +603,15 @@ let pendingFiles = []; // Global to store all selected files for upload
 
 function doSearch() {
     const s = document.getElementById('site-search').value;
-    const from = document.getElementById('filter-from').value;
-    const to = document.getElementById('filter-to').value;
-    window.location.href = `?media=<?php echo $mediaFilter; ?>&search=${encodeURIComponent(s)}&from=${from}&to=${to}`;
+    const owner = document.querySelector('input[name="owner"]:checked')?.value || 'all';
+    const availability = document.querySelector('input[name="availability"]:checked')?.value || 'all';
+    const media = document.getElementById('filter-media').value;
+    const state = document.getElementById('filter-state').value;
+    const city = document.getElementById('filter-city').value;
+    const light = document.getElementById('filter-light').value;
+    const size = document.getElementById('filter-size').value;
+    
+    window.location.href = `?search=${encodeURIComponent(s)}&owner=${encodeURIComponent(owner)}&availability=${encodeURIComponent(availability)}&media=${encodeURIComponent(media)}&state=${encodeURIComponent(state)}&city=${encodeURIComponent(city)}&light=${encodeURIComponent(light)}&size=${encodeURIComponent(size)}`;
 }
 function openModal() { 
     const form = document.getElementById('siteForm');
