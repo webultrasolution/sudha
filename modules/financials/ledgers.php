@@ -27,8 +27,12 @@ $partners = $stmt->fetchAll();
     </a>
 </div>
 
+<div style="margin-bottom: 1rem; display: flex; justify-content: flex-end;">
+    <input type="text" id="ledgerSearch" placeholder="Search partners..." style="padding: 0.6rem 1rem; border-radius: 8px; border: 1px solid #e2e8f0; width: 300px; font-size: 0.9rem;" onkeyup="filterLedger()">
+</div>
+
 <div class="card" style="padding: 0; overflow: hidden; border-radius: 12px; border: 1px solid #e2e8f0; box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1);">
-    <table class="table" style="margin: 0; width: 100%; border-collapse: collapse;">
+    <table class="table" id="ledgerTable" style="margin: 0; width: 100%; border-collapse: collapse;">
         <thead>
             <tr style="background: #f8fafc; border-bottom: 2px solid #e2e8f0;">
                 <th style="padding: 1rem; text-align: left; font-size: 0.75rem; text-transform: uppercase; color: #64748b; font-weight: 800;">Name</th>
@@ -65,7 +69,7 @@ $partners = $stmt->fetchAll();
 
                 $balance = $totalBilled - $totalPaid;
             ?>
-            <tr style="background: #fff; border-bottom: 1px solid #f1f5f9; hover: background: #f8fafc;">
+            <tr class="ledger-row" style="background: #fff; border-bottom: 1px solid #f1f5f9;">
                 <td style="padding: 1rem;">
                     <div style="font-weight: 700; color: #0f172a;"><?php echo $p['name']; ?></div>
                     <div style="font-size: 0.7rem; color: #94a3b8; font-family: monospace;"><?php echo $p['gstin'] ?: 'NO-GST'; ?></div>
@@ -77,7 +81,7 @@ $partners = $stmt->fetchAll();
                     <?php echo formatCurrency(abs($balance)); ?> <?php echo $balance > 0 ? ($type == 'client' ? 'DUE' : 'PAYABLE') : 'ADV'; ?>
                 </td>
                 <td style="padding: 1rem; text-align: right;">
-                    <a href="client_ledger.php?client_id=<?php echo $p['id']; ?>" class="btn-sm" style="text-decoration: none; background: #0f172a; color: white; padding: 0.5rem 1rem; border-radius: 8px; font-size: 0.7rem; font-weight: 700;">
+                    <a href="partner_ledger.php?partner_id=<?php echo $p['id']; ?>" class="btn-sm" style="text-decoration: none; background: #0f172a; color: white; padding: 0.5rem 1rem; border-radius: 8px; font-size: 0.7rem; font-weight: 700;">
                         OPEN STATEMENT
                     </a>
                 </td>
@@ -91,5 +95,33 @@ $partners = $stmt->fetchAll();
         </tbody>
     </table>
 </div>
+
+<style>
+.ledger-row:hover { background: #f8fafc !important; }
+</style>
+
+<script>
+function filterLedger() {
+    const input = document.getElementById('ledgerSearch');
+    const filter = input.value.toLowerCase();
+    const table = document.getElementById('ledgerTable');
+    const tr = table.getElementsByTagName('tr');
+
+    for (let i = 1; i < tr.length; i++) { // Skip header
+        if (tr[i].getElementsByTagName('td').length === 1 && tr[i].getElementsByTagName('td')[0].colSpan === 6) continue; // Skip "No records found"
+        
+        const td = tr[i].getElementsByTagName('td');
+        let txtValue = "";
+        for (let j = 0; j < td.length; j++) {
+            txtValue += td[j].textContent || td[j].innerText;
+        }
+        if (txtValue.toLowerCase().indexOf(filter) > -1) {
+            tr[i].style.display = "";
+        } else {
+            tr[i].style.display = "none";
+        }
+    }
+}
+</script>
 
 <?php include_once __DIR__ . '/../../includes/footer.php'; ?>
