@@ -66,6 +66,11 @@ $haMargin = $haSale - $haCost;
 $totalMargin = $taMargin + $haMargin;
 
 $grandTotal = $b['grand_total'];
+
+// Check if Final Tax Invoice already exists — locks cost editing
+$stmtInvCheck = $pdo->prepare("SELECT id FROM invoices WHERE booking_id = ? AND type = 'tax' LIMIT 1");
+$stmtInvCheck->execute([$id]);
+$invoiceFinalized = (bool) $stmtInvCheck->fetchColumn();
 ?>
 
 <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 2rem;">
@@ -200,7 +205,7 @@ $stmtCheckPO = $pdo->prepare("SELECT id FROM purchase_orders WHERE campaign_id =
             <?php 
                 $itemMargin = $item['amount'] - ($item['purchase_amount'] ?? 0);
                 $marginPct = ($item['purchase_amount'] > 0) ? ($itemMargin / $item['purchase_amount'] * 100) : 0;
-                // Check if PO is already saved for this site on this booking
+                // Check PO existence for this vendor on this booking
                 $stmtCheckPO->execute([$b['id'], $item['vendor_id']]);
                 $existingPoId = $stmtCheckPO->fetchColumn();
                 $poLocked = !empty($existingPoId);
@@ -265,12 +270,14 @@ $stmtCheckPO = $pdo->prepare("SELECT id FROM purchase_orders WHERE campaign_id =
                         <?php if (($item['purchase_amount'] ?? 0) > 0): ?>
                             <div style="margin-bottom: 0.5rem;">
                                 <span style="font-size: 0.65rem; font-weight: 800; color: #94a3b8; text-transform: uppercase; display: block; margin-bottom: 2px;">Purchase Cost</span>
-                                <?php if ($poLocked): ?>
-                                    <div style="display: inline-flex; align-items: center; gap: 0.4rem; background: #f1f5f9; border: 1px solid #cbd5e1; border-radius: 4px; padding: 3px 8px;">
+                                <?php if ($invoiceFinalized): ?>
+                                    <!-- Locked after Final Invoice -->
+                                    <div style="display: inline-flex; align-items: center; gap: 0.4rem; background: #f1f5f9; border: 1px solid #cbd5e1; border-radius: 4px; padding: 3px 8px;" title="Locked: Final invoice has been generated">
                                         <i class="fas fa-lock" style="font-size: 0.6rem; color: #94a3b8;"></i>
                                         <span style="font-weight: 800; color: #334155; font-size: 0.9rem;"><?php echo number_format(floatval($item['purchase_amount']), 2); ?></span>
                                     </div>
                                 <?php else: ?>
+                                    <!-- Always editable before invoice -->
                                     <input type="number" step="0.01" value="<?php echo floatval($item['purchase_amount'] ?? 0); ?>" 
                                            onchange="updatePurchaseCost(<?php echo $item['id']; ?>, this.value)"
                                            style="width: 100px; font-weight: 700; color: #475569; font-size: 0.9rem; border: 1px solid #e2e8f0; border-radius: 4px; padding: 2px 5px; outline: none;"

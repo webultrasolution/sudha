@@ -120,21 +120,7 @@ if ($export === 'csv') {
                 ''
             ]
         ];
-        
-        if (floatval($inv['purchase_amount']) > 0) {
-            $ledger[] = [
-                'date' => strtotime($inv['created_at']),
-                'row' => [
-                    date('d-M-Y', strtotime($inv['created_at'])),
-                    'BK-' . str_pad($inv['booking_id'], 4, '0', STR_PAD_LEFT),
-                    'Expense',
-                    $site['vendor_name'] ?: 'Vendor',
-                    'Direct Booking Cost: ' . date('d/m/y', strtotime($inv['start_date'])) . ' - ' . date('d/m/y', strtotime($inv['end_date'])),
-                    '',
-                    number_format($inv['purchase_amount'], 2)
-                ]
-            ];
-        }
+        // Direct booking cost rows intentionally excluded — only POs shown as expenses
     }
     foreach ($pos as $po) {
         $ledger[] = [
