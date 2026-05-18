@@ -55,7 +55,7 @@ $activeEntity = getActiveEntity();
                     <li><a href="<?php echo BASE_URL; ?>modules/proposals/proposals.php" class="<?php echo $activePage == 'proposals' ? 'active-sub' : ''; ?>"><i class="fas fa-file-contract"></i> Sales / Proposals</a></li>
                     <li><a href="<?php echo BASE_URL; ?>modules/operations/bookings.php" class="<?php echo $activePage == 'bookings' ? 'active-sub' : ''; ?>"><i class="fas fa-calendar-check"></i> Bookings</a></li>
                     <li><a href="<?php echo BASE_URL; ?>modules/partners/printing_rates.php" class="<?php echo $activePage == 'printing_rates' ? 'active-sub' : ''; ?>"><i class="fas fa-print"></i> Printing PO</a></li>
-                    <li><a href="<?php echo BASE_URL; ?>modules/partners/client_printing_rates.php" class="<?php echo $activePage == 'client_printing_rates' ? 'active-sub' : ''; ?>"><i class="fas fa-file-invoice"></i> Client Printing PO</a></li>
+                    <li><a href="<?php echo BASE_URL; ?>modules/partners/client_printing_rates.php" class="<?php echo $activePage == 'client_printing_rates' ? 'active-sub' : ''; ?>"><i class="fas fa-file-invoice"></i> Client Printing Invoice</a></li>
                     <!-- <li><a href="<?php echo BASE_URL; ?>modules/operations/client_printing.php" class="<?php echo $activePage == 'client_printing' ? 'active-sub' : ''; ?>"><i class="fas fa-print"></i> Client Printing Sheet</a></li> -->
                 </ul>
             </li>
