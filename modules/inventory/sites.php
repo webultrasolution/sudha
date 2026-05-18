@@ -120,6 +120,10 @@ if (!empty($_GET['owner']) && $_GET['owner'] !== 'all') {
     $where .= " AND s.owner_type = ?";
     $params[] = $_GET['owner'];
 }
+if (!empty($_GET['vendor_id'])) {
+    $where .= " AND s.vendor_id = ?";
+    $params[] = $_GET['vendor_id'];
+}
 if (!empty($_GET['state'])) {
     $where .= " AND s.state = ?";
     $params[] = $_GET['state'];
@@ -133,8 +137,16 @@ if (!empty($_GET['light'])) {
     $params[] = $_GET['light'];
 }
 if (!empty($_GET['size'])) {
-    $where .= " AND CONCAT(s.width, 'x', s.height) = ?";
-    $params[] = $_GET['size'];
+    $parts = explode('x', strtolower($_GET['size']));
+    if (count($parts) === 2) {
+        $where .= " AND s.width = ? AND s.height = ?";
+        $params[] = floatval(trim($parts[0]));
+        $params[] = floatval(trim($parts[1]));
+    } else {
+        // Fallback just in case
+        $where .= " AND CONCAT(s.width, 'x', s.height) COLLATE utf8mb4_unicode_ci = ? COLLATE utf8mb4_unicode_ci";
+        $params[] = $_GET['size'];
+    }
 }
 
 // Query unique values for filters
@@ -191,9 +203,16 @@ $vendors = $pdo->query("SELECT id, name FROM partners WHERE type = 'vendor' ORDE
                 
                 <div style="display: flex; align-items: center; gap: 0.75rem; font-size: 0.8rem; font-weight: 700; color: #475569;">
                     <span style="text-transform: uppercase; font-size: 0.75rem;">Ownership:</span>
-                    <label style="display: flex; align-items: center; gap: 0.25rem; cursor: pointer; color: #0f172a;"><input type="radio" name="owner" value="all" <?php echo empty($_GET['owner']) || $_GET['owner'] === 'all' ? 'checked' : ''; ?> onchange="doSearch()"> All</label>
-                    <label style="display: flex; align-items: center; gap: 0.25rem; cursor: pointer; color: #0f172a;"><input type="radio" name="owner" value="HA" <?php echo ($_GET['owner'] ?? '') === 'HA' ? 'checked' : ''; ?> onchange="doSearch()"> Self</label>
-                    <label style="display: flex; align-items: center; gap: 0.25rem; cursor: pointer; color: #0f172a;"><input type="radio" name="owner" value="TA" <?php echo ($_GET['owner'] ?? '') === 'TA' ? 'checked' : ''; ?> onchange="doSearch()"> Vendor</label>
+                    <label style="display: flex; align-items: center; gap: 0.25rem; cursor: pointer; color: #0f172a;"><input type="radio" name="owner" value="all" <?php echo empty($_GET['owner']) || $_GET['owner'] === 'all' ? 'checked' : ''; ?> onchange="toggleVendorFilter(); doSearch();"> All</label>
+                    <label style="display: flex; align-items: center; gap: 0.25rem; cursor: pointer; color: #0f172a;"><input type="radio" name="owner" value="HA" <?php echo ($_GET['owner'] ?? '') === 'HA' ? 'checked' : ''; ?> onchange="toggleVendorFilter(); doSearch();"> Self</label>
+                    <label style="display: flex; align-items: center; gap: 0.25rem; cursor: pointer; color: #0f172a;"><input type="radio" name="owner" id="vendor-radio" value="TA" <?php echo ($_GET['owner'] ?? '') === 'TA' ? 'checked' : ''; ?> onchange="toggleVendorFilter(); doSearch();"> Vendor</label>
+                    
+                    <select id="filter-vendor" style="display: <?php echo ($_GET['owner'] ?? '') === 'TA' ? 'block' : 'none'; ?>; padding: 0.25rem 0.5rem; border: 1px solid #cbd5e1; border-radius: 4px; font-size: 0.75rem; font-weight: 600; color: #0f172a; margin-left: 0.5rem; width: 140px;" onchange="doSearch()">
+                        <option value="">All Vendors</option>
+                        <?php foreach ($vendors as $v): ?>
+                            <option value="<?php echo $v['id']; ?>" <?php echo ($_GET['vendor_id'] ?? '') == $v['id'] ? 'selected' : ''; ?>><?php echo htmlspecialchars($v['name']); ?></option>
+                        <?php endforeach; ?>
+                    </select>
                 </div>
                 
                 <div style="display: flex; align-items: center; gap: 0.75rem; font-size: 0.8rem; font-weight: 700; color: #475569;">
@@ -212,8 +231,8 @@ $vendors = $pdo->query("SELECT id, name FROM partners WHERE type = 'vendor' ORDE
         
         <div style="display: grid; grid-template-columns: 2fr 1fr 1fr 1fr 1fr 1fr; gap: 0.75rem;">
             <div class="search-group" style="position: relative;">
-                <i class="fas fa-search" style="position: absolute; left: 12px; top: 50%; transform: translateY(-50%); color: #94a3b8;"></i>
-                <input type="text" id="site-search" placeholder="Search by name, code, city..." value="<?php echo htmlspecialchars($search); ?>" style="width: 100%; padding: 0.5rem 0.5rem 0.5rem 35px; border: 1px solid #cbd5e1; border-radius: 6px; font-size: 0.85rem;" onkeypress="if(event.key === 'Enter') doSearch()">
+                <i class="fas fa-search" style="position: absolute; left: 12px; top: 50%; transform: translateY(-50%); color: #94a3b8; cursor: pointer;" onclick="doSearch()"></i>
+                <input type="text" id="site-search" placeholder="Search by name, code, city..." value="<?php echo htmlspecialchars($search); ?>" style="width: 100%; padding: 0.5rem 0.5rem 0.5rem 35px; border: 1px solid #cbd5e1; border-radius: 6px; font-size: 0.85rem;" onkeypress="if(event.key === 'Enter') doSearch()" onchange="doSearch()">
             </div>
             
             <select id="filter-media" style="width: 100%; padding: 0.5rem; border: 1px solid #cbd5e1; border-radius: 6px; font-size: 0.85rem; font-weight: 600; color: #0f172a;" onchange="doSearch()">
@@ -601,9 +620,17 @@ let currentLbIndex = 0;
 let lbImages = [];
 let pendingFiles = []; // Global to store all selected files for upload
 
+function toggleVendorFilter() {
+    const isVendor = document.getElementById('vendor-radio').checked;
+    const vendorSelect = document.getElementById('filter-vendor');
+    vendorSelect.style.display = isVendor ? 'block' : 'none';
+    if(!isVendor) vendorSelect.value = '';
+}
+
 function doSearch() {
     const s = document.getElementById('site-search').value;
     const owner = document.querySelector('input[name="owner"]:checked')?.value || 'all';
+    const vendor_id = document.getElementById('filter-vendor').value;
     const availability = document.querySelector('input[name="availability"]:checked')?.value || 'all';
     const media = document.getElementById('filter-media').value;
     const state = document.getElementById('filter-state').value;
@@ -611,8 +638,21 @@ function doSearch() {
     const light = document.getElementById('filter-light').value;
     const size = document.getElementById('filter-size').value;
     
-    window.location.href = `?search=${encodeURIComponent(s)}&owner=${encodeURIComponent(owner)}&availability=${encodeURIComponent(availability)}&media=${encodeURIComponent(media)}&state=${encodeURIComponent(state)}&city=${encodeURIComponent(city)}&light=${encodeURIComponent(light)}&size=${encodeURIComponent(size)}`;
+    window.location.href = `?search=${encodeURIComponent(s)}&owner=${encodeURIComponent(owner)}&vendor_id=${encodeURIComponent(vendor_id)}&availability=${encodeURIComponent(availability)}&media=${encodeURIComponent(media)}&state=${encodeURIComponent(state)}&city=${encodeURIComponent(city)}&light=${encodeURIComponent(light)}&size=${encodeURIComponent(size)}`;
 }
+
+// Auto-search on type with debounce
+let searchTimeout;
+document.addEventListener('DOMContentLoaded', () => {
+    const searchInput = document.getElementById('site-search');
+    if(searchInput) {
+        searchInput.addEventListener('input', () => {
+            clearTimeout(searchTimeout);
+            searchTimeout = setTimeout(doSearch, 600);
+        });
+    }
+});
+
 function openModal() { 
     const form = document.getElementById('siteForm');
     form.reset(); 
