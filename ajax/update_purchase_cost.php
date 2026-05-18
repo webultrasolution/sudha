@@ -35,6 +35,23 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                   AND po.campaign_id = ?
             ");
             $stmtSync->execute([$purchase_cost, $purchase_cost, $row['site_id'], $row['booking_id']]);
+
+            // 4. Recalculate PO header totals from all its items
+            $stmtPOid = $pdo->prepare("SELECT id FROM purchase_orders WHERE campaign_id = ? AND vendor_id = (SELECT vendor_id FROM sites WHERE id = ?) LIMIT 1");
+            $stmtPOid->execute([$row['booking_id'], $row['site_id']]);
+            $poId = $stmtPOid->fetchColumn();
+
+            if ($poId) {
+                $stmtSum = $pdo->prepare("SELECT COALESCE(SUM(cost), 0) FROM po_items WHERE po_id = ?");
+                $stmtSum->execute([$poId]);
+                $newSubtotal = floatval($stmtSum->fetchColumn());
+                $newCgst = $newSubtotal * 0.09;
+                $newSgst = $newSubtotal * 0.09;
+                $newTotal = $newSubtotal + $newCgst + $newSgst;
+
+                $stmtUpPO = $pdo->prepare("UPDATE purchase_orders SET po_amount = ?, cgst_amount = ?, sgst_amount = ?, total_amount = ? WHERE id = ?");
+                $stmtUpPO->execute([$newSubtotal, $newCgst, $newSgst, $newTotal, $poId]);
+            }
         }
 
         $pdo->commit();
