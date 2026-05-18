@@ -23,6 +23,18 @@ if ($po_id) {
     if (!$b) die("Purchase Order not found.");
     $vendor_id = $b['vendor_id'];
     $mode = 'saved_po'; // Internal mode for logic below
+
+    // Pull overall date range from po_items as fallback for $b
+    $stmtDates = $pdo->prepare("SELECT MIN(start_date) as min_start, MAX(end_date) as max_end FROM po_items WHERE po_id = ?");
+    $stmtDates->execute([$po_id]);
+    $dateRange = $stmtDates->fetch();
+    if (!empty($dateRange['min_start'])) {
+        $b['start_date'] = $dateRange['min_start'];
+        $b['end_date']   = $dateRange['max_end'];
+    } else {
+        $b['start_date'] = date('Y-m-d');
+        $b['end_date']   = date('Y-m-d', strtotime('+1 month'));
+    }
 }
 
 if (!$vendor_id && $mode !== 'saved_po') {
@@ -308,8 +320,13 @@ $company_signature = getSetting('company_signature', 'signature.png');
                 }
                 
                 $net_total += $item['purchase_amount'];
-                $sDate = (!empty($item['start_date']) && $item['start_date'] != '0000-00-00') ? $item['start_date'] : $b['start_date'];
-                $eDate = (!empty($item['end_date']) && $item['end_date'] != '0000-00-00') ? $item['end_date'] : $b['end_date'];
+                // Use item-level dates first; fall back to PO-level dates; final fallback = today
+                $sDate = (!empty($item['start_date']) && $item['start_date'] !== '0000-00-00')
+                            ? $item['start_date']
+                            : ((!empty($b['start_date']) && $b['start_date'] !== '0000-00-00') ? $b['start_date'] : date('Y-m-d'));
+                $eDate = (!empty($item['end_date']) && $item['end_date'] !== '0000-00-00')
+                            ? $item['end_date']
+                            : ((!empty($b['end_date']) && $b['end_date'] !== '0000-00-00') ? $b['end_date'] : date('Y-m-d', strtotime('+30 days')));
             ?>
             <tr>
                 <td><?php echo $idx + 1; ?></td>

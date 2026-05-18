@@ -39,6 +39,9 @@ ALTER TABLE proposals ADD COLUMN IF NOT EXISTS display_cost DECIMAL(15,2) DEFAUL
 
 -- 4. Update purchase_orders & bookings table
 ALTER TABLE purchase_orders ADD COLUMN IF NOT EXISTS total_amount DECIMAL(15,2) DEFAULT 0.00 AFTER igst_amount;
+ALTER TABLE purchase_orders ADD COLUMN IF NOT EXISTS campaign_name VARCHAR(255) DEFAULT NULL AFTER po_number;
+ALTER TABLE purchase_orders ADD COLUMN IF NOT EXISTS customer_id INT DEFAULT NULL;
+ALTER TABLE purchase_orders ADD COLUMN IF NOT EXISTS remarks TEXT DEFAULT NULL;
 
 ALTER TABLE bookings ADD COLUMN IF NOT EXISTS printing_cost DECIMAL(15,2) DEFAULT 0.00 AFTER grand_total;
 ALTER TABLE bookings ADD COLUMN IF NOT EXISTS mounting_cost DECIMAL(15,2) DEFAULT 0.00 AFTER printing_cost;
