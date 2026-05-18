@@ -67,7 +67,7 @@ $activeEntity = getActiveEntity();
                 <ul class="submenu" style="<?php echo in_array($activePage, ['invoices', 'payments', 'ledger']) ? 'display: block;' : 'display: none;'; ?>">
                     <li><a href="<?php echo BASE_URL; ?>modules/financials/invoices.php" class="<?php echo $activePage == 'invoices' ? 'active-sub' : ''; ?>"><i class="fas fa-file-invoice-dollar"></i> Invoices</a></li>
                     <li><a href="<?php echo BASE_URL; ?>modules/financials/payments.php" class="<?php echo $activePage == 'payments' ? 'active-sub' : ''; ?>"><i class="fas fa-money-bill-wave"></i> Payments</a></li>
-                    <li><a href="<?php echo BASE_URL; ?>modules/financials/ledgers.php" class="<?php echo $activePage == 'ledger' ? 'active-sub' : ''; ?>"><i class="fas fa-book"></i> Client Ledger</a></li>
+                    <li><a href="<?php echo BASE_URL; ?>modules/financials/ledgers.php" class="<?php echo $activePage == 'ledger' ? 'active-sub' : ''; ?>"><i class="fas fa-book"></i>  Ledger</a></li>
                 </ul>
             </li>
             <?php endif; ?>
