@@ -90,18 +90,28 @@ try {
     
     $poId = $pdo->lastInsertId();
 
-    // 7. Insert Items
+    // 7. Insert Items — always use booking-level dates as fallback
+    $bookingStart = $booking['start_date'] ?: date('Y-m-d');
+    $bookingEnd   = $booking['end_date']   ?: date('Y-m-d', strtotime('+30 days'));
+    $d1 = new DateTime($bookingStart);
+    $d2 = new DateTime($bookingEnd);
+    $bookingDays = $d1->diff($d2)->days + 1;
+
     $stmtPOItem = $pdo->prepare("
         INSERT INTO po_items (po_id, site_id, start_date, end_date, days, monthly_rate, cost) 
         VALUES (?, ?, ?, ?, ?, ?, ?)
     ");
     foreach ($items as $item) {
+        $sDate = (!empty($item['start_date']) && $item['start_date'] !== '0000-00-00') ? $item['start_date'] : $bookingStart;
+        $eDate = (!empty($item['end_date'])   && $item['end_date']   !== '0000-00-00') ? $item['end_date']   : $bookingEnd;
+        $days  = (!empty($item['days'])       && $item['days'] > 0)                   ? $item['days']       : $bookingDays;
+
         $stmtPOItem->execute([
             $poId,
             $item['site_id'],
-            $item['start_date'],
-            $item['end_date'],
-            $item['days'],
+            $sDate,
+            $eDate,
+            $days,
             $item['purchase_amount'],
             $item['purchase_amount']
         ]);
