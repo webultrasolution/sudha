@@ -56,13 +56,13 @@ $partners = $stmt->fetchAll();
                     $stmtPaid->execute([$p['id']]);
                     $totalPaid = $stmtPaid->fetchColumn() ?: 0;
                 } else {
-                    // Total Billed by Vendor (Purchase Orders)
-                    $stmtBilled = $pdo->prepare("SELECT SUM(total_amount) FROM purchase_orders WHERE vendor_id = ?");
+                    // Total Billed by Vendor (Purchase Orders) — use fallback calc if total_amount is null/0
+                    $stmtBilled = $pdo->prepare("SELECT SUM(COALESCE(NULLIF(total_amount, 0), po_amount + COALESCE(cgst_amount,0) + COALESCE(sgst_amount,0) + COALESCE(igst_amount,0))) FROM purchase_orders WHERE vendor_id = ?");
                     $stmtBilled->execute([$p['id']]);
                     $totalBilled = $stmtBilled->fetchColumn() ?: 0;
 
                     // Total Paid to Vendor (Payables)
-                    $stmtPaid = $pdo->prepare("SELECT SUM(amount) FROM payments WHERE partner_id = ? AND type = 'debit'");
+                    $stmtPaid = $pdo->prepare("SELECT SUM(amount) FROM payments WHERE partner_id = ? AND type = 'payable'");
                     $stmtPaid->execute([$p['id']]);
                     $totalPaid = $stmtPaid->fetchColumn() ?: 0;
                 }

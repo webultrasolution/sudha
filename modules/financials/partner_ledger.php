@@ -49,8 +49,10 @@ if ($pType == 'client') {
     // Vendor Logic
     $stmtPO = $pdo->prepare("
         SELECT id, 'po' as type, po_date as date, po_number as ref, 
-               po_amount as base_amt, (cgst_amount + sgst_amount + igst_amount) as tax_amount, 
-               total_amount as total_amt, total_amount as debit, 0 as credit, status
+               po_amount as base_amt, (COALESCE(cgst_amount,0) + COALESCE(sgst_amount,0) + COALESCE(igst_amount,0)) as tax_amount, 
+               COALESCE(NULLIF(total_amount, 0), po_amount + COALESCE(cgst_amount,0) + COALESCE(sgst_amount,0) + COALESCE(igst_amount,0)) as total_amt, 
+               COALESCE(NULLIF(total_amount, 0), po_amount + COALESCE(cgst_amount,0) + COALESCE(sgst_amount,0) + COALESCE(igst_amount,0)) as debit, 
+               0 as credit, status
         FROM purchase_orders 
         WHERE vendor_id = ?
     ");
