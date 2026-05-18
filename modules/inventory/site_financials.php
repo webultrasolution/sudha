@@ -69,7 +69,8 @@ $stmtExp = $pdo->prepare("
 $stmtExp->execute($params_po);
 $pos = $stmtExp->fetchAll();
 
-$total_expenses = $total_booking_costs;
+// Only POs count as expenses — booking purchase cost rows are excluded
+$total_expenses = 0;
 foreach ($pos as $po) {
     $total_expenses += floatval($po['cost']);
 }
@@ -319,25 +320,7 @@ include_once __DIR__ . '/../../includes/header.php';
                             </tr>
                         </thead>
                         <tbody>
-                            <!-- Booking Purchase Costs -->
-                            <?php foreach ($invoices as $inv): 
-                                if (floatval($inv['purchase_amount']) > 0):
-                            ?>
-                                <tr style="background: #fdf4ff; transition: all 0.2s;" onmouseover="this.style.background='#fae8ff';" onmouseout="this.style.background='#fdf4ff';">
-                                    <td style="padding: 0.65rem 0.75rem; border-top-left-radius: 6px; border-bottom-left-radius: 6px; border: 1px solid #fdf4ff; border-right: none;">
-                                        <div style="font-weight: 700; color: #0f172a; font-size: 0.8rem;">BK-<?php echo str_pad($inv['booking_id'], 4, '0', STR_PAD_LEFT); ?></div>
-                                        <div style="font-size: 0.65rem; color: #64748b;"><?php echo date('M d, y', strtotime($inv['created_at'])); ?></div>
-                                    </td>
-                                    <td style="padding: 0.65rem 0.75rem; border-top: 1px solid #fdf4ff; border-bottom: 1px solid #fdf4ff;">
-                                        <div style="font-size: 0.75rem; font-weight: 600; color: #334155; line-height: 1.2; margin-bottom: 2px;"><?php echo htmlspecialchars($site['vendor_name'] ?: 'Vendor'); ?></div>
-                                        <div style="font-size: 0.6rem; color: #c026d3; font-weight: 700; text-transform: uppercase; margin-bottom: 2px;">Direct Booking Cost</div>
-                                        <div style="font-size: 0.65rem; color: #64748b;"><i class="far fa-calendar-alt"></i> <?php echo date('d/m/y', strtotime($inv['start_date'])); ?> - <?php echo date('d/m/y', strtotime($inv['end_date'])); ?></div>
-                                    </td>
-                                    <td style="padding: 0.65rem 0.75rem; text-align: right; border-top-right-radius: 6px; border-bottom-right-radius: 6px; border: 1px solid #fdf4ff; border-left: none;">
-                                        <div style="font-weight: 800; color: #ef4444; font-size: 0.85rem;">₹<?php echo number_format($inv['purchase_amount'], 2); ?></div>
-                                    </td>
-                                </tr>
-                            <?php endif; endforeach; ?>
+                            <!-- Asset POs only - booking direct costs are excluded -->
                             
                             <!-- Asset POs -->
                             <?php foreach ($pos as $po): ?>
