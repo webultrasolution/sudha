@@ -26,11 +26,11 @@ $pos->execute([$id]);
 $pos = $pos->fetchAll();
 
 // Fetch Payment Summary
-$payments = $pdo->prepare("SELECT SUM(amount) FROM payments WHERE partner_id = ? AND type = 'debit'");
+$payments = $pdo->prepare("SELECT SUM(amount) FROM payments WHERE partner_id = ? AND type = 'payable'");
 $payments->execute([$id]);
 $totalPaid = $payments->fetchColumn() ?: 0;
 
-$totalPO = $pdo->prepare("SELECT SUM(total_amount) FROM purchase_orders WHERE vendor_id = ?");
+$totalPO = $pdo->prepare("SELECT SUM(COALESCE(NULLIF(total_amount, 0), po_amount + COALESCE(cgst_amount,0) + COALESCE(sgst_amount,0) + COALESCE(igst_amount,0))) FROM purchase_orders WHERE vendor_id = ?");
 $totalPO->execute([$id]);
 $totalLiability = $totalPO->fetchColumn() ?: 0;
 ?>
@@ -123,17 +123,29 @@ $totalLiability = $totalPO->fetchColumn() ?: 0;
                         <tr>
                             <th>PO #</th>
                             <th>Date</th>
-                            <th>Amount</th>
+                            <th style="text-align: right;">Amount (Base)</th>
+                            <th style="text-align: right;">Grand Total (Inc GST)</th>
                             <th>Status</th>
                             <th>Action</th>
                         </tr>
                     </thead>
                     <tbody>
-                        <?php foreach ($pos as $p): ?>
+                        <?php foreach ($pos as $p): 
+                            $baseAmt = floatval($p['po_amount'] ?: 0);
+                            $totalAmt = floatval($p['total_amount'] ?: ($p['po_amount'] + $p['cgst_amount'] + $p['sgst_amount'] + $p['igst_amount']));
+                        ?>
                         <tr>
                             <td><strong><?php echo $p['po_number']; ?></strong></td>
                             <td><?php echo date('d M Y', strtotime($p['created_at'])); ?></td>
-                            <td><?php echo formatCurrency($p['total_amount']); ?></td>
+                            <td style="text-align: right; font-weight: 700; color: #475569;">
+                                <button onclick="promptEditPoAmount(<?php echo $p['id']; ?>, <?php echo $baseAmt; ?>, '<?php echo $p['po_number']; ?>')" 
+                                        style="background: #f8fafc; border: 1px dashed #cbd5e1; color: #475569; padding: 0.25rem 0.5rem; border-radius: 6px; font-weight: 700; font-size: 0.8rem; cursor: pointer; display: inline-flex; align-items: center; gap: 0.4rem;">
+                                    ₹<?php echo number_format($baseAmt, 2); ?> <i class="fas fa-edit" style="font-size: 0.7rem; color: #94a3b8;"></i>
+                                </button>
+                            </td>
+                            <td style="text-align: right; font-weight: 800; color: #0f172a;">
+                                ₹<?php echo number_format($totalAmt, 2); ?>
+                            </td>
                             <td><span class="status-pill status-<?php echo $p['status']; ?>"><?php echo ucfirst($p['status']); ?></span></td>
                             <td><a href="../financials/po_view.php?id=<?php echo $p['id']; ?>" class="btn-icon"><i class="fas fa-eye"></i></a></td>
                         </tr>
@@ -157,6 +169,63 @@ function showTab(tabId) {
     document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
     document.getElementById(tabId).style.display = 'block';
     event.currentTarget.classList.add('active');
+}
+
+function promptEditPoAmount(poId, currentBase, poNumber) {
+    Swal.fire({
+        title: 'Edit PO Amount',
+        html: `
+            <div style="text-align: left;">
+                <p style="font-size: 0.85rem; color: #64748b; margin-bottom: 1rem;">
+                    Updating amount for <strong>${poNumber}</strong>.<br>
+                    GST (9% CGST + 9% SGST) will be recalculated automatically.
+                </p>
+                <label style="display:block; font-size: 0.75rem; font-weight: 700; color: #64748b; margin-bottom: 5px;">NEW BASE AMOUNT (₹)</label>
+                <input id="new_po_amount" type="number" step="0.01" class="swal2-input" value="${currentBase}" style="margin: 0; width: 100%; box-sizing: border-box;">
+            </div>
+        `,
+        showCancelButton: true,
+        confirmButtonText: 'Update PO',
+        focusConfirm: false,
+        preConfirm: () => {
+            const amount = document.getElementById('new_po_amount').value;
+            if (!amount || amount <= 0) {
+                Swal.showValidationMessage('Please enter a valid amount');
+                return false;
+            }
+            
+            const formData = new FormData();
+            formData.append('po_id', poId);
+            formData.append('amount', amount);
+            
+            return fetch('../../ajax/update_po_amount.php', {
+                method: 'POST',
+                body: formData
+            })
+            .then(r => r.json())
+            .then(res => {
+                if (!res.success) {
+                    throw new Error(res.message || 'Failed to update PO');
+                }
+                return res;
+            })
+            .catch(err => {
+                Swal.showValidationMessage(err.message);
+            });
+        }
+    }).then((result) => {
+        if (result.isConfirmed) {
+            Swal.fire({
+                icon: 'success',
+                title: 'Updated!',
+                text: 'PO amount and taxes recalculated successfully.',
+                timer: 1500,
+                showConfirmButton: false
+            }).then(() => {
+                location.reload();
+            });
+        }
+    });
 }
 </script>
 
