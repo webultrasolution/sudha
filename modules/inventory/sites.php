@@ -238,6 +238,7 @@ $vendors = $pdo->query("SELECT id, name FROM partners WHERE type = 'vendor' ORDE
                     </td>
                     <td data-label="Status"><span class="status-pill <?php echo $s['status']; ?>"><?php echo ucfirst($s['status']); ?></span></td>
                     <td data-label="Actions" style="text-align: right; white-space: nowrap;">
+                        <a href="site_financials.php?id=<?php echo $s['id']; ?>" class="btn-icon" style="color: #0d9488; background: #ccfbf1; display: inline-flex; text-decoration: none;" title="Site Financials (P&L)"><i class="fas fa-file-invoice-dollar"></i></a>
                         <button class="btn-icon btn-edit" onclick="editSite(<?php echo htmlspecialchars(json_encode($s)); ?>)" title="Edit"><i class="fas fa-edit"></i></button>
                         <button class="btn-icon btn-delete" onclick="deleteSite(event, <?php echo $s['id']; ?>)" title="Delete"><i class="fas fa-trash"></i></button>
                     </td>
