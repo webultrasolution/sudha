@@ -40,7 +40,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action'])) {
 }
 
 $activePage = 'client_printing_rates';
-$pageTitle = 'Client Printing PO';
+$pageTitle = 'Client Printing Invoice';
 include_once __DIR__ . '/../../includes/header.php';
 
 $selectedClientId = isset($_GET['client_id']) ? intval($_GET['client_id']) : 0;
@@ -72,10 +72,10 @@ $clients = $pdo->query("SELECT id, name FROM partners WHERE type = 'client' ORDE
 
 <div class="card">
     <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1.5rem;">
-        <h2 style="font-size: 1.25rem;">Client Printing PO</h2>
+        <h2 style="font-size: 1.25rem;">Client Printing Invoice</h2>
         <div style="display: flex; gap: 0.75rem;">
             <a href="create_client_printing_po.php" class="btn btn-primary" style="display: inline-flex; align-items: center; gap: 6px; text-decoration: none; background: #0d9488; border-color: #0d9488;">
-                <i class="fas fa-plus"></i> Add New Client Printing PO 
+                <i class="fas fa-plus"></i> Add New Client Printing Invoice 
             </a>
         </div>
     </div>
@@ -112,10 +112,7 @@ $clients = $pdo->query("SELECT id, name FROM partners WHERE type = 'client' ORDE
             ?>
             <tr class="rate-row" data-client-id="<?php echo $r['client_id']; ?>">
                 <td style="text-align: center;">
-                    <?php 
-                        $pdfUrl = "../operations/client_printing.php?client_id=" . $r['client_id'] . "&preview=1";
-                        foreach($ids as $id) $pdfUrl .= "&rate_ids[]=" . $id;
-                    ?>
+                   
                     <a href="<?php echo $pdfUrl; ?>" target="_blank" title="Download Group Client PO" style="color: #ef4444; font-size: 1.1rem;">
                         <i class="fas fa-file-pdf"></i>
                     </a>
@@ -159,6 +156,13 @@ $clients = $pdo->query("SELECT id, name FROM partners WHERE type = 'client' ORDE
                     <div style="display: flex; flex-direction: column; gap: 5px; align-items: flex-end;">
                         <?php foreach($ids as $i => $id): ?>
                             <div style="height: 38px; display: flex; align-items: center; gap: 8px;">
+                                <?php 
+                        $pdfUrl = "../operations/client_printing.php?client_id=" . $r['client_id'] . "&preview=1";
+                        foreach($ids as $id) $pdfUrl .= "&rate_ids[]=" . $id;
+                    ?>
+                    <a href="<?php echo $pdfUrl; ?>" target="_blank" title="Download Group Client PO" style="color: #ef4444; font-size: 1.1rem;">
+                        <i class="fas fa-file-pdf"></i>
+                    </a>
                                 <a href="create_client_printing_po.php?action=edit&id=<?php echo $id; ?>" class="btn-icon" style="color: #0284c7; background: #e0f2fe; padding: 6px; border-radius: 8px; font-size: 0.85rem; display: inline-flex; align-items: center; justify-content: center; width: 28px; height: 28px; border: none; text-decoration: none;" title="Edit">
                                     <i class="fas fa-edit"></i>
                                 </a>
@@ -173,7 +177,7 @@ $clients = $pdo->query("SELECT id, name FROM partners WHERE type = 'client' ORDE
             <?php endforeach; ?>
             <?php if (empty($rates)): ?>
             <tr>
-                <td colspan="6" style="text-align: center; padding: 2rem; color: #94a3b8;">No Client Printing POs found.</td>
+                <td colspan="6" style="text-align: center; padding: 2rem; color: #94a3b8;">No Client Printing Invoices found.</td>
             </tr>
             <?php endif; ?>
         </tbody>
@@ -192,8 +196,8 @@ document.addEventListener('DOMContentLoaded', () => {
     if (urlParams.has('msg')) {
         const msg = urlParams.get('msg');
         let text = '';
-        if (msg === 'added') text = 'Client Printing PO created successfully.';
-        if (msg === 'updated') text = 'Client Printing PO updated successfully.';
+        if (msg === 'added') text = 'Client Printing Invoice created successfully.';
+        if (msg === 'updated') text = 'Client Printing Invoice updated successfully.';
         
         if (text) {
             Swal.fire({
@@ -212,7 +216,7 @@ document.addEventListener('DOMContentLoaded', () => {
 function deleteRate(id) {
     Swal.fire({
         title: 'Delete Client Rate?',
-        text: "Are you sure you want to remove this Client Printing PO?",
+        text: "Are you sure you want to remove this Client Printing Invoice?",
         icon: 'warning',
         showCancelButton: true,
         confirmButtonColor: '#0d9488',
