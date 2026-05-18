@@ -172,6 +172,9 @@ foreach ($items as $item) {
         $vendorSites[$key]['count']++;
     }
 }
+
+// Prepare statement to check if PO exists
+$stmtCheckPO = $pdo->prepare("SELECT id FROM purchase_orders WHERE campaign_id = ? AND vendor_id = ?");
 ?>
 
 
@@ -217,9 +220,19 @@ foreach ($items as $item) {
                                         <span style="color: #64748b; font-weight: 500; font-size: 0.65rem;">(<?php echo $item['vendor_contact']; ?>)</span>
                                     <?php endif; ?>
                                 </span>
-                                <a href="generate_po.php?booking_id=<?php echo $b['id']; ?>&vendor_id=<?php echo $item['vendor_id']; ?>&vendor_gst=<?php echo urlencode($item['vendor_gst'] ?? ''); ?>" target="_blank" title="Download PO PDF" style="background: #0f172a; color: white; width: 26px; height: 26px; border-radius: 6px; display: flex; align-items: center; justify-content: center; font-size: 0.7rem; text-decoration: none;">
-                                    <i class="fas fa-file-pdf"></i>
-                                </a>
+                                <?php 
+                                    $stmtCheckPO->execute([$b['id'], $item['vendor_id']]);
+                                    $existingPoId = $stmtCheckPO->fetchColumn();
+                                ?>
+                                <?php if ($existingPoId): ?>
+                                    <a href="generate_po.php?po_id=<?php echo $existingPoId; ?>" target="_blank" title="View Saved PO" style="background: #10b981; color: white; width: 26px; height: 26px; border-radius: 6px; display: flex; align-items: center; justify-content: center; font-size: 0.7rem; text-decoration: none;">
+                                        <i class="fas fa-file-invoice"></i>
+                                    </a>
+                                <?php else: ?>
+                                    <button onclick="saveAndGeneratePO(<?php echo $b['id']; ?>, <?php echo $item['vendor_id']; ?>)" title="Generate & Save PO to Database" style="background: #0f172a; color: white; width: 26px; height: 26px; border-radius: 6px; border: none; cursor: pointer; display: flex; align-items: center; justify-content: center; font-size: 0.7rem;">
+                                        <i class="fas fa-save"></i>
+                                    </button>
+                                <?php endif; ?>
                                 <button onclick="sendPOEmail(<?php echo $b['id']; ?>, <?php echo $item['vendor_id']; ?>)" title="Send PO via Email" style="background: #3b82f6; color: white; width: 26px; height: 26px; border-radius: 6px; border: none; cursor: pointer; display: flex; align-items: center; justify-content: center; font-size: 0.7rem;">
                                     <i class="fas fa-envelope"></i>
                                 </button>
@@ -482,6 +495,40 @@ function openInvoicePopup(bookingId) {
     }).then((result) => {
         if (result.isConfirmed) {
             window.open(`generate_invoice.php?booking_id=${bookingId}`, '_blank');
+        }
+    });
+}
+function saveAndGeneratePO(booking_id, vendor_id) {
+    Swal.fire({
+        title: 'Save PO to Database?',
+        text: "This will officially save the Purchase Order for this vendor.",
+        icon: 'question',
+        showCancelButton: true,
+        confirmButtonColor: '#0d9488',
+        cancelButtonColor: '#ef4444',
+        confirmButtonText: 'Yes, Save it!'
+    }).then((result) => {
+        if (result.isConfirmed) {
+            Swal.showLoading();
+            fetch('../../ajax/save_booking_po.php', {
+                method: 'POST',
+                headers: {'Content-Type': 'application/json'},
+                body: JSON.stringify({ booking_id: booking_id, vendor_id: vendor_id })
+            })
+            .then(response => response.json())
+            .then(data => {
+                if (data.success) {
+                    Swal.fire('PO Saved!', `Purchase Order ${data.po_number} has been saved.`, 'success').then(() => {
+                        window.open(`generate_po.php?po_id=${data.po_id}`, '_blank');
+                        window.location.reload();
+                    });
+                } else {
+                    Swal.fire('Error', data.message || 'Failed to save PO', 'error');
+                }
+            })
+            .catch(error => {
+                Swal.fire('Error', 'Network or server error', 'error');
+            });
         }
     });
 }

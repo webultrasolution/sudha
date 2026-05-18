@@ -20,11 +20,11 @@ $activeEntity = getActiveEntity();
 <body>
     <?php if (!isset($hideSidebar) || !$hideSidebar): ?>
     <div class="sidebar">
-        <div class="sidebar-brand">
+        <div class="sidebar-brand" style="margin-bottom: 1rem; padding: 0; margin-top: -0.5rem;">
             <?php if ($activeEntity && $activeEntity['logo']): ?>
-                <img src="<?php echo BASE_URL; ?>assets/images/<?php echo $activeEntity['logo']; ?>" alt="<?php echo htmlspecialchars($activeEntity['name']); ?>" class="sidebar-logo">
+                <img src="<?php echo BASE_URL; ?>assets/images/<?php echo $activeEntity['logo']; ?>" alt="<?php echo htmlspecialchars($activeEntity['name']); ?>" class="sidebar-logo" style="max-width: 100px; max-height: 45px;">
             <?php else: ?>
-                <img src="<?php echo BASE_URL; ?>assets/img/LOGO.png" alt="Sudha Creative" class="sidebar-logo">
+                <img src="<?php echo BASE_URL; ?>assets/img/LOGO.png" alt="Sudha Creative" class="sidebar-logo" style="max-width: 100px; max-height: 45px;">
             <?php endif; ?>
         </div>
         <ul class="nav-menu">
@@ -87,8 +87,8 @@ $activeEntity = getActiveEntity();
                         <li><a href="<?php echo BASE_URL; ?>modules/users/index.php" class="<?php echo $activePage == 'users' ? 'active-sub' : ''; ?>"><i class="fas fa-users-cog"></i> User Management</a></li>
                         <li><a href="<?php echo BASE_URL; ?>modules/users/permissions.php" class="<?php echo $activePage == 'users' ? 'active-sub' : ''; ?>"><i class="fas fa-user-shield"></i> Role Permissions</a></li>
                     <?php endif; ?>
-                    <li><a href="<?php echo BASE_URL; ?>modules/admin/resources.php" class="<?php echo $activePage == 'resources' ? 'active-sub' : ''; ?>"><i class="fas fa-tools"></i> Resources</a></li>
-                    <li><a href="<?php echo BASE_URL; ?>modules/inventory/photofactory.php" class="<?php echo $activePage == 'photofactory' ? 'active-sub' : ''; ?>"><i class="fas fa-images"></i> Photofactory</a></li>
+                    <!-- <li><a href="<?php echo BASE_URL; ?>modules/admin/resources.php" class="<?php echo $activePage == 'resources' ? 'active-sub' : ''; ?>"><i class="fas fa-tools"></i> Resources</a></li>
+                    <li><a href="<?php echo BASE_URL; ?>modules/inventory/photofactory.php" class="<?php echo $activePage == 'photofactory' ? 'active-sub' : ''; ?>"><i class="fas fa-images"></i> Photofactory</a></li> -->
                 </ul>
             </li>
 
