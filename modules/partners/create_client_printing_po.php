@@ -3,7 +3,7 @@ include_once __DIR__ . '/../../config/db.php';
 include_once __DIR__ . '/../../includes/functions.php';
 
 $activePage = 'client_printing_rates';
-$pageTitle = 'Create Client Printing PO';
+$pageTitle = 'Create Client Printing Invoice';
 
 $id = isset($_GET['id']) ? intval($_GET['id']) : 0;
 $action = isset($_GET['action']) ? clean($_GET['action']) : 'add';
@@ -16,7 +16,7 @@ if ($id && $action === 'edit') {
     if (!$rateData) {
         die("Client rate record not found.");
     }
-    $pageTitle = 'Edit Client Printing PO';
+    $pageTitle = 'Edit Client Printing Invoice';
 }
 
 $clients = $pdo->query("SELECT id, name FROM partners WHERE type = 'client' ORDER BY name ASC")->fetchAll();

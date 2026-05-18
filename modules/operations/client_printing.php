@@ -79,7 +79,7 @@ $po_date = date('d-m-Y');
 if (!$preview):
 
 $activePage = 'client_printing';
-$pageTitle = 'Client Printing PO - Generate Print';
+$pageTitle = 'Client Printing Invoice - Generate Print';
 include_once __DIR__ . '/../../includes/header.php';
 ?>
 
@@ -88,7 +88,7 @@ include_once __DIR__ . '/../../includes/header.php';
         <div>
             <h2 style="font-size: 1.25rem; margin-bottom: 0.25rem;">
                 <i class="fas fa-file-invoice" style="color: var(--primary); margin-right: 0.5rem;"></i>
-                Generate Client Printing PO
+                Generate Client Printing Invoice
             </h2>
             <div style="font-size: 0.8rem; color: #64748b;">
                 Select Client and choose printing rates to include.
@@ -300,7 +300,7 @@ if (empty($rates)) die("No rates selected for this PO.");
 <html lang="en">
 <head>
     <meta charset="UTF-8">
-    <title>Client Printing PO - <?php echo htmlspecialchars($c['name'], ENT_QUOTES, 'UTF-8', false); ?></title>
+    <title>Client Printing Invoice - <?php echo htmlspecialchars($c['name'], ENT_QUOTES, 'UTF-8', false); ?></title>
     <style>
         @page { size: A4; margin: 0; }
         body { font-family: 'Arial', sans-serif; margin: 0; padding: 20px; color: #000; font-size: 11px; line-height: 1.3; }
@@ -510,7 +510,7 @@ if (empty($rates)) die("No rates selected for this PO.");
 </div>
 
 <div style="max-width: 800px; margin: 10px auto; text-align: center; font-size: 9px; color: #888;">
-    This is a computer generated Client Printing PO and does not require physical signature.
+    This is a computer generated Client Printing Invoice and does not require physical signature.
 </div>
 
 </body>
