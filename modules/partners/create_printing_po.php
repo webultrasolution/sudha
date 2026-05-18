@@ -70,7 +70,7 @@ include_once __DIR__ . '/../../includes/header.php';
                         <option value="One Way Vision" <?php echo ($rateData && ($rateData['media_type'] === 'One Way Vision' || $rateData['media_type'] === 'OWV')) ? 'selected' : ''; ?>>OWV</option>
                         <option value="Canvas" <?php echo ($rateData && $rateData['media_type'] === 'Canvas') ? 'selected' : ''; ?>>Canvas</option>
                     </select>
-a                </div>
+                </div>
 
                 <div class="form-group" style="margin-bottom: 2rem;">
                     <label style="font-weight: 800; color: #1e293b; font-size: 0.75rem; margin-bottom: 0.75rem; display: block; text-transform: uppercase; letter-spacing: 0.05em;">4. Rate (₹ per SQFT)</label>
@@ -352,7 +352,7 @@ function filterSitesByVendor() {
 
     displaySites.forEach(s => {
         const siteVendor = vendorsData.find(v => v.id == s.vendor_id);
-        const vName = siteVendor ? siteVendor.name : 'Unknown Vendor';
+        const vName = siteVendor ? siteVendor.name : '';
 
         // Add to dropdown (for Edit)
         const option = document.createElement('option');
