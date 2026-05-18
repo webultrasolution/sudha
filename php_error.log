@@ -156,3 +156,5 @@ Stack trace:
 [18-May-2026 23:14:07 Asia/Kolkata] PHP Deprecated:  strtotime(): Passing null to parameter #1 ($datetime) of type string is deprecated in D:\xampp\htdocs\easy-outdoor-crm\modules\operations\generate_po.php on line 324
 [18-May-2026 23:14:07 Asia/Kolkata] PHP Deprecated:  date_create(): Passing null to parameter #1 ($datetime) of type string is deprecated in D:\xampp\htdocs\easy-outdoor-crm\modules\operations\generate_po.php on line 327
 [18-May-2026 23:14:07 Asia/Kolkata] PHP Deprecated:  date_create(): Passing null to parameter #1 ($datetime) of type string is deprecated in D:\xampp\htdocs\easy-outdoor-crm\modules\operations\generate_po.php on line 328
+[18-May-2026 21:35:16 Europe/Berlin] PHP Warning:  Undefined array key "rate_per_sqft" in D:\xampp\htdocs\easy-outdoor-crm\modules\partners\client_printing_rates.php on line 10
+[18-May-2026 21:39:03 Europe/Berlin] PHP Warning:  Undefined array key "rate_per_sqft" in D:\xampp\htdocs\easy-outdoor-crm\modules\partners\client_printing_rates.php on line 10
