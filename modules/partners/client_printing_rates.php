@@ -59,6 +59,8 @@ $rates = $pdo->query("
         GROUP_CONCAT(COALESCE(s.height, 0) SEPARATOR '||') as heights,
         GROUP_CONCAT(r.media_type SEPARATOR '||') as media_types,
         GROUP_CONCAT(r.rate_per_sqft SEPARATOR '||') as rates,
+        MAX(r.attachments) as attachments,
+        MAX(r.client_tax_order) as client_tax_order,
         MAX(r.is_final_invoice) as is_final_invoice
     FROM client_printing_rates r
     JOIN partners c ON r.client_id = c.id
@@ -84,11 +86,11 @@ $clients = $pdo->query("SELECT id, name FROM partners WHERE type = 'client' ORDE
     <table class="table">
         <thead>
             <tr>
-                <th style="width: 40px;"></th>
                 <th>Client</th>
                 <th>Site / Dimension</th>
                 <th>Media Type</th>
                 <th>Rate (per SQFT)</th>
+                <th>Attachments</th>
                 <th style="text-align: right;">Actions</th>
             </tr>
         </thead>
@@ -112,10 +114,6 @@ $clients = $pdo->query("SELECT id, name FROM partners WHERE type = 'client' ORDE
                 }
             ?>
             <tr class="rate-row" data-client-id="<?php echo $r['client_id']; ?>">
-                <td style="text-align: center;">
-                   
-                   
-                </td>
                 <td>
                     <strong><?php echo htmlspecialchars($r['client_name'], ENT_QUOTES, 'UTF-8', false); ?></strong>
                     <?php if($r['po_number']): ?>
@@ -151,25 +149,86 @@ $clients = $pdo->query("SELECT id, name FROM partners WHERE type = 'client' ORDE
                         </div>
                     <?php endif; ?>
                 </td>
+                <td>
+                    <?php if (!empty($r['po_number'])): ?>
+                    <div style="display: flex; flex-direction: column; gap: 8px;">
+                        <!-- Invoice Attachments Section -->
+                        <div style="display: flex; align-items: center; flex-wrap: wrap; gap: 4px;">
+                            <span style="font-size: 0.65rem; font-weight: 800; color: #94a3b8; text-transform: uppercase; margin-right: 4px;">Invoice:</span>
+                            <?php 
+                            if (!empty($r['attachments'])): 
+                                $files = explode('||', $r['attachments']);
+                                foreach ($files as $file):
+                                    $ext = strtolower(pathinfo($file, PATHINFO_EXTENSION));
+                                    $icon = 'fa-file';
+                                    if (in_array($ext, ['jpg', 'jpeg', 'png'])) $icon = 'fa-file-image';
+                                    if ($ext === 'pdf') $icon = 'fa-file-pdf';
+                            ?>
+                                    <a href="../../uploads/pos/<?php echo urlencode($file); ?>" target="_blank" class="attachment-badge" title="<?php echo htmlspecialchars($file); ?>">
+                                        <i class="fas <?php echo $icon; ?>"></i>
+                                    </a>
+                            <?php 
+                                endforeach;
+                            endif; 
+                            ?>
+                            <button class="btn-upload-row" onclick="triggerUpload('<?php echo $r['po_number']; ?>')" title="Upload Invoice/Scan">
+                                <i class="fas fa-cloud-upload-alt"></i> Upload
+                            </button>
+                        </div>
+                        
+                        <!-- Client Tax Order Section -->
+                        <div style="display: flex; align-items: center; flex-wrap: wrap; gap: 4px;">
+                            <span style="font-size: 0.65rem; font-weight: 800; color: #94a3b8; text-transform: uppercase; margin-right: 4px;">Tax Order:</span>
+                            <?php if (!empty($r['client_tax_order'])): 
+                                $ext = strtolower(pathinfo($r['client_tax_order'], PATHINFO_EXTENSION));
+                                $icon = 'fa-file';
+                                if (in_array($ext, ['jpg', 'jpeg', 'png'])) $icon = 'fa-file-image';
+                                if ($ext === 'pdf') $icon = 'fa-file-pdf';
+                            ?>
+                                <a href="../../uploads/pos/tax_orders/<?php echo urlencode($r['client_tax_order']); ?>" target="_blank" class="attachment-badge" style="background: #e0e7ff; color: #4f46e5;" title="Client Tax Order: <?php echo htmlspecialchars($r['client_tax_order']); ?>">
+                                    <i class="fas <?php echo $icon; ?>"></i>
+                                </a>
+                            <?php endif; ?>
+                            <button class="btn-upload-row" style="background: #eef2ff; color: #4f46e5; border-color: #c7d2fe;" onclick="triggerTaxOrderUpload('<?php echo $r['po_number']; ?>')" title="Upload Client Tax Order">
+                                <i class="fas fa-cloud-upload-alt"></i> Upload
+                            </button>
+                        </div>
+                    </div>
+                    <?php else: ?>
+                    <span style="color: #94a3b8; font-size: 0.75rem;">Requires PO</span>
+                    <?php endif; ?>
+                </td>
                 <td style="text-align: right;">
                     <div style="display: flex; flex-direction: column; gap: 5px; align-items: flex-end;">
-                        <?php foreach($ids as $i => $id): ?>
-                            <div style="height: 38px; display: flex; align-items: center; gap: 8px;">
-                                <?php 
-                        $pdfUrl = "../operations/client_printing.php?client_id=" . $r['client_id'] . "&preview=1";
-                        foreach($ids as $id) $pdfUrl .= "&rate_ids[]=" . $id;
-                    ?>
-                    <a href="<?php echo $pdfUrl; ?>" target="_blank" title="Download Group Client PO" style="color: #ef4444; font-size: 1.1rem;">
-                        <i class="fas fa-file-pdf"></i>
-                    </a>
-                                <a href="create_client_printing_po.php?action=edit&id=<?php echo $id; ?>" class="btn-icon" style="color: #0284c7; background: #e0f2fe; padding: 6px; border-radius: 8px; font-size: 0.85rem; display: inline-flex; align-items: center; justify-content: center; width: 28px; height: 28px; border: none; text-decoration: none;" title="Edit">
-                                    <i class="fas fa-edit"></i>
-                                </a>
-                                <button class="btn-icon btn-delete" onclick="deleteRate(<?php echo $id; ?>)" style="display: inline-flex; align-items: center; justify-content: center; width: 28px; height: 28px;" title="Delete">
-                                    <i class="fas fa-trash"></i>
-                                </button>
-                            </div>
-                        <?php endforeach; ?>
+                        <!-- Group PDF Action -->
+                        <div style="height: 38px; display: flex; align-items: center; gap: 8px;">
+                            <?php 
+                                $pdfUrl = "../operations/client_printing.php?client_id=" . $r['client_id'] . "&preview=1";
+                                foreach($ids as $pdfId) $pdfUrl .= "&rate_ids[]=" . $pdfId;
+                            ?>
+                            <a href="<?php echo $pdfUrl; ?>" target="_blank" class="btn-icon" style="color: #ef4444; background: #fee2e2; padding: 6px; border-radius: 8px; font-size: 0.85rem; display: inline-flex; align-items: center; justify-content: center; width: 28px; height: 28px; border: none; text-decoration: none;" title="Download Group Client PO">
+                                <i class="fas fa-file-pdf"></i>
+                            </a>
+                            <a href="create_client_printing_po.php?action=edit&id=<?php echo $ids[0]; ?>" class="btn-icon" style="color: #0284c7; background: #e0f2fe; padding: 6px; border-radius: 8px; font-size: 0.85rem; display: inline-flex; align-items: center; justify-content: center; width: 28px; height: 28px; border: none; text-decoration: none;" title="Edit">
+                                <i class="fas fa-edit"></i>
+                            </a>
+                            <button class="btn-icon btn-delete" onclick="deleteRate(<?php echo $ids[0]; ?>)" style="display: inline-flex; align-items: center; justify-content: center; width: 28px; height: 28px;" title="Delete">
+                                <i class="fas fa-trash"></i>
+                            </button>
+                        </div>
+                        
+                        <?php if (count($ids) > 1): ?>
+                            <?php for($i = 1; $i < count($ids); $i++): ?>
+                                <div style="height: 38px; display: flex; align-items: center; gap: 8px;">
+                                    <a href="create_client_printing_po.php?action=edit&id=<?php echo $ids[$i]; ?>" class="btn-icon" style="color: #0284c7; background: #e0f2fe; padding: 6px; border-radius: 8px; font-size: 0.85rem; display: inline-flex; align-items: center; justify-content: center; width: 28px; height: 28px; border: none; text-decoration: none;" title="Edit">
+                                        <i class="fas fa-edit"></i>
+                                    </a>
+                                    <button class="btn-icon btn-delete" onclick="deleteRate(<?php echo $ids[$i]; ?>)" style="display: inline-flex; align-items: center; justify-content: center; width: 28px; height: 28px;" title="Delete">
+                                        <i class="fas fa-trash"></i>
+                                    </button>
+                                </div>
+                            <?php endfor; ?>
+                        <?php endif; ?>
                         
                         <!-- Row-level Final Tax Invoice Action -->
                         <div style="margin-top: 10px; padding-top: 5px; border-top: 1px solid #e2e8f0; display: flex; justify-content: flex-end; gap: 8px; width: 100%;">
@@ -200,7 +259,112 @@ $clients = $pdo->query("SELECT id, name FROM partners WHERE type = 'client' ORDE
     </table>
 </div>
 
+<input type="file" id="po-list-upload-input" style="display: none;" onchange="handlePOUpload(this)" accept=".pdf,.png,.jpg,.jpeg">
+
+<style>
+.btn-upload-row {
+    background: #f0fdf4;
+    color: #166534;
+    border: 1px dashed #bbf7d0;
+    padding: 0.25rem 0.5rem;
+    border-radius: 6px;
+    font-size: 0.75rem;
+    font-weight: 700;
+    cursor: pointer;
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    transition: all 0.2s;
+}
+.btn-upload-row:hover {
+    background: #dcfce7;
+    border-color: #86efac;
+    transform: translateY(-1px);
+}
+.attachment-badge {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 26px;
+    height: 26px;
+    border-radius: 6px;
+    background: #f1f5f9;
+    color: #475569;
+    font-size: 0.85rem;
+    transition: all 0.2s;
+}
+.attachment-badge:hover {
+    background: #e2e8f0;
+    color: #0d9488;
+    transform: translateY(-1px);
+}
+</style>
+
 <script>
+let activeUploadPoNumber = null;
+let activeUploadType = 'invoice';
+
+function triggerUpload(poNumber) {
+    if (!poNumber) return Swal.fire('Error', 'Invalid PO number for attachment.', 'error');
+    activeUploadPoNumber = poNumber;
+    activeUploadType = 'invoice';
+    document.getElementById('po-list-upload-input').click();
+}
+
+function triggerTaxOrderUpload(poNumber) {
+    if (!poNumber) return Swal.fire('Error', 'Invalid PO number for attachment.', 'error');
+    activeUploadPoNumber = poNumber;
+    activeUploadType = 'tax_order';
+    document.getElementById('po-list-upload-input').click();
+}
+
+function handlePOUpload(input) {
+    if (!input.files || input.files.length === 0 || !activeUploadPoNumber) return;
+    
+    const file = input.files[0];
+    const formData = new FormData();
+    formData.append('po_number', activeUploadPoNumber);
+    formData.append('file', file);
+    
+    Swal.fire({
+        title: 'Uploading Document...',
+        text: 'Please wait while the file is being processed.',
+        allowOutsideClick: false,
+        didOpen: () => {
+            Swal.showLoading();
+        }
+    });
+
+    const url = activeUploadType === 'tax_order' 
+        ? '../../ajax/upload_client_printing_tax_order.php' 
+        : '../../ajax/upload_client_printing_attachment.php';
+
+    fetch(url, {
+        method: 'POST',
+        body: formData
+    })
+    .then(r => r.json())
+    .then(res => {
+        if (res.success) {
+            Swal.fire({
+                icon: 'success',
+                title: 'Uploaded Successfully!',
+                text: 'Attachment added successfully.',
+                timer: 1500,
+                showConfirmButton: false
+            }).then(() => {
+                location.reload();
+            });
+        } else {
+            Swal.fire('Upload Failed', res.message || 'Error occurred.', 'error');
+        }
+    })
+    .catch(err => {
+        console.error(err);
+        Swal.fire('Error', 'Network error. Please try again.', 'error');
+    });
+}
+
 document.addEventListener('DOMContentLoaded', () => {
     const urlParams = new URLSearchParams(window.location.search);
     if (urlParams.has('client_id')) {
