@@ -44,10 +44,14 @@ if ($toDate) {
 if ($pType == 'client') {
     $reportTitle = "Bills Receivable";
     $stmtInv = $pdo->prepare("
-        SELECT i.created_at as dated, b.customer_po_no as po_num, b.customer_po_date as po_date, 
-               i.invoice_number as bill_no, i.total_amount as bill_amount, b.campaign_name
+        SELECT i.created_at as dated, 
+               COALESCE(NULLIF(b.customer_po_no, ''), NULLIF(p.proposal_number, ''), NULLIF(b.external_po, '')) as po_num, 
+               COALESCE(NULLIF(b.customer_po_date, '0000-00-00'), DATE(p.created_at), DATE(b.created_at)) as po_date, 
+               i.invoice_number as bill_no, i.total_amount as bill_amount, 
+               COALESCE(NULLIF(b.campaign_name, ''), NULLIF(p.campaign_name, ''), NULLIF(b.brand_name, ''), 'General Campaign') as campaign_name
         FROM invoices i
         JOIN bookings b ON i.booking_id = b.id
+        LEFT JOIN proposals p ON b.proposal_id = p.id
         WHERE b.client_id = ? $dateFilterInv
         ORDER BY i.created_at ASC
     ");
@@ -116,10 +120,10 @@ header("Expires: 0");
 <body>
     <table style="border-collapse: collapse; width: 100%;">
         <tr>
-            <td colspan="7" class="title">SUDHA CREATIVE</td>
+            <td colspan="7" class="title"><?php echo mb_strtoupper($partnerName); ?></td>
         </tr>
         <tr>
-            <td colspan="7" class="subtitle">MAHANANDA PALLY, MALDA - 732102</td>
+            <td colspan="7" class="subtitle"><?php echo htmlspecialchars($partner['address'] ?? ''); ?></td>
         </tr>
         <tr>
             <td colspan="7" class="report-title"><?php echo $reportTitle; ?></td>

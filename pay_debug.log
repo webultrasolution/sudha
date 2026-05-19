@@ -52,3 +52,17 @@ Invoice Updated to partially_paid
 )
 
 INSERT Success. ID: 4
+2026-05-19 22:45:43 - POST: Array
+(
+    [client_id] => 24
+    [amount] => 343434
+    [payment_date] => 2026-05-19
+    [reference_no] => 3434
+    [payment_mode] => Cash
+    [doc_id] => 3
+    [type] => receivable
+)
+
+INSERT Success. ID: 5
+Updating Invoice: 3
+Invoice Updated to paid
