@@ -1,0 +1,11 @@
+[19-May-2026 23:44:23 Europe/Berlin] PHP Warning:  Undefined variable $balanceLabel in D:\xampp\htdocs\easy-outdoor-crm\modules\financials\partner_ledger.php on line 231
+[20-May-2026 03:21:35 Asia/Kolkata] PHP Deprecated:  Implicit conversion from float 1.4000000000000001 to int loses precision in D:\xampp\htdocs\easy-outdoor-crm\includes\functions.php on line 256
+[20-May-2026 03:21:35 Asia/Kolkata] PHP Deprecated:  Implicit conversion from float 14.000000000000002 to int loses precision in D:\xampp\htdocs\easy-outdoor-crm\includes\functions.php on line 256
+[20-May-2026 03:24:41 Asia/Kolkata] PHP Deprecated:  Implicit conversion from float 1.4000000000000001 to int loses precision in D:\xampp\htdocs\easy-outdoor-crm\includes\functions.php on line 256
+[20-May-2026 03:24:41 Asia/Kolkata] PHP Deprecated:  Implicit conversion from float 14.000000000000002 to int loses precision in D:\xampp\htdocs\easy-outdoor-crm\includes\functions.php on line 256
+[20-May-2026 03:27:37 Asia/Kolkata] PHP Deprecated:  Implicit conversion from float 1.4000000000000001 to int loses precision in D:\xampp\htdocs\easy-outdoor-crm\includes\functions.php on line 256
+[20-May-2026 03:27:37 Asia/Kolkata] PHP Deprecated:  Implicit conversion from float 14.000000000000002 to int loses precision in D:\xampp\htdocs\easy-outdoor-crm\includes\functions.php on line 256
+[20-May-2026 03:28:41 Asia/Kolkata] PHP Deprecated:  Implicit conversion from float 1.4000000000000001 to int loses precision in D:\xampp\htdocs\easy-outdoor-crm\includes\functions.php on line 256
+[20-May-2026 03:28:41 Asia/Kolkata] PHP Deprecated:  Implicit conversion from float 14.000000000000002 to int loses precision in D:\xampp\htdocs\easy-outdoor-crm\includes\functions.php on line 256
+[20-May-2026 03:28:42 Asia/Kolkata] PHP Deprecated:  Implicit conversion from float 1.4000000000000001 to int loses precision in D:\xampp\htdocs\easy-outdoor-crm\includes\functions.php on line 256
+[20-May-2026 03:28:42 Asia/Kolkata] PHP Deprecated:  Implicit conversion from float 14.000000000000002 to int loses precision in D:\xampp\htdocs\easy-outdoor-crm\includes\functions.php on line 256

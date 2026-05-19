@@ -99,6 +99,7 @@ foreach ($ledgerEntries as $item) {
 $outstanding = $totalInvoiced - $totalReceived;
 
 $balance = 0;
+$balanceLabel = $pType == 'client' ? 'DUE' : 'PAYABLE';
 ?>
 
 <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 2rem;">

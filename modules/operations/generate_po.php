@@ -73,7 +73,7 @@ if ($mode === 'direct') {
     
     $site_list = implode(',', array_map('intval', $site_ids));
     $itemSql = "
-        SELECT s.*, s.site_code, s.location, s.city, s.width, s.height, s.light_type, s.hsn_code, s.vendor_gst, s.type as media_type,
+        SELECT s.*, s.name as site_name, s.site_code, s.location, s.city, s.width, s.height, s.light_type, s.hsn_code, s.vendor_gst, s.type as media_type,
                s.purchase_rate as purchase_amount, ? as start_date, ? as end_date
         FROM sites s
         WHERE s.id IN ($site_list) AND s.vendor_id = ?
@@ -85,7 +85,7 @@ if ($mode === 'direct') {
 } else if ($mode === 'saved_po') {
     // Fetch Items from po_items
     $itemSql = "
-        SELECT pi.*, pi.cost as purchase_amount, s.site_code, s.location, s.city, s.width, s.height, s.light_type, s.hsn_code, s.vendor_gst, s.type as media_type
+        SELECT pi.*, pi.cost as purchase_amount, s.name as site_name, s.site_code, s.location, s.city, s.width, s.height, s.light_type, s.hsn_code, s.vendor_gst, s.type as media_type
         FROM po_items pi
         JOIN sites s ON pi.site_id = s.id
         WHERE pi.po_id = ?
@@ -127,7 +127,7 @@ if ($mode === 'direct') {
 
     if ($booking_id) {
         $itemSql = "
-            SELECT bi.*, s.site_code, s.location, s.city, s.width, s.height, s.light_type, s.hsn_code, s.vendor_gst, s.type as media_type
+            SELECT bi.*, s.name as site_name, s.site_code, s.location, s.city, s.width, s.height, s.light_type, s.hsn_code, s.vendor_gst, s.type as media_type
             FROM booking_items bi
             JOIN sites s ON bi.site_id = s.id
             WHERE bi.booking_id = ? AND s.vendor_id = ?
@@ -135,7 +135,7 @@ if ($mode === 'direct') {
         $itemParams = [$booking_id, $vendor_id];
     } else {
         $itemSql = "
-            SELECT pi.*, s.site_code, s.location, s.city, s.width, s.height, s.light_type, s.hsn_code, s.vendor_gst, s.type as media_type,
+            SELECT pi.*, s.name as site_name, s.site_code, s.location, s.city, s.width, s.height, s.light_type, s.hsn_code, s.vendor_gst, s.type as media_type,
                 pi.purchase_rate as purchase_amount, ? as start_date, ? as end_date
             FROM proposal_items pi
             JOIN sites s ON pi.site_id = s.id
@@ -158,9 +158,9 @@ $items = $stmtItems->fetchAll();
 // Safe PO Numbering
 $po_id = !empty($b['id']) ? $b['id'] : 0;
 $po_ref = ($po_id > 0) ? str_pad((string)$po_id, 3, '0', STR_PAD_LEFT) : ($b['proposal_number'] ?? 'DPO-' . date('His'));
-$ref_date = $b['start_date'] ?? $b['po_date'] ?? date('Y-m-d');
+$ref_date = $b['po_date'] ?? $b['start_date'] ?? date('Y-m-d');
 $po_number = "PO/" . date('y', strtotime($ref_date)) . "-" . date('y', strtotime($ref_date . ' +1 year')) . "/" . $po_ref;
-$po_date = date('d-m-Y');
+$po_date = date('d-M-Y', strtotime($ref_date));
 
 // Company Settings
 $company_name = getSetting('company_name', 'Sudha Creative & Advertising');
@@ -172,6 +172,42 @@ $company_email = getSetting('company_email', 'sudhacreativemalda@gmail.com');
 $company_letterhead = getSetting('company_letterhead');
 $company_signature = getSetting('company_signature', 'signature.png');
 
+// Dynamic Category of Service Calculation
+$serviceCategory = 'Display on Hoardings / Billboards';
+if (!empty($items)) {
+    $firstType = strtolower($items[0]['media_type'] ?? '');
+    if (strpos($firstType, 'hoarding') !== false) {
+        $serviceCategory = 'Display on Hoardings';
+    } elseif (strpos($firstType, 'led') !== false) {
+        $serviceCategory = 'Display on LED Screens';
+    } elseif (strpos($firstType, 'kiosk') !== false) {
+        $serviceCategory = 'Display on Kiosks';
+    } elseif (strpos($firstType, 'gantry') !== false) {
+        $serviceCategory = 'Display on Gantries';
+    } elseif (!empty($items[0]['media_type'])) {
+        $serviceCategory = 'Display on ' . ucwords($items[0]['media_type']) . 's';
+    }
+}
+
+function getStateName($gstin) {
+    $code = substr(trim($gstin ?? ''), 0, 2);
+    $states = [
+        '01' => 'JAMMU AND KASHMIR', '02' => 'HIMACHAL PRADESH', '03' => 'PUNJAB',
+        '04' => 'CHANDIGARH', '05' => 'UTTARAKHAND', '06' => 'HARYANA',
+        '07' => 'DELHI', '08' => 'RAJASTHAN', '09' => 'UTTAR PRADESH',
+        '10' => 'BIHAR', '11' => 'SIKKIM', '12' => 'ARUNACHAL PRADESH',
+        '13' => 'NAGALAND', '14' => 'MANIPUR', '15' => 'MIZORAM',
+        '16' => 'TRIPURA', '17' => 'MEGHALAYA', '18' => 'ASSAM',
+        '19' => 'WEST BENGAL', '20' => 'JHARKHAND', '21' => 'ODISHA',
+        '22' => 'CHHATTISGARH', '23' => 'MADHYA PRADESH', '24' => 'GUJARAT',
+        '26' => 'DADRA AND NAGAR HAVELI AND DAMAN AND DIU', '27' => 'MAHARASHTRA',
+        '28' => 'ANDHRA PRADESH (BEFORE DIVISION)', '29' => 'KARNATAKA',
+        '30' => 'GOA', '31' => 'LAKSHADWEEP', '32' => 'KERALA',
+        '33' => 'TAMIL NADU', '34' => 'PUDUCHERRY', '35' => 'ANDAMAN AND NICOBAR ISLANDS',
+        '36' => 'TELANGANA', '37' => 'ANDHRA PRADESH'
+    ];
+    return $states[$code] ?? 'WEST BENGAL';
+}
 ?>
 <!DOCTYPE html>
 <html lang="en">
@@ -230,81 +266,68 @@ $company_signature = getSetting('company_signature', 'signature.png');
     <?php endif; ?>
 
     <!-- PO Info -->
-    <div class="main-info">
-        <div class="info-col">
-            <div style="margin-bottom: 15px;">
-                <div class="section-title">Supplier / Vendor:</div>
-                <div style="font-weight: bold; font-size: 12px; margin-bottom: 2px;"><?php echo $v['name']; ?></div>
-                <div style="width: 250px;"><?php echo $v['address']; ?></div>
-                <div class="info-row" style="margin-top: 5px;">
-                    <span class="info-label">GSTIN / UIN</span>
-                    <span class="info-sep">:</span>
-                    <span class="info-value"><strong><?php echo $vendor_gst_filter ?: $v['gstin']; ?></strong></span>
-                </div>
-                <div class="info-row">
-                    <span class="info-label">Contact Person</span>
-                    <span class="info-sep">:</span>
-                    <span class="info-value"><?php echo $v['contact_person']; ?></span>
-                </div>
-                <div class="info-row">
-                    <span class="info-label">Phone</span>
-                    <span class="info-sep">:</span>
-                    <span class="info-value"><?php echo $v['phone']; ?></span>
-                </div>
-            </div>
-        </div>
-        
-        <div class="info-col">
-            <div class="info-row">
-                <span class="info-label">PO Number</span>
-                <span class="info-sep">:</span>
-                <span class="info-value"><strong><?php echo $po_number; ?></strong></span>
-            </div>
-            <div class="info-row">
-                <span class="info-label">PO Date</span>
-                <span class="info-sep">:</span>
-                <span class="info-value"><?php echo $po_date; ?></span>
-            </div>
-            <div class="info-row">
-                <span class="info-label">Reference</span>
-                <span class="info-sep">:</span>
-                <span class="info-value"><?php echo !empty($b['id']) ? '#BK-'.str_pad((string)$b['id'], 4, '0', STR_PAD_LEFT) : ($b['proposal_number'] ?? 'N/A'); ?></span>
-            </div>
-            <div class="info-row">
-                <span class="info-label">Campaign</span>
-                <span class="info-sep">:</span>
-                <span class="info-value"><strong><?php echo $b['campaign_name']; ?></strong></span>
-            </div>
-            <div class="info-row">
-                <span class="info-label">Client</span>
-                <span class="info-sep">:</span>
-                <span class="info-value"><?php echo $b['client_name']; ?></span>
-            </div>
-            <div class="info-row" style="margin-top: 5px;">
-                <span class="info-label">Buyer PAN</span>
-                <span class="info-sep">:</span>
-                <span class="info-value"><?php echo $company_pan; ?></span>
-            </div>
-            <div class="info-row">
-                <span class="info-label">Buyer GSTIN</span>
-                <span class="info-sep">:</span>
-                <span class="info-value"><?php echo $company_gstin; ?></span>
-            </div>
-        </div>
-    </div>
+    <table style="width: 100%; border: 1px solid #000; border-collapse: collapse; margin-bottom: 15px; font-size: 10px;">
+        <tr>
+            <td style="width: 50%; border-right: 1px solid #000; padding: 8px 10px; text-align: left; vertical-align: top; line-height: 1.45;">
+                <div style="display: flex; margin-bottom: 2px;"><span style="width: 150px; font-weight: bold;">Category of Service</span><span style="width: 10px;">:</span><span style="flex: 1;"><?php echo htmlspecialchars($serviceCategory); ?></span></div>
+                <div style="display: flex; margin-bottom: 2px;"><span style="width: 150px; font-weight: bold;">Campaign</span><span style="width: 10px;">:</span><span style="flex: 1; font-weight: bold; text-transform: uppercase;"><?php echo htmlspecialchars($b['campaign_name']); ?></span></div>
+                <div style="display: flex; margin-bottom: 2px;"><span style="width: 150px; font-weight: bold;">Purchase Order No.</span><span style="width: 10px;">:</span><span style="flex: 1; font-weight: bold; color: #1e293b;"><?php echo htmlspecialchars($po_number); ?></span></div>
+                <div style="display: flex; margin-bottom: 6px;"><span style="width: 150px; font-weight: bold;">Purchase Order Date</span><span style="width: 10px;">:</span><span style="flex: 1; font-weight: bold;"><?php echo htmlspecialchars($po_date); ?></span></div>
+                
+                <div style="display: flex; margin-bottom: 2px;"><span style="width: 150px; font-weight: bold;">Supplier Name</span><span style="width: 10px;">:</span><span style="flex: 1; font-weight: bold; text-transform: uppercase;"><?php echo htmlspecialchars($v['name']); ?></span></div>
+                <div style="display: flex; margin-bottom: 2px;"><span style="width: 150px; font-weight: bold;">Supplier Address</span><span style="width: 10px;">:</span><span style="flex: 1; font-size: 9.5px;"><?php echo htmlspecialchars($v['address']); ?></span></div>
+                
+                <?php 
+                $supplierGstin = trim($vendor_gst_filter ?: $v['gstin'] ?: '');
+                $supplierPan = strlen($supplierGstin) >= 12 ? substr($supplierGstin, 2, 10) : '';
+                $supplierStateCode = strlen($supplierGstin) >= 2 ? substr($supplierGstin, 0, 2) : '19';
+                ?>
+                <div style="display: flex; margin-bottom: 2px;"><span style="width: 150px; font-weight: bold;">Supplier Pan No</span><span style="width: 10px;">:</span><span style="flex: 1; font-weight: bold; text-transform: uppercase;"><?php echo htmlspecialchars($supplierPan ?: 'N/A'); ?></span></div>
+                <div style="display: flex; margin-bottom: 2px;"><span style="width: 150px; font-weight: bold;">Supplier GSTIN No.</span><span style="width: 10px;">:</span><span style="flex: 1; font-weight: bold; text-transform: uppercase;"><?php echo htmlspecialchars($supplierGstin ?: 'N/A'); ?></span></div>
+                <div style="display: flex; margin-bottom: 2px;"><span style="width: 150px; font-weight: bold;">Supplier State Code</span><span style="width: 10px;">:</span><span style="flex: 1; font-weight: bold;"><?php echo htmlspecialchars($supplierStateCode); ?></span></div>
+                <div style="display: flex; margin-bottom: 2px;"><span style="width: 150px; font-weight: bold;">Supplier MSME Registration</span><span style="width: 10px;">:</span><span style="flex: 1; font-weight: bold; text-transform: uppercase;"><?php echo (strlen($supplierGstin) >= 15) ? 'REGISTERED' : 'UNREGISTERED'; ?></span></div>
+                <div style="display: flex; margin-bottom: 2px;"><span style="width: 150px; font-weight: bold;">Supplier State Name</span><span style="width: 10px;">:</span><span style="flex: 1; font-weight: bold; text-transform: uppercase;"><?php echo getStateName($supplierGstin); ?></span></div>
+                <div style="display: flex; margin-bottom: 2px;"><span style="width: 150px; font-weight: bold;">Place Of Supply</span><span style="width: 10px;">:</span><span style="flex: 1; font-weight: bold; text-transform: uppercase;"><?php echo getStateName($company_gstin); ?></span></div>
+            </td>
+            
+            <td style="width: 50%; padding: 8px 10px; text-align: left; vertical-align: top; line-height: 1.45;">
+                <div style="display: flex; margin-bottom: 2px;"><span style="width: 150px; font-weight: bold;">Buyer's Name</span><span style="width: 10px;">:</span><span style="flex: 1; font-weight: bold; text-transform: uppercase;"><?php echo htmlspecialchars($company_name); ?></span></div>
+                <div style="display: flex; margin-bottom: 6px;"><span style="width: 150px; font-weight: bold;">Buyer's Address</span><span style="width: 10px;">:</span><span style="flex: 1; font-size: 9.5px;"><?php echo htmlspecialchars($company_address); ?></span></div>
+                
+                <?php 
+                $buyerGstin = trim($company_gstin);
+                $buyerPan = trim($company_pan);
+                $buyerStateCode = substr($buyerGstin, 0, 2);
+                ?>
+                <div style="display: flex; margin-bottom: 2px;"><span style="width: 150px; font-weight: bold;">Buyer Pan No.</span><span style="width: 10px;">:</span><span style="flex: 1; font-weight: bold; text-transform: uppercase;"><?php echo htmlspecialchars($buyerPan); ?></span></div>
+                <div style="display: flex; margin-bottom: 2px;"><span style="width: 150px; font-weight: bold;">Buyer GSTIN No.</span><span style="width: 10px;">:</span><span style="flex: 1; font-weight: bold; text-transform: uppercase;"><?php echo htmlspecialchars($buyerGstin); ?></span></div>
+                <div style="display: flex; margin-bottom: 2px;"><span style="width: 150px; font-weight: bold;">Buyer MSME Registration</span><span style="width: 10px;">:</span><span style="flex: 1; font-weight: bold; text-transform: uppercase;"><?php echo (strlen($buyerGstin) >= 15) ? 'REGISTERED' : 'UNREGISTERED'; ?></span></div>
+                <div style="display: flex; margin-bottom: 2px;"><span style="width: 150px; font-weight: bold;">Buyer State Code</span><span style="width: 10px;">:</span><span style="flex: 1; font-weight: bold;"><?php echo htmlspecialchars($buyerStateCode); ?></span></div>
+                <div style="display: flex; margin-bottom: 2px;"><span style="width: 150px; font-weight: bold;">Buyer State Name</span><span style="width: 10px;">:</span><span style="flex: 1; font-weight: bold; text-transform: uppercase;"><?php echo getStateName($company_gstin); ?></span></div>
+            </td>
+        </tr>
+    </table>
 
     <div class="table-title">Purchase Order Details:</div>
 
     <table>
         <thead>
             <tr>
-                <th style="width: 30px;">S.N.</th>
-                <th>LOCATION & MEDIA TYPE</th>
-                <th style="width: 70px;">HSN/SAC<br>Code</th>
-                <th style="width: 80px;">SIZE</th>
-                <th style="width: 100px;">PERIOD</th>
-                <th style="width: 80px;">Days</th>
-                <th style="width: 90px;">Total Cost(₹)</th>
+                <th rowspan="2" style="width: 35px;">Sl No</th>
+                <th rowspan="2" style="width: 70px;">HSN / SAC<br>CODE</th>
+                <th rowspan="2" style="width: 90px;">City</th>
+                <th rowspan="2">Location</th>
+                <th rowspan="2" style="width: 50px;">Size (W)</th>
+                <th rowspan="2" style="width: 50px;">Size (H)</th>
+                <th rowspan="2" style="width: 60px;">Lit /<br>Non Lit</th>
+                <th rowspan="2" style="width: 90px;">Display<br>Charges Per<br>Month</th>
+                <th colspan="2" style="width: 150px; border-bottom: 1px solid #000;">Charged Period</th>
+                <th rowspan="2" style="width: 70px;">Period</th>
+                <th rowspan="2" style="width: 95px;">Amount</th>
+            </tr>
+            <tr>
+                <th style="font-size: 8px; padding: 2px; width: 75px; border-right: 1px solid #000;">From</th>
+                <th style="font-size: 8px; padding: 2px; width: 75px;">To</th>
             </tr>
         </thead>
         <tbody>
@@ -327,26 +350,50 @@ $company_signature = getSetting('company_signature', 'signature.png');
                 $eDate = (!empty($item['end_date']) && $item['end_date'] !== '0000-00-00')
                             ? $item['end_date']
                             : ((!empty($b['end_date']) && $b['end_date'] !== '0000-00-00') ? $b['end_date'] : date('Y-m-d', strtotime('+30 days')));
+
+                // Calculate duration and monthly display charges
+                $date1 = date_create($sDate);
+                $date2 = date_create($eDate);
+                $diff = date_diff($date1, $date2);
+                $days = $diff->days + 1;
+
+                if ($days >= 28 && $days <= 31) {
+                    $periodStr = "1 Month";
+                    $monthlyCharges = $item['purchase_amount'];
+                } else {
+                    $months = round($days / 30, 1);
+                    $periodStr = $months . " Month" . ($months > 1 ? 's' : '');
+                    $monthlyCharges = $item['purchase_amount'] / ($days / 30);
+                }
+
+                // Lit / Non Lit Abbreviation
+                $lt = strtolower($item['light_type'] ?? '');
+                if (strpos($lt, 'front') !== false || $lt === 'lit' || $lt === 'fl') {
+                    $litLabel = 'FL';
+                } elseif (strpos($lt, 'back') !== false || $lt === 'bl') {
+                    $litLabel = 'BL';
+                } else {
+                    $litLabel = 'NL';
+                }
             ?>
             <tr>
                 <td><?php echo $idx + 1; ?></td>
-                <td style="text-align: left; padding-left: 10px;">
-                    <div style="font-weight: bold;"><?php echo $item['location']; ?></div>
-                    <div style="font-size: 9px; color: #555;"><?php echo $item['city']; ?> • <?php echo $item['media_type']; ?></div>
+                <td><?php echo htmlspecialchars($item['hsn_code'] ?: '998366'); ?></td>
+                <td><?php echo htmlspecialchars($item['city']); ?></td>
+                <td style="text-align: left; padding-left: 5px;">
+                    <div style="font-weight: bold; font-size: 10px; color: #1e293b;"><?php echo htmlspecialchars($item['site_name'] ?? $item['name'] ?? 'N/A'); ?></div>
+                    <?php if (!empty($item['location'])): ?>
+                        <div style="font-size: 8px; color: #64748b; margin-top: 2px; font-weight: 500;"><?php echo htmlspecialchars($item['location']); ?></div>
+                    <?php endif; ?>
                 </td>
-                <td><?php echo $item['hsn_code'] ?: '998366'; ?></td>
-                <td><?php echo $item['width']; ?>'x<?php echo $item['height']; ?>'</td>
-                <td style="font-size: 9px;">
-                    <?php echo date('d.m.Y', strtotime($sDate)); ?> to<br>
-                    <?php echo date('d.m.Y', strtotime($eDate)); ?>
-                </td>
-                <td><?php 
-                    $date1 = date_create($sDate);
-                    $date2 = date_create($eDate);
-                    $diff = date_diff($date1, $date2);
-                    echo ($diff->days + 1); 
-                ?></td>
-                <td style="text-align: right; padding-right: 10px; font-weight: bold;"><?php echo number_format($item['purchase_amount'], 2); ?></td>
+                <td><?php echo htmlspecialchars($item['width']); ?></td>
+                <td><?php echo htmlspecialchars($item['height']); ?></td>
+                <td><?php echo $litLabel; ?></td>
+                <td style="text-align: right; padding-right: 5px;"><?php echo number_format($monthlyCharges, 2); ?></td>
+                <td><?php echo date('d-m-Y', strtotime($sDate)); ?></td>
+                <td><?php echo date('d-m-Y', strtotime($eDate)); ?></td>
+                <td><?php echo $periodStr; ?></td>
+                <td style="text-align: right; padding-right: 5px; font-weight: bold;"><?php echo number_format($item['purchase_amount'], 2); ?></td>
             </tr>
             <?php endforeach; ?>
             
@@ -386,16 +433,16 @@ $company_signature = getSetting('company_signature', 'signature.png');
             ?>
             
             <tr class="totals-row">
-                <td colspan="6" style="text-align: right; padding-right: 10px;">Taxable Amount (Total Cost)</td>
-                <td style="text-align: right; padding-right: 10px;"><?php echo number_format($net_total, 2); ?></td>
+                <td colspan="11" style="text-align: right; padding-right: 10px;">Taxable Amount (Total Cost)</td>
+                <td style="text-align: right; padding-right: 10px; font-weight: bold;"><?php echo number_format($net_total, 2); ?></td>
             </tr>
             <tr class="totals-row">
-                <td colspan="6" style="text-align: right; padding-right: 10px;"><?php echo $gst_label; ?></td>
-                <td style="text-align: right; padding-right: 10px;"><?php echo number_format($gst_amount, 2); ?></td>
+                <td colspan="11" style="text-align: right; padding-right: 10px;"><?php echo $gst_label; ?></td>
+                <td style="text-align: right; padding-right: 10px; font-weight: bold;"><?php echo number_format($gst_amount, 2); ?></td>
             </tr>
             <tr class="totals-row" style="background: #f9f9f9; border-top: 2px solid #000;">
-                <td colspan="6" style="text-align: right; padding-right: 10px; font-size: 12px; height: 30px; vertical-align: middle;">Gross Payable Amount</td>
-                <td style="text-align: right; padding-right: 10px; font-size: 12px; vertical-align: middle;"><?php echo number_format($grand_total, 2); ?></td>
+                <td colspan="11" style="text-align: right; padding-right: 10px; font-size: 12px; height: 30px; vertical-align: middle;">Gross Payable Amount</td>
+                <td style="text-align: right; padding-right: 10px; font-size: 12px; vertical-align: middle; font-weight: bold;"><?php echo number_format($grand_total, 2); ?></td>
             </tr>
         </tbody>
     </table>
