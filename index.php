@@ -3,35 +3,71 @@ $activePage = 'dashboard';
 $pageTitle = 'Business Intelligence Dashboard';
 include_once __DIR__ . '/includes/header.php';
 
-// Financial Data
-$finStats = $pdo->query("
-    SELECT 
-        SUM(amount) as revenue,
-        SUM(purchase_rate * days) as cost,
-        SUM((sale_rate - purchase_rate) * days) as profit
-    FROM proposal_items 
-    JOIN proposals ON proposal_items.proposal_id = proposals.id
-    WHERE proposals.status != 'cancelled'
-")->fetch();
+// Check Dashboard Specific Permission
+if (!canView('dashboard')) {
+    echo "<div class='card' style='padding: 4rem 2rem; text-align: center; border-radius: 16px; margin: 3rem auto; max-width: 600px; box-shadow: 0 10px 30px rgba(0,0,0,0.05); border: none; background: white;'>
+        <div style='background: #fee2e2; color: #ef4444; width: 80px; height: 80px; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 2.5rem; margin: 0 auto 2rem;'>
+            <i class='fas fa-lock'></i>
+        </div>
+        <h2 style='color: #0f172a; font-weight: 800; font-size: 1.75rem; margin: 0 0 0.5rem 0;'>Dashboard Locked</h2>
+        <p style='color: #64748b; line-height: 1.6; margin: 0 0 2rem 0; font-size: 0.95rem;'>Your current user role does not have authorization to view the Business Intelligence Dashboard. Please use the sidebar to navigate to your assigned modules.</p>
+        <div style='display: flex; justify-content: center; gap: 1rem;'>
+            <a href='modules/inventory/sites.php' class='btn btn-secondary' style='font-weight: 700; border-radius: 8px; padding: 0.6rem 1.25rem; font-size: 0.85rem; text-decoration: none; display: inline-flex; align-items: center; gap: 6px;'><i class='fas fa-map-marked-alt'></i> View Sites</a>
+            <a href='modules/proposals/proposals.php' class='btn btn-primary' style='font-weight: 700; border-radius: 8px; padding: 0.6rem 1.25rem; font-size: 0.85rem; text-decoration: none; display: inline-flex; align-items: center; gap: 6px;'><i class='fas fa-file-contract'></i> Proposals</a>
+        </div>
+    </div>";
+    include_once __DIR__ . '/includes/footer.php';
+    exit;
+}
 
-$revenue = $finStats['revenue'] ?: 0;
-$cost = $finStats['cost'] ?: 0;
-$profit = $finStats['profit'] ?: 0;
-$margin = $revenue > 0 ? ($profit / $revenue) * 100 : 0;
+$canViewFinancials = canView('financials');
+$canViewInventory = canView('inventory');
+$canViewProposals = canView('proposals');
+$canViewBookings = canView('bookings');
 
-// Monthly Data for Chart
-$monthlyData = $pdo->query("
-    SELECT DATE_FORMAT(p.created_at, '%b %Y') as month, SUM(pi.amount) as rev, SUM((pi.sale_rate - pi.purchase_rate) * pi.days) as prof
-    FROM proposals p JOIN proposal_items pi ON p.id = pi.proposal_id
-    WHERE p.status != 'cancelled' GROUP BY month ORDER BY p.created_at ASC LIMIT 6
-")->fetchAll();
+$revenue = 0;
+$cost = 0;
+$profit = 0;
+$margin = 0;
+$chartLabels = '[]';
+$chartRevenue = '[]';
+$chartProfit = '[]';
 
-$chartLabels = json_encode(array_column($monthlyData, 'month'));
-$chartRevenue = json_encode(array_column($monthlyData, 'rev'));
-$chartProfit = json_encode(array_column($monthlyData, 'prof'));
+if ($canViewFinancials) {
+    // Financial Data
+    $finStats = $pdo->query("
+        SELECT 
+            SUM(amount) as revenue,
+            SUM(purchase_rate * days) as cost,
+            SUM((sale_rate - purchase_rate) * days) as profit
+        FROM proposal_items 
+        JOIN proposals ON proposal_items.proposal_id = proposals.id
+        WHERE proposals.status != 'cancelled'
+    ")->fetch();
 
-$totalSites = $pdo->query("SELECT COUNT(*) FROM sites")->fetchColumn() ?: 1;
-$bookedSites = $pdo->query("SELECT COUNT(*) FROM sites WHERE status = 'booked'")->fetchColumn();
+    $revenue = $finStats['revenue'] ?: 0;
+    $cost = $finStats['cost'] ?: 0;
+    $profit = $finStats['profit'] ?: 0;
+    $margin = $revenue > 0 ? ($profit / $revenue) * 100 : 0;
+
+    // Monthly Data for Chart
+    $monthlyData = $pdo->query("
+        SELECT DATE_FORMAT(p.created_at, '%b %Y') as month, SUM(pi.amount) as rev, SUM((pi.sale_rate - pi.purchase_rate) * pi.days) as prof
+        FROM proposals p JOIN proposal_items pi ON p.id = pi.proposal_id
+        WHERE p.status != 'cancelled' GROUP BY month ORDER BY p.created_at ASC LIMIT 6
+    ")->fetchAll();
+
+    $chartLabels = json_encode(array_column($monthlyData, 'month'));
+    $chartRevenue = json_encode(array_column($monthlyData, 'rev'));
+    $chartProfit = json_encode(array_column($monthlyData, 'prof'));
+}
+
+$totalSites = 1;
+$bookedSites = 0;
+if ($canViewInventory) {
+    $totalSites = $pdo->query("SELECT COUNT(*) FROM sites")->fetchColumn() ?: 1;
+    $bookedSites = $pdo->query("SELECT COUNT(*) FROM sites WHERE status = 'booked'")->fetchColumn();
+}
 ?>
 
 <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
@@ -39,6 +75,7 @@ $bookedSites = $pdo->query("SELECT COUNT(*) FROM sites WHERE status = 'booked'")
 <div class="dashboard-container" style="padding: 10px;">
     <!-- Row 1: Metrics -->
     <div class="metrics-grid">
+        <?php if ($canViewFinancials): ?>
         <div class="metric-card g-blue">
             <div class="m-content">
                 <i class="fas fa-chart-line"></i>
@@ -58,20 +95,28 @@ $bookedSites = $pdo->query("SELECT COUNT(*) FROM sites WHERE status = 'booked'")
             </div>
             <div class="m-mini-badge"><?php echo number_format($margin, 1); ?>%</div>
         </div>
+        <?php endif; ?>
+        
+        <?php if ($canViewInventory): ?>
         <div class="metric-card g-purple">
             <div class="m-content">
                 <i class="fas fa-map-marker-alt"></i>
                 <div class="m-data"><span>Occupancy</span><h3><?php echo $bookedSites; ?> / <?php echo $totalSites; ?></h3></div>
             </div>
         </div>
+        <?php endif; ?>
     </div>
 
     <!-- Row 2: Charts -->
-    <div class="charts-row">
+    <div class="charts-row" style="<?php echo !$canViewFinancials ? 'grid-template-columns: 1fr;' : ''; ?>">
+        <?php if ($canViewFinancials): ?>
         <div class="chart-box main-chart">
             <div class="box-header"><h4>Revenue vs Profit Analytics</h4></div>
             <div class="chart-wrapper"><canvas id="revenueChart"></canvas></div>
         </div>
+        <?php endif; ?>
+        
+        <?php if ($canViewInventory): ?>
         <div class="chart-box mini-chart">
             <div class="box-header"><h4>Media Type Distribution</h4></div>
             <div class="chart-wrapper"><canvas id="typeChart"></canvas></div>
@@ -81,11 +126,18 @@ $bookedSites = $pdo->query("SELECT COUNT(*) FROM sites WHERE status = 'booked'")
             $typeCounts = json_encode(array_column($typeData, 'count'));
             ?>
         </div>
+        <?php endif; ?>
     </div>
 
     <!-- Row 3: Tables & Details -->
-    <div class="details-row">
+    <div class="details-row" style="<?php 
+        $cols = 0;
+        if ($canViewFinancials) $cols++;
+        if ($canViewInventory) $cols += 2; // Vendor sources & Inventory Status
+        echo "grid-template-columns: repeat($cols, 1fr);";
+    ?>">
         <!-- Top Proposals -->
+        <?php if ($canViewFinancials): ?>
         <div class="table-box">
             <div class="box-header"><h4>Top Proposals</h4></div>
             <table class="modern-table">
@@ -103,8 +155,10 @@ $bookedSites = $pdo->query("SELECT COUNT(*) FROM sites WHERE status = 'booked'")
                 </tbody>
             </table>
         </div>
+        <?php endif; ?>
 
         <!-- Vendor Progress -->
+        <?php if ($canViewInventory): ?>
         <div class="table-box">
             <div class="box-header"><h4>Vendor Sources</h4></div>
             <div class="vendor-grid">
@@ -131,10 +185,17 @@ $bookedSites = $pdo->query("SELECT COUNT(*) FROM sites WHERE status = 'booked'")
             <div class="box-header"><h4>Inventory Status</h4></div>
             <div class="chart-wrapper"><canvas id="statusChart"></canvas></div>
         </div>
+        <?php endif; ?>
     </div>
 
     <!-- Row 4: Footer Polished Row -->
-    <div class="polished-footer">
+    <div class="polished-footer" style="<?php 
+        $footCols = 1; // Quick Links is always visible
+        if ($canViewFinancials) $footCols++; // Top Clients
+        if (hasRole('admin')) $footCols++; // System Activity is admin only
+        echo "grid-template-columns: repeat($footCols, 1fr);";
+    ?>">
+        <?php if ($canViewFinancials): ?>
         <div class="footer-card">
             <h5><i class="fas fa-crown"></i> Top Clients</h5>
             <div class="client-list">
@@ -153,6 +214,9 @@ $bookedSites = $pdo->query("SELECT COUNT(*) FROM sites WHERE status = 'booked'")
                 <?php endforeach; ?>
             </div>
         </div>
+        <?php endif; ?>
+        
+        <?php if (hasRole('admin')): ?>
         <div class="footer-card">
             <h5><i class="fas fa-history"></i> System Activity</h5>
             <div class="activity-list">
@@ -163,12 +227,20 @@ $bookedSites = $pdo->query("SELECT COUNT(*) FROM sites WHERE status = 'booked'")
                 <?php endforeach; ?>
             </div>
         </div>
+        <?php endif; ?>
+        
         <div class="footer-card dark-card">
             <h5>Quick Links</h5>
             <div class="quick-links">
+                <?php if (canAdd('proposals')): ?>
                 <a href="modules/proposals/create.php"><i class="fas fa-plus"></i> New Proposal</a>
+                <?php endif; ?>
+                <?php if (canAdd('bookings')): ?>
                 <a href="modules/operations/direct_booking.php"><i class="fas fa-plus-circle"></i> Direct Booking</a>
+                <?php endif; ?>
+                <?php if (canView('inventory')): ?>
                 <a href="modules/inventory/sites.php"><i class="fas fa-th"></i> Inventory</a>
+                <?php endif; ?>
             </div>
         </div>
     </div>
@@ -218,40 +290,46 @@ $bookedSites = $pdo->query("SELECT COUNT(*) FROM sites WHERE status = 'booked'")
 
 <script>
 // Line Chart
-new Chart(document.getElementById('revenueChart').getContext('2d'), {
-    type: 'line',
-    data: {
-        labels: <?php echo $chartLabels; ?>,
-        datasets: [{
-            label: 'Revenue', data: <?php echo $chartRevenue; ?>,
-            borderColor: '#3b82f6', backgroundColor: 'rgba(59, 130, 246, 0.1)', fill: true, tension: 0.4, borderWidth: 3
-        }, {
-            label: 'Profit', data: <?php echo $chartProfit; ?>,
-            borderColor: '#10b981', backgroundColor: 'transparent', fill: false, tension: 0.4, borderWidth: 3, borderDash: [5, 5]
-        }]
-    },
-    options: { maintainAspectRatio: false, plugins: { legend: { display: false } }, scales: { y: { beginAtZero: true, grid: { color: '#f1f5f9' }, ticks: { font: { size: 10 } } }, x: { grid: { display: false }, ticks: { font: { size: 10 } } } } }
-});
+if (document.getElementById('revenueChart')) {
+    new Chart(document.getElementById('revenueChart').getContext('2d'), {
+        type: 'line',
+        data: {
+            labels: <?php echo $chartLabels; ?>,
+            datasets: [{
+                label: 'Revenue', data: <?php echo $chartRevenue; ?>,
+                borderColor: '#3b82f6', backgroundColor: 'rgba(59, 130, 246, 0.1)', fill: true, tension: 0.4, borderWidth: 3
+            }, {
+                label: 'Profit', data: <?php echo $chartProfit; ?>,
+                borderColor: '#10b981', backgroundColor: 'transparent', fill: false, tension: 0.4, borderWidth: 3, borderDash: [5, 5]
+            }]
+        },
+        options: { maintainAspectRatio: false, plugins: { legend: { display: false } }, scales: { y: { beginAtZero: true, grid: { color: '#f1f5f9' }, ticks: { font: { size: 10 } } }, x: { grid: { display: false }, ticks: { font: { size: 10 } } } } }
+    });
+}
 
 // Doughnut
-new Chart(document.getElementById('typeChart'), {
-    type: 'doughnut',
-    data: {
-        labels: <?php echo $typeLabels; ?>,
-        datasets: [{ data: <?php echo $typeCounts; ?>, backgroundColor: ['#3b82f6', '#10b981', '#f59e0b', '#ef4444', '#8b5cf6'], borderWidth: 0 }]
-    },
-    options: { maintainAspectRatio: false, cutout: '75%', plugins: { legend: { position: 'bottom', labels: { boxWidth: 10, font: { size: 10 } } } } }
-});
+if (document.getElementById('typeChart')) {
+    new Chart(document.getElementById('typeChart'), {
+        type: 'doughnut',
+        data: {
+            labels: <?php echo $typeLabels; ?>,
+            datasets: [{ data: <?php echo $typeCounts; ?>, backgroundColor: ['#3b82f6', '#10b981', '#f59e0b', '#ef4444', '#8b5cf6'], borderWidth: 0 }]
+        },
+        options: { maintainAspectRatio: false, cutout: '75%', plugins: { legend: { position: 'bottom', labels: { boxWidth: 10, font: { size: 10 } } } } }
+    });
+}
 
 // Pie
-new Chart(document.getElementById('statusChart'), {
-    type: 'pie',
-    data: {
-        labels: ['Booked', 'Available'],
-        datasets: [{ data: [<?php echo $bookedSites; ?>, <?php echo ($totalSites-$bookedSites); ?>], backgroundColor: ['#ef4444', '#10b981'], borderWidth: 0 }]
-    },
-    options: { maintainAspectRatio: false, plugins: { legend: { position: 'bottom', labels: { boxWidth: 10, font: { size: 10 } } } } }
-});
+if (document.getElementById('statusChart')) {
+    new Chart(document.getElementById('statusChart'), {
+        type: 'pie',
+        data: {
+            labels: ['Booked', 'Available'],
+            datasets: [{ data: [<?php echo $bookedSites; ?>, <?php echo ($totalSites-$bookedSites); ?>], backgroundColor: ['#ef4444', '#10b981'], borderWidth: 0 }]
+        },
+        options: { maintainAspectRatio: false, plugins: { legend: { position: 'bottom', labels: { boxWidth: 10, font: { size: 10 } } } } }
+    });
+}
 </script>
 
 <?php include_once __DIR__ . '/includes/footer.php'; ?>

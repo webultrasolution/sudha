@@ -17,6 +17,7 @@ $pdo->exec("CREATE TABLE IF NOT EXISTS role_permissions (
 
 // Defined Modules with Descriptions
 $modules = [
+    'dashboard'  => ['name' => 'Dashboard', 'icon' => 'fa-th-large', 'desc' => 'Allow access to visual business intelligence dashboard and charts.'],
     'clients'    => ['name' => 'Clients', 'icon' => 'fa-building', 'desc' => 'Manage client database, business parameters, and accounting links.'],
     'vendors'    => ['name' => 'Vendors', 'icon' => 'fa-truck-loading', 'desc' => 'Manage partners, vendors, printing rates, and purchase orders.'],
     'inventory'  => ['name' => 'Inventory', 'icon' => 'fa-map-marked-alt', 'desc' => 'Control outdoor media sites, pricing, specifications, and availability.'],
