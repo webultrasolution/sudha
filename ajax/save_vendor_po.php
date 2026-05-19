@@ -37,14 +37,22 @@ try {
         $subtotal += floatval($site['rate']);
     }
 
+    // Check if vendor has GSTIN in database
+    $stmtGst = $pdo->prepare("SELECT gstin FROM partners WHERE id = ?");
+    $stmtGst->execute([$vendor_id]);
+    $db_vendor_gst = trim($stmtGst->fetchColumn() ?: '');
+    $vendor_has_gst = !empty($db_vendor_gst);
+
     $cgst = 0;
     $sgst = 0;
     $igst = 0;
-    if ($tax_type === 'cgst_sgst') {
-        $cgst = $subtotal * 0.09;
-        $sgst = $subtotal * 0.09;
-    } elseif ($tax_type === 'igst') {
-        $igst = $subtotal * 0.18;
+    if ($vendor_has_gst) {
+        if ($tax_type === 'cgst_sgst') {
+            $cgst = $subtotal * 0.09;
+            $sgst = $subtotal * 0.09;
+        } elseif ($tax_type === 'igst') {
+            $igst = $subtotal * 0.18;
+        }
     }
     $grand_total = $subtotal + $cgst + $sgst + $igst;
 

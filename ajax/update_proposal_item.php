@@ -2,6 +2,8 @@
 include_once __DIR__ . '/../config/db.php';
 include_once __DIR__ . '/../includes/functions.php';
 
+header('Content-Type: application/json');
+
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     $id = intval($_POST['id']);
     $field = $_POST['field'];
@@ -11,25 +13,71 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
     if ($field === 'sale_rate') {
         $rateVal = floatval($value);
-        // Update the item
         $stmt = $pdo->prepare("UPDATE proposal_items SET sale_rate = ?, amount = sale_rate * COALESCE(days, 30) / 30 WHERE id = ?");
         $stmt->execute([$rateVal, $id]);
         $success = true;
     } elseif ($field === 'start_date') {
         $dateVal = clean($value);
         if (!empty($dateVal)) {
-            // Fetch item days and calculate end_date
-            $stmt = $pdo->prepare("SELECT days FROM proposal_items WHERE id = ?");
+            $stmt = $pdo->prepare("SELECT end_date, days FROM proposal_items WHERE id = ?");
             $stmt->execute([$id]);
-            $days = intval($stmt->fetchColumn() ?: 30);
+            $row = $stmt->fetch();
+            $currEndDate = $row['end_date'];
+            $currDays = intval($row['days'] ?: 30);
             
-            $endDate = date('Y-m-d', strtotime($dateVal . " + " . ($days - 1) . " days"));
+            if (!empty($currEndDate)) {
+                $days = max(1, ceil((strtotime($currEndDate) - strtotime($dateVal)) / 86400) + 1);
+                $endDate = $currEndDate;
+            } else {
+                $days = $currDays;
+                $endDate = date('Y-m-d', strtotime($dateVal . " + " . ($days - 1) . " days"));
+            }
             
-            $stmt = $pdo->prepare("UPDATE proposal_items SET start_date = ?, end_date = ? WHERE id = ?");
-            $stmt->execute([$dateVal, $endDate, $id]);
+            $stmt = $pdo->prepare("UPDATE proposal_items SET start_date = ?, end_date = ?, days = ?, amount = sale_rate * ? / 30 WHERE id = ?");
+            $stmt->execute([$dateVal, $endDate, $days, $days, $id]);
         } else {
             $stmt = $pdo->prepare("UPDATE proposal_items SET start_date = NULL, end_date = NULL WHERE id = ?");
             $stmt->execute([$id]);
+        }
+        $success = true;
+    } elseif ($field === 'end_date') {
+        $dateVal = clean($value);
+        if (!empty($dateVal)) {
+            $stmt = $pdo->prepare("SELECT start_date, days FROM proposal_items WHERE id = ?");
+            $stmt->execute([$id]);
+            $row = $stmt->fetch();
+            $currStartDate = $row['start_date'];
+            $currDays = intval($row['days'] ?: 30);
+            
+            if (!empty($currStartDate)) {
+                $days = max(1, ceil((strtotime($dateVal) - strtotime($currStartDate)) / 86400) + 1);
+                $startDate = $currStartDate;
+            } else {
+                $days = $currDays;
+                $startDate = date('Y-m-d', strtotime($dateVal . " - " . ($days - 1) . " days"));
+            }
+            
+            $stmt = $pdo->prepare("UPDATE proposal_items SET start_date = ?, end_date = ?, days = ?, amount = sale_rate * ? / 30 WHERE id = ?");
+            $stmt->execute([$startDate, $dateVal, $days, $days, $id]);
+        } else {
+            $stmt = $pdo->prepare("UPDATE proposal_items SET end_date = NULL WHERE id = ?");
+            $stmt->execute([$id]);
+        }
+        $success = true;
+    } elseif ($field === 'days') {
+        $daysVal = max(1, intval($value));
+        
+        $stmt = $pdo->prepare("SELECT start_date FROM proposal_items WHERE id = ?");
+        $stmt->execute([$id]);
+        $startDate = $stmt->fetchColumn();
+        
+        if (!empty($startDate)) {
+            $endDate = date('Y-m-d', strtotime($startDate . " + " . ($daysVal - 1) . " days"));
+            $stmt = $pdo->prepare("UPDATE proposal_items SET days = ?, end_date = ?, amount = sale_rate * ? / 30 WHERE id = ?");
+            $stmt->execute([$daysVal, $endDate, $daysVal, $id]);
+        } else {
+            $stmt = $pdo->prepare("UPDATE proposal_items SET days = ?, amount = sale_rate * ? / 30 WHERE id = ?");
+            $stmt->execute([$daysVal, $daysVal, $id]);
         }
         $success = true;
     }

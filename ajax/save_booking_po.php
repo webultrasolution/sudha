@@ -61,9 +61,18 @@ try {
         $subtotal += floatval($item['purchase_amount'] ?? 0);
     }
     
-    // Assume 18% IGST or CGST/SGST based on logic. We'll default to 18% IGST for simplicity, or 9/9.
-    $cgst = $subtotal * 0.09;
-    $sgst = $subtotal * 0.09;
+    // Check if vendor has GSTIN in database
+    $stmtGst = $pdo->prepare("SELECT gstin FROM partners WHERE id = ?");
+    $stmtGst->execute([$vendor_id]);
+    $db_vendor_gst = trim($stmtGst->fetchColumn() ?: '');
+    $vendor_has_gst = !empty($db_vendor_gst);
+
+    $cgst = 0;
+    $sgst = 0;
+    if ($vendor_has_gst) {
+        $cgst = $subtotal * 0.09;
+        $sgst = $subtotal * 0.09;
+    }
     $grandTotal = $subtotal + $cgst + $sgst;
 
     // 5. Generate PO Number
