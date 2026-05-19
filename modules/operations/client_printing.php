@@ -295,12 +295,13 @@ document.getElementById('poForm')?.addEventListener('submit', function(e) {
 else:
 
 if (empty($rates)) die("No rates selected for this PO.");
+$is_final = isset($_GET['is_final']) && $_GET['is_final'] === '1';
 ?>
 <!DOCTYPE html>
 <html lang="en">
 <head>
     <meta charset="UTF-8">
-    <title>Client Printing Invoice - <?php echo htmlspecialchars($c['name'], ENT_QUOTES, 'UTF-8', false); ?></title>
+    <title><?php echo $is_final ? 'Tax Invoice' : 'Client Printing Invoice'; ?> - <?php echo htmlspecialchars($c['name'], ENT_QUOTES, 'UTF-8', false); ?></title>
     <style>
         @page { size: A4; margin: 0; }
         body { font-family: 'Arial', sans-serif; margin: 0; padding: 20px; color: #000; font-size: 11px; line-height: 1.3; }
@@ -339,7 +340,7 @@ if (empty($rates)) die("No rates selected for this PO.");
 </head>
 <body>
 
-<button class="btn-print" onclick="window.print()">PRINT CLIENT PO</button>
+<button class="btn-print" onclick="window.print()"><?php echo $is_final ? 'PRINT TAX INVOICE' : 'PRINT CLIENT PO'; ?></button>
 <a class="btn-back" href="client_printing.php?client_id=<?php echo $client_id; ?>&filter_vendor_id=<?php echo $selectedFilterVendorId; ?>">← BACK TO SELECTION</a>
 
 <div class="po-wrapper">
@@ -381,19 +382,19 @@ if (empty($rates)) die("No rates selected for this PO.");
 
         <div class="info-col">
             <div class="info-row">
-                <span class="info-label">PO Number</span>
+                <span class="info-label"><?php echo $is_final ? 'Invoice Number' : 'PO Number'; ?></span>
                 <span class="info-sep">:</span>
                 <span class="info-value"><strong><?php echo $po_number; ?></strong></span>
             </div>
             <div class="info-row">
-                <span class="info-label">PO Date</span>
+                <span class="info-label"><?php echo $is_final ? 'Invoice Date' : 'PO Date'; ?></span>
                 <span class="info-sep">:</span>
                 <span class="info-value"><?php echo $po_date; ?></span>
             </div>
             <div class="info-row">
                 <span class="info-label">Type</span>
                 <span class="info-sep">:</span>
-                <span class="info-value"><strong>CLIENT PRINTING ORDER</strong></span>
+                <span class="info-value"><strong><?php echo $is_final ? 'TAX INVOICE (FINAL)' : 'CLIENT PRINTING ORDER'; ?></strong></span>
             </div>
             <?php if ($po_remark): ?>
             <div class="info-row">
@@ -415,7 +416,7 @@ if (empty($rates)) die("No rates selected for this PO.");
         </div>
     </div>
 
-    <div class="table-title">Printing Order Details:</div>
+    <div class="table-title"><?php echo $is_final ? 'Tax Invoice Details' : 'Printing Order Details'; ?>:</div>
 
     <table>
         <thead>

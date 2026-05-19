@@ -336,7 +336,7 @@ $printingRates = $pdo->query("SELECT * FROM vendor_printing_rates")->fetchAll(PD
                         <td style="padding: 0.6rem 1rem;">
                             <div style="font-size: 0.5rem; color: var(--primary); font-weight: 900; text-transform: uppercase; margin-bottom: 2px;">Offer Rate</div>
                             <input type="number" class="p-input sale-rate-input" 
-                                   value="<?php echo $s['card_rate']; ?>" 
+                                   value="<?php echo (float)$s['card_rate']; ?>" 
                                    oninput="updateSitePrice('<?php echo $s['id']; ?>', this.value)"
                                    style="width: 80px; height: 24px; font-size: 0.75rem; font-weight: 800; border-radius: 5px; padding: 0 0.3rem;">
                         </td>

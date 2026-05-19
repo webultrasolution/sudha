@@ -58,7 +58,8 @@ $rates = $pdo->query("
         GROUP_CONCAT(COALESCE(s.width, 0) SEPARATOR '||') as widths,
         GROUP_CONCAT(COALESCE(s.height, 0) SEPARATOR '||') as heights,
         GROUP_CONCAT(r.media_type SEPARATOR '||') as media_types,
-        GROUP_CONCAT(r.rate_per_sqft SEPARATOR '||') as rates
+        GROUP_CONCAT(r.rate_per_sqft SEPARATOR '||') as rates,
+        MAX(r.is_final_invoice) as is_final_invoice
     FROM client_printing_rates r
     JOIN partners c ON r.client_id = c.id
     LEFT JOIN sites s ON r.site_id = s.id
@@ -113,9 +114,7 @@ $clients = $pdo->query("SELECT id, name FROM partners WHERE type = 'client' ORDE
             <tr class="rate-row" data-client-id="<?php echo $r['client_id']; ?>">
                 <td style="text-align: center;">
                    
-                    <a href="<?php echo $pdfUrl; ?>" target="_blank" title="Download Group Client PO" style="color: #ef4444; font-size: 1.1rem;">
-                        <i class="fas fa-file-pdf"></i>
-                    </a>
+                   
                 </td>
                 <td>
                     <strong><?php echo htmlspecialchars($r['client_name'], ENT_QUOTES, 'UTF-8', false); ?></strong>
@@ -171,6 +170,23 @@ $clients = $pdo->query("SELECT id, name FROM partners WHERE type = 'client' ORDE
                                 </button>
                             </div>
                         <?php endforeach; ?>
+                        
+                        <!-- Row-level Final Tax Invoice Action -->
+                        <div style="margin-top: 10px; padding-top: 5px; border-top: 1px solid #e2e8f0; display: flex; justify-content: flex-end; gap: 8px; width: 100%;">
+                            <?php if ($r['is_final_invoice']): ?>
+                                <?php 
+                                    $taxInvUrl = "../operations/client_printing.php?client_id=" . $r['client_id'] . "&preview=1&is_final=1";
+                                    foreach($ids as $id) $taxInvUrl .= "&rate_ids[]=" . $id;
+                                ?>
+                                <a href="<?php echo $taxInvUrl; ?>" target="_blank" class="btn" style="background: #10b981; color: white; padding: 4px 10px; border-radius: 6px; font-size: 0.75rem; font-weight: 700; display: inline-flex; align-items: center; gap: 4px; text-decoration: none;" title="View Final Tax Invoice">
+                                    <i class="fas fa-eye"></i> View Tax Invoice
+                                </a>
+                            <?php else: ?>
+                                <button class="btn" onclick="openPrintingInvoicePopup('<?php echo htmlspecialchars($r['po_number'] ?? '', ENT_QUOTES); ?>', <?php echo $r['client_id']; ?>, '<?php echo implode(',', $ids); ?>')" style="background: #0f172a; color: white; padding: 4px 10px; border-radius: 6px; font-size: 0.75rem; font-weight: 700; border: none; cursor: pointer; display: inline-flex; align-items: center; gap: 4px;" title="Final Tax Invoice">
+                                    <i class="fas fa-file-invoice-dollar"></i> Final Tax Invoice
+                                </button>
+                            <?php endif; ?>
+                        </div>
                     </div>
                 </td>
             </tr>
@@ -232,6 +248,98 @@ function deleteRate(id) {
             });
         }
     });
+}
+
+function openPrintingInvoicePopup(poNumber, clientId, rateIdsStr) {
+    Swal.fire({
+        title: 'Printing PO Confirmation',
+        html: `
+            <div style="text-align: left;">
+                <label style="display:block; font-size: 0.75rem; font-weight: 700; color: #64748b; margin-bottom: 5px;">CONFIRMATION TYPE</label>
+                <select id="confirmation_type" class="swal2-input" style="margin: 0 0 1rem 0; width: 100%; box-sizing: border-box;" onchange="toggleConfFields()">
+                    <option value="po">Customer Purchase Order (PO)</option>
+                    <option value="email">Email Confirmation</option>
+                </select>
+
+                <div id="po_fields">
+                    <label style="display:block; font-size: 0.75rem; font-weight: 700; color: #64748b; margin-bottom: 5px;">CUSTOMER PO NUMBER</label>
+                    <input id="customer_po_no" class="swal2-input" placeholder="Enter PO ID" style="margin: 0 0 1rem 0; width: 100%; box-sizing: border-box;">
+                    
+                    <label style="display:block; font-size: 0.75rem; font-weight: 700; color: #64748b; margin-bottom: 5px;">PO DATE</label>
+                    <input id="customer_po_date" type="date" class="swal2-input" style="margin: 0 0 1rem 0; width: 100%; box-sizing: border-box;">
+                </div>
+
+                <div id="email_fields" style="display:none;">
+                    <label style="display:block; font-size: 0.75rem; font-weight: 700; color: #64748b; margin-bottom: 5px;">EMAIL CONFIRMATION DATE</label>
+                    <input id="email_date" type="date" class="swal2-input" style="margin: 0 0 1rem 0; width: 100%; box-sizing: border-box;">
+                </div>
+                
+                <label style="display:block; font-size: 0.75rem; font-weight: 700; color: #64748b; margin-bottom: 5px;">UPLOAD ATTACHMENT (PDF/IMAGE)</label>
+                <input id="customer_po_file" type="file" accept=".pdf,image/*" class="swal2-file" style="margin: 0; width: 100%; box-sizing: border-box; border: 1px solid #e2e8f0; padding: 10px; border-radius: 6px;">
+            </div>
+        `,
+        focusConfirm: false,
+        showCancelButton: true,
+        confirmButtonText: 'Save & Generate Invoice',
+        preConfirm: () => {
+            const type = document.getElementById('confirmation_type').value;
+            const po_no = document.getElementById('customer_po_no').value;
+            const po_date = document.getElementById('customer_po_date').value;
+            const email_date = document.getElementById('email_date').value;
+            const po_file = document.getElementById('customer_po_file').files[0];
+            
+            if (type === 'po') {
+                if (!po_no) { Swal.showValidationMessage(`Customer PO Number is mandatory`); return false; }
+                if (!po_date) { Swal.showValidationMessage(`PO Date is mandatory`); return false; }
+            }
+            if (type === 'email') {
+                if (!email_date) { Swal.showValidationMessage(`Email Confirmation Date is mandatory`); return false; }
+            }
+            if (!po_file) {
+                Swal.showValidationMessage(`Please upload the PO/Email attachment (PDF/Image)`);
+                return false;
+            }
+            
+            let formData = new FormData();
+            formData.append('po_number', poNumber);
+            formData.append('client_id', clientId);
+            formData.append('rate_ids', rateIdsStr);
+            formData.append('confirmation_type', type);
+            formData.append('customer_po_no', po_no);
+            formData.append('customer_po_date', po_date);
+            formData.append('email_date', email_date);
+            formData.append('customer_po_file', po_file);
+            
+            return fetch('../../ajax/upload_printing_po.php', {
+                method: 'POST',
+                body: formData
+            }).then(response => response.json())
+            .then(data => {
+                if (!data.success) {
+                    throw new Error(data.message || 'Upload failed');
+                }
+                return true;
+            }).catch(error => {
+                Swal.showValidationMessage(`Request failed: ${error}`);
+            });
+        }
+    }).then((result) => {
+        if (result.isConfirmed) {
+            let rateIds = rateIdsStr.split(',');
+            let taxInvUrl = `../operations/client_printing.php?client_id=${clientId}&preview=1&is_final=1`;
+            rateIds.forEach(id => taxInvUrl += `&rate_ids[]=${id}`);
+            window.open(taxInvUrl, '_blank');
+            window.location.reload();
+        }
+    });
+}
+
+function toggleConfFields() {
+    const type = document.getElementById('confirmation_type').value;
+    const poFields = document.getElementById('po_fields');
+    const emailFields = document.getElementById('email_fields');
+    if (poFields) poFields.style.display = type === 'po' ? 'block' : 'none';
+    if (emailFields) emailFields.style.display = type === 'email' ? 'block' : 'none';
 }
 </script>
 
