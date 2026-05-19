@@ -57,6 +57,10 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         $stmtOps = $pdo->prepare("INSERT INTO operations (booking_id, site_id, status) VALUES (?, ?, 'pending')");
         
         foreach ($items as $item) {
+            // Respect custom item start/end dates if set, otherwise fallback to global proposal dates
+            $itemStartDate = (!empty($item['start_date']) && $item['start_date'] !== '0000-00-00') ? $item['start_date'] : $proposal['start_date'];
+            $itemEndDate = (!empty($item['end_date']) && $item['end_date'] !== '0000-00-00') ? $item['end_date'] : $proposal['end_date'];
+
             // Save snapshot to booking_items
             $stmtBI->execute([
                 $bookingId, 
@@ -64,8 +68,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 $item['site_id'], 
                 $item['purchase_rate'],
                 $item['sale_rate'], 
-                $proposal['start_date'], 
-                $proposal['end_date'], 
+                $itemStartDate, 
+                $itemEndDate, 
                 $item['days'], 
                 0, // Set purchase_amount to 0 by default (user must confirm manually)
                 $item['amount']

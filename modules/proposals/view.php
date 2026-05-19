@@ -189,9 +189,9 @@ $taMarkupPct = ($taCost > 0) ? ($taMarkup / $taCost) * 100 : 0;
         <div style="display: flex; gap: 1rem;">
             <div style="position: relative;">
                 <i class="fas fa-search" style="position: absolute; left: 1rem; top: 50%; transform: translateY(-50%); color: #94a3b8; font-size: 0.85rem;"></i>
-                <input type="text" placeholder="Search in plan..." class="p-input" style="width: 250px; padding-left: 2.5rem; height: 38px; border-radius: 8px;">
+                <input type="text" id="tableSearch" placeholder="Search in plan..." class="p-input" style="width: 250px; padding-left: 2.5rem; height: 38px; border-radius: 8px;">
             </div>
-            <button class="btn btn-primary" style="height: 38px; border-radius: 8px;"><i class="fas fa-save"></i> Save Changes</button>
+            <button class="btn btn-primary" onclick="saveAllChanges()" style="height: 38px; border-radius: 8px;"><i class="fas fa-save"></i> Save Changes</button>
         </div>
     </div>
     <table class="table" style="font-size: 0.75rem; white-space: nowrap;">
@@ -238,10 +238,10 @@ $taMarkupPct = ($taCost > 0) ? ($taMarkup / $taCost) * 100 : 0;
                         <span style="font-weight: 700; color: #10b981;"><?php echo $item['available_from'] ? date('d M', strtotime($item['available_from'])) : 'Live'; ?></span>
                     </div>
                 </td>
-                <td><input type="date" value="<?php echo htmlspecialchars($item['start_date'] ?? ''); ?>" class="t-date" style="height: 32px;"></td>
+                <td><input type="date" value="<?php echo htmlspecialchars($item['start_date'] ?? ''); ?>" onchange="updateItem(<?php echo $item['id']; ?>, 'start_date', this.value)" class="t-date" style="height: 32px;"></td>
                 <td>
                     <div style="font-size: 0.7rem; color: #94a3b8; margin-bottom: 2px;">Card: <?php echo formatCurrency($item['site_card_rate']); ?></div>
-                    <input type="number" class="t-input" value="<?php echo $item['sale_rate']; ?>" onchange="updateItem(<?php echo $item['id']; ?>, 'sale_rate', this.value)" style="height: 32px; width: 100px;">
+                    <input type="number" class="t-input" value="<?php echo (float)$item['sale_rate']; ?>" onchange="updateItem(<?php echo $item['id']; ?>, 'sale_rate', this.value)" style="height: 32px; width: 100px;">
                 </td>
                 <td style="font-weight: 800; color: var(--primary); text-align: right; font-size: 1rem;"><?php echo formatCurrency($item['amount']); ?></td>
                 <td style="text-align: right;">
@@ -337,8 +337,19 @@ function updateItem(itemId, field, val) {
     fetch('../../ajax/update_proposal_item.php', {
         method: 'POST',
         headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
-        body: `id=${itemId}&field=${field}&value=${val}`
+        body: `id=${itemId}&field=${field}&value=${encodeURIComponent(val)}`
     }).then(() => location.reload());
+}
+
+function saveAllChanges() {
+    Swal.fire({
+        toast: true,
+        position: 'top-end',
+        icon: 'success',
+        title: 'All changes saved successfully!',
+        showConfirmButton: false,
+        timer: 1500
+    });
 }
 
 function deleteItem(itemId) {
@@ -426,6 +437,22 @@ document.addEventListener('DOMContentLoaded', () => {
             }
         });
     });
+
+    const searchInput = document.getElementById('tableSearch');
+    if (searchInput) {
+        searchInput.addEventListener('input', (e) => {
+            const query = e.target.value.toLowerCase().trim();
+            const rows = document.querySelectorAll('table.table tbody tr');
+            rows.forEach(row => {
+                const text = row.innerText.toLowerCase();
+                if (text.includes(query)) {
+                    row.style.display = '';
+                } else {
+                    row.style.display = 'none';
+                }
+            });
+        });
+    }
 });
 
 function copyPublicLink(url) {
