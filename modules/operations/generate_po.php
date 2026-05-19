@@ -486,7 +486,13 @@ function getStateName($gstin) {
     <div style="padding: 10px; border-top: 1px solid #000; font-size: 9px;">
         <div style="display: flex; align-items: center; margin-bottom: 8px;">
             <div style="font-weight: bold; text-decoration: underline; font-size: 10.5px; margin-right: 15px;">Terms & Conditions</div>
-            <div style="font-weight: bold; color: #ff0000; font-size: 10.5px; flex: 1; text-align: center;"><?php echo getSetting('po_important_note', 'Filing of GSTR-1 within time is mandatory for acceptance of Invoice.'); ?></div>
+            <?php 
+            $poNote = getSetting('po_important_note', '');
+            if (empty(trim($poNote))) {
+                $poNote = 'Filing of GSTR-1 within time is mandatory for acceptance of Invoice.';
+            }
+            ?>
+            <div style="font-weight: bold; color: #ff0000; font-size: 10.5px; flex: 1; text-align: center;"><?php echo htmlspecialchars($poNote); ?></div>
         </div>
         <div style="margin: 0; line-height: 1.45; color: #000;">
             <?php 

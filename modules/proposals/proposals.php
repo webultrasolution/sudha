@@ -116,6 +116,7 @@ $proposals = $proposals->fetchAll();
                                 <a href="export_pdf.php?id=<?php echo $p['id']; ?>" target="_blank"><i class="fas fa-file-pdf" style="color: #ef4444;"></i> Visual Media Plan (PDF)</a>
                                 <a href="export_excel.php?id=<?php echo $p['id']; ?>"><i class="fas fa-file-excel" style="color: #10b981;"></i> Excel Rate Sheet</a>
                                 <a href="export_ppt.php?id=<?php echo $p['id']; ?>" target="_blank"><i class="fas fa-file-powerpoint" style="color: #f97316;"></i> PPT Deck / Presentation</a>
+                                <a href="javascript:void(0)" onclick="generateProforma(<?php echo $p['id']; ?>)"><i class="fas fa-file-invoice" style="color: #6366f1;"></i> Proforma Invoice (PI)</a>
                                 <div style="height: 1px; background: #f1f5f9; margin: 0.25rem 0;"></div>
                                 <div style="font-size: 0.6rem; font-weight: 800; color: #94a3b8; padding: 0.5rem 0.8rem; text-transform: uppercase; letter-spacing: 0.05em;">Visuals</div>
                                 <a href="export_ppt.php?id=<?php echo $p['id']; ?>&mode=view" target="_blank"><i class="fas fa-desktop" style="color: #6366f1;"></i> View Presentation</a>
@@ -216,6 +217,41 @@ function copyPublicLink(url) {
     }).catch(err => {
         console.error('Failed to copy: ', err);
     });
+}
+
+function generateProforma(proposalId) {
+    Swal.fire({
+        title: 'Generating Proforma Invoice',
+        text: 'Please wait while we compile the invoice details...',
+        icon: 'info',
+        allowOutsideClick: false,
+        didOpen: () => {
+            Swal.showLoading();
+        }
+    });
+
+    fetch(`../../ajax/create_proforma_from_proposal.php?proposal_id=${proposalId}`)
+        .then(response => response.json())
+        .then(data => {
+            if (data.success) {
+                Swal.fire({
+                    icon: 'success',
+                    title: 'Generated!',
+                    text: data.message,
+                    confirmButtonColor: '#1CADA9',
+                    confirmButtonText: 'View Proforma Invoice'
+                }).then(() => {
+                    window.open(`../financials/invoice_view.php?id=${data.invoice_id}`, '_blank');
+                    location.reload();
+                });
+            } else {
+                Swal.fire('Error', data.message || 'Failed to generate proforma invoice.', 'error');
+            }
+        })
+        .catch(err => {
+            console.error(err);
+            Swal.fire('Error', 'An error occurred during communication with the server.', 'error');
+        });
 }
 </script>
 
