@@ -373,7 +373,7 @@ $company_signature = getSetting('company_signature', 'signature.png');
                     $gst_amount = 0;
                 }
             } else {
-                $vendor_has_gst = !empty($v['gstin']) && trim($v['gstin']) !== '';
+                $vendor_has_gst = vendorHasGST($v['gstin'] ?? '');
                 if ($vendor_has_gst) {
                     $gst_label = 'IGST (18%)';
                     $gst_amount = $net_total * 0.18;

@@ -51,7 +51,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 $stmtGst = $pdo->prepare("SELECT gstin FROM partners WHERE id = ?");
                 $stmtGst->execute([$vendorId]);
                 $db_vendor_gst = trim($stmtGst->fetchColumn() ?: '');
-                $vendor_has_gst = !empty($db_vendor_gst);
+                $vendor_has_gst = vendorHasGST($db_vendor_gst);
 
                 $stmtSum = $pdo->prepare("SELECT COALESCE(SUM(cost), 0) FROM po_items WHERE po_id = ?");
                 $stmtSum->execute([$poId]);

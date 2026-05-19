@@ -81,7 +81,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             $stmtGst = $pdo->prepare("SELECT gstin FROM partners WHERE id = ?");
             $stmtGst->execute([$vid]);
             $db_vendor_gst = trim($stmtGst->fetchColumn() ?: '');
-            $vendor_has_gst = !empty($db_vendor_gst);
+            $vendor_has_gst = vendorHasGST($db_vendor_gst);
 
             $cgst = 0; $sgst = 0; $igst = 0;
             if ($vendor_has_gst) {
@@ -120,7 +120,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             $stmtGst = $pdo->prepare("SELECT gstin FROM partners WHERE id = ?");
             $stmtGst->execute([$pvid]);
             $db_vendor_gst = trim($stmtGst->fetchColumn() ?: '');
-            $vendor_has_gst = !empty($db_vendor_gst);
+            $vendor_has_gst = vendorHasGST($db_vendor_gst);
 
             $cgst = 0; $sgst = 0; $igst = 0;
             if ($vendor_has_gst) {
