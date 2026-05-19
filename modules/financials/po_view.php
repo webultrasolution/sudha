@@ -122,9 +122,25 @@ $poAttachments = $attachments->fetchAll();
                         <td colspan="3" style="text-align: right; padding: 0.75rem; border-right: 1px solid #e2e8f0;">Subtotal (Taxable):</td>
                         <td style="text-align: right;"><?php echo formatCurrency($poData['po_amount']); ?></td>
                     </tr>
+                    <?php
+                    $cgst_val = floatval($poData['cgst_amount'] ?? 0);
+                    $sgst_val = floatval($poData['sgst_amount'] ?? 0);
+                    $igst_val = floatval($poData['igst_amount'] ?? 0);
+                    $total_tax = $cgst_val + $sgst_val + $igst_val;
+                    
+                    if ($total_tax > 0) {
+                        if ($igst_val > 0) {
+                            $tax_label = 'IGST (18%):';
+                        } else {
+                            $tax_label = 'CGST + SGST (9%+9%):';
+                        }
+                    } else {
+                        $tax_label = 'GST (0%):';
+                    }
+                    ?>
                     <tr style="background: #f8fafc; font-weight: 700;">
-                        <td colspan="3" style="text-align: right; padding: 0.75rem; border-right: 1px solid #e2e8f0;">GST (18%):</td>
-                        <td style="text-align: right;"><?php echo formatCurrency($poData['cgst_amount'] + $poData['sgst_amount']); ?></td>
+                        <td colspan="3" style="text-align: right; padding: 0.75rem; border-right: 1px solid #e2e8f0;"><?php echo $tax_label; ?></td>
+                        <td style="text-align: right;"><?php echo formatCurrency($total_tax); ?></td>
                     </tr>
                     <tr style="background: #eff6ff; font-weight: 900; font-size: 1.1rem; color: #1e3a8a;">
                         <td colspan="3" style="text-align: right; padding: 1rem; border-right: 1px solid #e2e8f0; border-top: 2px solid #1e3a8a;">GRAND TOTAL:</td>

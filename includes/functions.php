@@ -279,4 +279,20 @@ function getActiveEntity() {
     
     return null;
 }
+
+/**
+ * Check if a partner / vendor has a valid GSTIN
+ */
+function vendorHasGST($gstin) {
+    if (empty($gstin)) return false;
+    $g = strtoupper(trim($gstin));
+    if (in_array($g, ['', 'NA', 'N/A', 'N.A.', 'NONE', 'NO-GST', 'NO GST', '0'])) {
+        return false;
+    }
+    // A valid GSTIN must be 15 characters long
+    if (strlen($g) < 15) {
+        return false;
+    }
+    return true;
+}
 ?>
