@@ -203,6 +203,8 @@ $taMarkupPct = ($taCost > 0) ? ($taMarkup / $taCost) * 100 : 0;
                 <th>Dimensions</th>
                 <th>Availability</th>
                 <th>Start Date</th>
+                <th>End Date</th>
+                <th>Days</th>
                 <th>Monthly Rate</th>
                 <th style="text-align: right;">Total Amount</th>
                 <th style="width: 50px; text-align: right;">Actions</th>
@@ -238,7 +240,9 @@ $taMarkupPct = ($taCost > 0) ? ($taMarkup / $taCost) * 100 : 0;
                         <span style="font-weight: 700; color: #10b981;"><?php echo $item['available_from'] ? date('d M', strtotime($item['available_from'])) : 'Live'; ?></span>
                     </div>
                 </td>
-                <td><input type="date" value="<?php echo htmlspecialchars($item['start_date'] ?? ''); ?>" onchange="updateItem(<?php echo $item['id']; ?>, 'start_date', this.value)" class="t-date" style="height: 32px;"></td>
+                <td><input type="date" value="<?php echo htmlspecialchars($item['start_date'] ?? ''); ?>" onchange="updateItem(<?php echo $item['id']; ?>, 'start_date', this.value)" class="t-date" style="height: 32px; width: 130px;"></td>
+                <td><input type="date" value="<?php echo htmlspecialchars($item['end_date'] ?? ''); ?>" onchange="updateItem(<?php echo $item['id']; ?>, 'end_date', this.value)" class="t-date" style="height: 32px; width: 130px;"></td>
+                <td><input type="number" min="1" value="<?php echo intval($item['days'] ?? 30); ?>" onchange="updateItem(<?php echo $item['id']; ?>, 'days', this.value)" class="t-input" style="height: 32px; width: 70px; text-align: center;"></td>
                 <td>
                     <div style="font-size: 0.7rem; color: #94a3b8; margin-bottom: 2px;">Card: <?php echo formatCurrency($item['site_card_rate']); ?></div>
                     <input type="number" class="t-input" value="<?php echo (float)$item['sale_rate']; ?>" onchange="updateItem(<?php echo $item['id']; ?>, 'sale_rate', this.value)" style="height: 32px; width: 100px;">

@@ -295,7 +295,7 @@ document.getElementById('poForm')?.addEventListener('submit', function(e) {
 else:
 
 if (empty($rates)) die("No rates selected for this PO.");
-$is_final = isset($_GET['is_final']) && $_GET['is_final'] === '1';
+asdfas$is_final = isset($_GET['is_final']) && $_GET['is_final'] === '1';
 ?>
 <!DOCTYPE html>
 <html lang="en">

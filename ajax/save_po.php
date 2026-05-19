@@ -22,8 +22,18 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         foreach ($data['sites'] as $site) {
             $subtotal += floatval($site['purchase_rate']);
         }
-        $cgst = $subtotal * 0.09;
-        $sgst = $subtotal * 0.09;
+        // Check if vendor has GSTIN in database
+        $stmtGst = $pdo->prepare("SELECT gstin FROM partners WHERE id = ?");
+        $stmtGst->execute([$data['vendorId']]);
+        $db_vendor_gst = trim($stmtGst->fetchColumn() ?: '');
+        $vendor_has_gst = !empty($db_vendor_gst);
+
+        $cgst = 0;
+        $sgst = 0;
+        if ($vendor_has_gst) {
+            $cgst = $subtotal * 0.09;
+            $sgst = $subtotal * 0.09;
+        }
         $grandTotal = $subtotal + $cgst + $sgst;
 
         // Generate PO Number

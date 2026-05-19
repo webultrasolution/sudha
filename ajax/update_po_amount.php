@@ -31,8 +31,18 @@ try {
     }
 
     // 2. Recalculate CGST & SGST (9% each) and total
-    $cgst = $new_amount * 0.09;
-    $sgst = $new_amount * 0.09;
+    // Check if vendor has GSTIN in database
+    $stmtGst = $pdo->prepare("SELECT gstin FROM partners WHERE id = ?");
+    $stmtGst->execute([$po['vendor_id']]);
+    $db_vendor_gst = trim($stmtGst->fetchColumn() ?: '');
+    $vendor_has_gst = !empty($db_vendor_gst);
+
+    $cgst = 0;
+    $sgst = 0;
+    if ($vendor_has_gst) {
+        $cgst = $new_amount * 0.09;
+        $sgst = $new_amount * 0.09;
+    }
     $total = $new_amount + $cgst + $sgst;
 
     // 3. Update the PO header

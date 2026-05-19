@@ -77,12 +77,20 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             $vSubtotal = 0;
             foreach ($vItems as $item) $vSubtotal += $item['rate'];
             
+            // Check if vendor has GSTIN in database
+            $stmtGst = $pdo->prepare("SELECT gstin FROM partners WHERE id = ?");
+            $stmtGst->execute([$vid]);
+            $db_vendor_gst = trim($stmtGst->fetchColumn() ?: '');
+            $vendor_has_gst = !empty($db_vendor_gst);
+
             $cgst = 0; $sgst = 0; $igst = 0;
-            if ($tax_type === 'cgst_sgst') {
-                $cgst = $vSubtotal * 0.09;
-                $sgst = $vSubtotal * 0.09;
-            } else {
-                $igst = $vSubtotal * 0.18;
+            if ($vendor_has_gst) {
+                if ($tax_type === 'cgst_sgst') {
+                    $cgst = $vSubtotal * 0.09;
+                    $sgst = $vSubtotal * 0.09;
+                } else {
+                    $igst = $vSubtotal * 0.18;
+                }
             }
             $vGrandTotal = $vSubtotal + $cgst + $sgst + $igst;
             
@@ -108,11 +116,19 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             $pSubtotal = 0;
             foreach ($pItems as $item) $pSubtotal += $item['total'];
             
+            // Check if vendor has GSTIN in database
+            $stmtGst = $pdo->prepare("SELECT gstin FROM partners WHERE id = ?");
+            $stmtGst->execute([$pvid]);
+            $db_vendor_gst = trim($stmtGst->fetchColumn() ?: '');
+            $vendor_has_gst = !empty($db_vendor_gst);
+
             $cgst = 0; $sgst = 0; $igst = 0;
-            if ($tax_type === 'cgst_sgst') {
-                $cgst = $pSubtotal * 0.09; $sgst = $pSubtotal * 0.09;
-            } else {
-                $igst = $pSubtotal * 0.18;
+            if ($vendor_has_gst) {
+                if ($tax_type === 'cgst_sgst') {
+                    $cgst = $pSubtotal * 0.09; $sgst = $pSubtotal * 0.09;
+                } else {
+                    $igst = $pSubtotal * 0.18;
+                }
             }
             $pGrandTotal = $pSubtotal + $cgst + $sgst + $igst;
             

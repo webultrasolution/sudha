@@ -42,11 +42,27 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             $poId = $stmtPOid->fetchColumn();
 
             if ($poId) {
+                // Fetch vendor ID
+                $stmtVendor = $pdo->prepare("SELECT vendor_id FROM sites WHERE id = ?");
+                $stmtVendor->execute([$row['site_id']]);
+                $vendorId = $stmtVendor->fetchColumn();
+
+                // Check if vendor has GSTIN in database
+                $stmtGst = $pdo->prepare("SELECT gstin FROM partners WHERE id = ?");
+                $stmtGst->execute([$vendorId]);
+                $db_vendor_gst = trim($stmtGst->fetchColumn() ?: '');
+                $vendor_has_gst = !empty($db_vendor_gst);
+
                 $stmtSum = $pdo->prepare("SELECT COALESCE(SUM(cost), 0) FROM po_items WHERE po_id = ?");
                 $stmtSum->execute([$poId]);
                 $newSubtotal = floatval($stmtSum->fetchColumn());
-                $newCgst = $newSubtotal * 0.09;
-                $newSgst = $newSubtotal * 0.09;
+                
+                $newCgst = 0;
+                $newSgst = 0;
+                if ($vendor_has_gst) {
+                    $newCgst = $newSubtotal * 0.09;
+                    $newSgst = $newSubtotal * 0.09;
+                }
                 $newTotal = $newSubtotal + $newCgst + $newSgst;
 
                 $stmtUpPO = $pdo->prepare("UPDATE purchase_orders SET po_amount = ?, cgst_amount = ?, sgst_amount = ?, total_amount = ? WHERE id = ?");

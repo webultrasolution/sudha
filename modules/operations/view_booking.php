@@ -194,7 +194,9 @@ $stmtCheckPO = $pdo->prepare("SELECT id FROM purchase_orders WHERE campaign_id =
                 <th>Asset Details</th>
                 <th>City / Code</th>
                 <th>Dimensions</th>
-                <th>Period</th>
+                <th>Start Date</th>
+                <th>End Date</th>
+                <th>Days</th>
                 <th>Cost / Margin</th>
                 <th style="text-align: right;">Selling Cost</th>
                 <th style="text-align: right; width: 50px;">Action</th>
@@ -259,12 +261,9 @@ $stmtCheckPO = $pdo->prepare("SELECT id FROM purchase_orders WHERE campaign_id =
                     <div style="font-weight: 700; color: #475569;"><?php echo $item['width'] . "' x " . $item['height'] . "'"; ?></div>
                     <div style="font-size: 0.7rem; color: #94a3b8;"><?php echo number_format($item['width']*$item['height']); ?> SQFT</div>
                 </td>
-                <td>
-                    <div style="font-size: 0.85rem; font-weight: 600; color: #64748b;">
-                        <?php echo date('d M', strtotime($item['start_date'])); ?> - <?php echo date('d M Y', strtotime($item['end_date'])); ?>
-                    </div>
-                    <div style="font-size: 0.7rem; color: #94a3b8;"><?php echo $item['days']; ?> Days</div>
-                </td>
+                <td><input type="date" value="<?php echo htmlspecialchars($item['start_date'] ?? ''); ?>" onchange="updateBookingItemPeriod(<?php echo $item['id']; ?>, 'start_date', this.value)" class="t-date" style="height: 32px; width: 130px; border-radius: 6px; padding: 2px 5px; font-weight: 600;" <?php echo $invoiceFinalized ? 'disabled' : ''; ?>></td>
+                <td><input type="date" value="<?php echo htmlspecialchars($item['end_date'] ?? ''); ?>" onchange="updateBookingItemPeriod(<?php echo $item['id']; ?>, 'end_date', this.value)" class="t-date" style="height: 32px; width: 130px; border-radius: 6px; padding: 2px 5px; font-weight: 600;" <?php echo $invoiceFinalized ? 'disabled' : ''; ?>></td>
+                <td><input type="number" min="1" value="<?php echo intval($item['days'] ?? 30); ?>" onchange="updateBookingItemPeriod(<?php echo $item['id']; ?>, 'days', this.value)" class="t-input" style="height: 32px; width: 70px; text-align: center; border-radius: 6px; padding: 2px 5px; font-weight: 600;" <?php echo $invoiceFinalized ? 'disabled' : ''; ?>></td>
                 <td>
                     <?php if ($item['owner_type'] === 'TA'): ?>
                         <?php if (($item['purchase_amount'] ?? 0) > 0): ?>
@@ -449,6 +448,35 @@ function updateSellingCost(itemId, cost) {
             }).then(() => location.reload());
         } else {
             Swal.fire('Error', res.message || 'Failed to update cost', 'error');
+        }
+    });
+}
+function updateBookingItemPeriod(itemId, field, value) {
+    const formData = new FormData();
+    formData.append('id', itemId);
+    formData.append('field', field);
+    formData.append('value', value);
+
+    fetch('../../ajax/update_booking_item_period.php', {
+        method: 'POST',
+        body: formData
+    })
+    .then(r => r.json())
+    .then(res => {
+        if(res.success) {
+            const Toast = Swal.mixin({
+                toast: true,
+                position: 'top-end',
+                showConfirmButton: false,
+                timer: 2000,
+                timerProgressBar: true
+            });
+            Toast.fire({
+                icon: 'success',
+                title: 'Booking item period updated'
+            }).then(() => location.reload());
+        } else {
+            Swal.fire('Error', res.message || 'Failed to update period', 'error');
         }
     });
 }
