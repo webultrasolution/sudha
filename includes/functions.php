@@ -226,7 +226,8 @@ function logActivity($action, $entityType = null, $entityId = null, $description
  * Convert number to words (Indian Style)
  */
 function amountInWords($number) {
-    $decimal = round($number - ($no = floor($number)), 2) * 100;
+    $decimal = (int)round(($number - floor($number)) * 100);
+    $no = (int)floor($number);
     $hundred = null;
     $digits_length = strlen($no);
     $i = 0;
@@ -243,18 +244,27 @@ function amountInWords($number) {
     $digits = array('', 'hundred','thousand','lakh', 'crore');
     while( $i < $digits_length ) {
         $divider = ($i == 2) ? 10 : 100;
-        $number = floor($no % $divider);
-        $no = floor($no / $divider);
+        $curr_num = (int)floor($no % $divider);
+        $no = (int)floor($no / $divider);
         $i += $divider == 10 ? 1 : 2;
-        if ($number) {
-            $plural = (($counter = count($str)) && $number > 9) ? 's' : null;
+        if ($curr_num) {
+            $plural = (($counter = count($str)) && $curr_num > 9) ? 's' : null;
             $hundred = ($counter == 1 && $str[0]) ? ' and ' : null;
-            $str [] = ($number < 21) ? $words[$number].' '. $digits[$counter]. $plural.' '.$hundred:$words[floor($number / 10) * 10].' '.$words[$number % 10]. ' '.$digits[$counter].$plural.' '.$hundred;
+            $str [] = ($curr_num < 21) ? $words[$curr_num].' '. $digits[$counter]. $plural.' '.$hundred:$words[(int)floor($curr_num / 10) * 10].' '.$words[$curr_num % 10]. ' '.$digits[$counter].$plural.' '.$hundred;
         } else $str[] = null;
     }
-    $Rupees = implode('', array_reverse($str));
-    $paise = ($decimal > 0) ? "." . ($words[$decimal / 10] . " " . $words[$decimal % 10]) . ' Paise' : '';
-    return ($Rupees ? $Rupees . 'Rupees ' : '') . $paise;
+    $Rupees = trim(implode('', array_reverse($str)));
+    
+    $paise = '';
+    if ($decimal > 0) {
+        if ($decimal < 21) {
+            $paise = ' and ' . $words[$decimal] . ' Paise';
+        } else {
+            $paise = ' and ' . $words[(int)floor($decimal / 10) * 10] . ' ' . $words[$decimal % 10] . ' Paise';
+        }
+    }
+    
+    return ($Rupees ? ucwords($Rupees) . ' Rupees' : '') . ($paise ? ucwords($paise) . ' Only' : ' Only');
 }
 /**
  * Get Setting Value from Database
