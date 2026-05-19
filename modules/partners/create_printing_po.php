@@ -250,13 +250,50 @@ include_once __DIR__ . '/../../includes/header.php';
                 </div>
         <?php endif; ?>
 
-        <div style="background: #f8fafc; padding: 1.5rem 2.5rem; border-top: 1px solid #f1f5f9; text-align: right;">
-            <a href="printing_rates.php" class="btn" style="font-weight: 700; color: #64748b; margin-right: 1.5rem; font-size: 1rem; border: none; background: transparent; padding: 0.5rem 1.5rem; text-decoration: none;">Discard Changes</a>
-            <button type="submit" class="btn btn-primary" style="background: #0d9488; color: white; border: none; padding: 1rem 3rem; border-radius: 12px; font-weight: 800; font-size: 1.1rem; transition: all 0.2s; box-shadow: 0 4px 12px rgba(13, 148, 136, 0.2);">
-                <i class="fas fa-save" style="margin-right: 0.5rem;"></i> Save Printing PO
-            </button>
+        <div style="background: #f8fafc; padding: 1.5rem 2.5rem; border-top: 1px solid #f1f5f9; display: flex; justify-content: space-between; align-items: center; position: sticky; bottom: 0; z-index: 100; box-shadow: 0 -4px 12px rgba(0,0,0,0.05);">
+            <?php if ($action !== 'edit'): ?>
+                <button type="button" onclick="openBucket()" id="review-bucket-btn" style="background: #f0fdfa; border: 1.5px solid #0d9488; color: #0d9488; padding: 0.75rem 1.5rem; border-radius: 10px; font-weight: 800; display: flex; align-items: center; gap: 8px; cursor: pointer; transition: all 0.2s; font-size: 0.9rem; outline: none;">
+                    <i class="fas fa-shopping-basket"></i>
+                    Review Selection (<span id="selected-count-btm">0</span>)
+                </button>
+            <?php else: ?>
+                <div></div>
+            <?php endif; ?>
+            <div>
+                <a href="printing_rates.php" class="btn" style="font-weight: 700; color: #64748b; margin-right: 1.5rem; font-size: 1rem; border: none; background: transparent; padding: 0.5rem 1.5rem; text-decoration: none;">Discard Changes</a>
+                <button type="submit" class="btn btn-primary" style="background: #0d9488; color: white; border: none; padding: 1rem 3rem; border-radius: 12px; font-weight: 800; font-size: 1.1rem; transition: all 0.2s; box-shadow: 0 4px 12px rgba(13, 148, 136, 0.2); cursor: pointer;">
+                    <i class="fas fa-save" style="margin-right: 0.5rem;"></i> Save Printing PO
+                </button>
+            </div>
         </div>
     </form>
+</div>
+
+<!-- SELECTION BUCKET (Slide-out Drawer) -->
+<div id="bucket-backdrop" onclick="closeBucket()" style="position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.4); backdrop-filter: blur(4px); z-index: 2000; display: none;"></div>
+<div id="selection-bucket-panel" style="position: fixed; top: 0; right: -1400px; width: 1000px; max-width: 90vw; height: 100%; background: white; z-index: 2001; box-shadow: -10px 0 30px rgba(0,0,0,0.1); transition: all 0.4s cubic-bezier(0.4, 0, 0.2, 1); display: flex; flex-direction: column; box-sizing: border-box;">
+    <div class="p-header" style="display: flex; justify-content: space-between; align-items: center; padding: 1.5rem; background: #0d9488; color: white; border: none; margin: 0;">
+        <div style="display: flex; align-items: center; gap: 1rem;">
+            <i class="fas fa-shopping-basket" style="font-size: 1.2rem;"></i>
+            <span style="font-size: 1.1rem; color: white; font-weight: 800;">Selection Review</span>
+        </div>
+        <div style="display: flex; gap: 1rem; align-items: center;">
+            <div class="selection-stats" style="background: rgba(255,255,255,0.2); color: white; padding: 0.3rem 0.8rem; border-radius: 6px; font-weight: 800; font-size: 0.75rem;">
+                <span id="bucket-count">0</span> Assets Selected
+            </div>
+            <button type="button" onclick="closeBucket()" style="background: rgba(0,0,0,0.1); border: none; color: white; width: 32px; height: 32px; border-radius: 8px; cursor: pointer; font-size: 1.2rem; display: flex; align-items: center; justify-content: center;">&times;</button>
+        </div>
+    </div>
+    <div id="bucket-empty-msg" style="padding: 4rem 2rem; text-align: center; color: #94a3b8; font-weight: 700;">
+        <i class="fas fa-shopping-cart" style="font-size: 3rem; margin-bottom: 1rem; display: block; opacity: 0.3;"></i>
+        Your bucket is empty. Select assets from the list.
+    </div>
+    <div id="bucket-list" style="flex: 1; overflow-y: auto; padding: 1rem;">
+        <!-- Selected items injected here -->
+    </div>
+    <div style="padding: 1.5rem; border-top: 1px solid #e2e8f0; background: #f8fafc;">
+        <button type="button" onclick="closeBucket()" class="btn btn-primary" style="width: 100%; height: 45px; border-radius: 10px; font-weight: 800; background: #0d9488; border: none; color: white; cursor: pointer;">CONTINUE SELECTION</button>
+    </div>
 </div>
 
 <style>
@@ -314,6 +351,7 @@ if (rateEl) {
             }
         });
         calculateTotal();
+        updateBucketUI();
     });
 }
 
@@ -336,6 +374,7 @@ document.getElementById('selectAllSites').addEventListener('change', function() 
         }
     });
     calculateTotal();
+    updateBucketUI();
 });
 
 function setMedia(val) {
@@ -414,12 +453,14 @@ function filterSitesByVendor() {
                 item.classList.remove('selected');
             }
             calculateTotal();
+            updateBucketUI();
         };
 
         rateInput.oninput = function() {
             this.dataset.touched = 'true';
             if (this.value !== '') chk.checked = true;
             calculateTotal();
+            updateBucketUI();
         };
 
         siteList.appendChild(item);
@@ -427,6 +468,7 @@ function filterSitesByVendor() {
     
     filterSitesInModal();
     calculateTotal();
+    updateBucketUI();
 }
 
 function filterSitesInModal() {
@@ -522,7 +564,8 @@ function resetFilters() {
 }
 
 function calculateTotal() {
-    const rate = parseFloat(document.getElementById('f_rate').value) || 0;
+    const rateEl = document.getElementById('f_rate');
+    const rate = rateEl ? (parseFloat(rateEl.value) || 0) : 0;
     let totalSqft = 0;
     let netAmount = 0;
     
@@ -545,11 +588,15 @@ function calculateTotal() {
     }
     
     if (totalSqft > 0) {
-        document.getElementById('sqft_value').innerText = totalSqft.toLocaleString() + ' SQFT';
-        document.getElementById('total_price_value').innerText = '₹' + netAmount.toLocaleString(undefined, {minimumFractionDigits: 2, maximumFractionDigits: 2});
-        document.getElementById('sqft_display').style.display = 'block';
+        const sqftValEl = document.getElementById('sqft_value');
+        const totalPriceEl = document.getElementById('total_price_value');
+        const sqftDisplayEl = document.getElementById('sqft_display');
+        if (sqftValEl) sqftValEl.innerText = totalSqft.toLocaleString() + ' SQFT';
+        if (totalPriceEl) totalPriceEl.innerText = '₹' + netAmount.toLocaleString(undefined, {minimumFractionDigits: 2, maximumFractionDigits: 2});
+        if (sqftDisplayEl) sqftDisplayEl.style.display = 'block';
     } else {
-        document.getElementById('sqft_display').style.display = 'none';
+        const sqftDisplayEl = document.getElementById('sqft_display');
+        if (sqftDisplayEl) sqftDisplayEl.style.display = 'none';
     }
 }
 
@@ -589,6 +636,123 @@ document.getElementById('rateForm').addEventListener('submit', function(e) {
     }
 });
 
+function openBucket() {
+    document.getElementById('selection-bucket-panel').style.right = '0';
+    document.getElementById('bucket-backdrop').style.display = 'block';
+    document.body.style.overflow = 'hidden';
+}
+
+function closeBucket() {
+    document.getElementById('selection-bucket-panel').style.right = '-1400px';
+    document.getElementById('bucket-backdrop').style.display = 'none';
+    document.body.style.overflow = '';
+}
+
+function uncheckSiteInBucket(siteId) {
+    const chk = document.querySelector(`.site-item[data-id="${siteId}"] .site-chk-input`);
+    if (chk) {
+        chk.checked = false;
+        chk.closest('.site-item').classList.remove('selected');
+        calculateTotal();
+        updateBucketUI();
+    }
+}
+
+function syncRateFromBucket(siteId, rate) {
+    const item = document.querySelector(`.site-item[data-id="${siteId}"]`);
+    if (item) {
+        const rateInput = item.querySelector('.site-individual-rate');
+        const chk = item.querySelector('.site-chk-input');
+        if (rateInput) {
+            rateInput.value = rate;
+            rateInput.dataset.touched = 'true';
+            if (rate !== '' && chk) chk.checked = true;
+            calculateTotal();
+            updateBucketUI();
+        }
+    }
+}
+
+function updateBucketUI() {
+    const bucketList = document.getElementById('bucket-list');
+    const emptyMsg = document.getElementById('bucket-empty-msg');
+    const bucketCount = document.getElementById('bucket-count');
+    const selectedCountBtm = document.getElementById('selected-count-btm');
+    
+    const checkedCheckboxes = document.querySelectorAll('.site-chk-input:checked');
+    const count = checkedCheckboxes.length;
+    
+    if (bucketCount) bucketCount.innerText = count;
+    if (selectedCountBtm) selectedCountBtm.innerText = count;
+    
+    if (count === 0) {
+        if (emptyMsg) emptyMsg.style.display = 'block';
+        if (bucketList) bucketList.innerHTML = '';
+        return;
+    }
+    
+    if (emptyMsg) emptyMsg.style.display = 'none';
+    
+    let html = `
+        <table class="crs-table selection-table" style="width: 100%; border-collapse: separate; border-spacing: 0 0.5rem; text-align: left; font-family: inherit;">
+            <thead>
+                <tr style="border-bottom: 2px solid #f1f5f9;">
+                    <th style="width: 40px; padding: 0.8rem 1rem; font-size: 0.75rem; font-weight: 800; color: #94a3b8; text-transform: uppercase;">#</th>
+                    <th style="width: 50px; padding: 0.8rem 1rem; font-size: 0.75rem; font-weight: 800; color: #94a3b8; text-transform: uppercase;">Remove</th>
+                    <th style="padding: 0.8rem 1rem; font-size: 0.75rem; font-weight: 800; color: #94a3b8; text-transform: uppercase;">Site Code</th>
+                    <th style="padding: 0.8rem 1rem; font-size: 0.75rem; font-weight: 800; color: #94a3b8; text-transform: uppercase;">Site Name</th>
+                    <th style="padding: 0.8rem 1rem; font-size: 0.75rem; font-weight: 800; color: #94a3b8; text-transform: uppercase;">Dimension / SQFT</th>
+                    <th style="padding: 0.8rem 1rem; font-size: 0.75rem; font-weight: 800; color: #94a3b8; text-transform: uppercase; width: 120px;">Rate (₹/SQFT)</th>
+                    <th style="padding: 0.8rem 1rem; text-align: right; font-size: 0.75rem; font-weight: 800; color: #94a3b8; text-transform: uppercase; width: 150px;">Total (₹)</th>
+                </tr>
+            </thead>
+            <tbody>
+    `;
+    
+    checkedCheckboxes.forEach((chk, index) => {
+        const item = chk.closest('.site-item');
+        const siteId = item.dataset.id;
+        const siteCode = item.dataset.code;
+        const siteName = item.dataset.name;
+        const sizeStr = item.dataset.size;
+        const sqftVal = parseFloat(chk.dataset.sqft) || 0;
+        
+        const gridRateInput = item.querySelector('.site-individual-rate');
+        const fRateEl = document.getElementById('f_rate');
+        const currentRate = gridRateInput.value || (fRateEl ? fRateEl.value : '') || 0;
+        const totalCost = sqftVal * currentRate;
+        
+        html += `
+            <tr style="background: #f8fafc; border-radius: 8px;">
+                <td style="font-weight: 700; color: #64748b; padding: 0.8rem 1rem; border-radius: 8px 0 0 8px;">${index + 1}</td>
+                <td style="padding: 0.8rem 1rem;">
+                    <button type="button" onclick="uncheckSiteInBucket('${siteId}')" style="background: #fee2e2; color: #ef4444; border: none; width: 28px; height: 28px; border-radius: 6px; cursor: pointer; display: flex; align-items: center; justify-content: center; transition: all 0.2s;">
+                        <i class="fas fa-trash-alt" style="font-size: 0.75rem;"></i>
+                    </button>
+                </td>
+                <td style="padding: 0.8rem 1rem; font-weight: 800; color: #f97316; font-size: 0.85rem;">${siteCode}</td>
+                <td style="padding: 0.8rem 1rem; font-weight: 600; color: #1e293b; font-size: 0.85rem;">${siteName}</td>
+                <td style="padding: 0.8rem 1rem;">
+                    <div style="font-weight: 700; color: #1e293b; font-size: 0.8rem;">${sizeStr}</div>
+                    <small style="color: #64748b; font-size: 0.7rem; font-weight: 600;">${sqftVal.toLocaleString()} SQFT</small>
+                </td>
+                <td style="padding: 0.8rem 1rem;">
+                    <input type="number" step="0.01" value="${gridRateInput.value}" 
+                           oninput="syncRateFromBucket('${siteId}', this.value)"
+                           placeholder="₹"
+                           style="width: 100px; height: 32px; font-size: 0.85rem; font-weight: 800; border-radius: 6px; border: 1px solid #e2e8f0; padding: 0 0.4rem; color: #0d9488; text-align: right;">
+                </td>
+                <td style="padding: 0.8rem 1rem; text-align: right; font-weight: 900; color: #0d9488; font-size: 0.95rem; border-radius: 0 8px 8px 0;">
+                    ₹${totalCost.toLocaleString(undefined, {minimumFractionDigits: 2, maximumFractionDigits: 2})}
+                </td>
+            </tr>
+        `;
+    });
+    
+    html += `</tbody></table>`;
+    if (bucketList) bucketList.innerHTML = html;
+}
+
 document.addEventListener('DOMContentLoaded', () => {
     // Initial Setup
     resetFilters();
@@ -609,6 +773,7 @@ document.addEventListener('DOMContentLoaded', () => {
         filterSitesByVendor();
     }
     calculateTotal();
+    updateBucketUI();
 });
 </script>
 
