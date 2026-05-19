@@ -523,23 +523,45 @@ function getStateName($gstin) {
                 [$company_name, $company_address, $company_gstin, $buyerStateCode, getStateName($company_gstin)],
                 $termsText
             );
+            
+            // Auto-append GST compliance lines if they are not present in the saved setting
+            if (strpos($termsText, 'GSTIN Number') === false) {
+                $termsText .= "\n14. GSTIN Number : " . $company_gstin;
+            }
+            if (strpos($termsText, 'State Code') === false) {
+                $termsText .= "\n15. State Code : " . $buyerStateCode;
+            }
+            if (strpos($termsText, 'State Name') === false) {
+                $termsText .= "\n16. State Name : " . strtoupper(getStateName($company_gstin));
+            }
+            if (strpos($termsText, 'Place of supply') === false) {
+                $termsText .= "\n17. Place of supply : " . strtoupper(getStateName($company_gstin));
+            }
+            
+            // Dynamic parser override: Ensures any hardcoded/saved states in settings are dynamically updated in uppercase to match the top block!
+            $topPOS = strtoupper(getStateName($company_gstin));
+            $termsText = preg_replace('/State Code\s*:\s*[^\r\n]+/i', 'State Code : ' . $buyerStateCode, $termsText);
+            $termsText = preg_replace('/State Name\s*:\s*[^\r\n]+/i', 'State Name : ' . $topPOS, $termsText);
+            $termsText = preg_replace('/Place of supply\s*:\s*[^\r\n]+/i', 'Place of supply : ' . $topPOS, $termsText);
+            $termsText = preg_replace('/GSTIN Number\s*:\s*[^\r\n]+/i', 'GSTIN Number : ' . $company_gstin, $termsText);
+            
             echo nl2br(htmlspecialchars($termsText)); 
             ?>
         </div>
     </div>
 
     <!-- Signature Footer -->
-    <div style="border-top: 1px solid #000; display: flex; min-height: 105px; font-size: 10px;">
+    <div style="border-top: 1px solid #000; display: flex; min-height: 125px; font-size: 10px;">
         <div style="flex: 1; border-right: 1px solid #000; padding: 8px 10px; display: flex; flex-direction: column; justify-content: space-between; align-items: flex-start;">
             <div style="font-weight: bold; text-transform: uppercase;">For <?php echo htmlspecialchars($company_name); ?></div>
-            <div style="position: relative; height: 50px; width: 100%;">
-                <img src="<?php echo BASE_URL; ?>assets/images/<?php echo $company_signature; ?>" style="height: 45px; display: block; margin-left: 10px;" onerror="this.style.display='none'">
+            <div style="position: relative; height: 70px; width: 100%; display: flex; align-items: center;">
+                <img src="<?php echo BASE_URL; ?>assets/images/<?php echo $company_signature; ?>" style="height: 65px; display: block; margin-left: 10px;" onerror="this.style.display='none'">
             </div>
             <div style="font-weight: bold;">Authorised Signatory</div>
         </div>
         <div style="flex: 1; padding: 8px 10px; display: flex; flex-direction: column; justify-content: space-between; align-items: flex-start;">
             <div style="font-weight: bold;">Received & Accepted by <span style="text-transform: uppercase;"><?php echo htmlspecialchars($v['name'] ?? ''); ?></span></div>
-            <div style="height: 50px;"></div>
+            <div style="height: 70px;"></div>
             <div style="font-weight: bold; align-self: flex-end; padding-right: 20px;">Authorised Signatory</div>
         </div>
     </div>
