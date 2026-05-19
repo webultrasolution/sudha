@@ -450,34 +450,71 @@ function getStateName($gstin) {
         </tbody>
     </table>
 
-    <div style="padding: 10px; border-top: 1px solid #000;">
-        <strong>Amount in Words:</strong> <span style="text-transform: capitalize;"><?php echo amountInWords($grand_total); ?> Only</span>
-    </div>
+    <!-- Amount in Words -->
+    <table style="width: 100%; border-collapse: collapse; border-top: 1px solid #000;">
+        <tr>
+            <td style="text-align: left; padding: 6px 10px; font-size: 10px; border-bottom: none; border-right: none;">
+                <strong>Amount In Words</strong><br>
+                <span style="font-weight: bold; text-transform: capitalize;"><?php echo amountInWords($grand_total); ?></span>
+            </td>
+            <td style="text-align: right; width: 80px; vertical-align: bottom; padding: 6px 10px; font-size: 9px; font-weight: bold; border-bottom: none; border-right: none;">
+                E. & O.E.
+            </td>
+        </tr>
+    </table>
 
     <div style="padding: 10px; border-top: 1px solid #000; font-size: 9px;">
-        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 5px;">
-            <div style="font-weight: bold; text-decoration: underline; font-size: 10px;">Terms & Conditions</div>
-            <div style="font-weight: bold; color: #cc0000; font-size: 11px;"><?php echo getSetting('po_important_note', 'Filing of GSTR-1 within time is mandatory for acceptance of Invoice.'); ?></div>
+        <div style="display: flex; align-items: center; margin-bottom: 8px;">
+            <div style="font-weight: bold; text-decoration: underline; font-size: 10.5px; margin-right: 15px;">Terms & Conditions</div>
+            <div style="font-weight: bold; color: #ff0000; font-size: 10.5px; flex: 1; text-align: center;"><?php echo getSetting('po_important_note', 'Filing of GSTR-1 within time is mandatory for acceptance of Invoice.'); ?></div>
         </div>
-        <div style="margin: 0; line-height: 1.2; white-space: pre-wrap;">
-            <?php echo nl2br(getSetting('po_terms', '')); ?>
+        <div style="margin: 0; line-height: 1.45; color: #000;">
+            <?php 
+            $defaultTerms = "1. Flex mounting will be Free of Cost
+2. Kindly take proper care while mounting the vinyl & make sure there should be no wrinkles seen on the above hoarding. In case of execution being not proper resulting in poor quality of Flex/Vinyl mounting the same should be remounted free of cost within 24 hours. Penalty of display charges will be deducted on prorata basis for every day delayed.
+3. In case of non illumination of Lit sites display charge will be deducted on prorata basis for everyday of non illuminous.
+4. The media should be maintained by the contractor in good condition throughout the contract period.
+5. We reserve the right to discontinue or cancel the booking midway of display period.
+6. We reserve the right to accept or reject the quality of the job executed.
+7. Please arrange to send four sets of High Resolution Photographs (Two Long view & Two Close view) together with display report.
+8. The contract period will start from the date of display.
+9. For the print jobs the printer will have to give free replacement of print for any prints found fading or not as per given specification immediately.
+10. Any deviation from the specification given above will not be payable.
+11. All Bills should carry our purchase order copy.
+12. Required 2 Nos Bill For Payment Processing.
+13. Raise Your Bill In favor Of: [company_name], [company_address]
+14. GSTIN Number : [company_gstin]
+15. State Code : [buyerStateCode]
+16. State Name : [buyerStateName]
+17. Place of supply : [buyerStateName]";
+            
+            $termsText = getSetting('po_terms', $defaultTerms);
+            if (empty(trim($termsText))) {
+                $termsText = $defaultTerms;
+            }
+            $termsText = str_replace(
+                ['[company_name]', '[company_address]', '[company_gstin]', '[buyerStateCode]', '[buyerStateName]'],
+                [$company_name, $company_address, $company_gstin, $buyerStateCode, getStateName($company_gstin)],
+                $termsText
+            );
+            echo nl2br(htmlspecialchars($termsText)); 
+            ?>
         </div>
     </div>
 
-    <div class="footer">
-        <div class="footer-left">
-            <div style="font-weight: bold; text-decoration: underline; margin-bottom: 5px;">Payment Terms:</div>
-            <p style="margin: 2px 0;">- 50% Advance with PO</p>
-            <p style="margin: 2px 0;">- 50% Balance after mounting with proofs</p>
-            <p style="margin: 2px 0;">- Cheque/NEFT in favor of: <strong><?php echo $v['name']; ?></strong></p>
-        </div>
-        <div class="footer-right">
-            <div>For <strong><?php echo $company_name; ?></strong></div>
-            <div style="margin-top: 30px;">
-                <img src="<?php echo BASE_URL; ?>assets/images/<?php echo $company_signature; ?>" style="height: 40px; display: block; margin: 0 auto;" onerror="this.style.display='none'">
-                <div style="border-top: 1px solid #000; width: 150px; margin: 5px auto 0;"></div>
-                <div style="font-weight: bold; margin-top: 2px;">Authorised Signatory</div>
+    <!-- Signature Footer -->
+    <div style="border-top: 1px solid #000; display: flex; min-height: 105px; font-size: 10px;">
+        <div style="flex: 1; border-right: 1px solid #000; padding: 8px 10px; display: flex; flex-direction: column; justify-content: space-between; align-items: flex-start;">
+            <div style="font-weight: bold; text-transform: uppercase;">For <?php echo htmlspecialchars($company_name); ?></div>
+            <div style="position: relative; height: 50px; width: 100%;">
+                <img src="<?php echo BASE_URL; ?>assets/images/<?php echo $company_signature; ?>" style="height: 45px; display: block; margin-left: 10px;" onerror="this.style.display='none'">
             </div>
+            <div style="font-weight: bold;">Authorised Signatory</div>
+        </div>
+        <div style="flex: 1; padding: 8px 10px; display: flex; flex-direction: column; justify-content: space-between; align-items: flex-start;">
+            <div style="font-weight: bold;">Received & Accepted by <span style="text-transform: uppercase;"><?php echo htmlspecialchars($v['name'] ?? ''); ?></span></div>
+            <div style="height: 50px;"></div>
+            <div style="font-weight: bold; align-self: flex-end; padding-right: 20px;">Authorised Signatory</div>
         </div>
     </div>
 </div>
