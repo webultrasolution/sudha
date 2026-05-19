@@ -201,7 +201,7 @@ $sizes = $pdo->query("SELECT DISTINCT CONCAT(width, 'x', height) as size FROM si
                     <div style="display: flex; flex-direction: column; gap: 8px;">
                         <!-- Invoice Attachments Section -->
                         <div style="display: flex; align-items: center; flex-wrap: wrap; gap: 4px;">
-                            <span style="font-size: 0.65rem; font-weight: 800; color: #94a3b8; text-transform: uppercase; margin-right: 4px;">Invoice:</span>
+                            <span style="font-size: 0.65rem; font-weight: 800; color: #94a3b8; text-transform: uppercase; margin-right: 4px; width: 100px; text-align: right;">Vendor Invoice:</span>
                             <?php 
                             if (!empty($r['attachments'])): 
                                 $files = explode('||', $r['attachments']);
@@ -218,25 +218,25 @@ $sizes = $pdo->query("SELECT DISTINCT CONCAT(width, 'x', height) as size FROM si
                                 endforeach;
                             endif; 
                             ?>
-                            <button class="btn-upload-row" onclick="triggerUpload('<?php echo $r['po_number']; ?>')" title="Upload Invoice/Scan">
+                            <button class="btn-upload-row" onclick="triggerUpload('<?php echo $r['po_number']; ?>')" title="Upload Vendor Invoice/Scan">
                                 <i class="fas fa-cloud-upload-alt"></i> Upload
                             </button>
                         </div>
                         
-                        <!-- Client Tax Order Section -->
+                        <!-- Client Tax Invoice Section -->
                         <div style="display: flex; align-items: center; flex-wrap: wrap; gap: 4px;">
-                            <span style="font-size: 0.65rem; font-weight: 800; color: #94a3b8; text-transform: uppercase; margin-right: 4px;">Tax Order:</span>
+                            <span style="font-size: 0.65rem; font-weight: 800; color: #94a3b8; text-transform: uppercase; margin-right: 4px; width: 100px; text-align: right;">Tax Invoice:</span>
                             <?php if (!empty($r['client_tax_order'])): 
                                 $ext = strtolower(pathinfo($r['client_tax_order'], PATHINFO_EXTENSION));
                                 $icon = 'fa-file';
                                 if (in_array($ext, ['jpg', 'jpeg', 'png'])) $icon = 'fa-file-image';
                                 if ($ext === 'pdf') $icon = 'fa-file-pdf';
                             ?>
-                                <a href="../../uploads/pos/tax_orders/<?php echo urlencode($r['client_tax_order']); ?>" target="_blank" class="attachment-badge" style="background: #e0e7ff; color: #4f46e5;" title="Client Tax Order: <?php echo htmlspecialchars($r['client_tax_order']); ?>">
+                                <a href="../../uploads/pos/tax_orders/<?php echo urlencode($r['client_tax_order']); ?>" target="_blank" class="attachment-badge" style="background: #e0e7ff; color: #4f46e5;" title="Tax Invoice: <?php echo htmlspecialchars($r['client_tax_order']); ?>">
                                     <i class="fas <?php echo $icon; ?>"></i>
                                 </a>
                             <?php endif; ?>
-                            <button class="btn-upload-row" style="background: #eef2ff; color: #4f46e5; border-color: #c7d2fe;" onclick="triggerTaxOrderUpload('<?php echo $r['po_number']; ?>')" title="Upload Client Tax Order">
+                            <button class="btn-upload-row" style="background: #eef2ff; color: #4f46e5; border-color: #c7d2fe;" onclick="triggerTaxOrderUpload('<?php echo $r['po_number']; ?>')" title="Upload Tax Invoice">
                                 <i class="fas fa-cloud-upload-alt"></i> Upload
                             </button>
                         </div>
