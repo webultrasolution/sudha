@@ -2,6 +2,9 @@
 include_once __DIR__ . '/../../config/db.php';
 include_once __DIR__ . '/../../includes/functions.php';
 
+// Enforce View Permission at Page Level
+requirePermission('inventory', 'view');
+
 // Handle Form Submissions (AJAX & POST)
 if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action'])) {
     if ($_POST['action'] === 'add_site' || $_POST['action'] === 'edit_site') {
@@ -28,6 +31,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action'])) {
         $available_from = !empty($_POST['available_from']) ? $_POST['available_from'] : date('Y-m-d');
 
         if ($_POST['action'] === 'add_site') {
+            requirePermission('inventory', 'add');
             try {
                 $stmt = $pdo->prepare("INSERT INTO sites (site_code, name, location, area, city, district, latitude, longitude, type, width, height, facing, light_type, hsn_code, vendor_gst, grade, owner_type, vendor_id, card_rate, purchase_rate, available_from) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)");
                 $stmt->execute([$code, $name, $location, $area, $city, $district, $latitude, $longitude, $type, $width, $height, $facing, $light_type, $hsn_code, $vendor_gst, $grade, $owner_type, $vendor_id, $card_rate, $purchase_rate, $available_from]);
@@ -52,6 +56,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action'])) {
                 header("Location: sites.php?error=" . urlencode($e->getMessage())); exit;
             }
         } else {
+            requirePermission('inventory', 'edit');
             $id = intval($_POST['id']);
             try {
                 $stmt = $pdo->prepare("UPDATE sites SET site_code=?, name=?, location=?, area=?, city=?, district=?, latitude=?, longitude=?, type=?, width=?, height=?, facing=?, light_type=?, hsn_code=?, vendor_gst=?, grade=?, owner_type=?, vendor_id=?, card_rate=?, purchase_rate=?, available_from=? WHERE id=?");
@@ -77,6 +82,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action'])) {
             }
         }
     } else if ($_POST['action'] === 'delete_site') {
+        requirePermission('inventory', 'delete');
         $id = intval($_POST['id']);
         try {
             // Also delete images from folder if needed, for now just DB cleanup
@@ -186,12 +192,14 @@ $vendors = $pdo->query("SELECT id, name FROM partners WHERE type = 'vendor' ORDE
 
 <div class="card">
     <div style="display: flex; justify-content: flex-end; gap: 1rem; margin-bottom: 1rem;">
+        <?php if (canAdd('inventory')): ?>
         <button class="btn btn-secondary" onclick="openImportModal()" style="background: #f1f5f9; color: #475569; border: 1px solid #e2e8f0;">
             <i class="fas fa-file-import"></i> Bulk Import
         </button>
         <button class="btn btn-primary" onclick="openModal()">
             <i class="fas fa-plus"></i> Add New Site
         </button>
+        <?php endif; ?>
     </div>
 
     <div style="background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 12px; padding: 1.25rem; margin-bottom: 1.5rem;">
@@ -337,8 +345,12 @@ $vendors = $pdo->query("SELECT id, name FROM partners WHERE type = 'vendor' ORDE
                     <td data-label="Status"><span class="status-pill <?php echo $s['status']; ?>"><?php echo ucfirst($s['status']); ?></span></td>
                     <td data-label="Actions" style="text-align: right; white-space: nowrap;">
                         <a href="site_financials.php?id=<?php echo $s['id']; ?>" class="btn-icon" style="color: #0d9488; background: #ccfbf1; display: inline-flex; text-decoration: none;" title="Site Financials (P&L)"><i class="fas fa-file-invoice-dollar"></i></a>
+                        <?php if (canEdit('inventory')): ?>
                         <button class="btn-icon btn-edit" onclick="editSite(<?php echo htmlspecialchars(json_encode($s)); ?>)" title="Edit"><i class="fas fa-edit"></i></button>
+                        <?php endif; ?>
+                        <?php if (canDelete('inventory')): ?>
                         <button class="btn-icon btn-delete" onclick="deleteSite(event, <?php echo $s['id']; ?>)" title="Delete"><i class="fas fa-trash"></i></button>
+                        <?php endif; ?>
                     </td>
                 </tr>
                 <?php endforeach; ?>

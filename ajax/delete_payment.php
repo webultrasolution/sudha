@@ -9,6 +9,11 @@ if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
     exit;
 }
 
+if (!canDelete('financials')) {
+    echo json_encode(['success' => false, 'message' => 'Access Denied: You do not have permission to delete payments.']);
+    exit;
+}
+
 $id = isset($_POST['id']) ? intval($_POST['id']) : 0;
 
 if (!$id) {

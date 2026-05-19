@@ -5,6 +5,10 @@ include_once __DIR__ . '/../includes/functions.php';
 header('Content-Type: application/json');
 
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
+    if (!canEdit('financials')) {
+        echo json_encode(['success' => false, 'message' => 'Access Denied: You do not have permission to upload PO attachments.']);
+        exit;
+    }
     $po_id = intval($_POST['po_id']);
     
     if (isset($_FILES['file']) && $_FILES['file']['error'] === UPLOAD_ERR_OK) {

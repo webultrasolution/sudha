@@ -2,6 +2,9 @@
 include_once __DIR__ . '/../../config/db.php';
 include_once __DIR__ . '/../../includes/functions.php';
 
+// Enforce View Permission at Page Level
+requirePermission('clients', 'view');
+
 // Handle Form Submissions
 if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action'])) {
     if ($_POST['action'] === 'add' || $_POST['action'] === 'edit') {
@@ -10,6 +13,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action'])) {
         $rate = floatval($_POST['rate_per_sqft']);
 
         if ($_POST['action'] === 'add') {
+            requirePermission('clients', 'add');
             $site_ids = !empty($_POST['site_ids']) ? $_POST['site_ids'] : [null];
             $individual_rates = $_POST['individual_rates'] ?? [];
             $po_number = "CPPO-" . date('ymd') . "-" . rand(100, 999);
@@ -24,6 +28,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action'])) {
             }
             header("Location: client_printing_rates.php?msg=added"); exit;
         } else {
+            requirePermission('clients', 'edit');
             $id = intval($_POST['id']);
             $site_id = !empty($_POST['site_id']) ? intval($_POST['site_id']) : null;
             $stmt = $pdo->prepare("UPDATE client_printing_rates SET client_id=?, site_id=?, media_type=?, rate_per_sqft=? WHERE id=?");
@@ -31,6 +36,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action'])) {
             header("Location: client_printing_rates.php?msg=updated"); exit;
         }
     } elseif ($_POST['action'] === 'delete') {
+        requirePermission('clients', 'delete');
         header('Content-Type: application/json');
         $id = intval($_POST['id']);
         $stmt = $pdo->prepare("DELETE FROM client_printing_rates WHERE id = ?");
@@ -77,9 +83,11 @@ $clients = $pdo->query("SELECT id, name FROM partners WHERE type = 'client' ORDE
     <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1.5rem;">
         <h2 style="font-size: 1.25rem;">Client Printing Invoice</h2>
         <div style="display: flex; gap: 0.75rem;">
+            <?php if (canAdd('clients')): ?>
             <a href="create_client_printing_po.php" class="btn btn-primary" style="display: inline-flex; align-items: center; gap: 6px; text-decoration: none; background: #0d9488; border-color: #0d9488;">
                 <i class="fas fa-plus"></i> Add New Client Printing Invoice 
             </a>
+            <?php endif; ?>
         </div>
     </div>
 
@@ -171,9 +179,11 @@ $clients = $pdo->query("SELECT id, name FROM partners WHERE type = 'client' ORDE
                                 endforeach;
                             endif; 
                             ?>
+                            <?php if (canEdit('clients')): ?>
                             <button class="btn-upload-row" onclick="triggerUpload('<?php echo $r['po_number']; ?>')" title="Upload Client Invoice/Scan">
                                 <i class="fas fa-cloud-upload-alt"></i> Upload
                             </button>
+                            <?php endif; ?>
                         </div>
                         
                         <!-- Client Tax Invoice Section -->
@@ -189,9 +199,11 @@ $clients = $pdo->query("SELECT id, name FROM partners WHERE type = 'client' ORDE
                                     <i class="fas <?php echo $icon; ?>"></i>
                                 </a>
                             <?php endif; ?>
+                            <?php if (canEdit('clients')): ?>
                             <button class="btn-upload-row" style="background: #eef2ff; color: #4f46e5; border-color: #c7d2fe;" onclick="triggerTaxOrderUpload('<?php echo $r['po_number']; ?>')" title="Upload Tax Invoice">
                                 <i class="fas fa-cloud-upload-alt"></i> Upload
                             </button>
+                            <?php endif; ?>
                         </div>
                     </div>
                     <?php else: ?>
@@ -209,23 +221,31 @@ $clients = $pdo->query("SELECT id, name FROM partners WHERE type = 'client' ORDE
                             <a href="<?php echo $pdfUrl; ?>" target="_blank" class="btn-icon" style="color: #ef4444; background: #fee2e2; padding: 6px; border-radius: 8px; font-size: 0.85rem; display: inline-flex; align-items: center; justify-content: center; width: 28px; height: 28px; border: none; text-decoration: none;" title="Download Group Client PO">
                                 <i class="fas fa-file-pdf"></i>
                             </a>
+                            <?php if (canEdit('clients')): ?>
                             <a href="create_client_printing_po.php?action=edit&id=<?php echo $ids[0]; ?>" class="btn-icon" style="color: #0284c7; background: #e0f2fe; padding: 6px; border-radius: 8px; font-size: 0.85rem; display: inline-flex; align-items: center; justify-content: center; width: 28px; height: 28px; border: none; text-decoration: none;" title="Edit">
                                 <i class="fas fa-edit"></i>
                             </a>
+                            <?php endif; ?>
+                            <?php if (canDelete('clients')): ?>
                             <button class="btn-icon btn-delete" onclick="deleteRate(<?php echo $ids[0]; ?>)" style="display: inline-flex; align-items: center; justify-content: center; width: 28px; height: 28px;" title="Delete">
                                 <i class="fas fa-trash"></i>
                             </button>
+                            <?php endif; ?>
                         </div>
                         
                         <?php if (count($ids) > 1): ?>
                             <?php for($i = 1; $i < count($ids); $i++): ?>
                                 <div style="height: 38px; display: flex; align-items: center; gap: 8px;">
+                                    <?php if (canEdit('clients')): ?>
                                     <a href="create_client_printing_po.php?action=edit&id=<?php echo $ids[$i]; ?>" class="btn-icon" style="color: #0284c7; background: #e0f2fe; padding: 6px; border-radius: 8px; font-size: 0.85rem; display: inline-flex; align-items: center; justify-content: center; width: 28px; height: 28px; border: none; text-decoration: none;" title="Edit">
                                         <i class="fas fa-edit"></i>
                                     </a>
+                                    <?php endif; ?>
+                                    <?php if (canDelete('clients')): ?>
                                     <button class="btn-icon btn-delete" onclick="deleteRate(<?php echo $ids[$i]; ?>)" style="display: inline-flex; align-items: center; justify-content: center; width: 28px; height: 28px;" title="Delete">
                                         <i class="fas fa-trash"></i>
                                     </button>
+                                    <?php endif; ?>
                                 </div>
                             <?php endfor; ?>
                         <?php endif; ?>
@@ -241,9 +261,11 @@ $clients = $pdo->query("SELECT id, name FROM partners WHERE type = 'client' ORDE
                                     <i class="fas fa-eye"></i> View Tax Invoice
                                 </a>
                             <?php else: ?>
+                                <?php if (canEdit('clients')): ?>
                                 <button class="btn" onclick="openPrintingInvoicePopup('<?php echo htmlspecialchars($r['po_number'] ?? '', ENT_QUOTES); ?>', <?php echo $r['client_id']; ?>, '<?php echo implode(',', $ids); ?>')" style="background: #0f172a; color: white; padding: 4px 10px; border-radius: 6px; font-size: 0.75rem; font-weight: 700; border: none; cursor: pointer; display: inline-flex; align-items: center; gap: 4px;" title="Final Tax Invoice">
                                     <i class="fas fa-file-invoice-dollar"></i> Final Tax Invoice
                                 </button>
+                                <?php endif; ?>
                             <?php endif; ?>
                         </div>
                     </div>

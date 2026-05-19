@@ -2,13 +2,20 @@
 include_once __DIR__ . '/../../config/db.php';
 include_once __DIR__ . '/../../includes/functions.php';
 
-$canManage = hasRole(['admin', 'operations']);
+// Enforce Page-Level View Permission
+requirePermission('users', 'view');
+
+$canAdd = canAdd('users');
+$canEdit = canEdit('users');
+$canDelete = canDelete('users');
+$canManage = $canAdd || $canEdit || $canDelete;
 
 // Handle Add/Edit/Delete via POST - MUST BE BEFORE HEADER
 if ($_SERVER['REQUEST_METHOD'] == 'POST' && $canManage) {
     if (isset($_POST['action'])) {
         $successMsg = "";
         if ($_POST['action'] == 'add') {
+            requirePermission('users', 'add');
             $username = clean($_POST['username']);
             $password = password_hash($_POST['password'], PASSWORD_DEFAULT);
             $fullname = clean($_POST['full_name']);
@@ -19,6 +26,7 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST' && $canManage) {
             $stmt->execute([$username, $password, $fullname, $email, $role]);
             $successMsg = "Staff member added successfully!";
         } elseif ($_POST['action'] == 'edit') {
+            requirePermission('users', 'edit');
             $id = intval($_POST['id']);
             $username = clean($_POST['username']);
             $fullname = clean($_POST['full_name']);
@@ -35,6 +43,7 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST' && $canManage) {
             }
             $successMsg = "Staff details updated successfully!";
         } elseif ($_POST['action'] == 'delete') {
+            requirePermission('users', 'delete');
             header('Content-Type: application/json');
             $id = intval($_POST['id']);
             if ($id != $_SESSION['user_id']) {
@@ -88,7 +97,7 @@ $users = $users->fetchAll();
 <div class="card">
     <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1.5rem;">
         <h2 style="font-size: 1.25rem;"><i class="fas fa-user-shield"></i> CRM Users & Permissions</h2>
-        <?php if ($canManage): ?>
+        <?php if ($canAdd): ?>
         <button class="btn btn-primary" onclick="openModal('addModal')">
             <i class="fas fa-plus"></i> Add New Staff
         </button>
@@ -127,10 +136,12 @@ $users = $users->fetchAll();
                 <td><?php echo date('d M Y', strtotime($user['created_at'])); ?></td>
                 <?php if ($canManage): ?>
                 <td>
+                    <?php if ($canEdit): ?>
                     <button class="btn-icon btn-edit" onclick="editUser(<?php echo htmlspecialchars(json_encode($user)); ?>)">
                         <i class="fas fa-edit"></i>
                     </button>
-                    <?php if ($user['id'] != $_SESSION['user_id']): ?>
+                    <?php endif; ?>
+                    <?php if ($canDelete && $user['id'] != $_SESSION['user_id']): ?>
                     <button type="button" class="btn-icon btn-delete" onclick="deleteUser(event, <?php echo $user['id']; ?>)">
                         <i class="fas fa-trash"></i>
                     </button>

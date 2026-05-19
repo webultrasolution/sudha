@@ -239,13 +239,17 @@ $stmtCheckPO = $pdo->prepare("SELECT id FROM purchase_orders WHERE campaign_id =
                                         <i class="fas fa-file-invoice"></i>
                                     </a>
                                 <?php else: ?>
+                                    <?php if (canEdit('bookings')): ?>
                                     <button onclick="saveAndGeneratePO(<?php echo $b['id']; ?>, <?php echo $item['vendor_id']; ?>)" title="Generate & Save PO to Database" style="background: #0f172a; color: white; width: 26px; height: 26px; border-radius: 6px; border: none; cursor: pointer; display: flex; align-items: center; justify-content: center; font-size: 0.7rem;">
                                         <i class="fas fa-save"></i>
                                     </button>
+                                    <?php endif; ?>
                                 <?php endif; ?>
+                                <?php if (canEdit('bookings')): ?>
                                 <button onclick="sendPOEmail(<?php echo $b['id']; ?>, <?php echo $item['vendor_id']; ?>)" title="Send PO via Email" style="background: #3b82f6; color: white; width: 26px; height: 26px; border-radius: 6px; border: none; cursor: pointer; display: flex; align-items: center; justify-content: center; font-size: 0.7rem;">
                                     <i class="fas fa-envelope"></i>
                                 </button>
+                                <?php endif; ?>
                                 <a href="https://wa.me/<?php echo preg_replace('/[^0-9]/', '', $item['vendor_phone'] ?? ''); ?>?text=Dear <?php echo urlencode($item['vendor_name'] ?? 'Vendor'); ?>, Please find the Purchase Order for Campaign: <?php echo urlencode($b['campaign_name'] ?? 'General'); ?>. Booking Ref: #BK-<?php echo str_pad($b['id'], 4, '0', STR_PAD_LEFT); ?>. Thank you." target="_blank" title="Send via WhatsApp" style="background: #22c55e; color: white; width: 26px; height: 26px; border-radius: 6px; display: flex; align-items: center; justify-content: center; font-size: 0.7rem; text-decoration: none;">
                                     <i class="fab fa-whatsapp"></i>
                                 </a>
@@ -261,17 +265,17 @@ $stmtCheckPO = $pdo->prepare("SELECT id FROM purchase_orders WHERE campaign_id =
                     <div style="font-weight: 700; color: #475569;"><?php echo $item['width'] . "' x " . $item['height'] . "'"; ?></div>
                     <div style="font-size: 0.7rem; color: #94a3b8;"><?php echo number_format($item['width']*$item['height']); ?> SQFT</div>
                 </td>
-                <td><input type="date" value="<?php echo htmlspecialchars($item['start_date'] ?? ''); ?>" onchange="updateBookingItemPeriod(<?php echo $item['id']; ?>, 'start_date', this.value)" class="t-date" style="height: 32px; width: 130px; border-radius: 6px; padding: 2px 5px; font-weight: 600;" <?php echo $invoiceFinalized ? 'disabled' : ''; ?>></td>
-                <td><input type="date" value="<?php echo htmlspecialchars($item['end_date'] ?? ''); ?>" onchange="updateBookingItemPeriod(<?php echo $item['id']; ?>, 'end_date', this.value)" class="t-date" style="height: 32px; width: 130px; border-radius: 6px; padding: 2px 5px; font-weight: 600;" <?php echo $invoiceFinalized ? 'disabled' : ''; ?>></td>
-                <td><input type="number" min="1" value="<?php echo intval($item['days'] ?? 30); ?>" onchange="updateBookingItemPeriod(<?php echo $item['id']; ?>, 'days', this.value)" class="t-input" style="height: 32px; width: 70px; text-align: center; border-radius: 6px; padding: 2px 5px; font-weight: 600;" <?php echo $invoiceFinalized ? 'disabled' : ''; ?>></td>
+                <td><input type="date" value="<?php echo htmlspecialchars($item['start_date'] ?? ''); ?>" onchange="updateBookingItemPeriod(<?php echo $item['id']; ?>, 'start_date', this.value)" class="t-date" style="height: 32px; width: 130px; border-radius: 6px; padding: 2px 5px; font-weight: 600;" <?php echo ($invoiceFinalized || !canEdit('bookings')) ? 'disabled' : ''; ?>></td>
+                <td><input type="date" value="<?php echo htmlspecialchars($item['end_date'] ?? ''); ?>" onchange="updateBookingItemPeriod(<?php echo $item['id']; ?>, 'end_date', this.value)" class="t-date" style="height: 32px; width: 130px; border-radius: 6px; padding: 2px 5px; font-weight: 600;" <?php echo ($invoiceFinalized || !canEdit('bookings')) ? 'disabled' : ''; ?>></td>
+                <td><input type="number" min="1" value="<?php echo intval($item['days'] ?? 30); ?>" onchange="updateBookingItemPeriod(<?php echo $item['id']; ?>, 'days', this.value)" class="t-input" style="height: 32px; width: 70px; text-align: center; border-radius: 6px; padding: 2px 5px; font-weight: 600;" <?php echo ($invoiceFinalized || !canEdit('bookings')) ? 'disabled' : ''; ?>></td>
                 <td>
                     <?php if ($item['owner_type'] === 'TA'): ?>
                         <?php if (($item['purchase_amount'] ?? 0) > 0): ?>
                             <div style="margin-bottom: 0.5rem;">
                                 <span style="font-size: 0.65rem; font-weight: 800; color: #94a3b8; text-transform: uppercase; display: block; margin-bottom: 2px;">Purchase Cost</span>
-                                <?php if ($invoiceFinalized): ?>
-                                    <!-- Locked after Final Invoice -->
-                                    <div style="display: inline-flex; align-items: center; gap: 0.4rem; background: #f1f5f9; border: 1px solid #cbd5e1; border-radius: 4px; padding: 3px 8px;" title="Locked: Final invoice has been generated">
+                                <?php if ($invoiceFinalized || !canEdit('bookings')): ?>
+                                    <!-- Locked after Final Invoice or without edit permission -->
+                                    <div style="display: inline-flex; align-items: center; gap: 0.4rem; background: #f1f5f9; border: 1px solid #cbd5e1; border-radius: 4px; padding: 3px 8px;" title="Locked">
                                         <i class="fas fa-lock" style="font-size: 0.6rem; color: #94a3b8;"></i>
                                         <span style="font-weight: 800; color: #334155; font-size: 0.9rem;"><?php echo number_format(floatval($item['purchase_amount']), 2); ?></span>
                                     </div>
@@ -293,9 +297,13 @@ $stmtCheckPO = $pdo->prepare("SELECT id FROM purchase_orders WHERE campaign_id =
                                 </div>
                             </div>
                         <?php else: ?>
+                            <?php if (canEdit('bookings')): ?>
                             <button onclick="promptSetCost(<?php echo $item['id']; ?>)" style="background: #f1f5f9; border: 1px dashed #cbd5e1; color: #64748b; padding: 0.5rem; border-radius: 8px; font-size: 0.7rem; font-weight: 700; cursor: pointer; width: 100%; display: flex; align-items: center; justify-content: center; gap: 0.4rem;">
                                 <i class="fas fa-plus-circle"></i> SET PURCHASE COST
                             </button>
+                            <?php else: ?>
+                            <span style="color: #94a3b8; font-size: 0.75rem; font-weight: 600;">Cost Pending</span>
+                            <?php endif; ?>
                         <?php endif; ?>
                     <?php else: ?>
                         <div style="color: #94a3b8; font-size: 0.75rem; font-weight: 600; display: flex; align-items: center; gap: 0.4rem;">
@@ -304,8 +312,8 @@ $stmtCheckPO = $pdo->prepare("SELECT id FROM purchase_orders WHERE campaign_id =
                     <?php endif; ?>
                 </td>
                 <td style="text-align: right; vertical-align: middle;">
-                    <?php if ($invoiceFinalized): ?>
-                        <div style="display: inline-flex; align-items: center; gap: 0.4rem; background: #f1f5f9; border: 1px solid #cbd5e1; border-radius: 4px; padding: 3px 8px; justify-content: flex-end;" title="Locked: Final invoice has been generated">
+                    <?php if ($invoiceFinalized || !canEdit('bookings')): ?>
+                        <div style="display: inline-flex; align-items: center; gap: 0.4rem; background: #f1f5f9; border: 1px solid #cbd5e1; border-radius: 4px; padding: 3px 8px; justify-content: flex-end;" title="Locked">
                             <i class="fas fa-lock" style="font-size: 0.6rem; color: #94a3b8;"></i>
                             <span style="font-weight: 800; color: #334155; font-size: 0.9rem;"><?php echo number_format(floatval($item['amount']), 2); ?></span>
                         </div>
@@ -318,9 +326,11 @@ $stmtCheckPO = $pdo->prepare("SELECT id FROM purchase_orders WHERE campaign_id =
                     <?php endif; ?>
                 </td>
                 <td style="text-align: right;">
+                    <?php if (canDelete('bookings')): ?>
                     <button onclick="deleteItem(<?php echo $item['id']; ?>)" style="background: none; border: none; color: #ef4444; cursor: pointer; padding: 0.5rem;" title="Remove Site from Booking">
                         <i class="fas fa-trash-alt"></i>
                     </button>
+                    <?php endif; ?>
                 </td>
             </tr>
             <?php endforeach; ?>

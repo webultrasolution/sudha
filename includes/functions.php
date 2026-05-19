@@ -106,6 +106,34 @@ function requireRole($roles) {
     }
 }
 
+/**
+ * Force a permission check and redirect if not permitted
+ */
+function requirePermission($module, $action = 'view') {
+    if (session_status() === PHP_SESSION_NONE) session_start();
+    $role = $_SESSION['user_role'] ?? '';
+    if ($role === 'admin') return; // Admin has all permissions
+    
+    $p = getPerms($module);
+    $ok = false;
+    if ($action === 'view') $ok = ($p['can_view'] == 1);
+    elseif ($action === 'add') $ok = ($p['can_add'] == 1);
+    elseif ($action === 'edit') $ok = ($p['can_edit'] == 1);
+    elseif ($action === 'delete') $ok = ($p['can_delete'] == 1);
+    
+    if (!$ok) {
+        echo "<div style='padding: 50px; text-align: center; font-family: Arial, sans-serif; height: 100vh; display: flex; align-items: center; justify-content: center; background: #f8fafc;'>
+                <div style='max-width: 500px; width: 100%; background: #fff; padding: 35px; border-radius: 16px; box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.05), 0 4px 6px -4px rgba(0, 0, 0, 0.05); border-top: 4px solid #ef4444; box-sizing: border-box;'>
+                    <i class='fas fa-shield-alt' style='font-size: 3.5rem; color: #ef4444; margin-bottom: 20px;'></i>
+                    <h1 style='color: #0f172a; margin: 0 0 10px 0; font-size: 1.6rem; font-weight: 800; font-family: Outfit, sans-serif;'>Access Denied</h1>
+                    <p style='color: #64748b; margin-bottom: 30px; font-size: 0.95rem; font-family: Outfit, sans-serif;'>Aapke paas is page ko dekhne ya action perform karne ki permission nahi hai.</p>
+                    <a href='" . BASE_URL . "index.php' style='display: inline-block; padding: 12px 24px; background: #1cada9; color: white; text-decoration: none; border-radius: 8px; font-weight: 700; font-family: Outfit, sans-serif; transition: background 0.2s;'>Dashboard par wapas jayein</a>
+                </div>
+              </div>";
+        exit;
+    }
+}
+
 
 /**
  * Check if user is logged in

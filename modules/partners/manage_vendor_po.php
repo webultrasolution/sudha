@@ -2,6 +2,8 @@
 include_once __DIR__ . '/../../config/db.php';
 include_once __DIR__ . '/../../includes/functions.php';
 
+requirePermission('vendors', 'add');
+
 $vendor_id = isset($_GET['vendor_id']) ? intval($_GET['vendor_id']) : 0;
 if (!$vendor_id) { header("Location: vendors.php"); exit; }
 

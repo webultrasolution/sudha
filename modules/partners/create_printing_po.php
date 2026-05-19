@@ -5,8 +5,16 @@ include_once __DIR__ . '/../../includes/functions.php';
 $activePage = 'printing_rates';
 $pageTitle = 'Create Printing PO';
 
+requirePermission('vendors', 'view');
+
 $id = isset($_GET['id']) ? intval($_GET['id']) : 0;
 $action = isset($_GET['action']) ? clean($_GET['action']) : 'add';
+
+if ($action === 'edit') {
+    requirePermission('vendors', 'edit');
+} else {
+    requirePermission('vendors', 'add');
+}
 
 $rateData = null;
 if ($id && $action === 'edit') {

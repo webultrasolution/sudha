@@ -3,6 +3,9 @@ $activePage = 'pos';
 $pageTitle = 'View Purchase Order';
 include_once __DIR__ . '/../../includes/header.php';
 
+// Enforce View Permission at Page Level
+requirePermission('financials', 'view');
+
 $poId = isset($_GET['id']) ? intval($_GET['id']) : 0;
 
 $po = $pdo->prepare("
@@ -168,6 +171,7 @@ $poAttachments = $attachments->fetchAll();
                     <small><?php echo date('d M Y', strtotime($poData['vendor_invoice_date'])); ?></small>
                 </div>
             <?php else: ?>
+                <?php if (canEdit('financials')): ?>
                 <form id="invoiceForm" style="margin-bottom: 1.5rem;">
                     <div class="form-group">
                         <label style="font-size: 0.75rem;">Inv Number</label>
@@ -181,6 +185,9 @@ $poAttachments = $attachments->fetchAll();
                         Update Details
                     </button>
                 </form>
+                <?php else: ?>
+                    <p style="font-size: 0.85rem; color: #94a3b8; font-style: italic;">No vendor invoice details recorded.</p>
+                <?php endif; ?>
             <?php endif; ?>
 
             <h3 style="font-size: 1rem; margin-top: 2rem; margin-bottom: 1rem;"><i class="fas fa-paperclip"></i> Attachments</h3>
@@ -197,12 +204,14 @@ $poAttachments = $attachments->fetchAll();
                 <?php endif; ?>
             </div>
             
+            <?php if (canEdit('financials')): ?>
             <form id="uploadForm" enctype="multipart/form-data" style="margin-top: 1rem;">
                 <input type="file" id="po_file" style="display: none;" onchange="uploadPOFile()">
                 <button type="button" class="btn" style="width: 100%; border: 1px dashed var(--primary); color: var(--primary);" onclick="document.getElementById('po_file').click()">
                     <i class="fas fa-upload"></i> Upload Invoice/Scan
                 </button>
             </form>
+            <?php endif; ?>
         </div>
     </div>
 </div>

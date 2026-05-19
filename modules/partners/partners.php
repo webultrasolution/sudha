@@ -6,6 +6,8 @@ include_once __DIR__ . '/../../includes/functions.php';
 if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action'])) {
     if ($_POST['action'] === 'add_partner') {
         $type = clean($_POST['type']);
+        requirePermission($type === 'client' ? 'clients' : 'vendors', 'add');
+        
         $name = clean($_POST['name']);
         $gstin = clean($_POST['gstin']);
         $pan = clean($_POST['pan']);
@@ -20,6 +22,17 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action'])) {
         exit;
     } elseif ($_POST['action'] === 'edit_partner') {
         $id = intval($_POST['id']);
+        
+        // Fetch partner type for permission enforcement
+        $p_type = $pdo->prepare("SELECT type FROM partners WHERE id = ?");
+        $p_type->execute([$id]);
+        $type = $p_type->fetchColumn();
+        if ($type) {
+            requirePermission($type === 'client' ? 'clients' : 'vendors', 'edit');
+        } else {
+            die("Invalid partner ID.");
+        }
+
         $name = clean($_POST['name']);
         $gstin = clean($_POST['gstin']);
         $pan = clean($_POST['pan']);
@@ -35,6 +48,18 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action'])) {
     } elseif ($_POST['action'] === 'delete_partner') {
         header('Content-Type: application/json');
         $id = intval($_POST['id']);
+        
+        // Fetch partner type for permission enforcement
+        $p_type = $pdo->prepare("SELECT type FROM partners WHERE id = ?");
+        $p_type->execute([$id]);
+        $type = $p_type->fetchColumn();
+        if ($type) {
+            requirePermission($type === 'client' ? 'clients' : 'vendors', 'delete');
+        } else {
+            echo json_encode(['success' => false, 'message' => 'Invalid partner ID.']);
+            exit;
+        }
+
         try {
             $stmt = $pdo->prepare("DELETE FROM partners WHERE id = ?");
             $stmt->execute([$id]);
@@ -77,9 +102,11 @@ $vendors = $vendors->fetchAll();
     <div class="card">
         <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1.5rem;">
             <h2 style="font-size: 1.25rem;"><i class="fas fa-briefcase" style="color: var(--primary);"></i> Clients</h2>
+            <?php if (canAdd('clients')): ?>
             <button class="btn btn-primary" onclick="openModal('client')">
                 <i class="fas fa-plus"></i> Add Client
             </button>
+            <?php endif; ?>
         </div>
         <table class="table">
             <thead>
@@ -104,8 +131,12 @@ $vendors = $vendors->fetchAll();
                     <td><code style="font-size: 0.75rem;"><?php echo $p['gstin'] ?: 'N/A'; ?></code></td>
                     <td><?php echo $p['contact_person']; ?></td>
                     <td>
+                        <?php if (canEdit('clients')): ?>
                         <button type="button" class="btn" title="Edit" onclick="editPartner(<?php echo htmlspecialchars(json_encode($p)); ?>)"><i class="fas fa-edit"></i></button>
+                        <?php endif; ?>
+                        <?php if (canDelete('clients')): ?>
                         <button type="button" class="btn" style="color: var(--danger);" title="Delete" onclick="deletePartner(<?php echo $p['id']; ?>)"><i class="fas fa-trash"></i></button>
+                        <?php endif; ?>
                     </td>
                 </tr>
                 <?php endforeach; ?>
@@ -118,9 +149,11 @@ $vendors = $vendors->fetchAll();
     <div class="card">
         <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1.5rem;">
             <h2 style="font-size: 1.25rem;"><i class="fas fa-truck-loading" style="color: var(--warning);"></i> Vendors</h2>
+            <?php if (canAdd('vendors')): ?>
             <button class="btn btn-primary" onclick="openModal('vendor')">
                 <i class="fas fa-plus"></i> Add Vendor
             </button>
+            <?php endif; ?>
         </div>
         <table class="table">
             <thead>
@@ -144,8 +177,12 @@ $vendors = $vendors->fetchAll();
                     <td><code style="font-size: 0.75rem;"><?php echo $p['gstin'] ?: 'N/A'; ?></code></td>
                     <td><?php echo $p['contact_person']; ?></td>
                     <td>
+                        <?php if (canEdit('vendors')): ?>
                         <button type="button" class="btn" title="Edit" onclick="editPartner(<?php echo htmlspecialchars(json_encode($p)); ?>)"><i class="fas fa-edit"></i></button>
+                        <?php endif; ?>
+                        <?php if (canDelete('vendors')): ?>
                         <button type="button" class="btn" style="color: var(--danger);" title="Delete" onclick="deletePartner(<?php echo $p['id']; ?>)"><i class="fas fa-trash"></i></button>
+                        <?php endif; ?>
                     </td>
                 </tr>
                 <?php endforeach; ?>

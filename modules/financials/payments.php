@@ -3,11 +3,8 @@ $activePage = 'payments';
 $pageTitle = 'Payment Tracking';
 include_once __DIR__ . '/../../includes/header.php';
 
-if (!hasRole(['admin', 'accounts'])) {
-    echo "<div class='card'>Access Denied.</div>";
-    include_once __DIR__ . '/../../includes/footer.php';
-    exit;
-}
+// Enforce View Permission at Page Level
+requirePermission('financials', 'view');
 
 // Fetch Payments
 $payments = $pdo->query("
@@ -25,9 +22,11 @@ $partners = $pdo->query("SELECT id, name FROM partners ORDER BY name ASC")->fetc
 <div class="card">
     <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1.5rem;">
         <h2 style="font-size: 1.25rem;">Financial Transactions</h2>
+        <?php if (canAdd('financials')): ?>
         <button class="btn btn-primary" onclick="openPaymentModal()">
             <i class="fas fa-plus"></i> Record Payment
         </button>
+        <?php endif; ?>
     </div>
 
     <table class="table">

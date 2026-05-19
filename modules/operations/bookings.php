@@ -2,8 +2,12 @@
 include_once __DIR__ . '/../../config/db.php';
 include_once __DIR__ . '/../../includes/functions.php';
 
+// Enforce View Permission at Page Level
+requirePermission('bookings', 'view');
+
 // Handle Delete
 if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action']) && $_POST['action'] === 'delete') {
+    requirePermission('bookings', 'delete');
     header('Content-Type: application/json');
     $id = intval($_POST['id']);
     try {
@@ -36,9 +40,11 @@ $bookings = $pdo->query("
 <div class="card">
     <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1.5rem;">
         <h2 style="font-size: 1.25rem;">Active Bookings</h2>
+        <?php if (canAdd('bookings')): ?>
         <a href="direct_booking.php" class="btn btn-primary">
             <i class="fas fa-plus"></i> Direct Booking
         </a>
+        <?php endif; ?>
     </div>
 
     <table class="table">
@@ -100,7 +106,9 @@ $bookings = $pdo->query("
                     </td>
                     <td>
                         <a href="mounting.php?booking_id=<?php echo $b['id']; ?>" class="btn-icon btn-view" title="View Operations"><i class="fas fa-clipboard-list"></i></a>
+                        <?php if (canDelete('bookings')): ?>
                         <button class="btn-icon btn-delete" onclick="deleteBooking(<?php echo $b['id']; ?>)"><i class="fas fa-trash"></i></button>
+                        <?php endif; ?>
                     </td>
                 </tr>
                 <?php endforeach; ?>

@@ -35,30 +35,47 @@ $activeEntity = getActiveEntity();
             </li>
 
             <!-- Master Data Submenu -->
+            <?php if (canView('clients') || canView('inventory') || canView('vendors')): ?>
             <li class="nav-item has-submenu">
                 <a href="#" class="nav-link submenu-toggle <?php echo in_array($activePage, ['clients', 'sites', 'vendors']) ? 'active submenu-open' : ''; ?>">
                     <i class="fas fa-database"></i> <span>Master Data</span> <i class="fas fa-chevron-down toggle-icon" style="margin-left: auto; font-size: 0.8rem;"></i>
                 </a>
                 <ul class="submenu" style="<?php echo in_array($activePage, ['clients', 'sites', 'vendors']) ? 'display: block;' : 'display: none;'; ?>">
+                    <?php if (canView('clients')): ?>
                     <li><a href="<?php echo BASE_URL; ?>modules/partners/clients.php" class="<?php echo $activePage == 'clients' ? 'active-sub' : ''; ?>"><i class="fas fa-building"></i> Company/Client</a></li>
+                    <?php endif; ?>
+                    <?php if (canView('inventory')): ?>
                     <li><a href="<?php echo BASE_URL; ?>modules/inventory/sites.php" class="<?php echo $activePage == 'sites' ? 'active-sub' : ''; ?>"><i class="fas fa-map-marked-alt"></i> Site/Location</a></li>
+                    <?php endif; ?>
+                    <?php if (canView('vendors')): ?>
                     <li><a href="<?php echo BASE_URL; ?>modules/partners/vendors.php" class="<?php echo $activePage == 'vendors' ? 'active-sub' : ''; ?>"><i class="fas fa-truck-loading"></i> Vendors</a></li>
+                    <?php endif; ?>
                 </ul>
             </li>
+            <?php endif; ?>
 
             <!-- Operations & Sales Submenu -->
+            <?php if (canView('proposals') || canView('bookings') || canView('vendors') || canView('clients')): ?>
             <li class="nav-item has-submenu">
                 <a href="#" class="nav-link submenu-toggle <?php echo in_array($activePage, ['proposals', 'bookings', 'printing_rates', 'client_printing', 'client_printing_rates']) ? 'active submenu-open' : ''; ?>">
                     <i class="fas fa-briefcase"></i> <span>Operations & Sales</span> <i class="fas fa-chevron-down toggle-icon" style="margin-left: auto; font-size: 0.8rem;"></i>
                 </a>
                 <ul class="submenu" style="<?php echo in_array($activePage, ['proposals', 'bookings', 'direct_booking', 'printing_rates', 'client_printing', 'client_printing_rates']) ? 'display: block;' : 'display: none;'; ?>">
+                    <?php if (canView('proposals')): ?>
                     <li><a href="<?php echo BASE_URL; ?>modules/proposals/proposals.php" class="<?php echo $activePage == 'proposals' ? 'active-sub' : ''; ?>"><i class="fas fa-file-contract"></i> Sales / Proposals</a></li>
+                    <?php endif; ?>
+                    <?php if (canView('bookings')): ?>
                     <li><a href="<?php echo BASE_URL; ?>modules/operations/bookings.php" class="<?php echo $activePage == 'bookings' ? 'active-sub' : ''; ?>"><i class="fas fa-calendar-check"></i> Bookings</a></li>
+                    <?php endif; ?>
+                    <?php if (canView('vendors')): ?>
                     <li><a href="<?php echo BASE_URL; ?>modules/partners/printing_rates.php" class="<?php echo $activePage == 'printing_rates' ? 'active-sub' : ''; ?>"><i class="fas fa-print"></i>Vendors Printing PO</a></li>
+                    <?php endif; ?>
+                    <?php if (canView('clients')): ?>
                     <li><a href="<?php echo BASE_URL; ?>modules/partners/client_printing_rates.php" class="<?php echo $activePage == 'client_printing_rates' ? 'active-sub' : ''; ?>"><i class="fas fa-file-invoice"></i> Client Printing Invoice</a></li>
-                    <!-- <li><a href="<?php echo BASE_URL; ?>modules/operations/client_printing.php" class="<?php echo $activePage == 'client_printing' ? 'active-sub' : ''; ?>"><i class="fas fa-print"></i> Client Printing Sheet</a></li> -->
+                    <?php endif; ?>
                 </ul>
             </li>
+            <?php endif; ?>
 
             <!-- Financials Submenu (Dynamic Permissions) -->
             <?php if (canAccess('financials')): ?>

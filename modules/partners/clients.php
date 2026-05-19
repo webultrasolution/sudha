@@ -2,6 +2,9 @@
 include_once __DIR__ . '/../../config/db.php';
 include_once __DIR__ . '/../../includes/functions.php';
 
+// Enforce View Permission at Page Level
+requirePermission('clients', 'view');
+
 // Handle Form Submissions
 if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action'])) {
     $name = clean($_POST['name']);
@@ -26,15 +29,18 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action'])) {
     }
 
     if ($_POST['action'] === 'add') {
+        requirePermission('clients', 'add');
         $stmt = $pdo->prepare("INSERT INTO partners (name, business_type, contact_person, phone, email, address, city, state, district, pincode, gstin, additional_gst, pan, billing_address, status, type) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'client')");
         $stmt->execute([$name, $business_type, $contact, $phone, $email, $address, $city, $state, $district, $pincode, $gstin, $additional_gst, $pan, $billing_address, $status]);
         header("Location: clients.php?msg=added"); exit;
     } elseif ($_POST['action'] === 'edit') {
+        requirePermission('clients', 'edit');
         $id = intval($_POST['id']);
         $stmt = $pdo->prepare("UPDATE partners SET name=?, business_type=?, contact_person=?, phone=?, email=?, address=?, city=?, state=?, district=?, pincode=?, gstin=?, additional_gst=?, pan=?, billing_address=?, status=? WHERE id=?");
         $stmt->execute([$name, $business_type, $contact, $phone, $email, $address, $city, $state, $district, $pincode, $gstin, $additional_gst, $pan, $billing_address, $status, $id]);
         header("Location: clients.php?msg=updated"); exit;
     } elseif ($_POST['action'] === 'delete') {
+        requirePermission('clients', 'delete');
         header('Content-Type: application/json');
         $id = intval($_POST['id']);
         $stmt = $pdo->prepare("DELETE FROM partners WHERE id = ?");
@@ -86,12 +92,14 @@ $indian_states = ["Andhra Pradesh", "Arunachal Pradesh", "Assam", "Bihar", "Chha
                 </select>
                 <button type="submit" class="btn" style="padding: 0.5rem 1rem;"><i class="fas fa-search"></i></button>
             </form>
+            <?php if (canAdd('clients')): ?>
             <button class="btn btn-secondary" onclick="openImportModal()" style="background: #f1f5f9; color: #475569; border: 1px solid #e2e8f0;">
                 <i class="fas fa-file-import"></i> Bulk Import
             </button>
             <button class="btn btn-primary" onclick="openModal()">
                 <i class="fas fa-plus"></i> Add New Company
             </button>
+            <?php endif; ?>
         </div>
     </div>
 
@@ -137,8 +145,12 @@ $indian_states = ["Andhra Pradesh", "Arunachal Pradesh", "Assam", "Bihar", "Chha
                 </td>
                 <td style="text-align: right; white-space: nowrap;">
                     <a href="../financials/partner_ledger.php?partner_id=<?php echo $c['id']; ?>" class="btn-icon btn-ledger" title="View Ledger"><i class="fas fa-book"></i></a>
+                    <?php if (canEdit('clients')): ?>
                     <button class="btn-icon btn-edit" onclick="editClient(<?php echo htmlspecialchars(json_encode($c)); ?>)" title="Edit"><i class="fas fa-edit"></i></button>
+                    <?php endif; ?>
+                    <?php if (canDelete('clients')): ?>
                     <button class="btn-icon btn-delete" onclick="deleteClient(<?php echo $c['id']; ?>)" title="Delete"><i class="fas fa-trash"></i></button>
+                    <?php endif; ?>
                 </td>
             </tr>
             <?php endforeach; ?>

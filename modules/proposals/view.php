@@ -1,11 +1,14 @@
 <?php
 $activePage = 'proposals';
 $pageTitle = 'Plan Detail Workspace';
+// Load Core Libraries (SweetAlert, FontAwesome, CSS) without the sidebar
+$hideSidebar = true;
 include_once __DIR__ . '/../../config/db.php';
 include_once __DIR__ . '/../../includes/functions.php';
 
-// Load Core Libraries (SweetAlert, FontAwesome, CSS) without the sidebar
-$hideSidebar = true;
+// Enforce View Permission at Page Level
+requirePermission('proposals', 'view');
+
 include_once __DIR__ . '/../../includes/header.php';
 
 // Prevent timezone warnings
@@ -99,7 +102,7 @@ $taMarkupPct = ($taCost > 0) ? ($taMarkup / $taCost) * 100 : 0;
                 <a href="download_photos.php?id=<?php echo $id; ?>"><i class="fas fa-images" style="color: #8b5cf6;"></i> Download Photos</a>
             </div>
         </div>
-        <?php if ($p['status'] != 'confirmed'): ?>
+        <?php if ($p['status'] != 'confirmed' && canAdd('bookings')): ?>
             <button class="btn" onclick="confirmProposal(<?php echo $id; ?>)" style="background: linear-gradient(135deg, #10b981 0%, #059669 100%); border: none; color: white; padding: 0.75rem 1.5rem; border-radius: 10px; font-weight: 800; font-size: 0.9rem; cursor: pointer; display: flex; align-items: center; gap: 0.5rem; transition: all 0.2s; box-shadow: 0 4px 6px -1px rgba(16, 185, 129, 0.3);" onmouseover="this.style.transform='translateY(-1px)'; this.style.boxShadow='0 10px 15px -3px rgba(16, 185, 129, 0.4)';" onmouseout="this.style.transform='none'; this.style.boxShadow='0 4px 6px -1px rgba(16, 185, 129, 0.3)';">
                 <i class="fas fa-check-double"></i> Convert to Booking
             </button>
@@ -114,15 +117,15 @@ $taMarkupPct = ($taCost > 0) ? ($taMarkup / $taCost) * 100 : 0;
         <h4 class="p-title"><i class="fas fa-sliders-h"></i> Configuration</h4>
         <div class="p-row">
             <label style="font-weight: 600;">Discount %</label>
-            <input type="number" step="0.01" class="p-val-input" value="<?php echo $p['discounting_pct']; ?>" onchange="updatePlan('discounting_pct', this.value)">
+            <input type="number" step="0.01" class="p-val-input" value="<?php echo $p['discounting_pct']; ?>" onchange="updatePlan('discounting_pct', this.value)" <?php echo !canEdit('proposals') ? 'disabled' : ''; ?>>
         </div>
         <div class="p-row">
             <label style="font-weight: 600;">Markup %</label>
-            <input type="number" step="0.01" class="p-val-input" value="<?php echo $p['pricing_pct']; ?>" onchange="updatePlan('pricing_pct', this.value)">
+            <input type="number" step="0.01" class="p-val-input" value="<?php echo $p['pricing_pct']; ?>" onchange="updatePlan('pricing_pct', this.value)" <?php echo !canEdit('proposals') ? 'disabled' : ''; ?>>
         </div>
         <div style="margin-top: 1rem; border-top: 1px solid #f1f5f9; padding-top: 1rem;">
             <label style="display: flex; align-items: center; gap: 0.75rem; cursor: pointer;">
-                <input type="checkbox" checked style="width: 16px; height: 16px; accent-color: var(--primary);">
+                <input type="checkbox" checked style="width: 16px; height: 16px; accent-color: var(--primary);" <?php echo !canEdit('proposals') ? 'disabled' : ''; ?>>
                 <span style="font-size: 0.85rem; font-weight: 600; color: #475569;">Auto-Sync Dates</span>
             </label>
         </div>
@@ -133,11 +136,11 @@ $taMarkupPct = ($taCost > 0) ? ($taMarkup / $taCost) * 100 : 0;
         <h4 class="p-title"><i class="fas fa-hammer"></i> Production</h4>
         <div class="p-row">
             <label style="font-weight: 600;">Printing (₹)</label>
-            <input type="number" class="p-val-input" value="<?php echo $p['printing_cost']; ?>" onchange="updatePlan('printing_cost', this.value)">
+            <input type="number" class="p-val-input" value="<?php echo $p['printing_cost']; ?>" onchange="updatePlan('printing_cost', this.value)" <?php echo !canEdit('proposals') ? 'disabled' : ''; ?>>
         </div>
         <div class="p-row">
             <label style="font-weight: 600;">Mounting (₹)</label>
-            <input type="number" class="p-val-input" value="<?php echo $p['mounting_cost']; ?>" onchange="updatePlan('mounting_cost', this.value)">
+            <input type="number" class="p-val-input" value="<?php echo $p['mounting_cost']; ?>" onchange="updatePlan('mounting_cost', this.value)" <?php echo !canEdit('proposals') ? 'disabled' : ''; ?>>
         </div>
     </div>
 
@@ -191,13 +194,15 @@ $taMarkupPct = ($taCost > 0) ? ($taMarkup / $taCost) * 100 : 0;
                 <i class="fas fa-search" style="position: absolute; left: 1rem; top: 50%; transform: translateY(-50%); color: #94a3b8; font-size: 0.85rem;"></i>
                 <input type="text" id="tableSearch" placeholder="Search in plan..." class="p-input" style="width: 250px; padding-left: 2.5rem; height: 38px; border-radius: 8px;">
             </div>
+            <?php if (canEdit('proposals')): ?>
             <button class="btn btn-primary" onclick="saveAllChanges()" style="height: 38px; border-radius: 8px;"><i class="fas fa-save"></i> Save Changes</button>
+            <?php endif; ?>
         </div>
     </div>
     <table class="table" style="font-size: 0.75rem; white-space: nowrap;">
         <thead style="background: #f8fafc;">
             <tr>
-                <th style="width: 30px;"><input type="checkbox" id="selectAll" checked style="cursor: pointer;"></th>
+                <th style="width: 30px;"><input type="checkbox" id="selectAll" checked style="cursor: pointer;" <?php echo !canEdit('proposals') ? 'disabled' : ''; ?>></th>
                 <th>Asset Details</th>
                 <th>City / Code</th>
                 <th>Dimensions</th>
@@ -213,7 +218,7 @@ $taMarkupPct = ($taCost > 0) ? ($taMarkup / $taCost) * 100 : 0;
         <tbody>
             <?php $sr=1; foreach ($items as $item): ?>
             <tr>
-                <td><input type="checkbox" class="item-checkbox" value="<?php echo $item['id']; ?>" checked style="cursor: pointer;"></td>
+                <td><input type="checkbox" class="item-checkbox" value="<?php echo $item['id']; ?>" checked style="cursor: pointer;" <?php echo !canEdit('proposals') ? 'disabled' : ''; ?>></td>
                 <td>
                     <div style="font-weight: 800; color: #1e293b; margin-bottom: 2px;"><?php echo $item['site_name']; ?></div>
                     <div style="font-size: 0.75rem; color: #64748b; margin-bottom: 6px;"><?php echo $item['location']; ?></div>
@@ -240,16 +245,18 @@ $taMarkupPct = ($taCost > 0) ? ($taMarkup / $taCost) * 100 : 0;
                         <span style="font-weight: 700; color: #10b981;"><?php echo $item['available_from'] ? date('d M', strtotime($item['available_from'])) : 'Live'; ?></span>
                     </div>
                 </td>
-                <td><input type="date" value="<?php echo htmlspecialchars($item['start_date'] ?? ''); ?>" onchange="updateItem(<?php echo $item['id']; ?>, 'start_date', this.value)" class="t-date" style="height: 32px; width: 130px;"></td>
-                <td><input type="date" value="<?php echo htmlspecialchars($item['end_date'] ?? ''); ?>" onchange="updateItem(<?php echo $item['id']; ?>, 'end_date', this.value)" class="t-date" style="height: 32px; width: 130px;"></td>
-                <td><input type="number" min="1" value="<?php echo intval($item['days'] ?? 30); ?>" onchange="updateItem(<?php echo $item['id']; ?>, 'days', this.value)" class="t-input" style="height: 32px; width: 70px; text-align: center;"></td>
+                <td><input type="date" value="<?php echo htmlspecialchars($item['start_date'] ?? ''); ?>" onchange="updateItem(<?php echo $item['id']; ?>, 'start_date', this.value)" class="t-date" style="height: 32px; width: 130px;" <?php echo !canEdit('proposals') ? 'disabled' : ''; ?>></td>
+                <td><input type="date" value="<?php echo htmlspecialchars($item['end_date'] ?? ''); ?>" onchange="updateItem(<?php echo $item['id']; ?>, 'end_date', this.value)" class="t-date" style="height: 32px; width: 130px;" <?php echo !canEdit('proposals') ? 'disabled' : ''; ?>></td>
+                <td><input type="number" min="1" value="<?php echo intval($item['days'] ?? 30); ?>" onchange="updateItem(<?php echo $item['id']; ?>, 'days', this.value)" class="t-input" style="height: 32px; width: 70px; text-align: center;" <?php echo !canEdit('proposals') ? 'disabled' : ''; ?>></td>
                 <td>
                     <div style="font-size: 0.7rem; color: #94a3b8; margin-bottom: 2px;">Card: <?php echo formatCurrency($item['site_card_rate']); ?></div>
-                    <input type="number" class="t-input" value="<?php echo (float)$item['sale_rate']; ?>" onchange="updateItem(<?php echo $item['id']; ?>, 'sale_rate', this.value)" style="height: 32px; width: 100px;">
+                    <input type="number" class="t-input" value="<?php echo (float)$item['sale_rate']; ?>" onchange="updateItem(<?php echo $item['id']; ?>, 'sale_rate', this.value)" style="height: 32px; width: 100px;" <?php echo !canEdit('proposals') ? 'disabled' : ''; ?>>
                 </td>
                 <td style="font-weight: 800; color: var(--primary); text-align: right; font-size: 1rem;"><?php echo formatCurrency($item['amount']); ?></td>
                 <td style="text-align: right;">
+                    <?php if (canEdit('proposals')): ?>
                     <button class="btn-icon" onclick="deleteItem(<?php echo $item['id']; ?>)" style="color: #ef4444; cursor: pointer; border: none; background: transparent; font-size: 1rem;"><i class="fas fa-trash-alt"></i></button>
+                    <?php endif; ?>
                 </td>
             </tr>
             <?php endforeach; ?>

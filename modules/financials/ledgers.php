@@ -3,6 +3,10 @@ $activePage = 'ledger';
 $pageTitle = 'Financials - Account Ledgers';
 include_once __DIR__ . '/../../config/db.php';
 include_once __DIR__ . '/../../includes/functions.php';
+
+// Enforce View Permission at Page Level
+requirePermission('financials', 'view');
+
 include_once __DIR__ . '/../../includes/header.php';
 
 $type = isset($_GET['type']) ? $_GET['type'] : 'client';

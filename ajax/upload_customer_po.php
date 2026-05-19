@@ -5,6 +5,10 @@ include_once __DIR__ . '/../includes/functions.php';
 header('Content-Type: application/json');
 
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
+    if (!canEdit('bookings') && !canAdd('financials')) {
+        echo json_encode(['success' => false, 'message' => 'Access Denied: You do not have permission to confirm bookings or generate invoices.']);
+        exit;
+    }
     $booking_id = intval($_POST['booking_id'] ?? 0);
     $type = clean($_POST['confirmation_type'] ?? 'po');
     $po_no = clean($_POST['customer_po_no'] ?? '');

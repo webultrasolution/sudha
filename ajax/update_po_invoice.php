@@ -5,6 +5,10 @@ include_once __DIR__ . '/../includes/functions.php';
 header('Content-Type: application/json');
 
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
+    if (!canEdit('financials')) {
+        echo json_encode(['success' => false, 'message' => 'Access Denied: You do not have permission to update PO invoice.']);
+        exit;
+    }
     $id = intval($_POST['id']);
     $no = clean($_POST['no']);
     $date = clean($_POST['date']);
