@@ -43,7 +43,7 @@ try {
     if ($tax_type === 'cgst_sgst') {
         $cgst = $subtotal * 0.09;
         $sgst = $subtotal * 0.09;
-    } else {
+    } elseif ($tax_type === 'igst') {
         $igst = $subtotal * 0.18;
     }
     $grand_total = $subtotal + $cgst + $sgst + $igst;

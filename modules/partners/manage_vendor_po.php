@@ -141,8 +141,14 @@ include_once __DIR__ . '/../../includes/header.php';
                 <div class="po-fg">
                     <label>Tax Type</label>
                     <select id="po_tax_type">
-                        <option value="igst">IGST (18%)</option>
+                        <?php if (empty($vendor['gstin'])): ?>
+                            <option value="none" selected>No GST (0%)</option>
+                        <?php endif; ?>
+                        <option value="igst" <?php echo !empty($vendor['gstin']) ? 'selected' : ''; ?>>IGST (18%)</option>
                         <option value="cgst_sgst">CGST + SGST (9%+9%)</option>
+                        <?php if (!empty($vendor['gstin'])): ?>
+                            <option value="none">No GST (0%)</option>
+                        <?php endif; ?>
                     </select>
                 </div>
                 <div class="po-fg" style="grid-column: span 2;">
@@ -313,7 +319,11 @@ function recalcTotals() {
     const count = sites.length;
     const subtotal = sites.reduce((a, s) => a + s.rate, 0);
     const taxType = document.getElementById('po_tax_type').value;
-    const taxAmt = subtotal * 0.18;
+    
+    let taxAmt = 0;
+    if (taxType !== 'none') {
+        taxAmt = subtotal * 0.18;
+    }
     const grand = subtotal + taxAmt;
 
     document.getElementById('sel-count').innerText = count;
@@ -326,6 +336,8 @@ function recalcTotals() {
     const taxDisp = document.getElementById('tax-display');
     if (taxType === 'cgst_sgst') {
         taxDisp.querySelector('.label').innerText = 'CGST+SGST (9%+9%)';
+    } else if (taxType === 'none') {
+        taxDisp.querySelector('.label').innerText = 'GST (0%)';
     } else {
         taxDisp.querySelector('.label').innerText = 'IGST (18%)';
     }
