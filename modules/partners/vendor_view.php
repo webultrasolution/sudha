@@ -2,6 +2,9 @@
 include_once __DIR__ . '/../../config/db.php';
 include_once __DIR__ . '/../../includes/functions.php';
 
+// Enforce View Permission at Page Level
+requirePermission('vendors', 'view');
+
 $id = $_GET['id'] ?? null;
 if (!$id) { header("Location: vendors.php"); exit; }
 
@@ -153,10 +156,14 @@ $totalLiability = $totalPO->fetchColumn() ?: 0;
                             </td>
                             <td><?php echo date('d M Y', strtotime($p['created_at'])); ?></td>
                             <td style="text-align: right; font-weight: 700; color: #475569;">
+                                <?php if (canEdit('vendors')): ?>
                                 <button onclick="promptEditPoAmount(<?php echo $p['id']; ?>, <?php echo $baseAmt; ?>, '<?php echo $p['po_number']; ?>')" 
                                         style="background: #f8fafc; border: 1px dashed #cbd5e1; color: #475569; padding: 0.25rem 0.5rem; border-radius: 6px; font-weight: 700; font-size: 0.8rem; cursor: pointer; display: inline-flex; align-items: center; gap: 0.4rem;">
                                     ₹<?php echo number_format($baseAmt, 2); ?> <i class="fas fa-edit" style="font-size: 0.7rem; color: #94a3b8;"></i>
                                 </button>
+                                <?php else: ?>
+                                ₹<?php echo number_format($baseAmt, 2); ?>
+                                <?php endif; ?>
                             </td>
                             <td style="text-align: right; font-weight: 800; color: #0f172a;">
                                 ₹<?php echo number_format($totalAmt, 2); ?>

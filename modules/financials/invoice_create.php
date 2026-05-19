@@ -3,12 +3,8 @@ $activePage = 'invoices';
 $pageTitle = 'Generate Tax Invoice';
 include_once __DIR__ . '/../../includes/header.php';
 
-// Check RBAC
-if (!hasRole(['admin', 'accounts'])) {
-    echo "<div class='card' style='color: var(--danger);'>Access Denied.</div>";
-    include_once __DIR__ . '/../../includes/footer.php';
-    exit;
-}
+// Enforce Add Permission at Page Level
+requirePermission('financials', 'add');
 
 // Fetch Confirmed Bookings that don't have a final tax invoice yet
 $bookings = $pdo->query("

@@ -5,8 +5,16 @@ include_once __DIR__ . '/../../includes/functions.php';
 $activePage = 'client_printing_rates';
 $pageTitle = 'Create Client Printing Invoice';
 
+requirePermission('clients', 'view');
+
 $id = isset($_GET['id']) ? intval($_GET['id']) : 0;
 $action = isset($_GET['action']) ? clean($_GET['action']) : 'add';
+
+if ($action === 'edit') {
+    requirePermission('clients', 'edit');
+} else {
+    requirePermission('clients', 'add');
+}
 
 $rateData = null;
 if ($id && $action === 'edit') {

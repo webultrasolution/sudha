@@ -2,6 +2,9 @@
 include_once __DIR__ . '/../../config/db.php';
 include_once __DIR__ . '/../../includes/functions.php';
 
+// Enforce View Permission at Page Level
+requirePermission('vendors', 'view');
+
 // Handle Form Submissions
 if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action'])) {
     $name = clean($_POST['name']);
@@ -27,15 +30,18 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action'])) {
     }
 
     if ($_POST['action'] === 'add') {
+        requirePermission('vendors', 'add');
         $stmt = $pdo->prepare("INSERT INTO partners (name, business_type, contact_person, phone, email, address, city, state, district, pincode, gstin, additional_gst, pan, billing_address, payment_terms, status, type) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'vendor')");
         $stmt->execute([$name, $business_type, $contact, $phone, $email, $address, $city, $state, $district, $pincode, $gstin, $additional_gst, $pan, $billing_address, $payment_terms, $status]);
         header("Location: vendors.php?msg=added"); exit;
     } elseif ($_POST['action'] === 'edit') {
+        requirePermission('vendors', 'edit');
         $id = intval($_POST['id']);
         $stmt = $pdo->prepare("UPDATE partners SET name=?, business_type=?, contact_person=?, phone=?, email=?, address=?, city=?, state=?, district=?, pincode=?, gstin=?, additional_gst=?, pan=?, billing_address=?, payment_terms=?, status=? WHERE id=?");
         $stmt->execute([$name, $business_type, $contact, $phone, $email, $address, $city, $state, $district, $pincode, $gstin, $additional_gst, $pan, $billing_address, $payment_terms, $status, $id]);
         header("Location: vendors.php?msg=updated"); exit;
     } elseif ($_POST['action'] === 'delete') {
+        requirePermission('vendors', 'delete');
         header('Content-Type: application/json');
         $id = intval($_POST['id']);
         $stmt = $pdo->prepare("DELETE FROM partners WHERE id = ?");
@@ -76,9 +82,11 @@ $indian_states = ["Andhra Pradesh", "Arunachal Pradesh", "Assam", "Bihar", "Chha
                 <input type="text" name="search" value="<?php echo htmlspecialchars($search); ?>" placeholder="Search vendor..." style="padding: 0.5rem; border: 1px solid #ddd; border-radius: 6px;">
                 <button type="submit" class="btn" style="padding: 0.5rem 1rem;"><i class="fas fa-search"></i></button>
             </form>
+            <?php if (canAdd('vendors')): ?>
             <button class="btn btn-primary" onclick="openModal()">
                 <i class="fas fa-plus"></i> Create Vendor
             </button>
+            <?php endif; ?>
         </div>
     </div>
 
@@ -117,8 +125,12 @@ $indian_states = ["Andhra Pradesh", "Arunachal Pradesh", "Assam", "Bihar", "Chha
                     <a href="manage_vendor_po.php?vendor_id=<?php echo $v['id']; ?>" class="btn-icon" style="background: #ccfbf1; color: var(--primary);" title="Create Purchase Order"><i class="fas fa-file-invoice-dollar"></i></a>
                     <a href="printing_rates.php?vendor_id=<?php echo $v['id']; ?>" class="btn-icon" style="background: #e0e7ff; color: #4f46e5;" title="Printing PO "><i class="fas fa-print"></i></a>
                     <!-- <a href="../operations/direct_booking.php?vendor_id=<?php echo $v['id']; ?>" class="btn-icon btn-view" title="Direct Booking (No Proposal)"><i class="fas fa-file-signature"></i></a> -->
+                    <?php if (canEdit('vendors')): ?>
                     <button class="btn-icon btn-edit" onclick="editVendor(<?php echo htmlspecialchars(json_encode($v)); ?>)" title="Edit"><i class="fas fa-edit"></i></button>
+                    <?php endif; ?>
+                    <?php if (canDelete('vendors')): ?>
                     <button class="btn-icon btn-delete" onclick="deleteVendor(<?php echo $v['id']; ?>)" title="Delete"><i class="fas fa-trash"></i></button>
+                    <?php endif; ?>
                 </td>
             </tr>
             <?php endforeach; ?>

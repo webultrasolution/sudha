@@ -2,8 +2,12 @@
 include_once __DIR__ . '/../../config/db.php';
 include_once __DIR__ . '/../../includes/functions.php';
 
+// Enforce View Permission at Page Level
+requirePermission('proposals', 'view');
+
 // Handle Delete
 if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action']) && $_POST['action'] === 'delete') {
+    requirePermission('proposals', 'delete');
     header('Content-Type: application/json');
     $id = intval($_POST['id']);
     try {
@@ -45,9 +49,11 @@ $proposals = $proposals->fetchAll();
 <div class="card">
     <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1.5rem;">
         <h2 style="font-size: 1.25rem;">Recent Proposals</h2>
+        <?php if (canAdd('proposals')): ?>
         <a href="create.php" class="btn btn-primary">
             <i class="fas fa-plus"></i> Create New Proposal
         </a>
+        <?php endif; ?>
     </div>
 
     <table class="table">
@@ -118,7 +124,9 @@ $proposals = $proposals->fetchAll();
                             </div>
                         </div>
                         <a href="view.php?id=<?php echo $p['id']; ?>" class="btn-icon btn-view" title="Workspace" style="color: #64748b;"><i class="fas fa-layer-group"></i></a>
+                        <?php if (canDelete('proposals')): ?>
                         <button class="btn-icon btn-delete" onclick="deleteProposal(<?php echo $p['id']; ?>)"><i class="fas fa-trash"></i></button>
+                        <?php endif; ?>
                     </td>
                 </tr>
                 <?php endforeach; ?>

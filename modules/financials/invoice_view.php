@@ -3,6 +3,9 @@ $activePage = 'invoices';
 $pageTitle = 'Invoice Details';
 include_once __DIR__ . '/../../includes/header.php';
 
+// Enforce View Permission at Page Level
+requirePermission('financials', 'view');
+
 $id = isset($_GET['id']) ? intval($_GET['id']) : 0;
 
 // Fetch Invoice
@@ -43,7 +46,7 @@ $items = $stmtItems->fetchAll();
     <div style="display: flex; gap: 0.5rem;">
         <button class="btn" onclick="window.print()"><i class="fas fa-print"></i> Print</button>
         <button class="btn btn-primary" onclick="sendEmail(<?php echo $id; ?>)"><i class="fas fa-envelope"></i> Email to Client</button>
-        <?php if ($invoice['payment_status'] !== 'paid'): ?>
+        <?php if ($invoice['payment_status'] !== 'paid' && canEdit('financials')): ?>
             <button class="btn" style="background: var(--success); color: white;" onclick="markPaid(<?php echo $id; ?>)">
                 <i class="fas fa-check"></i> Mark as Paid
             </button>

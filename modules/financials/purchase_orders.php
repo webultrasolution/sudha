@@ -3,11 +3,8 @@ $activePage = 'pos';
 $pageTitle = 'Purchase Order Management';
 include_once __DIR__ . '/../../includes/header.php';
 
-if (!hasRole(['admin', 'accounts'])) {
-    echo "<div class='card'>Access Denied.</div>";
-    include_once __DIR__ . '/../../includes/footer.php';
-    exit;
-}
+// Enforce View Permission at Page Level
+requirePermission('financials', 'view');
 
 // Handle Filters
 $selectedVendorId = isset($_GET['vendor_id']) ? intval($_GET['vendor_id']) : 0;
@@ -70,9 +67,11 @@ $vendorsList = $pdo->query("SELECT id, name FROM partners WHERE type = 'vendor' 
 <div class="card">
     <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1.5rem;">
         <h2 style="font-size: 1.25rem;">Vendor Purchase Orders</h2>
+        <?php if (canAdd('financials')): ?>
         <a href="po_create.php" class="btn btn-primary">
             <i class="fas fa-plus"></i> Create New PO
         </a>
+        <?php endif; ?>
     </div>
 
     <!-- Single Hidden File Input for AJAX Uploads -->
@@ -126,9 +125,11 @@ $vendorsList = $pdo->query("SELECT id, name FROM partners WHERE type = 'vendor' 
                                 endforeach;
                             endif; 
                             ?>
+                            <?php if (canEdit('financials')): ?>
                             <button class="btn-upload-row" onclick="triggerUpload(<?php echo $p['id']; ?>)" title="Upload Invoice/Scan">
                                 <i class="fas fa-cloud-upload-alt"></i> Upload
                             </button>
+                            <?php endif; ?>
                         </div>
                         
                         <!-- Client Tax Invoice Section -->
@@ -144,9 +145,11 @@ $vendorsList = $pdo->query("SELECT id, name FROM partners WHERE type = 'vendor' 
                                     <i class="fas <?php echo $icon; ?>"></i>
                                 </a>
                             <?php endif; ?>
+                            <?php if (canEdit('financials')): ?>
                             <button class="btn-upload-row" style="background: #eef2ff; color: #4f46e5; border-color: #c7d2fe;" onclick="triggerTaxOrderUpload(<?php echo $p['id']; ?>)" title="Upload Tax Invoice">
                                 <i class="fas fa-cloud-upload-alt"></i> Upload
                             </button>
+                            <?php endif; ?>
                         </div>
                     </div>
                 </td>

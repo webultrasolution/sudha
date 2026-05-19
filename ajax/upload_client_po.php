@@ -5,6 +5,10 @@ include_once __DIR__ . '/../includes/functions.php';
 header('Content-Type: application/json');
 
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
+    if (!canEdit('bookings') && !canEdit('clients')) {
+        echo json_encode(['success' => false, 'message' => 'Access Denied: You do not have permission to upload client PO.']);
+        exit;
+    }
     $client_id = intval($_POST['client_id']);
     $booking_id = intval($_POST['booking_id']);
     $po_no = clean($_POST['po_no']);

@@ -3,6 +3,10 @@ $activePage = 'ledger';
 $pageTitle = 'Partner Statement';
 include_once __DIR__ . '/../../config/db.php';
 include_once __DIR__ . '/../../includes/functions.php';
+
+// Enforce View Permission at Page Level
+requirePermission('financials', 'view');
+
 include_once __DIR__ . '/../../includes/header.php';
 
 $partner_id = isset($_GET['partner_id']) ? intval($_GET['partner_id']) : (isset($_GET['client_id']) ? intval($_GET['client_id']) : 0);
@@ -112,9 +116,11 @@ $balance = 0;
         <a href="ledgers.php?type=<?php echo $pType; ?>" class="btn" style="background: #f8fafc; border: 1px solid #e2e8f0; color: #475569; padding: 0.75rem 1.25rem; border-radius: 10px; font-weight: 700; text-decoration: none;">
             <i class="fas fa-arrow-left"></i> Back
         </a>
+        <?php if (canAdd('financials')): ?>
         <button class="btn btn-primary" onclick="addPayment(<?php echo $partner_id; ?>, '<?php echo $pMode; ?>')" style="padding: 0.75rem 1.5rem; border-radius: 10px; font-weight: 800; background: var(--primary); color: white; border: none; cursor: pointer;">
             <i class="fas fa-plus"></i> <?php echo ($pType == 'client') ? 'Record Receipt' : 'Record Payment Made'; ?>
         </button>
+        <?php endif; ?>
     </div>
 </div>
 
@@ -207,7 +213,7 @@ $balance = 0;
                     <?php echo formatCurrency(abs($balance)); ?> <span style="font-size: 0.65rem; opacity: 0.8;"><?php echo $balanceLabel; ?></span>
                 </td>
                 <td style="padding: 1rem; text-align: right;" class="no-print">
-                    <?php if ($item['type'] === 'payment'): ?>
+                    <?php if ($item['type'] === 'payment' && canDelete('financials')): ?>
                         <button onclick="deletePayment(<?php echo $item['id']; ?>)" class="btn-icon btn-delete" title="Delete Payment" style="color: #ef4444; border: none; background: none; cursor: pointer;">
                             <i class="fas fa-trash-alt"></i>
                         </button>

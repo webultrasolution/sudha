@@ -10,6 +10,12 @@ if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
     exit;
 }
 
+// Enforce Granular Permission Check
+if (!canEdit('vendors') && !canEdit('financials')) {
+    echo json_encode(['success' => false, 'message' => 'Access Denied: You do not have permission to edit POs.']);
+    exit;
+}
+
 $po_id      = intval($_POST['po_id'] ?? 0);
 $new_amount = floatval($_POST['amount'] ?? 0);
 

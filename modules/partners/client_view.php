@@ -2,6 +2,9 @@
 include_once __DIR__ . '/../../config/db.php';
 include_once __DIR__ . '/../../includes/functions.php';
 
+// Enforce View Permission at Page Level
+requirePermission('clients', 'view');
+
 $id = $_GET['id'] ?? null;
 if (!$id) { header("Location: clients.php"); exit; }
 
@@ -131,9 +134,11 @@ $totalPaid = $totalPaid->fetchColumn() ?: 0;
             </div>
             
             <div id="pos-tab" class="tab-content" style="padding: 1.5rem; display: none;">
+                <?php if (canEdit('clients')): ?>
                 <div style="text-align: right; margin-bottom: 1rem;">
                     <button class="btn btn-primary" onclick="openPOModal()"><i class="fas fa-plus"></i> Upload Client PO</button>
                 </div>
+                <?php endif; ?>
                 <table class="table">
                     <thead>
                         <tr>

@@ -2,6 +2,9 @@
 include_once __DIR__ . '/../../config/db.php';
 include_once __DIR__ . '/../../includes/functions.php';
 
+// Enforce View Permission at Endpoint Level
+requirePermission('financials', 'view');
+
 $partner_id = isset($_GET['partner_id']) ? intval($_GET['partner_id']) : 0;
 
 if (!$partner_id) {
@@ -42,7 +45,7 @@ if ($toDate) {
 }
 
 if ($pType == 'client') {
-    $reportTitle = "Bills Receivable";
+    $reportTitle = "";
     $stmtInv = $pdo->prepare("
         SELECT i.created_at as dated, 
                COALESCE(NULLIF(b.customer_po_no, ''), NULLIF(p.proposal_number, ''), NULLIF(b.external_po, '')) as po_num, 
@@ -58,7 +61,7 @@ if ($pType == 'client') {
     $stmtInv->execute($params);
     $entries = $stmtInv->fetchAll();
 } else {
-    $reportTitle = "Bills Payable";
+    $reportTitle = "";
     $stmtPO = $pdo->prepare("
         SELECT po_date as dated, po_number as po_num, po_date as po_date, 
                vendor_invoice_no as bill_no, vendor_invoice_date as bill_date,

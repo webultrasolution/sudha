@@ -3,6 +3,10 @@ include_once __DIR__ . '/../config/db.php';
 include_once __DIR__ . '/../includes/functions.php';
 
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
+    if (!canEdit('financials')) {
+        echo json_encode(['success' => false, 'message' => 'Access Denied: You do not have permission to update invoice status.']);
+        exit;
+    }
     $data = json_decode(file_get_contents('php://input'), true);
     $invoiceId = intval($data['invoice_id']);
     $status = clean($data['status']);

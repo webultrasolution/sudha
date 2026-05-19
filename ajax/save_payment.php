@@ -5,6 +5,10 @@ include_once __DIR__ . '/../includes/functions.php';
 header('Content-Type: application/json');
 
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
+    if (!canAdd('financials')) {
+        echo json_encode(['success' => false, 'message' => 'Access Denied: You do not have permission to record payments.']);
+        exit;
+    }
     file_put_contents(__DIR__ . '/../pay_debug.log', date('Y-m-d H:i:s') . ' - POST: ' . print_r($_POST, true) . PHP_EOL, FILE_APPEND);
     
     $partner_id = intval($_POST['client_id'] ?? 0);
