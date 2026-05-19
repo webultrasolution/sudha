@@ -11,7 +11,6 @@ if (!hasRole(['admin', 'accounts'])) {
 
 // Handle Filters
 $selectedVendorId = isset($_GET['vendor_id']) ? intval($_GET['vendor_id']) : 0;
-$selectedType = isset($_GET['type']) ? clean($_GET['type']) : '';
 
 $whereClauses = [];
 $params = [];
@@ -19,10 +18,6 @@ $params = [];
 if ($selectedVendorId > 0) {
     $whereClauses[] = "po.vendor_id = ?";
     $params[] = $selectedVendorId;
-}
-if (!empty($selectedType)) {
-    $whereClauses[] = "po.type = ?";
-    $params[] = $selectedType;
 }
 
 $whereSql = "";
@@ -59,20 +54,11 @@ $vendorsList = $pdo->query("SELECT id, name FROM partners WHERE type = 'vendor' 
                 <?php endforeach; ?>
             </select>
         </div>
-        <div style="flex: 1; min-width: 180px;">
-            <label style="display: block; font-size: 0.65rem; font-weight: 800; color: #94a3b8; text-transform: uppercase; letter-spacing: 0.05em; margin-bottom: 0.5rem;">Filter by Type</label>
-            <select name="type" style="width: 100%; padding: 0.6rem 0.75rem; border: 1px solid #e2e8f0; border-radius: 10px; font-size: 0.85rem; font-weight: 600; background: white; outline: none; transition: border-color 0.2s;">
-                <option value="">All Types</option>
-                <option value="rental" <?php echo $selectedType == 'rental' ? 'selected' : ''; ?>>Rental</option>
-                <option value="printing" <?php echo $selectedType == 'printing' ? 'selected' : ''; ?>>Printing</option>
-                <option value="adhoc" <?php echo $selectedType == 'adhoc' ? 'selected' : ''; ?>>Adhoc</option>
-            </select>
-        </div>
         <div style="display: flex; gap: 0.5rem;">
             <button type="submit" class="btn btn-primary" style="height: 42px; padding: 0 1.5rem; font-weight: 800; font-size: 0.85rem; border-radius: 10px; display: inline-flex; align-items: center; gap: 6px; box-shadow: 0 4px 12px rgba(13,148,136,0.15);">
                 <i class="fas fa-filter"></i> Filter
             </button>
-            <?php if ($selectedVendorId > 0 || !empty($selectedType)): ?>
+            <?php if ($selectedVendorId > 0): ?>
                 <a href="purchase_orders.php" class="btn" style="height: 42px; padding: 0 1.25rem; font-weight: 800; font-size: 0.85rem; border-radius: 10px; background: #e2e8f0; color: #475569; display: inline-flex; align-items: center; gap: 6px; text-decoration: none; border: none; justify-content: center;">
                     <i class="fas fa-times-circle"></i> Clear
                 </a>
