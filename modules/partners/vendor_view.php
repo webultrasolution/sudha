@@ -118,10 +118,19 @@ $totalLiability = $totalPO->fetchColumn() ?: 0;
             </div>
             
             <div id="pos-tab" class="tab-content" style="padding: 1.5rem; display: none;">
-                <table class="table">
+                <div style="margin-bottom: 1rem; display: flex; justify-content: flex-end;">
+                    <select id="poTypeFilter" onchange="filterPOsByType()" class="form-input" style="width: auto; display: inline-block;">
+                        <option value="all">All PO Types</option>
+                        <option value="rental">Rental</option>
+                        <option value="printing">Printing</option>
+                        <option value="adhoc">Adhoc</option>
+                    </select>
+                </div>
+                <table class="table" id="posTable">
                     <thead>
                         <tr>
                             <th>PO #</th>
+                            <th>Type</th>
                             <th>Date</th>
                             <th style="text-align: right;">Amount (Base)</th>
                             <th style="text-align: right;">Grand Total (Inc GST)</th>
@@ -133,9 +142,15 @@ $totalLiability = $totalPO->fetchColumn() ?: 0;
                         <?php foreach ($pos as $p): 
                             $baseAmt = floatval($p['po_amount'] ?: 0);
                             $totalAmt = floatval($p['total_amount'] ?: ($p['po_amount'] + $p['cgst_amount'] + $p['sgst_amount'] + $p['igst_amount']));
+                            $poType = strtolower($p['type'] ?? 'direct');
                         ?>
-                        <tr>
+                        <tr class="po-row" data-type="<?php echo htmlspecialchars($poType); ?>">
                             <td><strong><?php echo $p['po_number']; ?></strong></td>
+                            <td>
+                                <span class="badge" style="background: #f1f5f9; color: #475569; font-size: 0.75rem; padding: 2px 6px; text-transform: uppercase;">
+                                    <?php echo htmlspecialchars($p['type'] ?? 'direct'); ?>
+                                </span>
+                            </td>
                             <td><?php echo date('d M Y', strtotime($p['created_at'])); ?></td>
                             <td style="text-align: right; font-weight: 700; color: #475569;">
                                 <button onclick="promptEditPoAmount(<?php echo $p['id']; ?>, <?php echo $baseAmt; ?>, '<?php echo $p['po_number']; ?>')" 
@@ -147,7 +162,10 @@ $totalLiability = $totalPO->fetchColumn() ?: 0;
                                 ₹<?php echo number_format($totalAmt, 2); ?>
                             </td>
                             <td><span class="status-pill status-<?php echo $p['status']; ?>"><?php echo ucfirst($p['status']); ?></span></td>
-                            <td><a href="../financials/po_view.php?id=<?php echo $p['id']; ?>" class="btn-icon"><i class="fas fa-eye"></i></a></td>
+                            <td>
+                                <a href="../financials/po_view.php?id=<?php echo $p['id']; ?>" class="btn-icon" title="View"><i class="fas fa-eye"></i></a>
+                                <a href="../operations/generate_po.php?po_id=<?php echo $p['id']; ?>" target="_blank" class="btn-icon" style="color: var(--primary);" title="Download PDF"><i class="fas fa-file-pdf"></i></a>
+                            </td>
                         </tr>
                         <?php endforeach; ?>
                     </tbody>
@@ -169,6 +187,20 @@ function showTab(tabId) {
     document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
     document.getElementById(tabId).style.display = 'block';
     event.currentTarget.classList.add('active');
+}
+
+function filterPOsByType() {
+    const filterValue = document.getElementById('poTypeFilter').value.toLowerCase();
+    const rows = document.querySelectorAll('.po-row');
+    
+    rows.forEach(row => {
+        const type = row.getAttribute('data-type');
+        if (filterValue === 'all' || type === filterValue) {
+            row.style.display = '';
+        } else {
+            row.style.display = 'none';
+        }
+    });
 }
 
 function promptEditPoAmount(poId, currentBase, poNumber) {
