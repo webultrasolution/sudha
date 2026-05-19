@@ -351,8 +351,38 @@ $company_signature = getSetting('company_signature', 'signature.png');
             <?php endforeach; ?>
             
             <?php 
-            $gst_amount = $net_total * 0.18;
-            $grand_total = $net_total + $gst_amount;
+            $cgst_amount = 0;
+            $sgst_amount = 0;
+            $igst_amount = 0;
+            $gst_label = 'GST (18%)';
+
+            if ($mode === 'saved_po') {
+                $cgst_amount = floatval($b['cgst_amount'] ?? 0);
+                $sgst_amount = floatval($b['sgst_amount'] ?? 0);
+                $igst_amount = floatval($b['igst_amount'] ?? 0);
+                $grand_total = floatval($b['total_amount'] ?? 0);
+                
+                if ($cgst_amount > 0 || $sgst_amount > 0) {
+                    $gst_label = 'CGST + SGST (9%+9%)';
+                    $gst_amount = $cgst_amount + $sgst_amount;
+                } elseif ($igst_amount > 0) {
+                    $gst_label = 'IGST (18%)';
+                    $gst_amount = $igst_amount;
+                } else {
+                    $gst_label = 'GST (0%)';
+                    $gst_amount = 0;
+                }
+            } else {
+                $vendor_has_gst = !empty($v['gstin']) && trim($v['gstin']) !== '';
+                if ($vendor_has_gst) {
+                    $gst_label = 'IGST (18%)';
+                    $gst_amount = $net_total * 0.18;
+                } else {
+                    $gst_label = 'GST (0%)';
+                    $gst_amount = 0;
+                }
+                $grand_total = $net_total + $gst_amount;
+            }
             ?>
             
             <tr class="totals-row">
@@ -360,7 +390,7 @@ $company_signature = getSetting('company_signature', 'signature.png');
                 <td style="text-align: right; padding-right: 10px;"><?php echo number_format($net_total, 2); ?></td>
             </tr>
             <tr class="totals-row">
-                <td colspan="6" style="text-align: right; padding-right: 10px;">GST (18%)</td>
+                <td colspan="6" style="text-align: right; padding-right: 10px;"><?php echo $gst_label; ?></td>
                 <td style="text-align: right; padding-right: 10px;"><?php echo number_format($gst_amount, 2); ?></td>
             </tr>
             <tr class="totals-row" style="background: #f9f9f9; border-top: 2px solid #000;">

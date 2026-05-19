@@ -304,7 +304,20 @@ $stmtCheckPO = $pdo->prepare("SELECT id FROM purchase_orders WHERE campaign_id =
                         </div>
                     <?php endif; ?>
                 </td>
-                <td style="font-weight: 800; color: #0f172a; text-align: right; font-size: 1rem;"><?php echo formatCurrency($item['amount']); ?></td>
+                <td style="text-align: right; vertical-align: middle;">
+                    <?php if ($invoiceFinalized): ?>
+                        <div style="display: inline-flex; align-items: center; gap: 0.4rem; background: #f1f5f9; border: 1px solid #cbd5e1; border-radius: 4px; padding: 3px 8px; justify-content: flex-end;" title="Locked: Final invoice has been generated">
+                            <i class="fas fa-lock" style="font-size: 0.6rem; color: #94a3b8;"></i>
+                            <span style="font-weight: 800; color: #334155; font-size: 0.9rem;"><?php echo number_format(floatval($item['amount']), 2); ?></span>
+                        </div>
+                    <?php else: ?>
+                        <input type="number" step="0.01" value="<?php echo floatval($item['amount'] ?? 0); ?>" 
+                               onchange="updateSellingCost(<?php echo $item['id']; ?>, this.value)"
+                               style="width: 120px; text-align: right; font-weight: 800; color: #0f172a; font-size: 0.95rem; border: 1px solid #e2e8f0; border-radius: 6px; padding: 4px 8px; outline: none; background: #fff; transition: border-color 0.2s;"
+                               onfocus="this.style.borderColor='var(--primary)'" 
+                               onblur="this.style.borderColor='#e2e8f0'">
+                    <?php endif; ?>
+                </td>
                 <td style="text-align: right;">
                     <button onclick="deleteItem(<?php echo $item['id']; ?>)" style="background: none; border: none; color: #ef4444; cursor: pointer; padding: 0.5rem;" title="Remove Site from Booking">
                         <i class="fas fa-trash-alt"></i>
@@ -405,6 +418,34 @@ function updatePurchaseCost(itemId, cost) {
             Toast.fire({
                 icon: 'success',
                 title: 'Purchase cost updated'
+            }).then(() => location.reload());
+        } else {
+            Swal.fire('Error', res.message || 'Failed to update cost', 'error');
+        }
+    });
+}
+function updateSellingCost(itemId, cost) {
+    const formData = new FormData();
+    formData.append('item_id', itemId);
+    formData.append('selling_cost', cost);
+
+    fetch('../../ajax/update_selling_cost.php', {
+        method: 'POST',
+        body: formData
+    })
+    .then(r => r.json())
+    .then(res => {
+        if(res.success) {
+            const Toast = Swal.mixin({
+                toast: true,
+                position: 'top-end',
+                showConfirmButton: false,
+                timer: 2000,
+                timerProgressBar: true
+            });
+            Toast.fire({
+                icon: 'success',
+                title: 'Selling cost updated'
             }).then(() => location.reload());
         } else {
             Swal.fire('Error', res.message || 'Failed to update cost', 'error');
