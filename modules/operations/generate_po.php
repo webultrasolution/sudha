@@ -1,4 +1,7 @@
 <?php
+// Disable deprecation errors
+error_reporting(E_ALL & ~E_DEPRECATED & ~E_USER_DEPRECATED);
+
 include_once __DIR__ . '/../../config/db.php';
 include_once __DIR__ . '/../../includes/functions.php';
 
@@ -270,7 +273,7 @@ function getStateName($gstin) {
         <tr>
             <td style="width: 50%; border-right: 1px solid #000; padding: 8px 10px; text-align: left; vertical-align: top; line-height: 1.45;">
                 <div style="display: flex; margin-bottom: 2px;"><span style="width: 150px; font-weight: bold;">Category of Service</span><span style="width: 10px;">:</span><span style="flex: 1;"><?php echo htmlspecialchars($serviceCategory); ?></span></div>
-                <div style="display: flex; margin-bottom: 2px;"><span style="width: 150px; font-weight: bold;">Campaign</span><span style="width: 10px;">:</span><span style="flex: 1; font-weight: bold; text-transform: uppercase;"><?php echo htmlspecialchars($b['campaign_name']); ?></span></div>
+                <div style="display: flex; margin-bottom: 2px;"><span style="width: 150px; font-weight: bold;">Campaign</span><span style="width: 10px;">:</span><span style="flex: 1; font-weight: bold; text-transform: uppercase;"><?php echo htmlspecialchars($b['campaign_name'] ?? ''); ?></span></div>
                 <div style="display: flex; margin-bottom: 2px;"><span style="width: 150px; font-weight: bold;">Purchase Order No.</span><span style="width: 10px;">:</span><span style="flex: 1; font-weight: bold; color: #1e293b;"><?php echo htmlspecialchars($po_number); ?></span></div>
                 <div style="display: flex; margin-bottom: 6px;"><span style="width: 150px; font-weight: bold;">Purchase Order Date</span><span style="width: 10px;">:</span><span style="flex: 1; font-weight: bold;"><?php echo htmlspecialchars($po_date); ?></span></div>
                 
