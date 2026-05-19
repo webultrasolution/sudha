@@ -103,6 +103,9 @@ $balance = 0;
         <p style="color: #64748b; margin: 0; font-weight: 500;">Partner: <strong style="color: #0f172a;"><?php echo $partner['name']; ?></strong></p>
     </div>
     <div style="display: flex; gap: 1rem;">
+        <button onclick="exportExcel()" class="btn" style="background: white; border: 1px solid #cbd5e1; color: #475569; padding: 0.75rem 1.25rem; border-radius: 10px; font-weight: 700; display: inline-flex; align-items: center; gap: 0.5rem; cursor: pointer;">
+            <i class="fas fa-file-excel" style="color: #10b981;"></i> Export Excel
+        </button>
         <button onclick="window.print()" class="btn" style="background: white; border: 1px solid #cbd5e1; color: #475569; padding: 0.75rem 1.25rem; border-radius: 10px; font-weight: 700; cursor: pointer;">
             <i class="fas fa-print"></i> Print Statement
         </button>
@@ -131,7 +134,13 @@ $balance = 0;
     </div>
 </div>
 
-<div style="margin-bottom: 1rem; display: flex; justify-content: flex-end;">
+<div style="margin-bottom: 1rem; display: flex; justify-content: space-between; align-items: center;" class="no-print">
+    <div style="display: flex; gap: 1rem; align-items: center;">
+        <label style="font-size: 0.85rem; font-weight: 700; color: #475569;">Date Filter:</label>
+        <input type="date" id="filterFromDate" onchange="filterLedger()" style="padding: 0.6rem; border-radius: 8px; border: 1px solid #e2e8f0; font-size: 0.9rem;">
+        <span style="font-weight: 700; color: #94a3b8;">to</span>
+        <input type="date" id="filterToDate" onchange="filterLedger()" style="padding: 0.6rem; border-radius: 8px; border: 1px solid #e2e8f0; font-size: 0.9rem;">
+    </div>
     <input type="text" id="ledgerSearch" placeholder="Search transactions..." style="padding: 0.6rem 1rem; border-radius: 8px; border: 1px solid #e2e8f0; width: 300px; font-size: 0.9rem;" onkeyup="filterLedger()">
 </div>
 
@@ -230,19 +239,46 @@ $balance = 0;
 </style>
 
 <script>
+function exportExcel() {
+    const from = document.getElementById('filterFromDate').value;
+    const to = document.getElementById('filterToDate').value;
+    let url = 'export_ledger_csv.php?partner_id=<?php echo $partner_id; ?>';
+    if (from) url += '&from_date=' + encodeURIComponent(from);
+    if (to) url += '&to_date=' + encodeURIComponent(to);
+    window.location.href = url;
+}
+
 function filterLedger() {
     const input = document.getElementById('ledgerSearch');
     const filter = input.value.toLowerCase();
+    const fromDateVal = document.getElementById('filterFromDate').value;
+    const toDateVal = document.getElementById('filterToDate').value;
+    
+    const fromDate = fromDateVal ? new Date(fromDateVal) : null;
+    const toDate = toDateVal ? new Date(toDateVal) : null;
+    if (fromDate) fromDate.setHours(0,0,0,0);
+    if (toDate) toDate.setHours(23,59,59,999);
+
     const table = document.getElementById('ledgerTable');
     const tr = table.getElementsByTagName('tr');
 
     for (let i = 1; i < tr.length - 1; i++) { // Skip header and footer
         const td = tr[i].getElementsByTagName('td');
+        if (!td || td.length === 0) continue;
+        
         let txtValue = "";
         for (let j = 0; j < td.length; j++) {
             txtValue += td[j].textContent || td[j].innerText;
         }
-        if (txtValue.toLowerCase().indexOf(filter) > -1) {
+        let textMatch = txtValue.toLowerCase().indexOf(filter) > -1;
+        
+        let dateMatch = true;
+        let rowDateStr = td[0].textContent || td[0].innerText;
+        let rowDate = new Date(rowDateStr);
+        if (fromDate && rowDate < fromDate) dateMatch = false;
+        if (toDate && rowDate > toDate) dateMatch = false;
+
+        if (textMatch && dateMatch) {
             tr[i].style.display = "";
         } else {
             tr[i].style.display = "none";

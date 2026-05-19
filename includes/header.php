@@ -54,7 +54,7 @@ $activeEntity = getActiveEntity();
                 <ul class="submenu" style="<?php echo in_array($activePage, ['proposals', 'bookings', 'direct_booking', 'printing_rates', 'client_printing', 'client_printing_rates']) ? 'display: block;' : 'display: none;'; ?>">
                     <li><a href="<?php echo BASE_URL; ?>modules/proposals/proposals.php" class="<?php echo $activePage == 'proposals' ? 'active-sub' : ''; ?>"><i class="fas fa-file-contract"></i> Sales / Proposals</a></li>
                     <li><a href="<?php echo BASE_URL; ?>modules/operations/bookings.php" class="<?php echo $activePage == 'bookings' ? 'active-sub' : ''; ?>"><i class="fas fa-calendar-check"></i> Bookings</a></li>
-                    <li><a href="<?php echo BASE_URL; ?>modules/partners/printing_rates.php" class="<?php echo $activePage == 'printing_rates' ? 'active-sub' : ''; ?>"><i class="fas fa-print"></i> Printing PO</a></li>
+                    <li><a href="<?php echo BASE_URL; ?>modules/partners/printing_rates.php" class="<?php echo $activePage == 'printing_rates' ? 'active-sub' : ''; ?>"><i class="fas fa-print"></i>Vendors Printing PO</a></li>
                     <li><a href="<?php echo BASE_URL; ?>modules/partners/client_printing_rates.php" class="<?php echo $activePage == 'client_printing_rates' ? 'active-sub' : ''; ?>"><i class="fas fa-file-invoice"></i> Client Printing Invoice</a></li>
                     <!-- <li><a href="<?php echo BASE_URL; ?>modules/operations/client_printing.php" class="<?php echo $activePage == 'client_printing' ? 'active-sub' : ''; ?>"><i class="fas fa-print"></i> Client Printing Sheet</a></li> -->
                 </ul>
@@ -70,7 +70,7 @@ $activeEntity = getActiveEntity();
                     <li><a href="<?php echo BASE_URL; ?>modules/financials/invoices.php" class="<?php echo $activePage == 'invoices' ? 'active-sub' : ''; ?>"><i class="fas fa-file-invoice-dollar"></i> Invoices</a></li>
                     <li><a href="<?php echo BASE_URL; ?>modules/financials/payments.php" class="<?php echo $activePage == 'payments' ? 'active-sub' : ''; ?>"><i class="fas fa-money-bill-wave"></i> Payments</a></li>
                     <?php if (hasRole(['admin', 'accounts'])): ?>
-                    <li><a href="<?php echo BASE_URL; ?>modules/financials/purchase_orders.php" class="<?php echo $activePage == 'pos' ? 'active-sub' : ''; ?>"><i class="fas fa-shopping-cart"></i> Purchase Orders</a></li>
+                    <li><a href="<?php echo BASE_URL; ?>modules/financials/purchase_orders.php" class="<?php echo $activePage == 'pos' ? 'active-sub' : ''; ?>"><i class="fas fa-shopping-cart"></i>Vendors Purchase Orders</a></li>
                     <?php endif; ?>
                     <li><a href="<?php echo BASE_URL; ?>modules/financials/ledgers.php" class="<?php echo $activePage == 'ledger' ? 'active-sub' : ''; ?>"><i class="fas fa-book"></i>  Ledger</a></li>
                 </ul>
