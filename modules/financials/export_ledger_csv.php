@@ -45,7 +45,7 @@ if ($pType == 'client') {
     $reportTitle = "Bills Receivable";
     $stmtInv = $pdo->prepare("
         SELECT i.created_at as dated, b.customer_po_no as po_num, b.customer_po_date as po_date, 
-               i.invoice_number as bill_no, i.total_amount as bill_amount
+               i.invoice_number as bill_no, i.total_amount as bill_amount, b.campaign_name
         FROM invoices i
         JOIN bookings b ON i.booking_id = b.id
         WHERE b.client_id = ? $dateFilterInv
@@ -57,8 +57,9 @@ if ($pType == 'client') {
     $reportTitle = "Bills Payable";
     $stmtPO = $pdo->prepare("
         SELECT po_date as dated, po_number as po_num, po_date as po_date, 
-               '' as bill_no, 
-               COALESCE(NULLIF(total_amount, 0), po_amount + COALESCE(cgst_amount,0) + COALESCE(sgst_amount,0) + COALESCE(igst_amount,0)) as bill_amount
+               vendor_invoice_no as bill_no, vendor_invoice_date as bill_date,
+               COALESCE(NULLIF(total_amount, 0), po_amount + COALESCE(cgst_amount,0) + COALESCE(sgst_amount,0) + COALESCE(igst_amount,0)) as bill_amount,
+               campaign_name
         FROM purchase_orders 
         WHERE vendor_id = ? $dateFilterPO
         ORDER BY po_date ASC
@@ -115,46 +116,54 @@ header("Expires: 0");
 <body>
     <table style="border-collapse: collapse; width: 100%;">
         <tr>
-            <td colspan="5" class="title">SUDHA CREATIVE</td>
+            <td colspan="7" class="title">SUDHA CREATIVE</td>
         </tr>
         <tr>
-            <td colspan="5" class="subtitle">MAHANANDA PALLY, MALDA - 732102</td>
+            <td colspan="7" class="subtitle">MAHANANDA PALLY, MALDA - 732102</td>
         </tr>
         <tr>
-            <td colspan="5" class="report-title"><?php echo $reportTitle; ?></td>
+            <td colspan="7" class="report-title"><?php echo $reportTitle; ?></td>
         </tr>
-        <tr><td colspan="5"></td></tr>
+        <tr><td colspan="7"></td></tr>
         <tr>
-            <td colspan="5" class="bold" style="font-family: Arial, sans-serif;">Account : <?php echo $partnerName; ?>.</td>
+            <td colspan="7" class="bold" style="font-family: Arial, sans-serif;">Account : <?php echo $partnerName; ?></td>
         </tr>
         <tr>
-            <td colspan="5" class="bold" style="font-family: Arial, sans-serif;">From <?php echo $minDate; ?> to <?php echo $maxDate; ?></td>
+            <td colspan="7" class="bold" style="font-family: Arial, sans-serif;">From <?php echo $minDate; ?> to <?php echo $maxDate; ?></td>
         </tr>
-        <tr><td colspan="5"></td></tr>
+        <tr><td colspan="7"></td></tr>
         <tr>
-            <td class="table-header" style="width: 120px;">Dated</td>
+            <td class="table-header" style="width: 80px;">SL No.</td>
             <td class="table-header" style="width: 200px;">PO Num</td>
             <td class="table-header" style="width: 120px;">PO Date</td>
             <td class="table-header" style="width: 180px;">Bill No.</td>
+            <td class="table-header" style="width: 120px;">Bill Date</td>
             <td class="table-header" style="width: 150px;">Bill Amount</td>
+            <td class="table-header" style="width: 200px;">Campaign</td>
         </tr>
-        <?php foreach ($entries as $row): 
+        <?php 
+        $sl_no = 1;
+        foreach ($entries as $row): 
             $totalBillAmount += $row['bill_amount'];
-            $dated = $row['dated'] ? date('d-m-Y', strtotime($row['dated'])) : '';
             $po_date = $row['po_date'] ? date('d.m.Y', strtotime($row['po_date'])) : '';
+            $raw_bill_date = !empty($row['bill_date']) ? $row['bill_date'] : $row['dated'];
+            $bill_date = $raw_bill_date ? date('d-m-Y', strtotime($raw_bill_date)) : '';
         ?>
         <tr>
-            <td class="table-cell"><?php echo $dated; ?></td>
+            <td class="table-cell"><?php echo $sl_no++; ?></td>
             <td class="table-cell"><?php echo htmlspecialchars($row['po_num'] ?? ''); ?></td>
             <td class="table-cell"><?php echo $po_date; ?></td>
-            <td class="table-cell"><?php echo htmlspecialchars($row['bill_no']); ?></td>
+            <td class="table-cell"><?php echo htmlspecialchars($row['bill_no'] ?? ''); ?></td>
+            <td class="table-cell"><?php echo $bill_date; ?></td>
             <td class="table-cell-right"><?php echo number_format($row['bill_amount'], 2, '.', ''); ?></td>
+            <td class="table-cell"><?php echo htmlspecialchars($row['campaign_name'] ?? ''); ?></td>
         </tr>
         <?php endforeach; ?>
         <tr>
-            <td colspan="3" style="border: none;"></td>
+            <td colspan="4" style="border: none;"></td>
             <td class="total-row text-center" style="text-align: center;">Total</td>
             <td class="total-row table-cell-right"><?php echo number_format($totalBillAmount, 2, '.', ''); ?></td>
+            <td style="border: none;"></td>
         </tr>
     </table>
 </body>
