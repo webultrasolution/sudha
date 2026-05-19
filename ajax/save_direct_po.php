@@ -135,8 +135,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             $poNum = 'PRT-' . date('Ymd') . '-' . rand(100, 999);
             
             $stmtPO = $pdo->prepare("
-                INSERT INTO purchase_orders (vendor_id, customer_id, employee_id, campaign_name, brand_name, external_po, po_number, po_date, po_amount, cgst_amount, sgst_amount, igst_amount, total_amount, status, remarks) 
-                VALUES (?, ?, ?, ?, ?, ?, ?, CURDATE(), ?, ?, ?, ?, ?, 'approved', ?)
+                INSERT INTO purchase_orders (vendor_id, customer_id, employee_id, campaign_name, brand_name, external_po, po_number, po_date, po_amount, cgst_amount, sgst_amount, igst_amount, total_amount, status, remarks, type) 
+                VALUES (?, ?, ?, ?, ?, ?, ?, CURDATE(), ?, ?, ?, ?, ?, 'approved', ?, 'printing')
             ");
             $stmtPO->execute([$pvid, $client_id, $_SESSION['user_id'] ?? 0, $campaign_name, $brand_name, $external_po, $poNum, $pSubtotal, $cgst, $sgst, $igst, $pGrandTotal, "Printing PO: " . $remarks]);
             $poId = $pdo->lastInsertId();

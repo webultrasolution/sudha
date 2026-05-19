@@ -93,8 +93,8 @@ try {
         $poNum = 'PRT-' . date('Ymd') . '-' . rand(100, 999);
 
         $stmtPO = $pdo->prepare("
-            INSERT INTO purchase_orders (vendor_id, employee_id, campaign_name, po_number, po_date, po_amount, cgst_amount, sgst_amount, igst_amount, total_amount, status, remarks) 
-            VALUES (?, ?, ?, ?, CURDATE(), ?, ?, ?, ?, ?, 'approved', ?)
+            INSERT INTO purchase_orders (vendor_id, employee_id, campaign_name, po_number, po_date, po_amount, cgst_amount, sgst_amount, igst_amount, total_amount, status, remarks, type) 
+            VALUES (?, ?, ?, ?, CURDATE(), ?, ?, ?, ?, ?, 'approved', ?, 'printing')
         ");
         $stmtPO->execute([
             $vid,
