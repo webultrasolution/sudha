@@ -15,7 +15,7 @@ $mode = $_GET['mode'] ?? '';
 // 1. If PO ID is provided, fetch everything from DB (Works for Direct POs saved to DB)
 if ($po_id) {
     $stmtB = $pdo->prepare("
-        SELECT po.*, c.name as client_name, po.campaign_name as campaign_name, po.po_number as proposal_number
+        SELECT po.*, c.name as client_name, po.campaign_name as campaign_name, po.po_number as proposal_number, po.campaign_id
         FROM purchase_orders po
         LEFT JOIN partners c ON po.customer_id = c.id
         WHERE po.id = ?
@@ -24,6 +24,26 @@ if ($po_id) {
     $b = $stmtB->fetch();
     
     if (!$b) die("Purchase Order not found.");
+    
+    // Fallback: If campaign name is empty in PO table, retrieve it from the booking or linked proposal
+    if (empty($b['campaign_name']) && !empty($b['campaign_id'])) {
+        $stmtCamp = $pdo->prepare("
+            SELECT b.campaign_name as booking_camp, p.campaign_name as prop_camp
+            FROM bookings b
+            LEFT JOIN proposals p ON b.proposal_id = p.id
+            WHERE b.id = ?
+        ");
+        $stmtCamp->execute([$b['campaign_id']]);
+        $campInfo = $stmtCamp->fetch();
+        if ($campInfo) {
+            $b['campaign_name'] = $campInfo['booking_camp'] ?: $campInfo['prop_camp'] ?: '';
+        }
+    }
+    
+    if (empty($b['campaign_name'])) {
+        $b['campaign_name'] = 'General Campaign';
+    }
+
     $vendor_id = $b['vendor_id'];
     $mode = 'saved_po'; // Internal mode for logic below
 
