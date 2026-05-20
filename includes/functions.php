@@ -39,6 +39,36 @@ function calculateGST($subtotal, $isInterState = false) {
 }
 
 /**
+ * Revert an entity's approval_status to pending_approval when a non-admin edits it.
+ * Inserts a new approval_request if one doesn't already exist for this entity in pending state.
+ * 
+ * @param PDO    $pdo        Database connection
+ * @param string $table      The table name (e.g. 'proposals', 'bookings')
+ * @param int    $entityId   The row ID
+ * @param string $entityType The entity type key (e.g. 'proposal', 'booking')
+ * @param string $entityRef  Human-readable reference (e.g. proposal number)
+ * @param int    $userId     The user making the change
+ */
+function revertToPendingOnEdit($pdo, $table, $entityId, $entityType, $entityRef, $userId) {
+    // Only revert if it was previously approved (not already pending/rejected)
+    $cur = $pdo->prepare("SELECT approval_status FROM $table WHERE id = ?");
+    $cur->execute([$entityId]);
+    $currentStatus = $cur->fetchColumn();
+
+    if ($currentStatus === 'approved') {
+        $pdo->prepare("UPDATE $table SET approval_status = 'pending_approval' WHERE id = ?")
+            ->execute([$entityId]);
+
+        // Delete old pending request if any, then insert new
+        $pdo->prepare("DELETE FROM approval_requests WHERE entity_type = ? AND entity_id = ? AND status = 'pending'")
+            ->execute([$entityType, $entityId]);
+
+        $pdo->prepare("INSERT INTO approval_requests (entity_type, entity_id, entity_ref, requested_by, status) VALUES (?, ?, ?, ?, 'pending')")
+            ->execute([$entityType, $entityId, $entityRef . ' (Edited)', $userId]);
+    }
+}
+
+/**
  * Format Currency (INR)
  */
 function formatCurrency($amount) {

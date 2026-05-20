@@ -73,9 +73,9 @@ $dbType = ($pType == 'client') ? 'receivable' : 'payable';
 $stmtPay = $pdo->prepare("
     SELECT id, 'payment' as type, payment_date as date, transaction_id as ref, 
            amount as base_amt, 0 as tax_amount, amount as total_amt, 
-           0 as debit, amount as credit, payment_mode as status
+           0 as debit, amount as credit, payment_mode as status, approval_status
     FROM payments 
-    WHERE partner_id = ? AND type = ?
+    WHERE partner_id = ? AND type = ? AND approval_status = 'approved'
 ");
 $stmtPay->execute([$partner_id, $dbType]);
 $payments = $stmtPay->fetchAll();
@@ -369,16 +369,19 @@ function addPayment(clientId, type) {
                 })
                 .then(data => {
                     if (!data.success) throw new Error(data.message || 'Unknown Error');
-                    return true;
+                    return data;
                 }).catch(error => {
                     Swal.showValidationMessage('Failed: ' + error.message);
                 });
             }
         }).then((result) => {
             if (result.isConfirmed) {
-                Swal.fire('Success', 'Transaction recorded', 'success').then(() => {
-                    location.reload();
-                });
+                let resData = result.value;
+                if (resData && resData.approval_status === 'pending_approval') {
+                    Swal.fire('Sent for Approval!', 'Your payment record has been submitted to admin for approval.', 'info').then(() => location.reload());
+                } else {
+                    Swal.fire('Success', 'Transaction recorded', 'success').then(() => location.reload());
+                }
             }
         });
     });

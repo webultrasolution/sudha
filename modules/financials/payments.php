@@ -180,7 +180,11 @@ function savePayment() {
     .then(r => r.json())
     .then(res => {
         if (res.success) {
-            Swal.fire('Recorded', 'Payment has been recorded successfully.', 'success').then(() => location.reload());
+            if (res.approval_status === 'pending_approval') {
+                Swal.fire('Sent for Approval!', 'Your payment record has been submitted for admin approval.', 'info').then(() => location.reload());
+            } else {
+                Swal.fire('Recorded', 'Payment has been recorded successfully.', 'success').then(() => location.reload());
+            }
         } else {
             Swal.fire('Error', res.message, 'error');
         }

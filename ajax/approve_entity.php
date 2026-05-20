@@ -35,7 +35,7 @@ if (!$entityId && $entityType === 'client_printing') {
     exit;
 }
 
-if (!in_array($action, ['approve', 'reject']) || !in_array($entityType, ['proposal', 'purchase_order', 'booking', 'invoice', 'client_printing'])) {
+if (!in_array($action, ['approve', 'reject']) || !in_array($entityType, ['proposal', 'purchase_order', 'booking', 'invoice', 'client_printing', 'payment'])) {
     echo json_encode(['success' => false, 'message' => 'Invalid parameters.']);
     exit;
 }
@@ -89,6 +89,33 @@ try {
             // Get the actual first ID to update approval_requests
             $rateId = $pdo->query("SELECT id FROM client_printing_rates WHERE po_number = '$poNumber' LIMIT 1")->fetchColumn();
             $entityId = $rateId; 
+            break;
+
+        case 'payment':
+            $stmt = $pdo->prepare("UPDATE payments SET approval_status = ?, approved_by = ?, approved_at = NOW() WHERE id = ?");
+            $stmt->execute([$newApprovalStatus, $adminId, $entityId]);
+            
+            // If approved and linked to invoice, recalculate invoice payment status
+            if ($newApprovalStatus === 'approved') {
+                $payStmt = $pdo->prepare("SELECT invoice_id FROM payments WHERE id = ?");
+                $payStmt->execute([$entityId]);
+                $invId = $payStmt->fetchColumn();
+                
+                if ($invId) {
+                    $paidStmt = $pdo->prepare("SELECT SUM(amount) FROM payments WHERE invoice_id = ? AND approval_status = 'approved'");
+                    $paidStmt->execute([$invId]);
+                    $totalPaid = floatval($paidStmt->fetchColumn());
+
+                    $invStmt = $pdo->prepare("SELECT total_amount FROM invoices WHERE id = ?");
+                    $invStmt->execute([$invId]);
+                    $invTotal = floatval($invStmt->fetchColumn());
+
+                    $status = ($totalPaid >= $invTotal) ? 'paid' : (($totalPaid > 0) ? 'partially_paid' : 'unpaid');
+                    $upd = $pdo->prepare("UPDATE invoices SET payment_status = ? WHERE id = ?");
+                    $upd->execute([$status, $invId]);
+                }
+            }
+            $ref = "Payment #$entityId";
             break;
 
         default:

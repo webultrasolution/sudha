@@ -66,3 +66,15 @@ INSERT Success. ID: 4
 INSERT Success. ID: 5
 Updating Invoice: 3
 Invoice Updated to paid
+2026-05-20 22:40:34 - POST: Array
+(
+    [client_id] => 13
+    [amount] => 3434
+    [payment_date] => 2026-05-22
+    [reference_no] => 3434
+    [payment_mode] => Cash
+    [doc_id] => 6
+    [type] => receivable
+)
+
+INSERT Success. ID: 6

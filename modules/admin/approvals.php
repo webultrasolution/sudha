@@ -67,6 +67,17 @@ $clientPrintings = $pdo->query("
     ORDER BY r.id DESC
 ")->fetchAll();
 
+// Fetch pending payments
+$payments = $pdo->query("
+    SELECT p.*, c.name as partner_name, u.full_name as requested_by_name
+    FROM payments p
+    LEFT JOIN partners c ON p.partner_id = c.id
+    LEFT JOIN approval_requests ar ON ar.entity_type = 'payment' AND ar.entity_id = p.id
+    LEFT JOIN users u ON ar.requested_by = u.id
+    WHERE p.approval_status = 'pending_approval'
+    ORDER BY p.created_at DESC
+")->fetchAll();
+
 // Fetch recent actions (approved/rejected)
 $recentActions = $pdo->query("
     SELECT ar.*, u1.full_name as requested_name, u2.full_name as reviewed_name
@@ -82,6 +93,7 @@ $pendingPOs = count($pos);
 $pendingBookings = count($bookings);
 $pendingInvoices = count($invoices);
 $pendingClientPrintings = count($clientPrintings);
+$pendingPayments = count($payments);
 ?>
 
 <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 1.5rem; margin-bottom: 2rem;">
@@ -135,6 +147,16 @@ $pendingClientPrintings = count($clientPrintings);
             <div style="font-size: 1.75rem; font-weight: 800; color: <?php echo $pendingClientPrintings > 0 ? '#7e22ce' : '#0f172a'; ?>;"><?php echo $pendingClientPrintings; ?></div>
         </div>
     </div>
+
+    <div class="card" style="padding: 1.25rem; display: flex; align-items: center; gap: 1.25rem; border: none; border-radius: 16px; box-shadow: 0 4px 20px rgba(0,0,0,0.03); cursor: pointer; <?php echo $tab === 'payments' ? 'border-left: 4px solid var(--primary);' : ''; ?>" onclick="window.location='?tab=payments'">
+        <div style="background: #fef08a; color: #ca8a04; width: 48px; height: 48px; border-radius: 12px; display: flex; align-items: center; justify-content: center; font-size: 1.3rem;">
+            <i class="fas fa-money-bill-wave"></i>
+        </div>
+        <div>
+            <h4 style="margin: 0; color: #64748b; font-size: 0.7rem; text-transform: uppercase; font-weight: 700; letter-spacing: 0.05em;">Payments</h4>
+            <div style="font-size: 1.75rem; font-weight: 800; color: <?php echo $pendingPayments > 0 ? '#ca8a04' : '#0f172a'; ?>;"><?php echo $pendingPayments; ?></div>
+        </div>
+    </div>
 </div>
 
 <!-- Main Card -->
@@ -149,6 +171,7 @@ $pendingClientPrintings = count($clientPrintings);
             'bookings'  => ['Bookings', 'fa-calendar-check', $pendingBookings],
             'invoices'  => ['Invoices', 'fa-file-invoice-dollar', $pendingInvoices],
             'client_printing' => ['Client Printing', 'fa-print', $pendingClientPrintings],
+            'payments'  => ['Payments', 'fa-money-bill-wave', $pendingPayments],
             'history'   => ['Recent Activity', 'fa-history', 0],
         ];
         foreach ($tabs as $key => $info):
@@ -426,14 +449,76 @@ $pendingClientPrintings = count($clientPrintings);
                     </td>
                     <td>
                         <div style="display: flex; gap: 0.5rem;">
-                            <button class="btn btn-primary" onclick="actionEntity('client_printing', '<?php echo $cp['po_number']; ?>', 'approve')" style="padding: 6px 12px; font-size: 0.8rem; background: #10b981; border: none;"><i class="fas fa-check"></i> Approve</button>
-                            <button class="btn btn-primary" onclick="actionEntity('client_printing', '<?php echo $cp['po_number']; ?>', 'reject')" style="padding: 6px 12px; font-size: 0.8rem; background: #ef4444; border: none;"><i class="fas fa-times"></i> Reject</button>
+                            <button class="btn btn-primary" onclick="approveEntity('client_printing', '<?php echo $cp['po_number']; ?>')" style="padding: 6px 12px; font-size: 0.8rem; background: #10b981; border: none;"><i class="fas fa-check"></i> Approve</button>
+                            <button class="btn btn-primary" onclick="rejectEntity('client_printing', '<?php echo $cp['po_number']; ?>')" style="padding: 6px 12px; font-size: 0.8rem; background: #ef4444; border: none;"><i class="fas fa-times"></i> Reject</button>
                         </div>
                     </td>
                 </tr>
                 <?php endforeach; ?>
                 <?php if (empty($clientPrintings)): ?>
                 <tr><td colspan="5" style="text-align: center; padding: 3rem; color: #94a3b8;"><i class="fas fa-check-circle" style="font-size: 2rem; display: block; margin-bottom: 0.75rem; color: #10b981;"></i>All client printing requests have been reviewed!</td></tr>
+                <?php endif; ?>
+            </tbody>
+        </table>
+    </div>
+    <?php endif; ?>
+
+    <!-- ====== PAYMENTS TAB ====== -->
+    <?php if ($tab === 'payments'): ?>
+    <div style="overflow-x: auto;">
+        <table class="table matrix-table" style="border: 1px solid #e2e8f0; border-radius: 12px; overflow: hidden;">
+            <thead>
+                <tr>
+                    <th>Payment Info</th>
+                    <th>Partner</th>
+                    <th>Requested By</th>
+                    <th>Amount & Mode</th>
+                    <th>Actions</th>
+                </tr>
+            </thead>
+            <tbody>
+                <?php foreach ($payments as $pay): ?>
+                <tr>
+                    <td>
+                        <div style="display: flex; gap: 0.5rem; margin-bottom: 4px;">
+                            <?php if ($pay['type'] === 'receivable'): ?>
+                                <span style="background: #dcfce7; color: #166534; padding: 2px 8px; border-radius: 4px; font-size: 0.65rem; font-weight: 800; text-transform: uppercase;">Customer Pmt</span>
+                            <?php else: ?>
+                                <span style="background: #fee2e2; color: #991b1b; padding: 2px 8px; border-radius: 4px; font-size: 0.65rem; font-weight: 800; text-transform: uppercase;">Vendor Pmt</span>
+                            <?php endif; ?>
+                        </div>
+                        <strong><?php echo htmlspecialchars($pay['transaction_id'] ?: 'No Txn ID'); ?></strong>
+                        <div style="font-size: 0.75rem; color: #64748b; margin-top: 2px;">
+                            Date: <?php echo date('d M Y', strtotime($pay['payment_date'])); ?>
+                        </div>
+                    </td>
+                    <td><strong><?php echo htmlspecialchars($pay['partner_name'] ?: 'Unknown'); ?></strong></td>
+                    <td>
+                        <div style="display: flex; align-items: center; gap: 8px;">
+                            <div style="width: 28px; height: 28px; border-radius: 50%; background: #e2e8f0; display: flex; align-items: center; justify-content: center; font-size: 0.75rem; font-weight: 800; color: #475569;">
+                                <?php echo substr($pay['requested_by_name'] ?: '?', 0, 1); ?>
+                            </div>
+                            <span style="font-size: 0.85rem; font-weight: 600;"><?php echo htmlspecialchars($pay['requested_by_name'] ?: 'System'); ?></span>
+                        </div>
+                    </td>
+                    <td>
+                        <div style="font-size: 1.1rem; font-weight: 800; color: #0f172a;">
+                            ₹<?php echo number_format($pay['amount'], 2); ?>
+                        </div>
+                        <div style="font-size: 0.75rem; color: #64748b; font-weight: 600; margin-top: 2px;">
+                            Mode: <?php echo htmlspecialchars($pay['payment_mode']); ?>
+                        </div>
+                    </td>
+                    <td>
+                        <div style="display: flex; gap: 0.5rem;">
+                            <button class="btn btn-primary" onclick="approveEntity('payment', <?php echo $pay['id']; ?>)" style="padding: 6px 12px; font-size: 0.8rem; background: #10b981; border: none;"><i class="fas fa-check"></i> Approve</button>
+                            <button class="btn btn-primary" onclick="rejectEntity('payment', <?php echo $pay['id']; ?>)" style="padding: 6px 12px; font-size: 0.8rem; background: #ef4444; border: none;"><i class="fas fa-times"></i> Reject</button>
+                        </div>
+                    </td>
+                </tr>
+                <?php endforeach; ?>
+                <?php if (empty($payments)): ?>
+                <tr><td colspan="5" style="text-align: center; padding: 3rem; color: #94a3b8;"><i class="fas fa-check-circle" style="font-size: 2rem; display: block; margin-bottom: 0.75rem; color: #10b981;"></i>All payment requests have been reviewed!</td></tr>
                 <?php endif; ?>
             </tbody>
         </table>
