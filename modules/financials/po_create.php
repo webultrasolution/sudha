@@ -211,7 +211,8 @@ function finalizePO() {
     .then(r => r.json())
     .then(res => {
         if (res.success) {
-            Swal.fire('PO Generated', 'Purchase Order #' + res.po_number + ' has been created successfully.', 'success')
+            let msg = res.approval_status === 'pending_approval' ? 'Purchase Order submitted for approval!' : 'Purchase Order #' + res.po_number + ' has been created successfully.';
+            Swal.fire('PO Generated', msg, 'success')
             .then(() => window.location.href = 'purchase_orders.php');
         } else {
             Swal.fire('Error', res.message, 'error');

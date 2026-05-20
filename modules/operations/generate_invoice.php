@@ -11,6 +11,18 @@ if (!$booking_id) {
     die("Booking ID is required.");
 }
 
+// Check Invoice Approval Status
+$stmtInvCheck = $pdo->prepare("SELECT approval_status FROM invoices WHERE booking_id = ? AND type = 'tax' LIMIT 1");
+$stmtInvCheck->execute([$booking_id]);
+$invoiceData = $stmtInvCheck->fetch();
+
+if (session_status() === PHP_SESSION_NONE) session_start();
+$isAdmin = ($_SESSION['user_role'] ?? '') === 'admin';
+
+if ($invoiceData && ($invoiceData['approval_status'] ?? '') === 'pending_approval' && !$isAdmin) {
+    die("<div style='font-family: sans-serif; padding: 2rem; text-align: center; color: #64748b;'><h3>Access Denied</h3><p>This invoice is pending admin approval and cannot be viewed or printed yet.</p></div>");
+}
+
 // Fetch Booking & Client Details
 $stmt = $pdo->prepare("
     SELECT b.*, c.name as client_name, c.address as client_address, c.gstin as client_gstin, c.state as client_state, c.contact_person, c.phone, c.pan as client_pan

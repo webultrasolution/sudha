@@ -817,8 +817,13 @@ function saveDirectBooking() {
         body: JSON.stringify(data)
     }).then(r => r.json()).then(res => {
         if (res.success) {
-            Swal.fire('Success', 'Booking  generated!', 'success').then(() => window.location.href = 'bookings.php');
-            if(res.po_id) window.open('generate_po.php?po_id=' + res.po_id, '_blank');
+            let msg = res.po_id ? 'Purchase Order submitted for approval!' : 'Booking generated!';
+            if (res.approval_status === 'approved') msg = 'Purchase Order generated successfully!';
+            
+            Swal.fire('Success', msg, 'success').then(() => window.location.href = 'bookings.php');
+            if(res.po_id && res.approval_status !== 'pending_approval') {
+                // window.open('generate_po.php?po_id=' + res.po_id, '_blank');
+            }
         } else {
             Swal.fire('Error', res.message, 'error');
             btn.disabled = false; btn.innerHTML = 'GENERATE BOOKING';

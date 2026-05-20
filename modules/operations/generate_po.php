@@ -23,7 +23,15 @@ if ($po_id) {
     $stmtB->execute([$po_id]);
     $b = $stmtB->fetch();
     
-    if (!$b) die("Purchase Order not found.");
+    if (!$b) {
+        die("Purchase Order not found.");
+    }
+    
+    if (session_status() === PHP_SESSION_NONE) session_start();
+    $isAdmin = ($_SESSION['user_role'] ?? '') === 'admin';
+    if (($b['approval_status'] ?? '') === 'pending_approval' && !$isAdmin) {
+        die("<div style='font-family: sans-serif; padding: 2rem; text-align: center; color: #64748b;'><h3>Access Denied</h3><p>This Purchase Order is pending admin approval and cannot be viewed or printed yet.</p></div>");
+    }
     
     // Fallback: If campaign name is empty in PO table, retrieve it from the booking or linked proposal
     if (empty($b['campaign_name']) && !empty($b['campaign_id'])) {

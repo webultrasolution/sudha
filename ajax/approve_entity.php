@@ -28,7 +28,14 @@ $action     = $data['action'] ?? ''; // 'approve' or 'reject'
 $reason     = trim($data['reason'] ?? '');
 $adminId    = $_SESSION['user_id'];
 
-if (!$entityId || !in_array($action, ['approve', 'reject']) || !in_array($entityType, ['proposal', 'purchase_order', 'booking', 'invoice'])) {
+if (!$entityId && $entityType === 'client_printing') {
+    // Note: for client printing, entityId is passed as po_number string in the payload from approvals.php, so we handle it below
+} elseif (!$entityId && $entityType !== 'client_printing') {
+    echo json_encode(['success' => false, 'message' => 'Invalid parameters.']);
+    exit;
+}
+
+if (!in_array($action, ['approve', 'reject']) || !in_array($entityType, ['proposal', 'purchase_order', 'booking', 'invoice', 'client_printing'])) {
     echo json_encode(['success' => false, 'message' => 'Invalid parameters.']);
     exit;
 }
@@ -73,12 +80,23 @@ try {
             $ref = $pdo->query("SELECT invoice_number FROM invoices WHERE id = $entityId")->fetchColumn();
             break;
 
+        case 'client_printing':
+            // In approvals.php we pass po_number as entityId string for client_printing
+            $poNumber = $data['entity_id'] ?? '';
+            $stmt = $pdo->prepare("UPDATE client_printing_rates SET approval_status = ? WHERE po_number = ?");
+            $stmt->execute([$newApprovalStatus, $poNumber]);
+            $ref = $poNumber;
+            // Get the actual first ID to update approval_requests
+            $rateId = $pdo->query("SELECT id FROM client_printing_rates WHERE po_number = '$poNumber' LIMIT 1")->fetchColumn();
+            $entityId = $rateId; 
+            break;
+
         default:
             throw new Exception("Unknown entity type: $entityType");
     }
 
     // Update the approval_requests record
-    $stmtAR = $pdo->prepare("UPDATE approval_requests SET status = ?, reviewed_by = ?, reviewed_at = NOW(), remarks = ? WHERE entity_type = ? AND entity_id = ? AND status = 'pending'");
+    $stmtAR = $pdo->prepare("UPDATE approval_requests SET status = ?, reviewed_by = ?, reviewed_at = NOW(), remarks = ? WHERE entity_type = ? AND entity_id = ?");
     $stmtAR->execute([$newApprovalStatus, $adminId, $reason ?: null, $entityType, $entityId]);
 
     $actionLabel = ($action === 'approve') ? 'approved' : 'rejected';

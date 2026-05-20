@@ -95,14 +95,21 @@ $invoiceFinalized = (bool) $stmtInvCheck->fetchColumn();
         
         <?php
         // Check if invoice already exists
-        $stmtInv = $pdo->prepare("SELECT id FROM invoices WHERE booking_id = ? AND type = 'tax' LIMIT 1");
+        $stmtInv = $pdo->prepare("SELECT id, approval_status FROM invoices WHERE booking_id = ? AND type = 'tax' LIMIT 1");
         $stmtInv->execute([$id]);
         $existingInvoice = $stmtInv->fetch();
+        $isAdmin = ($_SESSION['user_role'] ?? '') === 'admin';
 
         if ($existingInvoice): ?>
-            <a href="generate_invoice.php?booking_id=<?php echo $id; ?>" target="_blank" class="btn" style="background: #10b981; color: white; padding: 0.75rem 1.5rem; border-radius: 10px; font-weight: 800; border: none; cursor: pointer; display: flex; align-items: center; gap: 0.5rem; text-decoration: none;">
-                <i class="fas fa-eye"></i> View Tax Invoice
-            </a>
+            <?php if (($existingInvoice['approval_status'] ?? '') === 'approved' || $isAdmin): ?>
+                <a href="generate_invoice.php?booking_id=<?php echo $id; ?>" target="_blank" class="btn" style="background: #10b981; color: white; padding: 0.75rem 1.5rem; border-radius: 10px; font-weight: 800; border: none; cursor: pointer; display: flex; align-items: center; gap: 0.5rem; text-decoration: none;">
+                    <i class="fas fa-eye"></i> View Tax Invoice
+                </a>
+            <?php else: ?>
+                <button class="btn" style="background: #f8fafc; border: 1px solid #e2e8f0; color: #94a3b8; padding: 0.75rem 1.25rem; border-radius: 10px; font-weight: 700; font-size: 0.9rem; cursor: not-allowed; display: flex; align-items: center; gap: 0.5rem;" title="Invoice is awaiting admin approval.">
+                    <i class="fas fa-lock"></i> Invoice Pending Approval
+                </button>
+            <?php endif; ?>
         <?php else: ?>
             <button class="btn" onclick="openInvoicePopup(<?php echo $b['id']; ?>)" style="background: #0f172a; color: white; padding: 0.75rem 1.5rem; border-radius: 10px; font-weight: 800; border: none; cursor: pointer; display: flex; align-items: center; gap: 0.5rem;">
                 <i class="fas fa-file-invoice-dollar"></i> Final Tax Invoice
@@ -179,7 +186,7 @@ foreach ($items as $item) {
 }
 
 // Prepare statement to check if PO exists
-$stmtCheckPO = $pdo->prepare("SELECT id FROM purchase_orders WHERE campaign_id = ? AND vendor_id = ?");
+$stmtCheckPO = $pdo->prepare("SELECT id, approval_status FROM purchase_orders WHERE campaign_id = ? AND vendor_id = ?");
 ?>
 
 
@@ -209,8 +216,10 @@ $stmtCheckPO = $pdo->prepare("SELECT id FROM purchase_orders WHERE campaign_id =
                 $marginPct = ($item['purchase_amount'] > 0) ? ($itemMargin / $item['purchase_amount'] * 100) : 0;
                 // Check PO existence for this vendor on this booking
                 $stmtCheckPO->execute([$b['id'], $item['vendor_id']]);
-                $existingPoId = $stmtCheckPO->fetchColumn();
+                $poData = $stmtCheckPO->fetch();
+                $existingPoId = $poData ? $poData['id'] : false;
                 $poLocked = !empty($existingPoId);
+                $poApprovalStatus = $poData ? $poData['approval_status'] : '';
             ?>
             <tr>
                 <td>
@@ -231,13 +240,24 @@ $stmtCheckPO = $pdo->prepare("SELECT id FROM purchase_orders WHERE campaign_id =
                                         <span style="color: #64748b; font-weight: 500; font-size: 0.65rem;">(<?php echo $item['vendor_contact']; ?>)</span>
                                     <?php endif; ?>
                                 </span>
-                                <?php 
-                                    // $existingPoId and $poLocked are already set above — reuse them
-                                ?>
                                 <?php if ($poLocked): ?>
-                                    <a href="generate_po.php?po_id=<?php echo $existingPoId; ?>" target="_blank" title="View Saved PO" style="background: #10b981; color: white; width: 26px; height: 26px; border-radius: 6px; display: flex; align-items: center; justify-content: center; font-size: 0.7rem; text-decoration: none;">
-                                        <i class="fas fa-file-invoice"></i>
-                                    </a>
+                                    <?php if ($poApprovalStatus === 'approved' || $isAdmin): ?>
+                                        <a href="generate_po.php?po_id=<?php echo $existingPoId; ?>" target="_blank" title="View Saved PO" style="background: #10b981; color: white; width: 26px; height: 26px; border-radius: 6px; display: flex; align-items: center; justify-content: center; font-size: 0.7rem; text-decoration: none;">
+                                            <i class="fas fa-file-invoice"></i>
+                                        </a>
+                                        <?php if (canEdit('bookings')): ?>
+                                        <button onclick="sendPOEmail(<?php echo $b['id']; ?>, <?php echo $item['vendor_id']; ?>)" title="Send PO via Email" style="background: #3b82f6; color: white; width: 26px; height: 26px; border-radius: 6px; border: none; cursor: pointer; display: flex; align-items: center; justify-content: center; font-size: 0.7rem;">
+                                            <i class="fas fa-envelope"></i>
+                                        </button>
+                                        <?php endif; ?>
+                                        <a href="https://wa.me/<?php echo preg_replace('/[^0-9]/', '', $item['vendor_phone'] ?? ''); ?>?text=Dear <?php echo urlencode($item['vendor_name'] ?? 'Vendor'); ?>, Please find the Purchase Order for Campaign: <?php echo urlencode($b['campaign_name'] ?? 'General'); ?>. Booking Ref: #BK-<?php echo str_pad($b['id'], 4, '0', STR_PAD_LEFT); ?>. Thank you." target="_blank" title="Send via WhatsApp" style="background: #22c55e; color: white; width: 26px; height: 26px; border-radius: 6px; display: flex; align-items: center; justify-content: center; font-size: 0.7rem; text-decoration: none;">
+                                            <i class="fab fa-whatsapp"></i>
+                                        </a>
+                                    <?php else: ?>
+                                        <button title="PO Pending Admin Approval" style="background: #f8fafc; color: #94a3b8; border: 1px solid #cbd5e1; width: 26px; height: 26px; border-radius: 6px; display: flex; align-items: center; justify-content: center; font-size: 0.7rem; cursor: not-allowed; border: none;">
+                                            <i class="fas fa-lock"></i>
+                                        </button>
+                                    <?php endif; ?>
                                 <?php else: ?>
                                     <?php if (canEdit('bookings')): ?>
                                     <button onclick="saveAndGeneratePO(<?php echo $b['id']; ?>, <?php echo $item['vendor_id']; ?>)" title="Generate & Save PO to Database" style="background: #0f172a; color: white; width: 26px; height: 26px; border-radius: 6px; border: none; cursor: pointer; display: flex; align-items: center; justify-content: center; font-size: 0.7rem;">
@@ -245,14 +265,6 @@ $stmtCheckPO = $pdo->prepare("SELECT id FROM purchase_orders WHERE campaign_id =
                                     </button>
                                     <?php endif; ?>
                                 <?php endif; ?>
-                                <?php if (canEdit('bookings')): ?>
-                                <button onclick="sendPOEmail(<?php echo $b['id']; ?>, <?php echo $item['vendor_id']; ?>)" title="Send PO via Email" style="background: #3b82f6; color: white; width: 26px; height: 26px; border-radius: 6px; border: none; cursor: pointer; display: flex; align-items: center; justify-content: center; font-size: 0.7rem;">
-                                    <i class="fas fa-envelope"></i>
-                                </button>
-                                <?php endif; ?>
-                                <a href="https://wa.me/<?php echo preg_replace('/[^0-9]/', '', $item['vendor_phone'] ?? ''); ?>?text=Dear <?php echo urlencode($item['vendor_name'] ?? 'Vendor'); ?>, Please find the Purchase Order for Campaign: <?php echo urlencode($b['campaign_name'] ?? 'General'); ?>. Booking Ref: #BK-<?php echo str_pad($b['id'], 4, '0', STR_PAD_LEFT); ?>. Thank you." target="_blank" title="Send via WhatsApp" style="background: #22c55e; color: white; width: 26px; height: 26px; border-radius: 6px; display: flex; align-items: center; justify-content: center; font-size: 0.7rem; text-decoration: none;">
-                                    <i class="fab fa-whatsapp"></i>
-                                </a>
                             </div>
                         <?php endif; ?>
                     </div>
@@ -583,14 +595,27 @@ function openInvoicePopup(bookingId) {
                 if (!data.success) {
                     throw new Error(data.message || 'Upload failed');
                 }
-                return true;
+                return data;
             }).catch(error => {
                 Swal.showValidationMessage(`Request failed: ${error}`);
             });
         }
     }).then((result) => {
         if (result.isConfirmed) {
-            window.open(`generate_invoice.php?booking_id=${bookingId}`, '_blank');
+            const data = result.value;
+            if (data.approval_status === 'pending_approval' && !data.is_admin) {
+                Swal.fire({
+                    icon: 'success',
+                    title: 'Approval Sent to Admin!',
+                    text: 'The invoice generation request has been sent to the Admin for approval.',
+                    confirmButtonColor: '#10b981'
+                }).then(() => {
+                    location.reload();
+                });
+            } else {
+                window.open(`generate_invoice.php?booking_id=${bookingId}`, '_blank');
+                location.reload();
+            }
         }
     });
 }
@@ -614,10 +639,15 @@ function saveAndGeneratePO(booking_id, vendor_id) {
             .then(response => response.json())
             .then(data => {
                 if (data.success) {
-                    Swal.fire('PO Saved!', `Purchase Order ${data.po_number} has been saved.`, 'success').then(() => {
-                        window.open(`generate_po.php?po_id=${data.po_id}`, '_blank');
-                        window.location.reload();
-                    });
+                    if (data.approval_status === 'pending_approval') {
+                        Swal.fire('Approval Sent!', data.message, 'success').then(() => {
+                            window.location.reload();
+                        });
+                    } else {
+                        Swal.fire('PO Saved!', `Purchase Order ${data.po_number} has been generated successfully.`, 'success').then(() => {
+                            window.location.reload();
+                        });
+                    }
                 } else {
                     Swal.fire('Error', data.message || 'Failed to save PO', 'error');
                 }

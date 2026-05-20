@@ -47,12 +47,24 @@ $bookings = $pdo->query("
 
 // Fetch pending invoices
 $invoices = $pdo->query("
-    SELECT i.*, b.campaign_name, c.name as client_name
+    SELECT i.*, b.campaign_name, b.customer_po_no, b.customer_po_file, b.customer_po_date, b.email_date, b.confirmation_type, c.name as client_name
     FROM invoices i
     LEFT JOIN bookings b ON i.booking_id = b.id
     LEFT JOIN partners c ON b.client_id = c.id
     WHERE i.approval_status = 'pending_approval'
     ORDER BY i.created_at DESC
+")->fetchAll();
+
+// Fetch pending client printing invoices
+$clientPrintings = $pdo->query("
+    SELECT r.*, c.name as client_name, p.full_name as requested_by_name
+    FROM client_printing_rates r
+    LEFT JOIN partners c ON r.client_id = c.id
+    LEFT JOIN approval_requests ar ON ar.entity_type = 'client_printing' AND ar.entity_ref = r.po_number
+    LEFT JOIN users p ON ar.requested_by = p.id
+    WHERE r.approval_status = 'pending_approval'
+    GROUP BY r.po_number
+    ORDER BY r.id DESC
 ")->fetchAll();
 
 // Fetch recent actions (approved/rejected)
@@ -65,10 +77,15 @@ $recentActions = $pdo->query("
     ORDER BY ar.reviewed_at DESC
     LIMIT 15
 ")->fetchAll();
+
+$pendingPOs = count($pos);
+$pendingBookings = count($bookings);
+$pendingInvoices = count($invoices);
+$pendingClientPrintings = count($clientPrintings);
 ?>
 
-<!-- Stats Summary -->
-<div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 1.25rem; margin-bottom: 2rem;">
+<div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 1.5rem; margin-bottom: 2rem;">
+    <!-- Dashboard Cards -->
     <div class="card" style="padding: 1.25rem; display: flex; align-items: center; gap: 1.25rem; border: none; border-radius: 16px; box-shadow: 0 4px 20px rgba(0,0,0,0.03); cursor: pointer; <?php echo $tab === 'proposals' ? 'border-left: 4px solid var(--primary);' : ''; ?>" onclick="window.location='?tab=proposals'">
         <div style="background: #fef3c7; color: #d97706; width: 48px; height: 48px; border-radius: 12px; display: flex; align-items: center; justify-content: center; font-size: 1.3rem;">
             <i class="fas fa-file-contract"></i>
@@ -108,6 +125,16 @@ $recentActions = $pdo->query("
             <div style="font-size: 1.75rem; font-weight: 800; color: <?php echo $pendingInvoices > 0 ? '#059669' : '#0f172a'; ?>;"><?php echo $pendingInvoices; ?></div>
         </div>
     </div>
+    
+    <div class="card" style="padding: 1.25rem; display: flex; align-items: center; gap: 1.25rem; border: none; border-radius: 16px; box-shadow: 0 4px 20px rgba(0,0,0,0.03); cursor: pointer; <?php echo $tab === 'client_printing' ? 'border-left: 4px solid var(--primary);' : ''; ?>" onclick="window.location='?tab=client_printing'">
+        <div style="background: #f3e8ff; color: #7e22ce; width: 48px; height: 48px; border-radius: 12px; display: flex; align-items: center; justify-content: center; font-size: 1.3rem;">
+            <i class="fas fa-print"></i>
+        </div>
+        <div>
+            <h4 style="margin: 0; color: #64748b; font-size: 0.7rem; text-transform: uppercase; font-weight: 700; letter-spacing: 0.05em;">Client Printing</h4>
+            <div style="font-size: 1.75rem; font-weight: 800; color: <?php echo $pendingClientPrintings > 0 ? '#7e22ce' : '#0f172a'; ?>;"><?php echo $pendingClientPrintings; ?></div>
+        </div>
+    </div>
 </div>
 
 <!-- Main Card -->
@@ -121,6 +148,7 @@ $recentActions = $pdo->query("
             'pos'       => ['Purchase Orders', 'fa-shopping-cart', $pendingPOs],
             'bookings'  => ['Bookings', 'fa-calendar-check', $pendingBookings],
             'invoices'  => ['Invoices', 'fa-file-invoice-dollar', $pendingInvoices],
+            'client_printing' => ['Client Printing', 'fa-print', $pendingClientPrintings],
             'history'   => ['Recent Activity', 'fa-history', 0],
         ];
         foreach ($tabs as $key => $info):
@@ -289,7 +317,7 @@ $recentActions = $pdo->query("
                     <th>Invoice #</th>
                     <th>Type</th>
                     <th>Client</th>
-                    <th>Campaign</th>
+                    <th>Customer Approval (PO/Email)</th>
                     <th>Amount</th>
                     <th>Date</th>
                     <th style="width: 200px;">Action</th>
@@ -298,7 +326,11 @@ $recentActions = $pdo->query("
             <tbody>
                 <?php foreach ($invoices as $inv): ?>
                 <tr id="row-invoice-<?php echo $inv['id']; ?>">
-                    <td style="font-weight: 700; color: var(--primary);"><?php echo htmlspecialchars($inv['invoice_number']); ?></td>
+                    <td style="font-weight: 700; color: var(--primary);">
+                        <a href="../operations/generate_invoice.php?booking_id=<?php echo $inv['booking_id']; ?>" target="_blank" style="text-decoration: none; color: var(--primary);">
+                            <?php echo htmlspecialchars($inv['invoice_number']); ?>
+                        </a>
+                    </td>
                     <td>
                         <?php
                         $invType = $inv['type'] ?? 'tax';
@@ -308,7 +340,28 @@ $recentActions = $pdo->query("
                         ?>
                     </td>
                     <td><?php echo htmlspecialchars($inv['client_name'] ?: '—'); ?></td>
-                    <td><?php echo htmlspecialchars($inv['campaign_name'] ?: '—'); ?></td>
+                    <td>
+                        <?php if ($invType === 'tax'): ?>
+                            <div style="font-size: 0.8rem;">
+                                <?php if ($inv['confirmation_type'] === 'email'): ?>
+                                    <strong>Email Conf:</strong> <?php echo $inv['email_date'] ? date('d M Y', strtotime($inv['email_date'])) : 'N/A'; ?>
+                                <?php else: ?>
+                                    <strong>PO:</strong> <?php echo htmlspecialchars($inv['customer_po_no'] ?: 'N/A'); ?><br>
+                                    <strong>Date:</strong> <?php echo $inv['customer_po_date'] ? date('d M Y', strtotime($inv['customer_po_date'])) : 'N/A'; ?>
+                                <?php endif; ?>
+                                
+                                <?php if (!empty($inv['customer_po_file'])): ?>
+                                    <br><a href="<?php echo BASE_URL . $inv['customer_po_file']; ?>" target="_blank" style="color: #3b82f6; text-decoration: none; font-weight: bold; display: inline-flex; align-items: center; gap: 0.3rem; margin-top: 4px;">
+                                        <i class="fas fa-paperclip"></i> View Document
+                                    </a>
+                                <?php else: ?>
+                                    <br><span style="color: #ef4444; font-size: 0.7rem;">No File Attached</span>
+                                <?php endif; ?>
+                            </div>
+                        <?php else: ?>
+                            <span style="color: #94a3b8;">N/A</span>
+                        <?php endif; ?>
+                    </td>
                     <td style="font-weight: 700;"><?php echo formatCurrency($inv['total_amount']); ?></td>
                     <td style="font-size: 0.8rem; color: #64748b;"><?php echo date('d M Y', strtotime($inv['created_at'])); ?></td>
                     <td>
@@ -325,6 +378,62 @@ $recentActions = $pdo->query("
                 <?php endforeach; ?>
                 <?php if (empty($invoices)): ?>
                 <tr><td colspan="7" style="text-align: center; padding: 3rem; color: #94a3b8;"><i class="fas fa-check-circle" style="font-size: 2rem; display: block; margin-bottom: 0.75rem; color: #10b981;"></i>All invoices have been reviewed!</td></tr>
+                <?php endif; ?>
+            </tbody>
+        </table>
+    </div>
+    <?php endif; ?>
+
+    <!-- ====== CLIENT PRINTING TAB ====== -->
+    <?php if ($tab === 'client_printing'): ?>
+    <div style="overflow-x: auto;">
+        <table class="table matrix-table" style="border: 1px solid #e2e8f0; border-radius: 12px; overflow: hidden;">
+            <thead>
+                <tr>
+                    <th>PO Ref</th>
+                    <th>Client</th>
+                    <th>Requested By</th>
+                    <th>Document</th>
+                    <th>Actions</th>
+                </tr>
+            </thead>
+            <tbody>
+                <?php foreach ($clientPrintings as $cp): ?>
+                <tr>
+                    <td>
+                        <strong><?php echo htmlspecialchars($cp['po_number']); ?></strong>
+                        <div style="font-size: 0.75rem; color: #64748b; margin-top: 2px;">
+                            Req: <?php echo date('d M, h:i A'); // Simplified for now since we don't have created_at on this table ?>
+                        </div>
+                    </td>
+                    <td><strong><?php echo htmlspecialchars($cp['client_name'] ?: 'Unknown'); ?></strong></td>
+                    <td>
+                        <div style="display: flex; align-items: center; gap: 8px;">
+                            <div style="width: 28px; height: 28px; border-radius: 50%; background: #e2e8f0; display: flex; align-items: center; justify-content: center; font-size: 0.75rem; font-weight: 800; color: #475569;">
+                                <?php echo substr($cp['requested_by_name'] ?: '?', 0, 1); ?>
+                            </div>
+                            <span style="font-size: 0.85rem; font-weight: 600;"><?php echo htmlspecialchars($cp['requested_by_name'] ?: 'System'); ?></span>
+                        </div>
+                    </td>
+                    <td>
+                        <?php if ($cp['customer_po_file']): ?>
+                            <a href="../../uploads/customer_pos/<?php echo urlencode($cp['customer_po_file']); ?>" target="_blank" style="display: inline-flex; align-items: center; gap: 5px; color: #0284c7; background: #f0f9ff; padding: 4px 10px; border-radius: 6px; font-size: 0.75rem; font-weight: 700; text-decoration: none;">
+                                <i class="fas fa-file-pdf"></i> View Attachment
+                            </a>
+                        <?php else: ?>
+                            <span style="color: #94a3b8; font-size: 0.8rem;"><i class="fas fa-minus-circle"></i> No Doc</span>
+                        <?php endif; ?>
+                    </td>
+                    <td>
+                        <div style="display: flex; gap: 0.5rem;">
+                            <button class="btn btn-primary" onclick="actionEntity('client_printing', '<?php echo $cp['po_number']; ?>', 'approve')" style="padding: 6px 12px; font-size: 0.8rem; background: #10b981; border: none;"><i class="fas fa-check"></i> Approve</button>
+                            <button class="btn btn-primary" onclick="actionEntity('client_printing', '<?php echo $cp['po_number']; ?>', 'reject')" style="padding: 6px 12px; font-size: 0.8rem; background: #ef4444; border: none;"><i class="fas fa-times"></i> Reject</button>
+                        </div>
+                    </td>
+                </tr>
+                <?php endforeach; ?>
+                <?php if (empty($clientPrintings)): ?>
+                <tr><td colspan="5" style="text-align: center; padding: 3rem; color: #94a3b8;"><i class="fas fa-check-circle" style="font-size: 2rem; display: block; margin-bottom: 0.75rem; color: #10b981;"></i>All client printing requests have been reviewed!</td></tr>
                 <?php endif; ?>
             </tbody>
         </table>
