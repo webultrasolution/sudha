@@ -6,6 +6,8 @@ if (session_status() === PHP_SESSION_NONE) {
     session_start();
 }
 
+$isAdmin = ($_SESSION['user_role'] ?? '') === 'admin';
+
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     $data = json_decode(file_get_contents('php://input'), true);
     
@@ -39,10 +41,14 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         // Generate PO Number
         $poNum = 'PO-' . date('Ymd') . '-' . rand(100, 999);
 
+        // Admin approves instantly; non-admin goes to queue
+        $poStatus       = $isAdmin ? 'approved' : 'pending';
+        $approvalStatus = $isAdmin ? 'approved' : 'pending_approval';
+
         // 2. Insert PO
         $stmt = $pdo->prepare("
-            INSERT INTO purchase_orders (campaign_id, vendor_id, employee_id, po_number, po_date, po_amount, cgst_amount, sgst_amount, total_amount, status) 
-            VALUES (?, ?, ?, ?, CURDATE(), ?, ?, ?, ?, 'approved')
+            INSERT INTO purchase_orders (campaign_id, vendor_id, employee_id, po_number, po_date, po_amount, cgst_amount, sgst_amount, total_amount, status, approval_status) 
+            VALUES (?, ?, ?, ?, CURDATE(), ?, ?, ?, ?, ?, ?)
         ");
         $stmt->execute([
             $data['campaignId'],
@@ -52,10 +58,18 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             $subtotal,
             $cgst,
             $sgst,
-            $grandTotal
+            $grandTotal,
+            $poStatus,
+            $approvalStatus
         ]);
         
         $poId = $pdo->lastInsertId();
+        
+        // Create approval request for non-admin
+        if (!$isAdmin) {
+            $stmtAR = $pdo->prepare("INSERT INTO approval_requests (entity_type, entity_id, entity_ref, requested_by, status) VALUES ('purchase_order', ?, ?, ?, 'pending')");
+            $stmtAR->execute([$poId, $poNum, $_SESSION['user_id']]);
+        }
         
         logActivity('generated a purchase order', 'purchase_orders', $poId, "PO Number: $poNum");
 
@@ -77,7 +91,12 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         }
 
         $pdo->commit();
-        echo json_encode(['success' => true, 'po_number' => $poNum]);
+        echo json_encode([
+            'success'         => true,
+            'po_number'       => $poNum,
+            'approval_status' => $approvalStatus,
+            'message'         => $isAdmin ? "PO $poNum generated." : "PO $poNum submitted for admin approval."
+        ]);
 
     } catch (Exception $e) {
         $pdo->rollBack();

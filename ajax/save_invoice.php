@@ -6,6 +6,8 @@ if (session_status() === PHP_SESSION_NONE) {
     session_start();
 }
 
+$isAdmin = ($_SESSION['user_role'] ?? '') === 'admin';
+
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     $data = json_decode(file_get_contents('php://input'), true);
     $bookingId = intval($data['booking_id']);
@@ -31,9 +33,11 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         $invNum = $prefix . '-' . date('Ymd') . '-' . rand(100, 999);
 
         // Insert Invoice
+        $approvalStatus = $isAdmin ? 'approved' : 'pending_approval';
+
         $stmtInv = $pdo->prepare("
-            INSERT INTO invoices (invoice_number, booking_id, type, sub_total, cgst, sgst, igst, total_amount, payment_status) 
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?, 'unpaid')
+            INSERT INTO invoices (invoice_number, booking_id, type, sub_total, cgst, sgst, igst, total_amount, payment_status, approval_status) 
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, 'unpaid', ?)
         ");
         
         // Simplified GST logic: Split 18% into 9/9 for Intra-state
@@ -49,10 +53,26 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             $cgst,
             $sgst,
             $igst,
-            $fin['grand_total']
+            $fin['grand_total'],
+            $approvalStatus
         ]);
 
-        echo json_encode(['success' => true, 'invoice_number' => $invNum]);
+        $invoiceId = $pdo->lastInsertId();
+
+        // Create approval request for non-admin
+        if (!$isAdmin) {
+            $stmtAR = $pdo->prepare("INSERT INTO approval_requests (entity_type, entity_id, entity_ref, requested_by, status) VALUES ('invoice', ?, ?, ?, 'pending')");
+            $stmtAR->execute([$invoiceId, $invNum, $_SESSION['user_id']]);
+        }
+
+        echo json_encode([
+            'success'         => true,
+            'invoice_number'  => $invNum,
+            'approval_status' => $approvalStatus,
+            'message'         => $isAdmin
+                ? "Invoice $invNum generated."
+                : "Invoice $invNum submitted for admin approval."
+        ]);
 
     } catch (Exception $e) {
         echo json_encode(['success' => false, 'message' => $e->getMessage()]);

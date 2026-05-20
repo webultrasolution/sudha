@@ -96,16 +96,32 @@ $activeEntity = getActiveEntity();
             
             <!-- Tools & Insights Submenu -->
             <li class="nav-item has-submenu">
-                <a href="#" class="nav-link submenu-toggle <?php echo in_array($activePage, ['reports', 'resources', 'photofactory', 'entities', 'settings']) ? 'active submenu-open' : ''; ?>">
+                <a href="#" class="nav-link submenu-toggle <?php echo in_array($activePage, ['reports', 'resources', 'photofactory', 'entities', 'settings', 'approvals']) ? 'active submenu-open' : ''; ?>">
                     <i class="fas fa-chart-line"></i> <span>Tools & Insights</span> <i class="fas fa-chevron-down toggle-icon" style="margin-left: auto; font-size: 0.8rem;"></i>
                 </a>
-                <ul class="submenu" style="<?php echo in_array($activePage, ['reports', 'resources', 'photofactory', 'entities', 'settings']) ? 'display: block;' : 'display: none;'; ?>">
+                <ul class="submenu" style="<?php echo in_array($activePage, ['reports', 'resources', 'photofactory', 'entities', 'settings', 'approvals']) ? 'display: block;' : 'display: none;'; ?>">
                     <li><a href="<?php echo BASE_URL; ?>modules/reports/reports.php" class="<?php echo $activePage == 'reports' ? 'active-sub' : ''; ?>"><i class="fas fa-chart-pie"></i> Reports</a></li>
                     <?php if (hasRole('admin')): ?>
+                        <?php
+                        // Fetch pending approval count for badge
+                        $pendingApprovalCount = 0;
+                        try {
+                            $pendingApprovalCount += $pdo->query("SELECT COUNT(*) FROM proposals WHERE approval_status = 'pending_approval'")->fetchColumn();
+                            $pendingApprovalCount += $pdo->query("SELECT COUNT(*) FROM purchase_orders WHERE approval_status = 'pending_approval'")->fetchColumn();
+                            $pendingApprovalCount += $pdo->query("SELECT COUNT(*) FROM bookings WHERE approval_status = 'pending_approval'")->fetchColumn();
+                            $pendingApprovalCount += $pdo->query("SELECT COUNT(*) FROM invoices WHERE approval_status = 'pending_approval'")->fetchColumn();
+                        } catch(Exception $e) {}
+                        ?>
+                        <li><a href="<?php echo BASE_URL; ?>modules/admin/approvals.php" class="<?php echo $activePage == 'approvals' ? 'active-sub' : ''; ?>" style="display: flex; align-items: center; justify-content: space-between;">
+                            <span><i class="fas fa-clipboard-check"></i> Approval Queue</span>
+                            <?php if ($pendingApprovalCount > 0): ?>
+                                <span style="background: #ef4444; color: #fff; font-size: 0.65rem; font-weight: 800; padding: 0.15rem 0.5rem; border-radius: 50px; min-width: 20px; text-align: center; animation: pulse 2s infinite;"><?php echo $pendingApprovalCount; ?></span>
+                            <?php endif; ?>
+                        </a></li>
                         <li><a href="<?php echo BASE_URL; ?>modules/admin/settings.php" class="<?php echo $activePage == 'settings' ? 'active-sub' : ''; ?>"><i class="fas fa-cog"></i> Admin Settings</a></li>
                         <li><a href="<?php echo BASE_URL; ?>modules/admin/entities.php" class="<?php echo $activePage == 'entities' ? 'active-sub' : ''; ?>"><i class="fas fa-layer-group"></i> Multi Content</a></li>
                     <?php endif; ?>
-                    <?php if (($_SESSION['user_role'] ?? '') === 'admin'): ?>
+                    <?php if (hasRole('admin')): ?>
                         <li><a href="<?php echo BASE_URL; ?>modules/users/index.php" class="<?php echo $activePage == 'users' ? 'active-sub' : ''; ?>"><i class="fas fa-users-cog"></i> User Management</a></li>
                         <li><a href="<?php echo BASE_URL; ?>modules/users/permissions.php" class="<?php echo $activePage == 'users' ? 'active-sub' : ''; ?>"><i class="fas fa-user-shield"></i> Role Permissions</a></li>
                         <li><a href="<?php echo BASE_URL; ?>modules/admin/activity_logs.php" class="<?php echo $activePage == 'activity_logs' ? 'active-sub' : ''; ?>"><i class="fas fa-history"></i> System Activity Logs</a></li>

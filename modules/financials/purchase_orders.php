@@ -96,13 +96,35 @@ $vendorsList = $pdo->query("SELECT id, name FROM partners WHERE type = 'vendor' 
             <tr>
                 <td><strong><?php echo $p['po_number']; ?></strong></td>
                 <td><?php echo $p['vendor_name']; ?></td>
-                <td><span class="badge-type"><?php echo ucfirst($p['type']); ?></span></td>
+                <td>
+                    <?php 
+                    $poType = strtolower(trim($p['type'] ?? 'direct'));
+                    if ($poType === 'system') {
+                        echo '<span class="badge-type" style="background: #ecfdf5; color: #065f46; border: 1px solid #a7f3d0; padding: 0.25rem 0.5rem; border-radius: 6px; font-weight: 700; font-size: 0.75rem;">System PO</span>';
+                    } else {
+                        echo '<span class="badge-type" style="background: #f8fafc; color: #334155; border: 1px solid #cbd5e1; padding: 0.25rem 0.5rem; border-radius: 6px; font-weight: 700; font-size: 0.75rem;">Direct PO</span>';
+                    }
+                    ?>
+                </td>
                 <td><?php echo date('d M Y', strtotime($p['po_date'])); ?></td>
                 <td><?php echo formatCurrency($p['total_amount']); ?></td>
                 <td>
                     <span class="status-pill status-<?php echo $p['status']; ?>">
                         <?php echo ucfirst($p['status']); ?>
                     </span>
+                    <?php if (($p['approval_status'] ?? '') === 'pending_approval'): ?>
+                        <div style="margin-top: 4px;">
+                            <span style="background: #fff7ed; color: #c2410c; border: 1px solid #fed7aa; padding: 0.15rem 0.5rem; border-radius: 50px; font-size: 0.6rem; font-weight: 800; display: inline-flex; align-items: center; gap: 4px; animation: pulse-approval 2s infinite;">
+                                <i class="fas fa-clock"></i> Awaiting Approval
+                            </span>
+                        </div>
+                    <?php elseif (($p['approval_status'] ?? '') === 'rejected'): ?>
+                        <div style="margin-top: 4px;">
+                            <span style="background: #fee2e2; color: #b91c1c; border: 1px solid #fca5a5; padding: 0.15rem 0.5rem; border-radius: 50px; font-size: 0.6rem; font-weight: 800; display: inline-flex; align-items: center; gap: 4px;" title="<?php echo htmlspecialchars($p['rejection_reason'] ?? ''); ?>">
+                                <i class="fas fa-times-circle"></i> Rejected
+                            </span>
+                        </div>
+                    <?php endif; ?>
                 </td>
                 <td>
                     <div style="display: flex; flex-direction: column; gap: 8px;">
@@ -156,7 +178,11 @@ $vendorsList = $pdo->query("SELECT id, name FROM partners WHERE type = 'vendor' 
                 <td><?php echo $p['creator']; ?></td>
                 <td>
                     <a href="po_view.php?id=<?php echo $p['id']; ?>" class="btn-icon" title="View"><i class="fas fa-eye"></i></a>
-                    <a href="../operations/generate_po.php?po_id=<?php echo $p['id']; ?>" target="_blank" class="btn-icon" style="color: var(--primary);" title="Download PDF"><i class="fas fa-file-pdf"></i></a>
+                    <?php if (($p['approval_status'] ?? '') === 'approved'): ?>
+                        <a href="../operations/generate_po.php?po_id=<?php echo $p['id']; ?>" target="_blank" class="btn-icon" style="color: var(--primary);" title="Download PDF"><i class="fas fa-file-pdf"></i></a>
+                    <?php else: ?>
+                        <span class="btn-icon" title="Locked (Awaiting Approval)" style="color: #cbd5e1; cursor: not-allowed;"><i class="fas fa-lock"></i></span>
+                    <?php endif; ?>
                 </td>
             </tr>
             <?php endforeach; ?>
@@ -174,7 +200,10 @@ $vendorsList = $pdo->query("SELECT id, name FROM partners WHERE type = 'vendor' 
 .status-pill { padding: 0.25rem 0.625rem; border-radius: 9999px; font-size: 0.75rem; font-weight: 500; }
 .status-draft { background: #f1f5f9; color: #475569; }
 .status-approved { background: #e0f2fe; color: #0369a1; }
+.status-pending { background: #fef9c3; color: #854d0e; }
 .status-paid { background: #dcfce7; color: #166534; }
+.status-cancelled { background: #fee2e2; color: #991b1b; }
+@keyframes pulse-approval { 0%, 100% { opacity: 1; } 50% { opacity: 0.5; } }
 .btn-icon { background: none; border: none; cursor: pointer; color: var(--secondary); font-size: 1rem; padding: 0.25rem; margin-right: 4px; }
 .btn-icon:hover { color: var(--primary); }
 

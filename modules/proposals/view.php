@@ -77,8 +77,14 @@ $taMarkupPct = ($taCost > 0) ? ($taMarkup / $taCost) * 100 : 0;
             <span style="background: #f1f5f9; color: #475569; padding: 0.25rem 0.75rem; border-radius: 8px; font-size: 0.75rem; font-weight: 700;">
                 <?php echo $p['proposal_number']; ?>
             </span>
+            <?php 
+                $displayStatus = $p['status'];
+                if (($p['approval_status'] ?? '') === 'approved' && $p['status'] === 'sent') {
+                    $displayStatus = 'approved';
+                }
+            ?>
             <span style="background: #e0e7ff; color: #4338ca; padding: 0.25rem 0.75rem; border-radius: 50px; font-size: 0.75rem; font-weight: 800; text-transform: uppercase;">
-                <?php echo strtoupper($p['status']); ?>
+                <?php echo strtoupper($displayStatus); ?>
             </span>
         </div>
         <p style="color: #64748b; margin: 0; font-size: 0.95rem; font-weight: 500;">
@@ -86,23 +92,29 @@ $taMarkupPct = ($taCost > 0) ? ($taMarkup / $taCost) * 100 : 0;
         </p>
     </div>
     <div style="display: flex; gap: 1rem; align-items: center;">
-        <div class="dropdown">
-            <button class="btn" style="background: white; border: 1px solid #e2e8f0; color: #475569; padding: 0.75rem 1.25rem; border-radius: 10px; font-weight: 700; font-size: 0.9rem; cursor: pointer; display: flex; align-items: center; gap: 0.5rem; transition: all 0.2s; box-shadow: 0 2px 4px rgba(0,0,0,0.02);" onmouseover="this.style.borderColor='#cbd5e1'; this.style.boxShadow='0 4px 6px -1px rgba(0,0,0,0.05)';" onmouseout="this.style.borderColor='#e2e8f0'; this.style.boxShadow='0 2px 4px rgba(0,0,0,0.02)';">
-                <i class="fas fa-download"></i> Export <i class="fas fa-caret-down" style="margin-left: 0.25rem; opacity: 0.7;"></i>
-            </button>
-            <div class="dropdown-content">
-                <div style="font-size: 0.6rem; font-weight: 800; color: #94a3b8; padding: 0.5rem 0.8rem; text-transform: uppercase; letter-spacing: 0.05em;">Client Documents</div>
-                <a href="export_pdf.php?id=<?php echo $id; ?>" target="_blank"><i class="fas fa-file-pdf" style="color: #ef4444;"></i> Visual Media Plan (PDF)</a>
-                <a href="export_excel.php?id=<?php echo $id; ?>"><i class="fas fa-file-excel" style="color: #10b981;"></i> Excel Rate Sheet</a>
-                <a href="export_ppt.php?id=<?php echo $id; ?>" target="_blank"><i class="fas fa-file-powerpoint" style="color: #f97316;"></i> PPT Deck / Presentation</a>
-                <div style="height: 1px; background: #f1f5f9; margin: 0.25rem 0;"></div>
-                <div style="font-size: 0.6rem; font-weight: 800; color: #94a3b8; padding: 0.5rem 0.8rem; text-transform: uppercase; letter-spacing: 0.05em;">Visuals</div>
-                <a href="export_ppt.php?id=<?php echo $id; ?>&mode=view" target="_blank"><i class="fas fa-desktop" style="color: #6366f1;"></i> View Presentation</a>
-                <a href="javascript:void(0)" onclick="copyPublicLink('<?php echo BASE_URL; ?>modules/proposals/export_ppt.php?id=<?php echo $id; ?>')"><i class="fas fa-link" style="color: #6366f1;"></i> Copy Public Link</a>
-                <a href="download_photos.php?id=<?php echo $id; ?>"><i class="fas fa-images" style="color: #8b5cf6;"></i> Download Photos</a>
+        <?php if (($p['approval_status'] ?? '') === 'approved'): ?>
+            <div class="dropdown">
+                <button class="btn" style="background: white; border: 1px solid #e2e8f0; color: #475569; padding: 0.75rem 1.25rem; border-radius: 10px; font-weight: 700; font-size: 0.9rem; cursor: pointer; display: flex; align-items: center; gap: 0.5rem; transition: all 0.2s; box-shadow: 0 2px 4px rgba(0,0,0,0.02);" onmouseover="this.style.borderColor='#cbd5e1'; this.style.boxShadow='0 4px 6px -1px rgba(0,0,0,0.05)';" onmouseout="this.style.borderColor='#e2e8f0'; this.style.boxShadow='0 2px 4px rgba(0,0,0,0.02)';">
+                    <i class="fas fa-download"></i> Export <i class="fas fa-caret-down" style="margin-left: 0.25rem; opacity: 0.7;"></i>
+                </button>
+                <div class="dropdown-content">
+                    <div style="font-size: 0.6rem; font-weight: 800; color: #94a3b8; padding: 0.5rem 0.8rem; text-transform: uppercase; letter-spacing: 0.05em;">Client Documents</div>
+                    <a href="export_pdf.php?id=<?php echo $id; ?>" target="_blank"><i class="fas fa-file-pdf" style="color: #ef4444;"></i> Visual Media Plan (PDF)</a>
+                    <a href="export_excel.php?id=<?php echo $id; ?>"><i class="fas fa-file-excel" style="color: #10b981;"></i> Excel Rate Sheet</a>
+                    <a href="export_ppt.php?id=<?php echo $id; ?>" target="_blank"><i class="fas fa-file-powerpoint" style="color: #f97316;"></i> PPT Deck / Presentation</a>
+                    <div style="height: 1px; background: #f1f5f9; margin: 0.25rem 0;"></div>
+                    <div style="font-size: 0.6rem; font-weight: 800; color: #94a3b8; padding: 0.5rem 0.8rem; text-transform: uppercase; letter-spacing: 0.05em;">Visuals</div>
+                    <a href="export_ppt.php?id=<?php echo $id; ?>&mode=view" target="_blank"><i class="fas fa-desktop" style="color: #6366f1;"></i> View Presentation</a>
+                    <a href="javascript:void(0)" onclick="copyPublicLink('<?php echo BASE_URL; ?>modules/proposals/export_ppt.php?id=<?php echo $id; ?>')"><i class="fas fa-link" style="color: #6366f1;"></i> Copy Public Link</a>
+                    <a href="download_photos.php?id=<?php echo $id; ?>"><i class="fas fa-images" style="color: #8b5cf6;"></i> Download Photos</a>
+                </div>
             </div>
-        </div>
-        <?php if ($p['status'] != 'confirmed' && canAdd('bookings')): ?>
+        <?php else: ?>
+            <button class="btn" style="background: #f8fafc; border: 1px solid #e2e8f0; color: #94a3b8; padding: 0.75rem 1.25rem; border-radius: 10px; font-weight: 700; font-size: 0.9rem; cursor: not-allowed; display: flex; align-items: center; gap: 0.5rem;" title="Documents are locked until admin approves this proposal.">
+                <i class="fas fa-lock"></i> Export Locked
+            </button>
+        <?php endif; ?>
+        <?php if ($p['status'] != 'confirmed' && canAdd('bookings') && ($p['approval_status'] ?? '') === 'approved'): ?>
             <button class="btn" onclick="confirmProposal(<?php echo $id; ?>)" style="background: linear-gradient(135deg, #10b981 0%, #059669 100%); border: none; color: white; padding: 0.75rem 1.5rem; border-radius: 10px; font-weight: 800; font-size: 0.9rem; cursor: pointer; display: flex; align-items: center; gap: 0.5rem; transition: all 0.2s; box-shadow: 0 4px 6px -1px rgba(16, 185, 129, 0.3);" onmouseover="this.style.transform='translateY(-1px)'; this.style.boxShadow='0 10px 15px -3px rgba(16, 185, 129, 0.4)';" onmouseout="this.style.transform='none'; this.style.boxShadow='0 4px 6px -1px rgba(16, 185, 129, 0.3)';">
                 <i class="fas fa-check-double"></i> Convert to Booking
             </button>

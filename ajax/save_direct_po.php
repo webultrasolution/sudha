@@ -6,6 +6,8 @@ if (session_status() === PHP_SESSION_NONE) {
     session_start();
 }
 
+$isAdmin = ($_SESSION['user_role'] ?? '') === 'admin';
+
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     $data = json_decode(file_get_contents('php://input'), true);
     
@@ -72,6 +74,10 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         $lastPoId = 0;
         $poCount = 0;
 
+        // Admin approves instantly; non-admin goes to queue
+        $poStatus       = $isAdmin ? 'approved' : 'pending';
+        $approvalStatus = $isAdmin ? 'approved' : 'pending_approval';
+
         // 2. Create PO for Each Site Vendor
         foreach ($vendorSites as $vid => $vItems) {
             $vSubtotal = 0;
@@ -97,13 +103,19 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             $poNum = 'PO-' . date('Ymd') . '-' . rand(100, 999);
             
             $stmtPO = $pdo->prepare("
-                INSERT INTO purchase_orders (vendor_id, customer_id, employee_id, campaign_name, brand_name, external_po, po_number, po_date, po_amount, cgst_amount, sgst_amount, igst_amount, total_amount, status, remarks) 
-                VALUES (?, ?, ?, ?, ?, ?, ?, CURDATE(), ?, ?, ?, ?, ?, 'approved', ?)
+                INSERT INTO purchase_orders (vendor_id, customer_id, employee_id, campaign_name, brand_name, external_po, po_number, po_date, po_amount, cgst_amount, sgst_amount, igst_amount, total_amount, status, approval_status, remarks) 
+                VALUES (?, ?, ?, ?, ?, ?, ?, CURDATE(), ?, ?, ?, ?, ?, ?, ?, ?)
             ");
-            $stmtPO->execute([$vid, $client_id, $_SESSION['user_id'] ?? 0, $campaign_name, $brand_name, $external_po, $poNum, $vSubtotal, $cgst, $sgst, $igst, $vGrandTotal, $remarks]);
+            $stmtPO->execute([$vid, $client_id, $_SESSION['user_id'] ?? 0, $campaign_name, $brand_name, $external_po, $poNum, $vSubtotal, $cgst, $sgst, $igst, $vGrandTotal, $poStatus, $approvalStatus, $remarks]);
             $poId = $pdo->lastInsertId();
             $lastPoId = $poId;
             $poCount++;
+
+            // Create approval request for non-admin
+            if (!$isAdmin) {
+                $stmtAR = $pdo->prepare("INSERT INTO approval_requests (entity_type, entity_id, entity_ref, requested_by, status) VALUES ('purchase_order', ?, ?, ?, 'pending')");
+                $stmtAR->execute([$poId, $poNum, $_SESSION['user_id'] ?? 0]);
+            }
 
             $stmtPOItem = $pdo->prepare("INSERT INTO po_items (po_id, site_id, start_date, end_date, days, monthly_rate, cost) VALUES (?, ?, ?, ?, ?, ?, ?)");
             foreach ($vItems as $item) {
@@ -135,13 +147,19 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             $poNum = 'PRT-' . date('Ymd') . '-' . rand(100, 999);
             
             $stmtPO = $pdo->prepare("
-                INSERT INTO purchase_orders (vendor_id, customer_id, employee_id, campaign_name, brand_name, external_po, po_number, po_date, po_amount, cgst_amount, sgst_amount, igst_amount, total_amount, status, remarks, type) 
-                VALUES (?, ?, ?, ?, ?, ?, ?, CURDATE(), ?, ?, ?, ?, ?, 'approved', ?, 'printing')
+                INSERT INTO purchase_orders (vendor_id, customer_id, employee_id, campaign_name, brand_name, external_po, po_number, po_date, po_amount, cgst_amount, sgst_amount, igst_amount, total_amount, status, approval_status, remarks, type) 
+                VALUES (?, ?, ?, ?, ?, ?, ?, CURDATE(), ?, ?, ?, ?, ?, ?, ?, ?, 'printing')
             ");
-            $stmtPO->execute([$pvid, $client_id, $_SESSION['user_id'] ?? 0, $campaign_name, $brand_name, $external_po, $poNum, $pSubtotal, $cgst, $sgst, $igst, $pGrandTotal, "Printing PO: " . $remarks]);
+            $stmtPO->execute([$pvid, $client_id, $_SESSION['user_id'] ?? 0, $campaign_name, $brand_name, $external_po, $poNum, $pSubtotal, $cgst, $sgst, $igst, $pGrandTotal, $poStatus, $approvalStatus, "Printing PO: " . $remarks]);
             $poId = $pdo->lastInsertId();
             $lastPoId = $poId;
             $poCount++;
+
+            // Create approval request for non-admin
+            if (!$isAdmin) {
+                $stmtAR = $pdo->prepare("INSERT INTO approval_requests (entity_type, entity_id, entity_ref, requested_by, status) VALUES ('purchase_order', ?, ?, ?, 'pending')");
+                $stmtAR->execute([$poId, $poNum, $_SESSION['user_id'] ?? 0]);
+            }
 
             $stmtPOItem = $pdo->prepare("INSERT INTO po_items (po_id, site_id, start_date, end_date, days, monthly_rate, cost, description) VALUES (?, ?, ?, ?, ?, ?, ?, ?)");
             foreach ($pItems as $item) {
@@ -154,12 +172,21 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         $overallTax = $bookingSubtotal * 0.18;
         $overallGrand = $bookingSubtotal + $overallTax;
 
+        $bookingStatus         = $isAdmin ? 'active' : 'pending';
+        $bookingApprovalStatus = $isAdmin ? 'approved' : 'pending_approval';
+
         $stmtBooking = $pdo->prepare("
-            INSERT INTO bookings (client_id, campaign_name, brand_name, external_po, contact_person, billing_gstin, tax_type, start_date, end_date, total_amount, tax_amount, grand_total, printing_cost, status) 
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            INSERT INTO bookings (client_id, campaign_name, brand_name, external_po, contact_person, billing_gstin, tax_type, start_date, end_date, total_amount, tax_amount, grand_total, printing_cost, status, approval_status) 
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
         ");
-        $stmtBooking->execute([$client_id, $campaign_name, $brand_name, $external_po, $contact_person, $billing_gstin, $tax_type, $start_date, $end_date, $bookingSubtotal, $overallTax, $overallGrand, $overallPrinting, $status]);
+        $stmtBooking->execute([$client_id, $campaign_name, $brand_name, $external_po, $contact_person, $billing_gstin, $tax_type, $start_date, $end_date, $bookingSubtotal, $overallTax, $overallGrand, $overallPrinting, $bookingStatus, $bookingApprovalStatus]);
         $bookingId = $pdo->lastInsertId();
+
+        // Create approval request for booking (non-admin)
+        if (!$isAdmin) {
+            $stmtAR = $pdo->prepare("INSERT INTO approval_requests (entity_type, entity_id, entity_ref, requested_by, status) VALUES ('booking', ?, ?, ?, 'pending')");
+            $stmtAR->execute([$bookingId, "Booking #$bookingId", $_SESSION['user_id'] ?? 0]);
+        }
 
         // 4. Create Operational Tasks & Booking Items
         $stmtOps = $pdo->prepare("INSERT INTO operations (booking_id, site_id, status) VALUES (?, ?, 'pending')");
@@ -190,20 +217,12 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         $pdo->commit();
         
         echo json_encode([
-            'success' => true, 
-            'po_id' => ($poCount === 1) ? $lastPoId : null,
-            'message' => "$poCount Purchase Orders generated successfully."
-        ]);
-
-        logActivity('generated a direct booking and purchase order(s)', 'bookings', $bookingId, "Booking ID: $bookingId, Multiple POs generated.");
-
-        $pdo->commit();
-        
-        // If only one PO was generated, return its ID for opening
-        echo json_encode([
-            'success' => true, 
-            'po_id' => (count($vendorSites) === 1) ? $lastPoId : null,
-            'message' => count($vendorSites) . " Purchase Orders generated successfully."
+            'success'         => true, 
+            'po_id'           => ($poCount === 1) ? $lastPoId : null,
+            'approval_status' => $approvalStatus,
+            'message'         => $isAdmin
+                ? "$poCount Purchase Orders generated successfully."
+                : "$poCount Purchase Orders submitted for admin approval."
         ]);
 
     } catch (Exception $e) {

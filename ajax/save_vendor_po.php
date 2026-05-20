@@ -6,6 +6,8 @@ if (session_status() === PHP_SESSION_NONE) {
     session_start();
 }
 
+$isAdmin = ($_SESSION['user_role'] ?? '') === 'admin';
+
 header('Content-Type: application/json');
 
 if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
@@ -59,11 +61,15 @@ try {
     // Generate PO Number
     $po_number = 'VPO-' . date('Ymd') . '-' . rand(100, 999);
 
+    // Admin approves instantly; non-admin goes to queue
+    $poStatus       = $isAdmin ? 'approved' : 'pending';
+    $approvalStatus = $isAdmin ? 'approved' : 'pending_approval';
+
     // Insert PO
     $stmtPO = $pdo->prepare("
         INSERT INTO purchase_orders 
-        (vendor_id, employee_id, campaign_name, po_number, po_date, po_amount, cgst_amount, sgst_amount, igst_amount, total_amount, status, remarks) 
-        VALUES (?, ?, ?, ?, CURDATE(), ?, ?, ?, ?, ?, 'approved', ?)
+        (vendor_id, employee_id, campaign_name, po_number, po_date, po_amount, cgst_amount, sgst_amount, igst_amount, total_amount, status, approval_status, remarks) 
+        VALUES (?, ?, ?, ?, CURDATE(), ?, ?, ?, ?, ?, ?, ?, ?)
     ");
     $stmtPO->execute([
         $vendor_id,
@@ -75,9 +81,17 @@ try {
         $sgst,
         $igst,
         $grand_total,
+        $poStatus,
+        $approvalStatus,
         $remarks
     ]);
     $po_id = $pdo->lastInsertId();
+
+    // Create approval request for non-admin
+    if (!$isAdmin) {
+        $stmtAR = $pdo->prepare("INSERT INTO approval_requests (entity_type, entity_id, entity_ref, requested_by, status) VALUES ('purchase_order', ?, ?, ?, 'pending')");
+        $stmtAR->execute([$po_id, $po_number, $_SESSION['user_id'] ?? 0]);
+    }
 
     // Insert PO Items
     $stmtItem = $pdo->prepare("
@@ -108,10 +122,13 @@ try {
     $pdo->commit();
 
     echo json_encode([
-        'success' => true,
-        'po_id' => $po_id,
-        'po_number' => $po_number,
-        'message' => "Purchase Order $po_number generated with " . count($data['sites']) . " site(s)."
+        'success'         => true,
+        'po_id'           => $po_id,
+        'po_number'       => $po_number,
+        'approval_status' => $approvalStatus,
+        'message'         => $isAdmin
+            ? "Purchase Order $po_number generated with " . count($data['sites']) . " site(s)."
+            : "Purchase Order $po_number submitted for admin approval."
     ]);
 
 } catch (Exception $e) {
