@@ -101,12 +101,6 @@ $vendors = $pdo->query("SELECT id, name FROM partners WHERE type = 'vendor' AND 
             <i class="fas fa-arrow-left"></i> Back
         </a>
         
-        <?php if (!$invoiceFinalized && canEdit('bookings')): ?>
-        <button class="btn" onclick="openAddSiteModal()" style="background: var(--primary); color: white; padding: 0.75rem 1.25rem; border-radius: 10px; font-weight: 800; font-size: 0.9rem; cursor: pointer; border: none; display: flex; align-items: center; gap: 0.5rem; box-shadow: 0 4px 15px rgba(13,148,136,0.3);">
-            <i class="fas fa-plus"></i> Add Sites
-        </button>
-        <?php endif; ?>
-        
         <?php
         // Check if invoice already exists
         $stmtInv = $pdo->prepare("SELECT id, approval_status FROM invoices WHERE booking_id = ? AND type = 'tax' LIMIT 1");
@@ -206,8 +200,20 @@ $stmtCheckPO = $pdo->prepare("SELECT id, approval_status FROM purchase_orders WH
 
 <!-- Detailed Site Table -->
 <div class="card" style="padding: 0; border-radius: 16px; overflow: hidden;">
-    <div style="padding: 1.5rem; border-bottom: 1px solid #f1f5f9;">
-        <h3 style="font-size: 1.1rem; margin: 0; color: #0f172a; font-weight: 800;">Booked Assets & Operations</h3>
+    <div style="padding: 1.5rem; display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid #f1f5f9;">
+        <div>
+            <h3 style="font-size: 1.1rem; margin: 0; color: #0f172a; font-weight: 800;"><i class="fas fa-list"></i> Booked Assets & Operations</h3>
+            <p style="margin: 0; font-size: 0.8rem; color: #64748b; margin-top: 0.25rem;">Review and adjust individual assets for this booking.</p>
+        </div>
+        <div style="display: flex; gap: 1rem;">
+            <div style="position: relative;">
+                <i class="fas fa-search" style="position: absolute; left: 1rem; top: 50%; transform: translateY(-50%); color: #94a3b8; font-size: 0.85rem;"></i>
+                <input type="text" id="tableSearch" placeholder="Search in booking..." class="p-input" style="width: 250px; padding-left: 2.5rem; height: 38px; border-radius: 8px;">
+            </div>
+            <?php if (!$invoiceFinalized && canEdit('bookings')): ?>
+            <button class="btn btn-secondary" onclick="openAddSiteModal()" style="height: 38px; border-radius: 8px; margin-right: 0.5rem; background: #f1f5f9; color: #475569; border: 1px solid #e2e8f0;"><i class="fas fa-plus-circle text-primary"></i> Add Sites</button>
+            <?php endif; ?>
+        </div>
     </div>
     <table class="table">
         <thead style="background: #f8fafc;">
@@ -815,6 +821,8 @@ function saveAndGeneratePO(booking_id, vendor_id) {
             });
         }
     });
+}
+
 // --- Add Site Modal JS ---
 let modalCurrentPage = 1;
 const modalPageSize = 50;
