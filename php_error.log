@@ -15,3 +15,8 @@
 [24-May-2026 01:03:23 Asia/Kolkata] PHP Warning:  Undefined variable $isAdmin in D:\xampp\htdocs\easy-outdoor-crm\modules\operations\view_booking.php on line 104
 [24-May-2026 01:03:30 Asia/Kolkata] PHP Warning:  Undefined variable $isAdmin in D:\xampp\htdocs\easy-outdoor-crm\modules\operations\view_booking.php on line 104
 [24-May-2026 01:04:10 Asia/Kolkata] PHP Warning:  Undefined variable $isAdmin in D:\xampp\htdocs\easy-outdoor-crm\modules\operations\view_booking.php on line 104
+[23-May-2026 21:45:12 Europe/Berlin] PHP Fatal error:  Uncaught PDOException: SQLSTATE[42S02]: Base table or view not found: 1146 Table 'easy_outdoor_crm.partner_gst_records' doesn't exist in D:\xampp\htdocs\easy-outdoor-crm\col_check.php:3
+Stack trace:
+#0 D:\xampp\htdocs\easy-outdoor-crm\col_check.php(3): PDO->query('SHOW COLUMNS FR...')
+#1 {main}
+  thrown in D:\xampp\htdocs\easy-outdoor-crm\col_check.php on line 3

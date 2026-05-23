@@ -10,7 +10,7 @@ $id = isset($_GET['id']) ? intval($_GET['id']) : 0;
 
 // Fetch Invoice
 $stmt = $pdo->prepare("
-    SELECT i.*, b.id as booking_id, c.name as client_name, c.email as client_email, c.phone as client_phone, c.address as client_address, c.gstin as client_gstin, p.proposal_number, p.start_date, p.end_date
+    SELECT i.*, b.id as booking_id, b.billing_gstin, c.name as client_name, c.email as client_email, c.phone as client_phone, c.address as client_address, c.gstin as client_gstin, c.additional_gst, p.proposal_number, p.start_date, p.end_date
     FROM invoices i
     JOIN bookings b ON i.booking_id = b.id
     JOIN proposals p ON b.proposal_id = p.id
@@ -24,6 +24,20 @@ if (!$invoice) {
     echo "<div class='card'>Invoice not found.</div>";
     include_once __DIR__ . '/../../includes/footer.php';
     exit;
+}
+
+// Override with selected Billing GSTIN details if applicable
+if (!empty($invoice['billing_gstin']) && $invoice['billing_gstin'] !== $invoice['client_gstin'] && !empty($invoice['additional_gst'])) {
+    $addGsts = json_decode($invoice['additional_gst'], true);
+    if (is_array($addGsts)) {
+        foreach ($addGsts as $g) {
+            if ($g['gstin'] === $invoice['billing_gstin']) {
+                $invoice['client_gstin'] = $g['gstin'];
+                $invoice['client_address'] = $g['address'];
+                break;
+            }
+        }
+    }
 }
 
 // Fetch Items (from the linked proposal)

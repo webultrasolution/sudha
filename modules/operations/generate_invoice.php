@@ -25,7 +25,7 @@ if ($invoiceData && ($invoiceData['approval_status'] ?? '') === 'pending_approva
 
 // Fetch Booking & Client Details
 $stmt = $pdo->prepare("
-    SELECT b.*, c.name as client_name, c.address as client_address, c.gstin as client_gstin, c.state as client_state, c.contact_person, c.phone, c.pan as client_pan
+    SELECT b.*, c.name as client_name, c.address as client_address, c.gstin as client_gstin, c.state as client_state, c.additional_gst, c.contact_person, c.phone, c.pan as client_pan
     FROM bookings b
     JOIN partners c ON b.client_id = c.id
     WHERE b.id = ?
@@ -35,6 +35,21 @@ $b = $stmt->fetch();
 
 if (!$b) {
     die("Booking not found.");
+}
+
+// Override with selected Billing GSTIN details if applicable
+if (!empty($b['billing_gstin']) && $b['billing_gstin'] !== $b['client_gstin'] && !empty($b['additional_gst'])) {
+    $addGsts = json_decode($b['additional_gst'], true);
+    if (is_array($addGsts)) {
+        foreach ($addGsts as $g) {
+            if ($g['gstin'] === $b['billing_gstin']) {
+                $b['client_gstin'] = $g['gstin'];
+                $b['client_address'] = $g['address'];
+                $b['client_state'] = $g['state'];
+                break;
+            }
+        }
+    }
 }
 
 // Fetch Items
