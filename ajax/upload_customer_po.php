@@ -14,6 +14,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     $po_no = clean($_POST['customer_po_no'] ?? '');
     $po_date = clean($_POST['customer_po_date'] ?? '');
     $email_date = clean($_POST['email_date'] ?? '');
+    $billing_gstin = clean($_POST['billing_gstin'] ?? '');
     
     if (!$booking_id) {
         echo json_encode(['success' => false, 'message' => 'Invalid Booking ID']);
@@ -37,9 +38,16 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         }
     }
 
-    $sql = "UPDATE bookings SET confirmation_type = ?, customer_po_no = ?, customer_po_date = ?, email_date = ?" . ($file_path ? ", customer_po_file = ?" : "") . " WHERE id = ?";
+    $sql = "UPDATE bookings SET confirmation_type = ?, customer_po_no = ?, customer_po_date = ?, email_date = ?" . ($file_path ? ", customer_po_file = ?" : "");
     $params = [$type, $po_no ?: null, $po_date ?: null, $email_date ?: null];
     if ($file_path) $params[] = $file_path;
+    
+    if (!empty($billing_gstin)) {
+        $sql .= ", billing_gstin = ?";
+        $params[] = $billing_gstin;
+    }
+    
+    $sql .= " WHERE id = ?";
     $params[] = $booking_id;
 
     $stmt = $pdo->prepare($sql);

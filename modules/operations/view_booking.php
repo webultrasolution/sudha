@@ -110,11 +110,42 @@ $vendors = $pdo->query("SELECT id, name FROM partners WHERE type = 'vendor' AND 
                 </button>
             <?php endif; ?>
         </div>
-        <p style="color: #64748b; margin: 0; font-size: 0.95rem; font-weight: 500;">
-            <strong style="color: #334155;"><?php echo $b['client_name']; ?></strong> • Tenure:
+        <p style="color: #64748b; margin: 0 0 0.5rem 0; font-size: 0.95rem; font-weight: 500;">
+            <strong style="color: #334155;"><?php echo htmlspecialchars($b['client_name']); ?></strong> • Tenure:
             <?php echo date('d M', strtotime($b['start_date'])); ?> to
             <?php echo date('d M Y', strtotime($b['end_date'])); ?>
         </p>
+        
+        <?php
+        // Parse GSTs for Group Companies
+        $gsts = [];
+        if (($b['business_type'] ?? '') === 'Group of Companies') {
+            if (!empty($b['primary_gstin'])) {
+                $gsts[] = ['gstin' => $b['primary_gstin'], 'state' => 'Primary'];
+            }
+            if (!empty($b['additional_gst'])) {
+                $add = json_decode($b['additional_gst'], true);
+                if (is_array($add)) {
+                    foreach ($add as $g) {
+                        $gsts[] = ['gstin' => $g['gstin'], 'state' => $g['state']];
+                    }
+                }
+            }
+        }
+        if (!empty($gsts)): ?>
+        <div style="display: flex; align-items: center; gap: 0.5rem;">
+            <span style="font-size: 0.85rem; color: #475569; background: #f1f5f9; padding: 0.2rem 0.6rem; border-radius: 4px; border: 1px solid #e2e8f0;">
+                <i class="fas fa-building" style="color: #64748b; margin-right: 4px;"></i> 
+                Billing GSTIN: <strong><?php echo htmlspecialchars($b['billing_gstin'] ?: $b['primary_gstin']); ?></strong>
+            </span>
+            <?php if ((!$invoiceFinalized || $isAdmin) && canEdit('bookings')): ?>
+                <button onclick="editBillingGstin()" class="btn"
+                    style="padding: 0.2rem 0.5rem; font-size: 0.7rem; border-radius: 4px; background: #e2e8f0; color: #475569; border: none; cursor: pointer; display: flex; align-items: center; gap: 0.3rem;">
+                    <i class="fas fa-edit"></i> Edit GSTIN
+                </button>
+            <?php endif; ?>
+        </div>
+        <?php endif; ?>
     </div>
     <div style="display: flex; gap: 1rem; align-items: center;">
         <a href="bookings.php" class="btn"
@@ -922,6 +953,44 @@ $stmtCheckPO = $pdo->prepare("SELECT id, approval_status FROM purchase_orders WH
             }
         });
     }
+
+    <?php if (!empty($gsts)): ?>
+    function editBillingGstin() {
+        Swal.fire({
+            title: 'Select Billing GSTIN / State',
+            html: `
+                <select id="edit_billing_gstin" class="swal2-input" style="width: 100%; box-sizing: border-box;">
+                    <?php foreach($gsts as $g): ?>
+                        <option value="<?php echo htmlspecialchars($g['gstin']); ?>" <?php echo (($b['billing_gstin'] ?? '') === $g['gstin']) ? 'selected' : ''; ?>>
+                            <?php echo htmlspecialchars($g['gstin'] . ' - ' . $g['state']); ?>
+                        </option>
+                    <?php endforeach; ?>
+                </select>
+            `,
+            showCancelButton: true,
+            confirmButtonText: 'Save',
+            preConfirm: () => {
+                return document.getElementById('edit_billing_gstin').value;
+            }
+        }).then((result) => {
+            if (result.isConfirmed) {
+                const formData = new FormData();
+                formData.append('booking_id', <?php echo $id; ?>);
+                formData.append('billing_gstin', result.value);
+                fetch('../../ajax/update_booking_gstin.php', {
+                    method: 'POST',
+                    body: formData
+                }).then(r => r.json()).then(res => {
+                    if (res.success) {
+                        location.reload();
+                    } else {
+                        Swal.fire('Error', res.message || 'Failed to update GSTIN', 'error');
+                    }
+                });
+            }
+        });
+    }
+    <?php endif; ?>
     function updateBookingItemPeriod(itemId, field, value) {
         const formData = new FormData();
         formData.append('id', itemId);
@@ -983,6 +1052,33 @@ $stmtCheckPO = $pdo->prepare("SELECT id, approval_status FROM purchase_orders WH
             title: 'Campaign Confirmation',
             html: `
             <div style="text-align: left;">
+                <?php
+                // Parse GSTs for Group Companies
+                $gsts = [];
+                if (($b['business_type'] ?? '') === 'Group of Companies') {
+                    if (!empty($b['primary_gstin'])) {
+                        $gsts[] = ['gstin' => $b['primary_gstin'], 'state' => 'Primary'];
+                    }
+                    if (!empty($b['additional_gst'])) {
+                        $add = json_decode($b['additional_gst'], true);
+                        if (is_array($add)) {
+                            foreach ($add as $g) {
+                                $gsts[] = ['gstin' => $g['gstin'], 'state' => $g['state']];
+                            }
+                        }
+                    }
+                }
+                if (!empty($gsts)): ?>
+                    <label style="display:block; font-size: 0.75rem; font-weight: 700; color: #64748b; margin-bottom: 5px;">BILLING GSTIN / STATE</label>
+                    <select id="invoice_billing_gstin" class="swal2-input" style="margin: 0 0 1rem 0; width: 100%; box-sizing: border-box;">
+                        <?php foreach($gsts as $g): ?>
+                            <option value="<?php echo htmlspecialchars($g['gstin']); ?>" <?php echo (($b['billing_gstin'] ?? '') === $g['gstin']) ? 'selected' : ''; ?>>
+                                <?php echo htmlspecialchars($g['gstin'] . ' - ' . $g['state']); ?>
+                            </option>
+                        <?php endforeach; ?>
+                    </select>
+                <?php endif; ?>
+
                 <label style="display:block; font-size: 0.75rem; font-weight: 700; color: #64748b; margin-bottom: 5px;">CONFIRMATION TYPE</label>
                 <select id="confirmation_type" class="swal2-input" style="margin: 0 0 1rem 0; width: 100%; box-sizing: border-box;" onchange="toggleConfFields()">
                     <option value="po">Customer Purchase Order (PO)</option>
@@ -1035,6 +1131,11 @@ $stmtCheckPO = $pdo->prepare("SELECT id, approval_status FROM purchase_orders WH
                 formData.append('customer_po_date', po_date);
                 formData.append('email_date', email_date);
                 formData.append('customer_po_file', po_file);
+                
+                const billingGstinSelect = document.getElementById('invoice_billing_gstin');
+                if (billingGstinSelect) {
+                    formData.append('billing_gstin', billingGstinSelect.value);
+                }
 
                 return fetch('../../ajax/upload_customer_po.php', {
                     method: 'POST',
