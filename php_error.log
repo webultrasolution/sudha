@@ -11,3 +11,7 @@
 [20-May-2026 03:28:42 Asia/Kolkata] PHP Deprecated:  Implicit conversion from float 14.000000000000002 to int loses precision in D:\xampp\htdocs\easy-outdoor-crm\includes\functions.php on line 256
 [20-May-2026 22:01:50 Europe/Berlin] PHP Warning:  Undefined array key "rate_per_sqft" in D:\xampp\htdocs\easy-outdoor-crm\modules\partners\client_printing_rates.php on line 13
 [21-May-2026 02:37:11 Asia/Kolkata] PHP Warning:  Undefined variable $company_signature in D:\xampp\htdocs\easy-outdoor-crm\modules\operations\generate_po.php on line 573
+[24-May-2026 01:02:29 Asia/Kolkata] PHP Warning:  Undefined variable $isAdmin in D:\xampp\htdocs\easy-outdoor-crm\modules\operations\view_booking.php on line 104
+[24-May-2026 01:03:23 Asia/Kolkata] PHP Warning:  Undefined variable $isAdmin in D:\xampp\htdocs\easy-outdoor-crm\modules\operations\view_booking.php on line 104
+[24-May-2026 01:03:30 Asia/Kolkata] PHP Warning:  Undefined variable $isAdmin in D:\xampp\htdocs\easy-outdoor-crm\modules\operations\view_booking.php on line 104
+[24-May-2026 01:04:10 Asia/Kolkata] PHP Warning:  Undefined variable $isAdmin in D:\xampp\htdocs\easy-outdoor-crm\modules\operations\view_booking.php on line 104

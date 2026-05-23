@@ -40,10 +40,11 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         $approvalStatus  = $isAdmin ? 'approved' : 'pending_approval';
 
         // 2. Create Booking
-        $stmtBooking = $pdo->prepare("INSERT INTO bookings (proposal_id, client_id, start_date, end_date, total_amount, tax_amount, grand_total, status, approval_status) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)");
+        $stmtBooking = $pdo->prepare("INSERT INTO bookings (proposal_id, client_id, campaign_name, start_date, end_date, total_amount, tax_amount, grand_total, status, approval_status) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)");
         $stmtBooking->execute([
             $proposalId,
             $proposal['client_id'],
+            $proposal['campaign_name'],
             $proposal['start_date'],
             $proposal['end_date'],
             $proposal['total_amount'],
