@@ -18,6 +18,7 @@ $media = isset($_GET['media']) ? $_GET['media'] : '';
 $state = isset($_GET['state']) ? $_GET['state'] : '';
 $city = isset($_GET['city']) ? $_GET['city'] : '';
 $vendor = isset($_GET['vendor']) ? $_GET['vendor'] : '';
+$locationFilter = isset($_GET['location']) ? $_GET['location'] : '';
 $availability = isset($_GET['availability']) ? $_GET['availability'] : 'available';
 $ownership = isset($_GET['ownership']) ? $_GET['ownership'] : 'all';
 $size = isset($_GET['size']) ? $_GET['size'] : '';
@@ -34,6 +35,7 @@ if ($q) {
 if ($media) { $where[] = "s.type = ?"; $params[] = $media; }
 if ($state) { $where[] = "s.state = ?"; $params[] = $state; }
 if ($city) { $where[] = "s.city = ?"; $params[] = $city; }
+if ($locationFilter) { $where[] = "s.location = ?"; $params[] = $locationFilter; }
 if ($vendor) { $where[] = "s.vendor_id = ?"; $params[] = $vendor; }
 if ($availability === 'available') { $where[] = "s.status = 'available'"; }
 if ($ownership !== 'all') { $where[] = "s.owner_type = ?"; $params[] = $ownership; }

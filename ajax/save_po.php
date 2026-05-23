@@ -11,7 +11,7 @@ $isAdmin = ($_SESSION['user_role'] ?? '') === 'admin';
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     $data = json_decode(file_get_contents('php://input'), true);
     
-    if (!$data || empty($data['campaignId']) || empty($data['vendorId'])) {
+    if (!$data || empty($data['campaignId']) || empty($data['vendorId']) || empty($data['entityId'])) {
         echo json_encode(['success' => false, 'message' => 'Incomplete data']);
         exit;
     }
@@ -47,12 +47,13 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
         // 2. Insert PO
         $stmt = $pdo->prepare("
-            INSERT INTO purchase_orders (campaign_id, vendor_id, employee_id, po_number, po_date, po_amount, cgst_amount, sgst_amount, total_amount, status, approval_status) 
+            INSERT INTO purchase_orders (campaign_id, vendor_id, entity_id, employee_id, po_number, po_date, po_amount, cgst_amount, sgst_amount, total_amount, status, approval_status) 
             VALUES (?, ?, ?, ?, CURDATE(), ?, ?, ?, ?, ?, ?)
         ");
         $stmt->execute([
             $data['campaignId'],
             $data['vendorId'],
+            $data['entityId'],
             $_SESSION['user_id'],
             $poNum,
             $subtotal,

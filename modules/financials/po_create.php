@@ -6,9 +6,10 @@ include_once __DIR__ . '/../../includes/header.php';
 // Enforce Add Permission at Page Level
 requirePermission('financials', 'add');
 
-// Fetch Campaigns & Vendors
+// Fetch Campaigns, Vendors & Entities
 $campaigns = $pdo->query("SELECT id, display_name, project_id FROM campaigns WHERE status = 'approved' OR status = 'running'")->fetchAll();
 $vendors = $pdo->query("SELECT id, name FROM partners WHERE type = 'vendor' ORDER BY name ASC")->fetchAll();
+$entities = $pdo->query("SELECT id, name FROM entities ORDER BY name ASC")->fetchAll();
 ?>
 
 <div class="wizard-container">
@@ -29,6 +30,15 @@ $vendors = $pdo->query("SELECT id, name FROM partners WHERE type = 'vendor' ORDE
                     <option value="">-- Choose Campaign --</option>
                     <?php foreach ($campaigns as $c): ?>
                         <option value="<?php echo $c['id']; ?>"><?php echo $c['project_id'] . ' - ' . $c['display_name']; ?></option>
+                    <?php endforeach; ?>
+                </select>
+            </div>
+            <div class="form-group">
+                <label>Billing Entity (Our Company)</label>
+                <select id="entity_id" class="p-input">
+                    <option value="">-- Choose Billing Entity --</option>
+                    <?php foreach ($entities as $e): ?>
+                        <option value="<?php echo $e['id']; ?>" <?php echo ($_SESSION['active_entity_id'] ?? '') == $e['id'] ? 'selected' : ''; ?>><?php echo $e['name']; ?></option>
                     <?php endforeach; ?>
                 </select>
             </div>
@@ -197,9 +207,21 @@ function finalizePO() {
     btn.disabled = true;
     btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Generating PO...';
 
+    const campaignId = document.getElementById('campaign_id').value;
+    const vendorId = document.getElementById('vendor_id').value;
+    const entityId = document.getElementById('entity_id').value;
+    
+    if (!campaignId || !vendorId || !entityId) {
+        Swal.fire('Error', 'Campaign, Vendor, and Billing Entity are required.', 'error');
+        btn.disabled = false;
+        btn.innerHTML = '<i class="fas fa-check-circle"></i> Confirm & Generate PO';
+        return;
+    }
+
     const data = {
-        campaignId: document.getElementById('campaign_id').value,
-        vendorId: document.getElementById('vendor_id').value,
+        campaignId: campaignId,
+        vendorId: vendorId,
+        entityId: entityId,
         sites: campaignSites
     };
 

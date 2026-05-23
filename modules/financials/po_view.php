@@ -11,10 +11,12 @@ $poId = isset($_GET['id']) ? intval($_GET['id']) : 0;
 $po = $pdo->prepare("
     SELECT po.*, v.name as vendor_name, v.address as v_address, v.gstin as v_gstin, v.phone as v_phone,
            COALESCE(c.display_name, po.campaign_name) as camp_name, 
-           COALESCE(c.project_id, 'Direct') as proj_id
+           COALESCE(c.project_id, 'Direct') as proj_id,
+           e.name as entity_name, e.logo as entity_logo, e.address as entity_address, e.gstin as entity_gstin, e.pan as entity_pan
     FROM purchase_orders po
     JOIN partners v ON po.vendor_id = v.id
     LEFT JOIN campaigns c ON po.campaign_id = c.id
+    LEFT JOIN entities e ON po.entity_id = e.id
     WHERE po.id = ?
 ");
 $po->execute([$poId]);
@@ -54,13 +56,17 @@ $poAttachments = $attachments->fetchAll();
     <div class="card" id="po-print-area" style="padding: 0; border: 1px solid #000; overflow: hidden; border-radius: 0;">
         <!-- Header / Letterhead -->
         <?php 
-        $company_letterhead = getSetting('company_letterhead');
-        if ($company_letterhead): ?>
-            <img src="<?php echo BASE_URL; ?>assets/images/<?php echo $company_letterhead; ?>" style="width: 100%; height: auto; display: block; border-bottom: 1px solid #000;">
+        $has_entity = !empty($poData['entity_id']);
+        $header_logo = $has_entity && $poData['entity_logo'] ? $poData['entity_logo'] : getSetting('company_letterhead');
+        $header_name = $has_entity ? $poData['entity_name'] : getSetting('company_name');
+        $header_addr = $has_entity ? $poData['entity_address'] : getSetting('company_address');
+        
+        if ($header_logo): ?>
+            <img src="<?php echo BASE_URL; ?>assets/images/<?php echo $header_logo; ?>" style="width: 100%; height: auto; display: block; border-bottom: 1px solid #000;">
         <?php else: ?>
             <div style="text-align: center; padding: 1rem; border-bottom: 1px solid #000; background: #f8fafc;">
-                <h2 style="margin: 0; text-transform: uppercase;"><?php echo getSetting('company_name'); ?></h2>
-                <p style="margin: 0; font-size: 0.8rem;"><?php echo getSetting('company_address'); ?></p>
+                <h2 style="margin: 0; text-transform: uppercase;"><?php echo htmlspecialchars($header_name); ?></h2>
+                <p style="margin: 0; font-size: 0.8rem;"><?php echo htmlspecialchars($header_addr); ?></p>
             </div>
         <?php endif; ?>
 
