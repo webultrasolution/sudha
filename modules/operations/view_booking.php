@@ -32,7 +32,7 @@ if (!$b) {
 
 // Fetch Items from booking_items
 $stmtItems = $pdo->prepare("
-    SELECT bi.*, s.site_code, s.location, s.city, s.type as media_type, s.owner_type, 
+    SELECT bi.*, s.site_code, s.name as site_name, s.location, s.city, s.type as media_type, s.owner_type, 
            s.width, s.height, s.light_type, s.vendor_id, v.name as vendor_name, v.contact_person as vendor_contact,
            o.status as op_status, o.id as op_id
     FROM booking_items bi
@@ -321,7 +321,8 @@ $stmtCheckPO = $pdo->prepare("SELECT id, approval_status FROM purchase_orders WH
                 ?>
                 <tr>
                     <td>
-                        <div style="font-weight: 700; color: #334155;"><?php echo $item['location']; ?></div>
+                        <div style="font-weight: 800; color: #1e293b; margin-bottom: 2px;"><?php echo htmlspecialchars($item['site_name'] ?? ''); ?></div>
+                        <div style="font-size: 0.75rem; color: #64748b; margin-bottom: 6px;"><?php echo htmlspecialchars($item['location'] ?? ''); ?></div>
                         <div
                             style="font-size: 0.7rem; color: #94a3b8; text-transform: uppercase; font-weight: 600; display: flex; align-items: center; gap: 0.5rem; flex-wrap: wrap;">
                             <?php echo $item['media_type']; ?> • <?php echo $item['light_type']; ?>

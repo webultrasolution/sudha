@@ -13,8 +13,8 @@ $stmt = $pdo->prepare("
     SELECT i.*, b.id as booking_id, b.billing_gstin, c.name as client_name, c.email as client_email, c.phone as client_phone, c.address as client_address, c.gstin as client_gstin, c.additional_gst, p.proposal_number, p.start_date, p.end_date
     FROM invoices i
     JOIN bookings b ON i.booking_id = b.id
-    JOIN proposals p ON b.proposal_id = p.id
-    JOIN partners c ON p.client_id = c.id
+    LEFT JOIN proposals p ON b.proposal_id = p.id
+    JOIN partners c ON b.client_id = c.id
     WHERE i.id = ?
 ");
 $stmt->execute([$id]);
@@ -40,13 +40,12 @@ if (!empty($invoice['billing_gstin']) && $invoice['billing_gstin'] !== $invoice[
     }
 }
 
-// Fetch Items (from the linked proposal)
+// Fetch Items (from the linked booking)
 $stmtItems = $pdo->prepare("
-    SELECT pi.*, s.name as site_name, s.site_code, s.type as site_type
-    FROM proposal_items pi
-    JOIN bookings b ON pi.proposal_id = b.proposal_id
-    JOIN sites s ON pi.site_id = s.id
-    WHERE b.id = ?
+    SELECT bi.*, s.name as site_name, s.location, s.site_code, s.type as site_type
+    FROM booking_items bi
+    JOIN sites s ON bi.site_id = s.id
+    WHERE bi.booking_id = ?
 ");
 $stmtItems->execute([$invoice['booking_id']]);
 $items = $stmtItems->fetchAll();
@@ -113,7 +112,10 @@ $items = $stmtItems->fetchAll();
             <?php foreach ($items as $item): ?>
             <tr>
                 <td><strong><?php echo $item['site_code']; ?></strong></td>
-                <td><?php echo $item['site_name']; ?></td>
+                <td>
+                    <?php echo htmlspecialchars($item['site_name'] ?? ''); ?><br>
+                    <small style="color: #64748b;"><?php echo htmlspecialchars($item['location'] ?? ''); ?></small>
+                </td>
                 <td><?php echo $item['site_type']; ?></td>
                 <td style="text-align: right;"><?php echo formatCurrency($item['sale_rate']); ?></td>
             </tr>

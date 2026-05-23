@@ -22,7 +22,7 @@ if (!$proposal) {
 
 // Fetch Items for the table
 $items = $pdo->prepare("
-    SELECT pi.*, s.site_code, s.location, s.city as site_city, s.type as site_type, s.width, s.height, s.light_type
+    SELECT pi.*, s.name as site_name, s.site_code, s.location, s.city as site_city, s.type as site_type, s.width, s.height, s.light_type
     FROM proposal_items pi
     JOIN sites s ON pi.site_id = s.id
     WHERE pi.proposal_id = ?
@@ -195,8 +195,8 @@ $visual_data = $images_stmt->fetchAll();
                     <div style="font-size: 11px; color: var(--slate); font-weight: 700;">CODE: <?php echo $item['site_code']; ?></div>
                 </td>
                 <td>
-                    <div style="font-weight: 700;"><?php echo $item['location']; ?></div>
-                    <div style="font-size: 11px; color: var(--slate); font-weight: 600;"><?php echo $item['site_city']; ?></div>
+                    <div style="font-weight: 700;"><?php echo htmlspecialchars($item['site_name'] ?? ''); ?></div>
+                    <div style="font-size: 11px; color: var(--slate); font-weight: 600;"><?php echo htmlspecialchars($item['location'] ?? ''); ?>, <?php echo htmlspecialchars($item['site_city'] ?? ''); ?></div>
                 </td>
                 <td style="font-weight: 600;"><?php echo (int)$item['width']; ?>' x <?php echo (int)$item['height']; ?>'</td>
                 <td style="font-weight: 600;"><?php echo $item['days']; ?></td>
