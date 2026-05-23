@@ -56,6 +56,7 @@ $bookings = $pdo->query("
                 <th>Campaign / Brand</th>
                 <th>Client</th>
                 <th>Period</th>
+                <th>Amount</th>
                 <th>Execution Status</th>
                 <th>Actions</th>
             </tr>
@@ -63,7 +64,7 @@ $bookings = $pdo->query("
         <tbody>
             <?php if (empty($bookings)): ?>
                 <tr>
-                    <td colspan="7" style="text-align: center; color: var(--secondary); padding: 2rem;">No active bookings found.</td>
+                    <td colspan="8" style="text-align: center; color: var(--secondary); padding: 2rem;">No active bookings found.</td>
                 </tr>
             <?php else: ?>
                 <?php foreach ($bookings as $b): ?>
@@ -98,6 +99,9 @@ $bookings = $pdo->query("
                     <td><?php echo $b['client_name']; ?></td>
                     <td style="font-size: 0.875rem; white-space: nowrap;">
                         <?php echo date('d M', strtotime($b['start_date'])); ?> - <?php echo date('d M Y', strtotime($b['end_date'])); ?>
+                    </td>
+                    <td style="font-weight: 800; color: #059669; white-space: nowrap;">
+                        <?php echo formatCurrency($b['grand_total']); ?>
                     </td>
                     <td>
                         <span class="exec-status status-<?php echo $b['status']; ?>">
