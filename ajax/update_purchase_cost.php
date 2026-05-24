@@ -27,18 +27,19 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
         if ($row) {
             // 3. Sync to po_items if a PO exists for this booking + site
+            // 3. Sync to po_items if a PO exists for this site (assuming latest active PO for this site)
+            // Note: Since PO isn't explicitly linked to booking_id, we update the most recent PO item for this site
             $stmtSync = $pdo->prepare("
                 UPDATE po_items pi
-                JOIN purchase_orders po ON pi.po_id = po.id
                 SET pi.cost = ?, pi.monthly_rate = ?
                 WHERE pi.site_id = ?
-                  AND po.campaign_id = ?
+                ORDER BY pi.id DESC LIMIT 1
             ");
-            $stmtSync->execute([$purchase_cost, $purchase_cost, $row['site_id'], $row['booking_id']]);
+            $stmtSync->execute([$purchase_cost, $purchase_cost, $row['site_id']]);
 
             // 4. Recalculate PO header totals from all its items
-            $stmtPOid = $pdo->prepare("SELECT id FROM purchase_orders WHERE campaign_id = ? AND vendor_id = (SELECT vendor_id FROM sites WHERE id = ?) LIMIT 1");
-            $stmtPOid->execute([$row['booking_id'], $row['site_id']]);
+            $stmtPOid = $pdo->prepare("SELECT po_id FROM po_items WHERE site_id = ? ORDER BY id DESC LIMIT 1");
+            $stmtPOid->execute([$row['site_id']]);
             $poId = $stmtPOid->fetchColumn();
 
             if ($poId) {

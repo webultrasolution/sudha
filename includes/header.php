@@ -178,7 +178,7 @@ $activeEntity = getActiveEntity();
                     <i class="fas fa-bars"></i>
                 </button>
                 <?php else: ?>
-                <a href="<?php echo BASE_URL; ?>modules/proposals/proposals.php" class="btn btn-secondary" style="border: none; background: #e2e8f0; border-radius: 8px; width: 40px; height: 40px; display: flex; align-items: center; justify-content: center; color: #475569; text-decoration: none;">
+                <a href="javascript:history.back()" class="btn btn-secondary" style="border: none; background: #e2e8f0; border-radius: 8px; width: 40px; height: 40px; display: flex; align-items: center; justify-content: center; color: #475569; text-decoration: none;">
                     <i class="fas fa-arrow-left"></i>
                 </a>
                 <?php endif; ?>

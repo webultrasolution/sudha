@@ -66,7 +66,12 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             $stmtBooking->execute([$booking_id]);
             $bookingData = $stmtBooking->fetch();
             
-            $invNo = 'INV/' . date('Y') . '/' . str_pad($booking_id, 4, '0', STR_PAD_LEFT);
+            $custom_invoice_number = clean($_POST['custom_invoice_number'] ?? '');
+            if (!empty($custom_invoice_number)) {
+                $invNo = $custom_invoice_number;
+            } else {
+                $invNo = 'INV/' . date('Y') . '/' . str_pad($booking_id, 4, '0', STR_PAD_LEFT);
+            }
             
             $approvalStatus = $isAdmin ? 'approved' : 'pending_approval';
             

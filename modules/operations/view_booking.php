@@ -899,6 +899,9 @@ $stmtCheckPO = $pdo->prepare("SELECT id, approval_status FROM purchase_orders WH
                 } else {
                     Swal.fire('Error', res.message || 'Failed to update cost', 'error');
                 }
+            })
+            .catch(error => {
+                Swal.fire('Error', 'Network or server error', 'error');
             });
     }
     function updateSellingCost(itemId, cost) {
@@ -927,6 +930,9 @@ $stmtCheckPO = $pdo->prepare("SELECT id, approval_status FROM purchase_orders WH
                 } else {
                     Swal.fire('Error', res.message || 'Failed to update cost', 'error');
                 }
+            })
+            .catch(error => {
+                Swal.fire('Error', 'Network or server error', 'error');
             });
     }
     function editCampaignName() {
@@ -1080,6 +1086,9 @@ $stmtCheckPO = $pdo->prepare("SELECT id, approval_status FROM purchase_orders WH
                     </select>
                 <?php endif; ?>
 
+                <label style="display:block; font-size: 0.75rem; font-weight: 700; color: #64748b; margin-bottom: 5px;">INVOICE NUMBER</label>
+                <input id="custom_invoice_number" class="swal2-input" placeholder="e.g. INV-2026-001 (Leave empty to auto-generate)" style="margin: 0 0 1rem 0; width: 100%; box-sizing: border-box;">
+
                 <label style="display:block; font-size: 0.75rem; font-weight: 700; color: #64748b; margin-bottom: 5px;">CONFIRMATION TYPE</label>
                 <select id="confirmation_type" class="swal2-input" style="margin: 0 0 1rem 0; width: 100%; box-sizing: border-box;" onchange="toggleConfFields()">
                     <option value="po">Customer Purchase Order (PO)</option>
@@ -1112,6 +1121,7 @@ $stmtCheckPO = $pdo->prepare("SELECT id, approval_status FROM purchase_orders WH
                 const po_date = document.getElementById('customer_po_date').value;
                 const email_date = document.getElementById('email_date').value;
                 const po_file = document.getElementById('customer_po_file').files[0];
+                const customInvoiceNo = document.getElementById('custom_invoice_number').value;
 
                 if (type === 'po') {
                     if (!po_no) { Swal.showValidationMessage(`Customer PO Number is mandatory`); return false; }
@@ -1131,6 +1141,7 @@ $stmtCheckPO = $pdo->prepare("SELECT id, approval_status FROM purchase_orders WH
                 formData.append('customer_po_no', po_no);
                 formData.append('customer_po_date', po_date);
                 formData.append('email_date', email_date);
+                formData.append('custom_invoice_number', customInvoiceNo);
                 formData.append('customer_po_file', po_file);
                 
                 const billingGstinSelect = document.getElementById('invoice_billing_gstin');

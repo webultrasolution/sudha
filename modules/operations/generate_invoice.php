@@ -289,6 +289,11 @@ $gst = calculateGST($subtotal, $isInterState);
                     <span
                         class="info-value"><?php echo $b['customer_po_date'] ? date('d.m.Y', strtotime($b['customer_po_date'])) : 'N/A'; ?></span>
                 </div>
+                <div class="info-row">
+                    <span class="info-label">Campaign</span>
+                    <span class="info-sep">:</span>
+                    <span class="info-value"><strong><?php echo htmlspecialchars($b['campaign_name'] ?? 'N/A'); ?></strong></span>
+                </div>
 
                 <div style="margin-top: 15px;">
                     <div class="section-title">Client Details:</div>

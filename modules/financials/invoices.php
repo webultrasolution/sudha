@@ -6,6 +6,46 @@ include_once __DIR__ . '/../../includes/header.php';
 // Enforce View Permission at Page Level
 requirePermission('financials', 'view');
 
+if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action']) && $_POST['action'] === 'delete') {
+    requirePermission('financials', 'delete');
+    header('Content-Type: application/json');
+    $id = intval($_POST['id']);
+    try {
+        $pdo->beginTransaction();
+        
+        // Find the booking ID and invoice number associated with this invoice
+        $stmt = $pdo->prepare("SELECT booking_id, invoice_number FROM invoices WHERE id = ?");
+        $stmt->execute([$id]);
+        $invoiceData = $stmt->fetch();
+        
+        if ($invoiceData) {
+            $bookingId = $invoiceData['booking_id'];
+            $invoiceNumber = $invoiceData['invoice_number'];
+            
+            // Delete associated ledger entries
+            $pdo->prepare("DELETE FROM client_ledgers WHERE reference_id = ? AND reference_type = 'invoice'")->execute([$id]);
+            
+            // Delete invoice items
+            $pdo->prepare("DELETE FROM invoice_items WHERE invoice_id = ?")->execute([$id]);
+            
+            // Delete the invoice itself
+            $pdo->prepare("DELETE FROM invoices WHERE id = ?")->execute([$id]);
+            
+            // Reset booking status so it can be re-invoiced
+            $pdo->prepare("UPDATE bookings SET is_finalized = 0, invoice_finalized_date = NULL WHERE id = ?")->execute([$bookingId]);
+            
+            logActivity('deleted invoice', 'financials', $id, "Invoice $invoiceNumber was deleted. Booking #$bookingId reverted to editable state.");
+        }
+        
+        $pdo->commit();
+        echo json_encode(['success' => true]);
+    } catch (Exception $e) {
+        $pdo->rollBack();
+        echo json_encode(['success' => false, 'message' => $e->getMessage()]);
+    }
+    exit;
+}
+
 // Pagination Logic
 $limit = 10;
 $page = isset($_GET['page']) ? (int)$_GET['page'] : 1;
@@ -79,6 +119,9 @@ $invoices = $invoices->fetchAll();
                     <td style="text-align: right;">
                         <a href="../operations/generate_invoice.php?booking_id=<?php echo $i['booking_id']; ?>" target="_blank" class="btn-icon" title="View & Print" style="color: #64748b;"><i class="fas fa-file-invoice"></i></a>
                         <button class="btn-icon" title="Email Invoice" style="color: var(--primary);"><i class="fas fa-paper-plane"></i></button>
+                        <?php if (canDelete('financials')): ?>
+                        <button class="btn-icon" title="Delete Invoice" onclick="deleteInvoice(<?php echo $i['id']; ?>)" style="color: #ef4444;"><i class="fas fa-trash"></i></button>
+                        <?php endif; ?>
                     </td>
                 </tr>
                 <?php endforeach; ?>
@@ -96,5 +139,33 @@ $invoices = $invoices->fetchAll();
 .btn-icon { color: var(--secondary); border: none; background: none; cursor: pointer; margin-right: 0.5rem; }
 .btn-icon:hover { color: var(--primary); }
 </style>
+
+<script>
+function deleteInvoice(id) {
+    Swal.fire({
+        title: 'Delete Invoice?',
+        text: "This will remove the invoice and its ledger entry, but the Booking will remain and can be edited/re-invoiced.",
+        icon: 'warning',
+        showCancelButton: true,
+        confirmButtonColor: '#ef4444',
+        cancelButtonColor: '#475569',
+        confirmButtonText: 'Yes, delete it'
+    }).then((result) => {
+        if (result.isConfirmed) {
+            fetch('invoices.php', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+                body: `action=delete&id=${id}`
+            }).then(r => r.json()).then(res => {
+                if (res.success) {
+                    Swal.fire('Deleted!', 'Invoice has been deleted and Booking reverted.', 'success').then(() => location.reload());
+                } else {
+                    Swal.fire('Error', res.message, 'error');
+                }
+            });
+        }
+    });
+}
+</script>
 
 <?php include_once __DIR__ . '/../../includes/footer.php'; ?>

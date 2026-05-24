@@ -150,7 +150,7 @@ if ($mode === 'direct') {
         $stmtB->execute([$proposal_id]);
         $b = $stmtB->fetch();
         // Normalize fields for PO display
-        $b['campaign_name'] = $b['campaign_name'] ?? 'General Campaign';
+        $b['campaign_name'] = !empty($b['campaign_name']) ? $b['campaign_name'] : 'General Campaign';
     }
 
     if (!$b) die("Data not found for the given IDs.");

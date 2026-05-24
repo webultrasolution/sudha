@@ -221,6 +221,7 @@ $sizes = $pdo->query("SELECT DISTINCT CONCAT(width, 'x', height) as size FROM si
                             ?>
                                     <a href="../../uploads/pos/<?php echo urlencode($file); ?>" target="_blank" class="attachment-badge" title="<?php echo htmlspecialchars($file); ?>">
                                         <i class="fas <?php echo $icon; ?>"></i>
+                                        <span style="font-size: 0.65rem; margin-left: 4px;"><?php echo htmlspecialchars(strlen(basename($file)) > 15 ? substr(basename($file), 0, 15) . '...' : basename($file)); ?></span>
                                     </a>
                             <?php 
                                 endforeach;
@@ -244,6 +245,7 @@ $sizes = $pdo->query("SELECT DISTINCT CONCAT(width, 'x', height) as size FROM si
                             ?>
                                 <a href="../../uploads/pos/tax_orders/<?php echo urlencode($r['client_tax_order']); ?>" target="_blank" class="attachment-badge" style="background: #e0e7ff; color: #4f46e5;" title="Tax Invoice: <?php echo htmlspecialchars($r['client_tax_order']); ?>">
                                     <i class="fas <?php echo $icon; ?>"></i>
+                                    <span style="font-size: 0.65rem; margin-left: 4px;"><?php echo htmlspecialchars(strlen(basename($r['client_tax_order'])) > 15 ? substr(basename($r['client_tax_order']), 0, 15) . '...' : basename($r['client_tax_order'])); ?></span>
                                 </a>
                             <?php endif; ?>
                             <?php if (canEdit('vendors')): ?>

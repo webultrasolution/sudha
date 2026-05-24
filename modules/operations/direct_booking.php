@@ -502,7 +502,8 @@ function renderSites(sites) {
     sites.forEach((s, i) => {
         const selectedSite = selectedSites.find(ss => ss.id == s.id);
         const isSelected = !!selectedSite;
-        const currentRate = isSelected ? selectedSite.rate : parseFloat(s.purchase_rate);
+        const defaultRate = s.owner_type === 'HA' ? parseFloat(s.card_rate || 0) : parseFloat(s.purchase_rate || 0);
+        const currentRate = isSelected ? selectedSite.rate : defaultRate;
         
         const thumb = s.thumbnail ? imgBaseUrl + s.thumbnail : 'https://via.placeholder.com/150x95?text=No+Img';
         const imgList = (s.all_images || "").split(',').filter(img => img.trim() !== "");
@@ -824,7 +825,16 @@ function saveDirectBooking() {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(data)
-    }).then(r => r.json()).then(res => {
+    }).then(async r => {
+        if (!r.ok) throw new Error("HTTP " + r.status);
+        const text = await r.text();
+        try {
+            return JSON.parse(text);
+        } catch (e) {
+            console.error("Server returned non-JSON:", text);
+            throw new Error("Invalid response from server. Check console for details.");
+        }
+    }).then(res => {
         if (res.success) {
             let msg = res.po_id ? 'Purchase Order submitted for approval!' : 'Booking generated!';
             if (res.approval_status === 'approved') msg = 'Purchase Order generated successfully!';
@@ -838,6 +848,9 @@ function saveDirectBooking() {
             Swal.fire('Error', res.message, 'error');
             btn.disabled = false; btn.innerHTML = 'GENERATE BOOKING';
         }
+    }).catch(err => {
+        Swal.fire('Error', err.message || 'An unexpected error occurred.', 'error');
+        btn.disabled = false; btn.innerHTML = 'GENERATE BOOKING';
     });
 }
 // Lightbox & Slider Logic
