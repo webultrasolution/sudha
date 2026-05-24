@@ -44,12 +44,13 @@ try {
         $stmtUpdate->execute([$proposalId]);
 
         $stmtBooking = $pdo->prepare("
-            INSERT INTO bookings (proposal_id, client_id, start_date, end_date, total_amount, tax_amount, grand_total, status) 
-            VALUES (?, ?, ?, ?, ?, ?, ?, 'active')
+            INSERT INTO bookings (proposal_id, client_id, billing_gstin, start_date, end_date, total_amount, tax_amount, grand_total, status) 
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, 'active')
         ");
         $stmtBooking->execute([
             $proposalId,
             $proposal['client_id'],
+            $proposal['billing_gstin'],
             $proposal['start_date'],
             $proposal['end_date'],
             $proposal['total_amount'],

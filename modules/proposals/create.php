@@ -27,6 +27,7 @@ $sites = $pdo->query($sitesQuery)->fetchAll();
 // Fetch filter values
 $cities = $pdo->query("SELECT DISTINCT city FROM sites WHERE city IS NOT NULL AND city != '' ORDER BY city")->fetchAll(PDO::FETCH_COLUMN);
 $states = $pdo->query("SELECT DISTINCT state FROM sites WHERE state IS NOT NULL AND state != '' ORDER BY state")->fetchAll(PDO::FETCH_COLUMN);
+$locations = $pdo->query("SELECT DISTINCT location FROM sites WHERE location IS NOT NULL AND location != '' ORDER BY location")->fetchAll(PDO::FETCH_COLUMN);
 $mediaTypes = $pdo->query("SELECT DISTINCT type FROM sites WHERE type IS NOT NULL AND type != '' ORDER BY type")->fetchAll(PDO::FETCH_COLUMN);
 $illuminations = $pdo->query("SELECT DISTINCT light_type FROM sites WHERE light_type IS NOT NULL AND light_type != '' ORDER BY light_type")->fetchAll(PDO::FETCH_COLUMN);
 $genres = $pdo->query("SELECT DISTINCT genre FROM sites WHERE genre IS NOT NULL AND genre != '' ORDER BY genre")->fetchAll(PDO::FETCH_COLUMN);
@@ -176,7 +177,7 @@ $printingRates = $pdo->query("SELECT * FROM vendor_printing_rates")->fetchAll(PD
             </div>
 
             <!-- Search Criteria -->
-            <div style="display: grid; grid-template-columns: 2fr 1fr 1fr 1fr 1fr 1fr; gap: 0.5rem; margin-bottom: 0.5rem; align-items: flex-end;">
+            <div style="display: grid; grid-template-columns: 2fr 1fr 1fr 1fr 1fr 1fr 1fr auto; gap: 0.5rem; margin-bottom: 0.5rem; align-items: flex-end;">
                 <div class="form-group" style="margin-bottom: 0;">
                     <label style="font-size: 0.55rem; font-weight: 900; color: var(--secondary); margin-bottom: 0.2rem; text-transform: uppercase;">Search Site / Code / Area</label>
                     <input type="text" id="site-search" class="p-input" placeholder="Search by Site Name, Code, Location, City, State, Media..." oninput="filterSites()" style="height: 30px; font-size: 0.75rem;">
@@ -203,6 +204,13 @@ $printingRates = $pdo->query("SELECT * FROM vendor_printing_rates")->fetchAll(PD
                     </select>
                 </div>
                 <div class="form-group" style="margin-bottom: 0;">
+                    <label style="font-size: 0.55rem; font-weight: 900; color: var(--secondary); margin-bottom: 0.2rem; text-transform: uppercase;">Location</label>
+                    <select id="filter-location" class="p-input" onchange="filterSites()" style="height: 30px; font-size: 0.75rem;">
+                        <option value="">All</option>
+                        <?php foreach($locations as $loc): ?> <option value="<?php echo htmlspecialchars($loc); ?>"><?php echo htmlspecialchars($loc); ?></option> <?php endforeach; ?>
+                    </select>
+                </div>
+                <div class="form-group" style="margin-bottom: 0;">
                     <label style="font-size: 0.55rem; font-weight: 900; color: var(--secondary); margin-bottom: 0.2rem; text-transform: uppercase;">Light</label>
                     <select id="light_type" class="p-input" onchange="filterSites()" style="height: 30px; font-size: 0.75rem;">
                         <option value="">All</option>
@@ -215,6 +223,9 @@ $printingRates = $pdo->query("SELECT * FROM vendor_printing_rates")->fetchAll(PD
                         <option value="">All</option>
                         <?php foreach($sizes as $sz): ?> <option value="<?php echo $sz; ?>"><?php echo $sz; ?></option> <?php endforeach; ?>
                     </select>
+                </div>
+                <div class="form-group" style="margin-bottom: 0; display: flex; align-items: flex-end;">
+                    <button class="btn btn-secondary" onclick="clearFilters()" style="height: 30px; font-size: 0.75rem; padding: 0 0.75rem; border-radius: 8px; background: #f1f5f9; color: #475569; border: 1px solid #e2e8f0;"><i class="fas fa-times-circle"></i> Clear</button>
                 </div>
             </div>
         </div>
@@ -1172,6 +1183,23 @@ function recalcAll() {
     document.getElementById('sum-grand-btm').innerText = '₹' + grand.toLocaleString(undefined, {minimumFractionDigits: 2, maximumFractionDigits: 2});
 }
 
+function clearFilters() {
+    document.getElementById('site-search').value = '';
+    document.getElementById('media_type').value = '';
+    document.getElementById('filter-state').value = '';
+    document.getElementById('filter-city').value = '';
+    document.getElementById('filter-location').value = '';
+    document.getElementById('light_type').value = '';
+    document.getElementById('filter-size').value = '';
+    if(document.getElementById('filter-vendor')) document.getElementById('filter-vendor').value = '';
+    
+    document.querySelector('input[name="ownership"][value="all"]').checked = true;
+    document.querySelector('input[name="availability"][value="available"]').checked = true;
+    document.getElementById('vendor-filter-group').style.display = 'none';
+
+    filterSites();
+}
+
 function filterSites() {
     const q = document.getElementById('site-search') ? document.getElementById('site-search').value.toLowerCase() : '';
     const mediaType = document.getElementById('media_type').value;
@@ -1191,6 +1219,7 @@ function filterSites() {
 
     const state = document.getElementById('filter-state').value;
     const city = document.getElementById('filter-city').value;
+    const locationFilter = document.getElementById('filter-location') ? document.getElementById('filter-location').value : '';
     const size = document.getElementById('filter-size').value;
 
     const rows = document.querySelectorAll('#asset-body tr.site-row');
@@ -1212,6 +1241,7 @@ function filterSites() {
         // Location & Size Filters
         if (state && row.dataset.state !== state) show = false;
         if (city && row.dataset.city !== city) show = false;
+        if (locationFilter && row.dataset.location !== locationFilter) show = false;
         if (size && row.dataset.size !== size) show = false;
         
         // Comprehensive Search (All Fields)

@@ -1,6 +1,7 @@
 <?php
 include_once __DIR__ . '/../config/db.php';
 include_once __DIR__ . '/../includes/functions.php';
+if (session_status() === PHP_SESSION_NONE) session_start();
 
 header('Content-Type: application/json');
 
@@ -49,6 +50,13 @@ try {
 
     $stmtUpdate = $pdo->prepare("UPDATE proposals SET total_amount = ?, tax_amount = ?, grand_total = ? WHERE id = ?");
     $stmtUpdate->execute([$newSubtotal, $tax, $grand, $proposalId]);
+
+    // Revert proposal to pending_approval if non-admin deleted an item from an approved proposal
+    $isAdmin = ($_SESSION['user_role'] ?? '') === 'admin';
+    if (!$isAdmin) {
+        $propRef = $pdo->query("SELECT proposal_number FROM proposals WHERE id = $proposalId")->fetchColumn();
+        revertToPendingOnEdit($pdo, 'proposals', $proposalId, 'proposal', $propRef, $_SESSION['user_id'] ?? 0);
+    }
 
     echo json_encode(['success' => true]);
 } catch (PDOException $e) {

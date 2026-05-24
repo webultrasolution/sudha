@@ -67,7 +67,8 @@ $rates = $pdo->query("
         GROUP_CONCAT(r.rate_per_sqft SEPARATOR '||') as rates,
         MAX(r.attachments) as attachments,
         MAX(r.client_tax_order) as client_tax_order,
-        MAX(r.is_final_invoice) as is_final_invoice
+        MAX(r.is_final_invoice) as is_final_invoice,
+        MAX(r.approval_status) as approval_status
     FROM client_printing_rates r
     JOIN partners c ON r.client_id = c.id
     LEFT JOIN sites s ON r.site_id = s.id
@@ -252,7 +253,11 @@ $clients = $pdo->query("SELECT id, name FROM partners WHERE type = 'client' ORDE
                         
                         <!-- Row-level Final Tax Invoice Action -->
                         <div style="margin-top: 10px; padding-top: 5px; border-top: 1px solid #e2e8f0; display: flex; justify-content: flex-end; gap: 8px; width: 100%;">
-                            <?php if ($r['is_final_invoice']): ?>
+                            <?php if ($r['approval_status'] === 'pending_approval'): ?>
+                                <button class="btn" style="background: #f8fafc; color: #94a3b8; padding: 4px 10px; border-radius: 6px; font-size: 0.75rem; font-weight: 700; border: 1px solid #cbd5e1; cursor: not-allowed; display: inline-flex; align-items: center; gap: 4px;" title="Pending Admin Approval">
+                                    <i class="fas fa-lock"></i> Pending Approval
+                                </button>
+                            <?php elseif ($r['is_final_invoice']): ?>
                                 <?php 
                                     $taxInvUrl = "../operations/client_printing.php?client_id=" . $r['client_id'] . "&preview=1&is_final=1";
                                     foreach($ids as $id) $taxInvUrl .= "&rate_ids[]=" . $id;
@@ -504,18 +509,25 @@ function openPrintingInvoicePopup(poNumber, clientId, rateIdsStr) {
                 if (!data.success) {
                     throw new Error(data.message || 'Upload failed');
                 }
-                return true;
+                return data;
             }).catch(error => {
                 Swal.showValidationMessage(`Request failed: ${error}`);
             });
         }
     }).then((result) => {
         if (result.isConfirmed) {
-            let rateIds = rateIdsStr.split(',');
-            let taxInvUrl = `../operations/client_printing.php?client_id=${clientId}&preview=1&is_final=1`;
-            rateIds.forEach(id => taxInvUrl += `&rate_ids[]=${id}`);
-            window.open(taxInvUrl, '_blank');
-            window.location.reload();
+            let resData = result.value;
+            if (resData && resData.approval_status === 'pending_approval') {
+                Swal.fire('Approval Sent!', 'The Client Printing Invoice has been sent for admin approval.', 'success').then(() => {
+                    window.location.reload();
+                });
+            } else {
+                let rateIds = rateIdsStr.split(',');
+                let taxInvUrl = `../operations/client_printing.php?client_id=${clientId}&preview=1&is_final=1`;
+                rateIds.forEach(id => taxInvUrl += `&rate_ids[]=${id}`);
+                window.open(taxInvUrl, '_blank');
+                window.location.reload();
+            }
         }
     });
 }

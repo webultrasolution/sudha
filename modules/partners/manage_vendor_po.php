@@ -399,16 +399,20 @@ function generatePO() {
     .then(r => r.json())
     .then(res => {
         if (res.success) {
+            let titleMsg = res.approval_status === 'pending_approval' ? 'PO Submitted for Approval!' : 'Purchase Order Generated!';
+            let textMsg = res.approval_status === 'pending_approval' ? 'Your PO is waiting for admin approval.' : (res.message || 'PO saved successfully.');
+            let confirmText = res.approval_status === 'pending_approval' ? 'Go to Vendors' : 'View PO';
+            
             Swal.fire({
                 icon: 'success',
-                title: 'Purchase Order Generated!',
-                text: res.message || 'PO saved successfully.',
+                title: titleMsg,
+                text: textMsg,
                 showCancelButton: true,
-                confirmButtonText: 'View PO',
+                confirmButtonText: confirmText,
                 cancelButtonText: 'Back to Vendors',
                 confirmButtonColor: '#d97706'
             }).then((result) => {
-                if (result.isConfirmed && res.po_id) {
+                if (result.isConfirmed && res.po_id && res.approval_status !== 'pending_approval') {
                     window.open('../operations/generate_po.php?po_id=' + res.po_id, '_blank');
                     window.location.href = 'vendors.php';
                 } else {

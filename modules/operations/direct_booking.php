@@ -9,6 +9,7 @@ $clients = $pdo->query("SELECT id, name, city, contact_person FROM partners WHER
 $vendors = $pdo->query("SELECT id, name FROM partners WHERE type = 'vendor' ORDER BY name ASC")->fetchAll();
 
 $cities = $pdo->query("SELECT DISTINCT city FROM sites WHERE city IS NOT NULL AND city != '' ORDER BY city")->fetchAll(PDO::FETCH_COLUMN);
+$locations = $pdo->query("SELECT DISTINCT location FROM sites WHERE location IS NOT NULL AND location != '' ORDER BY location")->fetchAll(PDO::FETCH_COLUMN);
 $states = $pdo->query("SELECT DISTINCT state FROM sites WHERE state IS NOT NULL AND state != '' ORDER BY state")->fetchAll(PDO::FETCH_COLUMN);
 $mediaTypes = $pdo->query("SELECT DISTINCT type FROM sites WHERE type IS NOT NULL AND type != '' ORDER BY type")->fetchAll(PDO::FETCH_COLUMN);
 $illuminations = $pdo->query("SELECT DISTINCT light_type FROM sites WHERE light_type IS NOT NULL AND light_type != '' ORDER BY light_type")->fetchAll(PDO::FETCH_COLUMN);
@@ -151,7 +152,7 @@ $printingRates = $pdo->query("SELECT * FROM vendor_printing_rates")->fetchAll(PD
                 </div>
             </div>
 
-            <div style="display: grid; grid-template-columns: 2.5fr 1fr 1fr 1fr 1fr 1fr; gap: 0.75rem; align-items: flex-end;">
+            <div style="display: grid; grid-template-columns: 2.5fr 1fr 1fr 1fr 1fr 1fr 1fr; gap: 0.75rem; align-items: flex-end;">
                 <div class="form-group" style="margin-bottom: 0;">
                     <label style="font-size: 0.55rem; font-weight: 900; color: #94a3b8; text-transform: uppercase; margin-bottom: 0.4rem; display: block;">Search Site / Code / Area</label>
                     <input type="text" id="site-search" class="p-input" placeholder="Search by Site Name, Code, Location, City, State..." oninput="fetchSites(1)" style="height: 38px; font-size: 0.85rem; background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 8px;">
@@ -175,6 +176,13 @@ $printingRates = $pdo->query("SELECT * FROM vendor_printing_rates")->fetchAll(PD
                     <select id="filter-city" class="p-input" onchange="fetchSites(1)" style="height: 38px; font-size: 0.85rem; background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 8px;">
                         <option value="">All</option>
                         <?php foreach($cities as $c): ?> <option value="<?php echo $c; ?>"><?php echo $c; ?></option> <?php endforeach; ?>
+                    </select>
+                </div>
+                <div class="form-group" style="margin-bottom: 0;">
+                    <label style="font-size: 0.55rem; font-weight: 900; color: #94a3b8; text-transform: uppercase; margin-bottom: 0.4rem; display: block;">Location</label>
+                    <select id="filter-location" class="p-input" onchange="fetchSites(1)" style="height: 38px; font-size: 0.85rem; background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 8px;">
+                        <option value="">All</option>
+                        <?php foreach($locations as $loc): ?> <option value="<?php echo htmlspecialchars($loc); ?>"><?php echo htmlspecialchars($loc); ?></option> <?php endforeach; ?>
                     </select>
                 </div>
                 <div class="form-group" style="margin-bottom: 0;">
@@ -455,6 +463,7 @@ function fetchSites(page = 1) {
     const media = document.getElementById('media_type').value;
     const state = document.getElementById('filter-state').value;
     const city = document.getElementById('filter-city').value;
+    const locationFilter = document.getElementById('filter-location') ? document.getElementById('filter-location').value : '';
     const ownership = document.querySelector('input[name="ownership"]:checked').value;
     const availability = document.querySelector('input[name="availability"]:checked').value;
     const vendor = document.getElementById('filter-vendor').value;
@@ -467,7 +476,7 @@ function fetchSites(page = 1) {
         vendorGroup.style.display = (ownership === 'TA') ? 'block' : 'none';
     }
 
-    const url = `../../ajax/fetch_sites.php?page=${page}&limit=${pageSize}&q=${encodeURIComponent(q)}&media=${encodeURIComponent(media)}&state=${encodeURIComponent(state)}&city=${encodeURIComponent(city)}&availability=${availability}&ownership=${ownership}&vendor=${vendor}&size=${encodeURIComponent(size)}&light=${encodeURIComponent(light)}`;
+    const url = `../../ajax/fetch_sites.php?page=${page}&limit=${pageSize}&q=${encodeURIComponent(q)}&media=${encodeURIComponent(media)}&state=${encodeURIComponent(state)}&city=${encodeURIComponent(city)}&location=${encodeURIComponent(locationFilter)}&availability=${availability}&ownership=${ownership}&vendor=${vendor}&size=${encodeURIComponent(size)}&light=${encodeURIComponent(light)}`;
 
     fetch(url)
     .then(r => r.json())
@@ -817,8 +826,14 @@ function saveDirectBooking() {
         body: JSON.stringify(data)
     }).then(r => r.json()).then(res => {
         if (res.success) {
-            Swal.fire('Success', 'Booking  generated!', 'success').then(() => window.location.href = 'bookings.php');
-            if(res.po_id) window.open('generate_po.php?po_id=' + res.po_id, '_blank');
+            let msg = res.po_id ? 'Purchase Order submitted for approval!' : 'Booking generated!';
+            if (res.approval_status === 'approved') msg = 'Purchase Order generated successfully!';
+            
+            Swal.fire('Success', msg, 'success').then(() => window.location.href = 'bookings.php');
+            if(res.po_id && res.approval_status !== 'pending_approval') {
+                // We don't auto-open pending POs
+                // window.open('generate_po.php?po_id=' + res.po_id, '_blank'); // Removed auto open per user request
+            }
         } else {
             Swal.fire('Error', res.message, 'error');
             btn.disabled = false; btn.innerHTML = 'GENERATE BOOKING';

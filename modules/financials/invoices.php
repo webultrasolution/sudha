@@ -17,8 +17,8 @@ $invoices = $pdo->prepare("
     SELECT i.*, b.id as booking_id, c.name as client_name 
     FROM invoices i
     JOIN bookings b ON i.booking_id = b.id
-    JOIN proposals p ON b.proposal_id = p.id
-    JOIN partners c ON p.client_id = c.id
+    LEFT JOIN proposals p ON b.proposal_id = p.id
+    JOIN partners c ON b.client_id = c.id
     ORDER BY i.id DESC
     LIMIT ? OFFSET ?
 ");

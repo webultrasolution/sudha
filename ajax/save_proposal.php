@@ -6,6 +6,8 @@ if (session_status() === PHP_SESSION_NONE) {
     session_start();
 }
 
+$isAdmin = ($_SESSION['user_role'] ?? '') === 'admin';
+
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     $data = json_decode(file_get_contents('php://input'), true);
     
@@ -51,12 +53,16 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         $propNum = 'PR-' . date('Ymd') . '-' . rand(1000, 9999);
 
         // 2. Insert Proposal
+        // Admin sends directly; non-admin goes to pending_approval queue
+        $proposalStatus   = $isAdmin ? 'sent' : 'draft';
+        $approvalStatus   = $isAdmin ? 'approved' : 'pending_approval';
+
         $stmt = $pdo->prepare("INSERT INTO proposals 
             (proposal_number, campaign_name, media_type, inventory_type, light_type, client_id, billing_gstin, tax_type, contact_person, start_date, end_date, total_days, remark,
              printing_cost, mounting_cost, 
              ha_markup_amount, ta_markup_amount, total_sqft, price_per_sqft, display_cost, 
-             total_amount, tax_amount, grand_total, status, created_by) 
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'sent', ?)");
+             total_amount, tax_amount, grand_total, status, approval_status, created_by) 
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)");
             
         $stmt->execute([
             $propNum,
@@ -82,10 +88,18 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             $subtotal,
             $gst,
             $grandTotal,
+            $proposalStatus,
+            $approvalStatus,
             $_SESSION['user_id']
         ]);
         
         $proposalId = $pdo->lastInsertId();
+
+        // Create approval request for non-admin
+        if (!$isAdmin) {
+            $stmtAR = $pdo->prepare("INSERT INTO approval_requests (entity_type, entity_id, entity_ref, requested_by, status) VALUES ('proposal', ?, ?, ?, 'pending')");
+            $stmtAR->execute([$proposalId, $propNum, $_SESSION['user_id']]);
+        }
         
         logActivity('generated a new proposal', 'proposals', $proposalId, "Proposal Number: $propNum");
 
@@ -111,7 +125,14 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         }
 
         $pdo->commit();
-        echo json_encode(['success' => true, 'proposal_id' => $proposalId]);
+        echo json_encode([
+            'success'         => true,
+            'proposal_id'     => $proposalId,
+            'approval_status' => $approvalStatus,
+            'message'         => $isAdmin
+                ? "Proposal $propNum created and sent."
+                : "Proposal $propNum submitted for admin approval."
+        ]);
 
     } catch (Exception $e) {
         $pdo->rollBack();

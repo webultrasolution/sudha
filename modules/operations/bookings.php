@@ -56,6 +56,7 @@ $bookings = $pdo->query("
                 <th>Campaign / Brand</th>
                 <th>Client</th>
                 <th>Period</th>
+                <th>Amount</th>
                 <th>Execution Status</th>
                 <th>Actions</th>
             </tr>
@@ -63,7 +64,7 @@ $bookings = $pdo->query("
         <tbody>
             <?php if (empty($bookings)): ?>
                 <tr>
-                    <td colspan="7" style="text-align: center; color: var(--secondary); padding: 2rem;">No active bookings found.</td>
+                    <td colspan="8" style="text-align: center; color: var(--secondary); padding: 2rem;">No active bookings found.</td>
                 </tr>
             <?php else: ?>
                 <?php foreach ($bookings as $b): ?>
@@ -99,10 +100,26 @@ $bookings = $pdo->query("
                     <td style="font-size: 0.875rem; white-space: nowrap;">
                         <?php echo date('d M', strtotime($b['start_date'])); ?> - <?php echo date('d M Y', strtotime($b['end_date'])); ?>
                     </td>
+                    <td style="font-weight: 800; color: #059669; white-space: nowrap;">
+                        <?php echo formatCurrency($b['grand_total']); ?>
+                    </td>
                     <td>
                         <span class="exec-status status-<?php echo $b['status']; ?>">
                             <?php echo ucfirst($b['status']); ?>
                         </span>
+                        <?php if (($b['approval_status'] ?? '') === 'pending_approval'): ?>
+                            <div style="margin-top: 4px;">
+                                <span style="background: #fff7ed; color: #c2410c; border: 1px solid #fed7aa; padding: 0.15rem 0.5rem; border-radius: 50px; font-size: 0.6rem; font-weight: 800; display: inline-flex; align-items: center; gap: 4px; animation: pulse-approval 2s infinite;">
+                                    <i class="fas fa-clock"></i> Awaiting Approval
+                                </span>
+                            </div>
+                        <?php elseif (($b['approval_status'] ?? '') === 'rejected'): ?>
+                            <div style="margin-top: 4px;">
+                                <span style="background: #fee2e2; color: #b91c1c; border: 1px solid #fca5a5; padding: 0.15rem 0.5rem; border-radius: 50px; font-size: 0.6rem; font-weight: 800; display: inline-flex; align-items: center; gap: 4px;" title="<?php echo htmlspecialchars($b['rejection_reason'] ?? ''); ?>">
+                                    <i class="fas fa-times-circle"></i> Rejected
+                                </span>
+                            </div>
+                        <?php endif; ?>
                     </td>
                     <td>
                         <a href="mounting.php?booking_id=<?php echo $b['id']; ?>" class="btn-icon btn-view" title="View Operations"><i class="fas fa-clipboard-list"></i></a>
@@ -123,6 +140,8 @@ $bookings = $pdo->query("
 .status-mounting { background: #dcfce7; color: #166534; }
 .status-active { background: #e0f2fe; color: #0369a1; }
 .status-completed { background: #f1f5f9; color: #475569; }
+.status-cancelled { background: #fee2e2; color: #991b1b; }
+@keyframes pulse-approval { 0%, 100% { opacity: 1; } 50% { opacity: 0.5; } }
 .btn-icon { background: none; border: none; cursor: pointer; color: var(--secondary); text-decoration: none; margin-right: 0.5rem; }
 .btn-icon:hover { color: var(--primary); }
 </style>

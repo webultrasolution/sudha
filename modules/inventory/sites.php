@@ -138,6 +138,10 @@ if (!empty($_GET['city'])) {
     $where .= " AND s.city = ?";
     $params[] = $_GET['city'];
 }
+if (!empty($_GET['location'])) {
+    $where .= " AND s.location = ?";
+    $params[] = $_GET['location'];
+}
 if (!empty($_GET['light'])) {
     $where .= " AND s.light_type = ?";
     $params[] = $_GET['light'];
@@ -158,6 +162,7 @@ if (!empty($_GET['size'])) {
 // Query unique values for filters
 $states = $pdo->query("SELECT DISTINCT state FROM sites WHERE state IS NOT NULL AND state != '' ORDER BY state")->fetchAll(PDO::FETCH_COLUMN);
 $cities = $pdo->query("SELECT DISTINCT city FROM sites WHERE city IS NOT NULL AND city != '' ORDER BY city")->fetchAll(PDO::FETCH_COLUMN);
+$locations = $pdo->query("SELECT DISTINCT location FROM sites WHERE location IS NOT NULL AND location != '' ORDER BY location")->fetchAll(PDO::FETCH_COLUMN);
 $light_types = $pdo->query("SELECT DISTINCT light_type FROM sites WHERE light_type IS NOT NULL AND light_type != '' ORDER BY light_type")->fetchAll(PDO::FETCH_COLUMN);
 $sizes = $pdo->query("SELECT DISTINCT CONCAT(width, 'x', height) as size FROM sites WHERE width > 0 AND height > 0 ORDER BY size")->fetchAll(PDO::FETCH_COLUMN);
 $media_types = $pdo->query("SELECT DISTINCT type FROM sites WHERE type IS NOT NULL AND type != '' ORDER BY type")->fetchAll(PDO::FETCH_COLUMN);
@@ -237,7 +242,7 @@ $vendors = $pdo->query("SELECT id, name FROM partners WHERE type = 'vendor' ORDE
             </div>
         </div>
         
-        <div style="display: grid; grid-template-columns: 2fr 1fr 1fr 1fr 1fr 1fr; gap: 0.75rem;">
+        <div style="display: grid; grid-template-columns: 2fr 1fr 1fr 1fr 1fr 1fr 1fr; gap: 0.75rem;">
             <div class="search-group" style="position: relative;">
                 <i class="fas fa-search" style="position: absolute; left: 12px; top: 50%; transform: translateY(-50%); color: #94a3b8; cursor: pointer;" onclick="doSearch()"></i>
                 <input type="text" id="site-search" placeholder="Search by name, code, city..." value="<?php echo htmlspecialchars($search); ?>" style="width: 100%; padding: 0.5rem 0.5rem 0.5rem 35px; border: 1px solid #cbd5e1; border-radius: 6px; font-size: 0.85rem;" onkeypress="if(event.key === 'Enter') doSearch()" onchange="doSearch()">
@@ -261,6 +266,13 @@ $vendors = $pdo->query("SELECT id, name FROM partners WHERE type = 'vendor' ORDE
                 <option value="">All Cities</option>
                 <?php foreach ($cities as $c): ?>
                     <option value="<?php echo htmlspecialchars($c); ?>" <?php echo ($_GET['city'] ?? '') === $c ? 'selected' : ''; ?>><?php echo htmlspecialchars($c); ?></option>
+                <?php endforeach; ?>
+            </select>
+            
+            <select id="filter-location" style="width: 100%; padding: 0.5rem; border: 1px solid #cbd5e1; border-radius: 6px; font-size: 0.85rem; font-weight: 600; color: #0f172a;" onchange="doSearch()">
+                <option value="">All Locations</option>
+                <?php foreach ($locations as $loc): ?>
+                    <option value="<?php echo htmlspecialchars($loc); ?>" <?php echo ($_GET['location'] ?? '') === $loc ? 'selected' : ''; ?>><?php echo htmlspecialchars($loc); ?></option>
                 <?php endforeach; ?>
             </select>
             
@@ -647,10 +659,11 @@ function doSearch() {
     const media = document.getElementById('filter-media').value;
     const state = document.getElementById('filter-state').value;
     const city = document.getElementById('filter-city').value;
+    const locationFilter = document.getElementById('filter-location') ? document.getElementById('filter-location').value : '';
     const light = document.getElementById('filter-light').value;
     const size = document.getElementById('filter-size').value;
     
-    window.location.href = `?search=${encodeURIComponent(s)}&owner=${encodeURIComponent(owner)}&vendor_id=${encodeURIComponent(vendor_id)}&availability=${encodeURIComponent(availability)}&media=${encodeURIComponent(media)}&state=${encodeURIComponent(state)}&city=${encodeURIComponent(city)}&light=${encodeURIComponent(light)}&size=${encodeURIComponent(size)}`;
+    window.location.href = `?search=${encodeURIComponent(s)}&owner=${encodeURIComponent(owner)}&vendor_id=${encodeURIComponent(vendor_id)}&availability=${encodeURIComponent(availability)}&media=${encodeURIComponent(media)}&state=${encodeURIComponent(state)}&city=${encodeURIComponent(city)}&location=${encodeURIComponent(locationFilter)}&light=${encodeURIComponent(light)}&size=${encodeURIComponent(size)}`;
 }
 
 // Auto-search on type with debounce

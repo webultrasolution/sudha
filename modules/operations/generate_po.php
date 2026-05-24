@@ -15,15 +15,25 @@ $mode = $_GET['mode'] ?? '';
 // 1. If PO ID is provided, fetch everything from DB (Works for Direct POs saved to DB)
 if ($po_id) {
     $stmtB = $pdo->prepare("
-        SELECT po.*, c.name as client_name, po.campaign_name as campaign_name, po.po_number as proposal_number, po.campaign_id
+        SELECT po.*, c.name as client_name, po.campaign_name as campaign_name, po.po_number as proposal_number, po.campaign_id,
+               e.name as entity_name, e.logo as entity_logo, e.address as entity_address, e.gstin as entity_gstin, e.pan as entity_pan
         FROM purchase_orders po
         LEFT JOIN partners c ON po.customer_id = c.id
+        LEFT JOIN entities e ON po.entity_id = e.id
         WHERE po.id = ?
     ");
     $stmtB->execute([$po_id]);
     $b = $stmtB->fetch();
     
-    if (!$b) die("Purchase Order not found.");
+    if (!$b) {
+        die("Purchase Order not found.");
+    }
+    
+    if (session_status() === PHP_SESSION_NONE) session_start();
+    $isAdmin = ($_SESSION['user_role'] ?? '') === 'admin';
+    if (($b['approval_status'] ?? '') === 'pending_approval' && !$isAdmin) {
+        die("<div style='font-family: sans-serif; padding: 2rem; text-align: center; color: #64748b;'><h3>Access Denied</h3><p>This Purchase Order is pending admin approval and cannot be viewed or printed yet.</p></div>");
+    }
     
     // Fallback: If campaign name is empty in PO table, retrieve it from the booking or linked proposal
     if (empty($b['campaign_name']) && !empty($b['campaign_id'])) {
@@ -192,8 +202,14 @@ $company_pan = getSetting('company_pan', 'AHRPT4740Q');
 $company_address = getSetting('company_address', 'Deshbandhu Para, P.O - Jhaljhalia, Dist - Malda - 732102, West Bengal');
 $company_phone = getSetting('company_phone', '8158854313');
 $company_email = getSetting('company_email', 'sudhacreativemalda@gmail.com');
-$company_letterhead = getSetting('company_letterhead');
-$company_signature = getSetting('company_signature', 'signature.png');
+$po_type = $po_type ?? 'RENTAL';
+$approval_badge = ($b['approval_status'] ?? '') === 'approved' ? '' : '<div style="position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%) rotate(-45deg); font-size: 8rem; color: rgba(239, 68, 68, 0.1); font-weight: 900; z-index: 0; pointer-events: none; border: 10px solid rgba(239, 68, 68, 0.1); padding: 2rem; border-radius: 20px;">DRAFT / PENDING</div>';
+
+// Setup Company / Entity Details
+$has_entity = !empty($b['entity_id']);
+$header_logo = $has_entity && !empty($b['entity_logo']) ? $b['entity_logo'] : getSetting('company_letterhead');
+$header_name = $has_entity ? $b['entity_name'] : getSetting('company_name', 'Sudha Creative & Advertising');
+$header_addr = $has_entity ? $b['entity_address'] : getSetting('company_address');
 
 // Dynamic Category of Service Calculation
 $serviceCategory = 'Display on Hoardings / Billboards';
@@ -277,14 +293,13 @@ function getStateName($gstin) {
 <button class="btn-print" onclick="window.print()">PRINT PURCHASE ORDER</button>
 
 <div class="po-wrapper">
-    <!-- Header -->
-    <?php if ($company_letterhead): ?>
-        <img src="<?php echo BASE_URL; ?>assets/images/<?php echo $company_letterhead; ?>" style="width: 100%; height: auto; display: block; border-bottom: 1px solid #000;">
+    <!-- Header / Letterhead -->
+    <?php if ($header_logo): ?>
+        <img src="<?php echo BASE_URL; ?>assets/images/<?php echo $header_logo; ?>" style="width: 100%; height: auto; display: block; border-bottom: 1px solid #000;">
     <?php else: ?>
-        <div class="header-top" style="text-align: center;">
-            <h2 style="margin: 0; text-transform: uppercase;"><?php echo $company_name; ?></h2>
-            <p><?php echo $company_address; ?></p>
-            <p>Ph: <?php echo $company_phone; ?> Email: <?php echo $company_email; ?></p>
+        <div style="text-align: center; padding: 1rem; border-bottom: 1px solid #000; background: #f8fafc;">
+            <h2 style="margin: 0; text-transform: uppercase;"><?php echo htmlspecialchars($header_name); ?></h2>
+            <p style="margin: 0; font-size: 0.8rem;"><?php echo htmlspecialchars($header_addr); ?></p>
         </div>
     <?php endif; ?>
 

@@ -17,7 +17,7 @@ if (!$proposal) die("Proposal not found.");
 
 // Fetch all images for each site in the proposal
 $items = $pdo->prepare("
-    SELECT pi.*, s.site_code, s.location, s.city as site_city, s.type as site_type, s.width, s.height, s.light_type,
+    SELECT pi.*, s.name as site_name, s.site_code, s.location, s.city as site_city, s.type as site_type, s.width, s.height, s.light_type,
     si.filename as image
     FROM proposal_items pi
     JOIN sites s ON pi.site_id = s.id
@@ -240,7 +240,7 @@ $slides_data = $items->fetchAll();
         // Format the caption as in the PDF: City Location.WidthXHeight. LightType (MediaType). Rs.Rate PM
         $dim = intval($item['width']) . "X" . intval($item['height']);
         $rate = number_format($item['sale_rate'], 0, '.', '');
-        $caption = "{$item['site_city']} {$item['location']}.{$dim}. {$item['light_type']} ( {$item['site_type']} ) . Rs.{$rate} PM";
+        $caption = "{$item['site_city']}, {$item['site_name']}, {$item['location']}. {$dim}. {$item['light_type']} ( {$item['site_type']} ) . Rs.{$rate} PM";
     ?>
     <div class="slide">
         <div class="slide-header">
@@ -395,6 +395,7 @@ $slides_data = $items->fetchAll();
                     // Caption - Matching the Bold Red Underlined style
                     const city = item.site_city || "";
                     const loc = item.location || "";
+                    const siteName = item.site_name || "";
                     const type = item.site_type || "";
                     const light = item.light_type || "";
                     const w = parseInt(item.width) || 0;
@@ -403,7 +404,7 @@ $slides_data = $items->fetchAll();
                     
                     let dim = w + 'X' + h;
                     let rateFormatted = new Intl.NumberFormat('en-IN').format(rateVal);
-                    let caption = `${city} ${loc}.${dim}. ${light} ( ${type} ) . Rs.${rateFormatted} PM`;
+                    let caption = `${city}, ${siteName}, ${loc}. ${dim}. ${light} ( ${type} ) . Rs.${rateFormatted} PM`;
                     
                     slide.addText(caption, { 
                         x: 0, y: '85%', w: '100%', 

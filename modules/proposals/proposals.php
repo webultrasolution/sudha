@@ -104,26 +104,49 @@ $proposals = $proposals->fetchAll();
                         <div style="font-size: 0.65rem; color: #94a3b8; font-weight: 700;">Base: ₹<?php echo number_format($p['total_amount'], 2); ?></div>
                     </td>
                     <td>
-                        <span class="status-pill status-<?php echo $p['status']; ?>" style="font-weight: 800; text-transform: uppercase; letter-spacing: 0.05em; font-size: 0.65rem;">
-                            <?php echo $p['status']; ?>
+                        <?php 
+                            $displayStatus = $p['status'];
+                            if (($p['approval_status'] ?? '') === 'approved' && $p['status'] === 'sent') {
+                                $displayStatus = 'approved';
+                            }
+                        ?>
+                        <span class="status-pill status-<?php echo $displayStatus; ?>" style="font-weight: 800; text-transform: uppercase; letter-spacing: 0.05em; font-size: 0.65rem;">
+                            <?php echo $displayStatus; ?>
                         </span>
+                        <?php if (($p['approval_status'] ?? '') === 'pending_approval'): ?>
+                            <div style="margin-top: 4px;">
+                                <span style="background: #fff7ed; color: #c2410c; border: 1px solid #fed7aa; padding: 0.15rem 0.5rem; border-radius: 50px; font-size: 0.6rem; font-weight: 800; display: inline-flex; align-items: center; gap: 4px; animation: pulse-approval 2s infinite;">
+                                    <i class="fas fa-clock"></i> Awaiting Approval
+                                </span>
+                            </div>
+                        <?php elseif (($p['approval_status'] ?? '') === 'rejected'): ?>
+                            <div style="margin-top: 4px;">
+                                <span style="background: #fee2e2; color: #b91c1c; border: 1px solid #fca5a5; padding: 0.15rem 0.5rem; border-radius: 50px; font-size: 0.6rem; font-weight: 800; display: inline-flex; align-items: center; gap: 4px;" title="<?php echo htmlspecialchars($p['rejection_reason'] ?? ''); ?>">
+                                    <i class="fas fa-times-circle"></i> Rejected
+                                </span>
+                            </div>
+                        <?php endif; ?>
                     </td>
                     <td style="text-align: right;">
-                        <div class="dropdown" style="display: inline-block;">
-                            <button class="btn-icon btn-view" title="Export Options"><i class="fas fa-file-export"></i></button>
-                            <div class="dropdown-content">
-                                <div style="font-size: 0.6rem; font-weight: 800; color: #94a3b8; padding: 0.5rem 0.8rem; text-transform: uppercase; letter-spacing: 0.05em;">Client Documents</div>
-                                <a href="export_pdf.php?id=<?php echo $p['id']; ?>" target="_blank"><i class="fas fa-file-pdf" style="color: #ef4444;"></i> Visual Media Plan (PDF)</a>
-                                <a href="export_excel.php?id=<?php echo $p['id']; ?>"><i class="fas fa-file-excel" style="color: #10b981;"></i> Excel Rate Sheet</a>
-                                <a href="export_ppt.php?id=<?php echo $p['id']; ?>" target="_blank"><i class="fas fa-file-powerpoint" style="color: #f97316;"></i> PPT Deck / Presentation</a>
-                                <a href="javascript:void(0)" onclick="generateProforma(<?php echo $p['id']; ?>)"><i class="fas fa-file-invoice" style="color: #6366f1;"></i> Proforma Invoice (PI)</a>
-                                <div style="height: 1px; background: #f1f5f9; margin: 0.25rem 0;"></div>
-                                <div style="font-size: 0.6rem; font-weight: 800; color: #94a3b8; padding: 0.5rem 0.8rem; text-transform: uppercase; letter-spacing: 0.05em;">Visuals</div>
-                                <a href="export_ppt.php?id=<?php echo $p['id']; ?>&mode=view" target="_blank"><i class="fas fa-desktop" style="color: #6366f1;"></i> View Presentation</a>
-                                <a href="javascript:void(0)" onclick="copyPublicLink('<?php echo BASE_URL; ?>modules/proposals/export_ppt.php?id=<?php echo $p['id']; ?>')"><i class="fas fa-link" style="color: #6366f1;"></i> Copy Public Link</a>
-                                <a href="download_photos.php?id=<?php echo $p['id']; ?>"><i class="fas fa-images" style="color: #8b5cf6;"></i> Download Photos</a>
+                        <?php if (($p['approval_status'] ?? '') === 'approved'): ?>
+                            <div class="dropdown" style="display: inline-block;">
+                                <button class="btn-icon btn-view" title="Export Options"><i class="fas fa-file-export"></i></button>
+                                <div class="dropdown-content">
+                                    <div style="font-size: 0.6rem; font-weight: 800; color: #94a3b8; padding: 0.5rem 0.8rem; text-transform: uppercase; letter-spacing: 0.05em;">Client Documents</div>
+                                    <a href="export_pdf.php?id=<?php echo $p['id']; ?>" target="_blank"><i class="fas fa-file-pdf" style="color: #ef4444;"></i> Visual Media Plan (PDF)</a>
+                                    <a href="export_excel.php?id=<?php echo $p['id']; ?>"><i class="fas fa-file-excel" style="color: #10b981;"></i> Excel Rate Sheet</a>
+                                    <a href="export_ppt.php?id=<?php echo $p['id']; ?>" target="_blank"><i class="fas fa-file-powerpoint" style="color: #f97316;"></i> PPT Deck / Presentation</a>
+                                    <a href="javascript:void(0)" onclick="generateProforma(<?php echo $p['id']; ?>)"><i class="fas fa-file-invoice" style="color: #6366f1;"></i> Proforma Invoice (PI)</a>
+                                    <div style="height: 1px; background: #f1f5f9; margin: 0.25rem 0;"></div>
+                                    <div style="font-size: 0.6rem; font-weight: 800; color: #94a3b8; padding: 0.5rem 0.8rem; text-transform: uppercase; letter-spacing: 0.05em;">Visuals</div>
+                                    <a href="export_ppt.php?id=<?php echo $p['id']; ?>&mode=view" target="_blank"><i class="fas fa-desktop" style="color: #6366f1;"></i> View Presentation</a>
+                                    <a href="javascript:void(0)" onclick="copyPublicLink('<?php echo BASE_URL; ?>modules/proposals/export_ppt.php?id=<?php echo $p['id']; ?>')"><i class="fas fa-link" style="color: #6366f1;"></i> Copy Public Link</a>
+                                    <a href="download_photos.php?id=<?php echo $p['id']; ?>"><i class="fas fa-images" style="color: #8b5cf6;"></i> Download Photos</a>
+                                </div>
                             </div>
-                        </div>
+                        <?php else: ?>
+                            <span class="btn-icon" title="Exports Locked (Awaiting Approval)" style="color: #cbd5e1; cursor: not-allowed; display: inline-block; padding: 0.25rem;"><i class="fas fa-lock"></i></span>
+                        <?php endif; ?>
                         <a href="view.php?id=<?php echo $p['id']; ?>" class="btn-icon btn-view" title="Workspace" style="color: #64748b;"><i class="fas fa-layer-group"></i></a>
                         <?php if (canDelete('proposals')): ?>
                         <button class="btn-icon btn-delete" onclick="deleteProposal(<?php echo $p['id']; ?>)"><i class="fas fa-trash"></i></button>
@@ -141,6 +164,10 @@ $proposals = $proposals->fetchAll();
 .status-pill { padding: 0.25rem 0.625rem; border-radius: 9999px; font-size: 0.75rem; font-weight: 500; }
 .status-confirmed { background: #dcfce7; color: #166534; }
 .status-cancelled { background: #fee2e2; color: #991b1b; }
+.status-draft { background: #f1f5f9; color: #475569; }
+.status-sent { background: #e0f2fe; color: #0369a1; }
+.status-approved { background: #e0f2fe; color: #0369a1; border: 1px solid #bae6fd; }
+@keyframes pulse-approval { 0%, 100% { opacity: 1; } 50% { opacity: 0.5; } }
 
 /* Improved Dropdown styling */
 .dropdown { position: relative; }

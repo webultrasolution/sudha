@@ -14,6 +14,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     $po_no = clean($_POST['customer_po_no'] ?? '');
     $po_date = clean($_POST['customer_po_date'] ?? '');
     $email_date = clean($_POST['email_date'] ?? '');
+    $billing_gstin = clean($_POST['billing_gstin'] ?? '');
     
     if (!$booking_id) {
         echo json_encode(['success' => false, 'message' => 'Invalid Booking ID']);
@@ -37,17 +38,29 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         }
     }
 
-    $sql = "UPDATE bookings SET confirmation_type = ?, customer_po_no = ?, customer_po_date = ?, email_date = ?" . ($file_path ? ", customer_po_file = ?" : "") . " WHERE id = ?";
+    $sql = "UPDATE bookings SET confirmation_type = ?, customer_po_no = ?, customer_po_date = ?, email_date = ?" . ($file_path ? ", customer_po_file = ?" : "");
     $params = [$type, $po_no ?: null, $po_date ?: null, $email_date ?: null];
     if ($file_path) $params[] = $file_path;
+    
+    if (!empty($billing_gstin)) {
+        $sql .= ", billing_gstin = ?";
+        $params[] = $billing_gstin;
+    }
+    
+    $sql .= " WHERE id = ?";
     $params[] = $booking_id;
 
     $stmt = $pdo->prepare($sql);
     if ($stmt->execute($params)) {
         // Automatically create record in 'invoices' table if it doesn't exist
-        $checkInvoice = $pdo->prepare("SELECT id FROM invoices WHERE booking_id = ?");
+        $checkInvoice = $pdo->prepare("SELECT id, approval_status FROM invoices WHERE booking_id = ?");
         $checkInvoice->execute([$booking_id]);
-        if (!$checkInvoice->fetch()) {
+        $existing = $checkInvoice->fetch();
+
+        if (session_status() === PHP_SESSION_NONE) session_start();
+        $isAdmin = ($_SESSION['user_role'] ?? '') === 'admin';
+
+        if (!$existing) {
             // Fetch booking totals for the invoice record
             $stmtBooking = $pdo->prepare("SELECT total_amount, grand_total FROM bookings WHERE id = ?");
             $stmtBooking->execute([$booking_id]);
@@ -55,11 +68,23 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             
             $invNo = 'INV/' . date('Y') . '/' . str_pad($booking_id, 4, '0', STR_PAD_LEFT);
             
-            $stmtInsert = $pdo->prepare("INSERT INTO invoices (invoice_number, booking_id, type, sub_total, total_amount, payment_status) VALUES (?, ?, 'tax', ?, ?, 'unpaid')");
-            $stmtInsert->execute([$invNo, $booking_id, $bookingData['total_amount'], $bookingData['grand_total']]);
+            $approvalStatus = $isAdmin ? 'approved' : 'pending_approval';
+            
+            $stmtInsert = $pdo->prepare("INSERT INTO invoices (invoice_number, booking_id, type, sub_total, total_amount, payment_status, approval_status) VALUES (?, ?, 'tax', ?, ?, 'unpaid', ?)");
+            $stmtInsert->execute([$invNo, $booking_id, $bookingData['total_amount'], $bookingData['grand_total'], $approvalStatus]);
+            
+            $invoiceId = $pdo->lastInsertId();
+            
+            if (!$isAdmin) {
+                $userId = $_SESSION['user_id'] ?? 0;
+                $stmtAR = $pdo->prepare("INSERT INTO approval_requests (entity_type, entity_id, entity_ref, requested_by, status) VALUES ('invoice', ?, ?, ?, 'pending')");
+                $stmtAR->execute([$invoiceId, $invNo, $userId]);
+            }
+        } else {
+            $approvalStatus = $existing['approval_status'] ?? 'approved';
         }
         
-        echo json_encode(['success' => true]);
+        echo json_encode(['success' => true, 'approval_status' => $approvalStatus, 'is_admin' => $isAdmin]);
     } else {
         echo json_encode(['success' => false, 'message' => 'Database Update Failed']);
     }
