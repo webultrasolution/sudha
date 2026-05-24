@@ -212,11 +212,31 @@ function updateSummary() {
 }
 
 document.getElementById('poForm')?.addEventListener('submit', function(e) {
+    e.preventDefault();
     const checked = document.querySelectorAll('.rate-chk:checked');
     if (checked.length === 0) {
-        e.preventDefault();
         Swal.fire('Error', 'Please select at least one site/rate to generate a PO.', 'error');
+        return;
     }
+
+    const rateIds = Array.from(checked).map(chk => chk.value);
+    const vendorId = document.querySelector('input[name="vendor_id"]').value;
+    const remark = document.querySelector('input[name="remark"]').value;
+
+    fetch('../../ajax/save_printing_po_direct.php', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ rate_ids: rateIds, vendor_id: vendorId, remark: remark })
+    })
+    .then(res => res.json())
+    .then(data => {
+        if (data.success) {
+            window.location.href = 'print_printing_po.php?po_id=' + data.po_id;
+        } else {
+            Swal.fire('Error', data.message || 'Failed to save PO', 'error');
+        }
+    })
+    .catch(err => Swal.fire('Error', 'Network error', 'error'));
 });
 </script>
 
@@ -383,7 +403,7 @@ if (empty($rates)) die("No rates selected for this PO.");
                         <div style="font-size: 9px; color: #555;"><?php echo $item['media_type']; ?></div>
                     <?php endif; ?>
                 </td>
-                <td><?php echo $item['hsn_code'] ?: '998366'; ?></td>
+                <td><?php echo $item['hsn_code'] ?: ''; ?></td>
                 <td><?php echo ($item['width'] && $item['height']) ? $item['width'] . "'x" . $item['height'] . "'" : '-'; ?></td>
                 <td><?php echo $sqft > 0 ? number_format($sqft) : '-'; ?></td>
                 <td style="font-size: 9px;"><?php echo $item['media_type']; ?></td>

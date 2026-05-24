@@ -37,14 +37,22 @@ if ($pType == 'client') {
 
     // 2. Fetch Invoices
     $stmtInv = $pdo->prepare("
-        SELECT i.id, 'invoice' as type, i.created_at as date, i.invoice_number as ref, 
-               i.sub_total as base_amt, (i.cgst + i.sgst + i.igst) as tax_amount, i.total_amount as total_amt, 
-               i.total_amount as debit, 0 as credit, 'Billed' as status
-        FROM invoices i
-        JOIN bookings b ON i.booking_id = b.id
-        WHERE b.client_id = ?
+          SELECT i.id, 'invoice' as type, i.created_at as date, i.invoice_number as ref, 
+                 i.sub_total as base_amt, (i.cgst + i.sgst + i.igst) as tax_amount, i.total_amount as total_amt, 
+                 i.total_amount as debit, 0 as credit, 'Billed' as status, i.approval_status
+          FROM invoices i
+          JOIN bookings b ON i.booking_id = b.id
+          WHERE b.client_id = ?
+          
+          UNION ALL
+          
+          SELECT i.id, 'invoice' as type, i.created_at as date, i.invoice_number as ref, 
+                 i.sub_total as base_amt, (i.cgst + i.sgst + i.igst) as tax_amount, i.total_amount as total_amt, 
+                 i.total_amount as debit, 0 as credit, 'Billed' as status, i.approval_status
+          FROM invoices i
+          WHERE i.client_id = ? AND (i.booking_id IS NULL OR i.booking_id = 0)
     ");
-    $stmtInv->execute([$partner_id]);
+    $stmtInv->execute([$partner_id, $partner_id]);
     $invoices = $stmtInv->fetchAll();
     foreach ($invoices as $inv) {
         $ledgerEntries[] = $inv;

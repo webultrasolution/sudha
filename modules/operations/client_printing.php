@@ -146,14 +146,36 @@ include_once __DIR__ . '/../../includes/header.php';
             <p>No Printing rates found in the system. Add rates first in Printing PO module.</p>
         </div>
     <?php else: ?>
-        <form method="GET" action="client_printing.php" id="poForm">
+        <form method="GET" action="client_printing.php" id="poForm" enctype="multipart/form-data">
             <input type="hidden" name="client_id" value="<?php echo $client_id; ?>">
             <input type="hidden" name="filter_vendor_id" value="<?php echo $selectedFilterVendorId; ?>">
             <input type="hidden" name="preview" value="1">
 
             <div style="margin-bottom: 1.5rem; padding: 1rem; background: #f8fafc; border-radius: 10px; border: 1px solid #e2e8f0;">
-                <label style="font-size: 0.85rem; font-weight: 700; color: #475569; margin-bottom: 0.5rem; display: block;">Remark / Reference (Optional)</label>
-                <input type="text" name="remark" placeholder="e.g. Campaign Name, Brand name..." style="width: 100%; padding: 0.65rem; border: 1px solid #ddd; border-radius: 6px; font-family: inherit;">
+                <div style="display: flex; gap: 1.5rem; flex-wrap: wrap;">
+                    <div style="flex: 1; min-width: 250px;">
+                        <label style="font-size: 0.85rem; font-weight: 700; color: #475569; margin-bottom: 0.5rem; display: block;">Remark / Reference (Optional)</label>
+                        <input type="text" name="remark" placeholder="e.g. Campaign Name, Brand name..." style="width: 100%; padding: 0.65rem; border: 1px solid #ddd; border-radius: 6px; font-family: inherit;">
+                    </div>
+                    
+                    <div style="flex: 1; min-width: 200px;">
+                        <label style="font-size: 0.85rem; font-weight: 700; color: #475569; margin-bottom: 0.5rem; display: block;">Ownership Type</label>
+                        <div style="display: flex; gap: 1rem; padding-top: 0.4rem;">
+                            <label style="display: flex; align-items: center; gap: 0.3rem; font-size: 0.9rem; font-weight: 600; cursor: pointer;">
+                                <input type="radio" name="ownership" value="Self" checked style="accent-color: var(--primary); width: 16px; height: 16px;"> Self
+                            </label>
+                            <label style="display: flex; align-items: center; gap: 0.3rem; font-size: 0.9rem; font-weight: 600; cursor: pointer;">
+                                <input type="radio" name="ownership" value="TA" style="accent-color: var(--primary); width: 16px; height: 16px;"> TA (Agency)
+                            </label>
+                        </div>
+                    </div>
+                    
+                    <div style="flex: 1; min-width: 250px;">
+                        <label style="font-size: 0.85rem; font-weight: 700; color: #475569; margin-bottom: 0.5rem; display: block;">Attach POS / Tax Invoice</label>
+                        <input type="file" name="attachment" accept=".pdf,.jpg,.jpeg,.png" style="width: 100%; padding: 0.5rem 0; font-size: 0.85rem;">
+                        <div style="font-size: 0.7rem; color: #94a3b8; margin-top: 0.2rem;">Optional. JPG, PNG, or PDF allowed.</div>
+                    </div>
+                </div>
             </div>
 
             <table class="table">
@@ -278,11 +300,35 @@ function updateSummary() {
 }
 
 document.getElementById('poForm')?.addEventListener('submit', function(e) {
+    e.preventDefault();
     const checked = document.querySelectorAll('.rate-chk:checked');
     if (checked.length === 0) {
-        e.preventDefault();
-        Swal.fire('Error', 'Please select at least one site/rate to generate a client print.', 'error');
+        Swal.fire('Error', 'Please select at least one site/rate to generate an Invoice.', 'error');
+        return;
     }
+
+    const formData = new FormData(this);
+    
+    // FormData handles checked inputs naturally if they have name="rate_ids[]"
+    // Just ensure they are included based on current selection
+    formData.delete('rate_ids[]');
+    Array.from(checked).forEach(chk => {
+        formData.append('rate_ids[]', chk.value);
+    });
+
+    fetch('../../ajax/save_client_printing_invoice.php', {
+        method: 'POST',
+        body: formData
+    })
+    .then(res => res.json())
+    .then(data => {
+        if (data.success) {
+            window.location.href = 'print_client_printing.php?invoice_id=' + data.invoice_id;
+        } else {
+            Swal.fire('Error', data.message || 'Failed to save Invoice', 'error');
+        }
+    })
+    .catch(err => Swal.fire('Error', 'Network error', 'error'));
 });
 </script>
 
@@ -450,7 +496,7 @@ $is_final = isset($_GET['is_final']) && $_GET['is_final'] === '1';
                         <div style="font-size: 9px; color: #555;"><?php echo $item['media_type']; ?></div>
                     <?php endif; ?>
                 </td>
-                <td><?php echo $item['hsn_code'] ?: '998366'; ?></td>
+                <td><?php echo $item['hsn_code'] ?: ''; ?></td>
                 <td><?php echo ($item['width'] && $item['height']) ? $item['width'] . "'x" . $item['height'] . "'" : '-'; ?></td>
                 <td><?php echo $sqft > 0 ? number_format($sqft) : '-'; ?></td>
                 <td style="font-size: 9px;"><?php echo $item['media_type']; ?></td>
