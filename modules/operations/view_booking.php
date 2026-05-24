@@ -178,11 +178,14 @@ $vendors = $pdo->query("SELECT id, name FROM partners WHERE type = 'vendor' AND 
                 <i class="fas fa-file-invoice-dollar"></i> Final Tax Invoice
             </button>
         <?php endif; ?>
-
-        <button class="btn btn-primary" onclick="window.print()"
-            style="padding: 0.75rem 1.5rem; border-radius: 10px; font-weight: 800;">
-            <i class="fas fa-print"></i> Print Details
-        </button>
+            <a href="generate_mounting_po.php?booking_id=<?php echo $id; ?>" class="btn"
+                style="background: #0d9488; color: white; padding: 0.75rem 1.5rem; border-radius: 10px; font-weight: 800; text-decoration: none; display: flex; align-items: center; gap: 0.5rem;">
+                <i class="fas fa-tools"></i> Generate Mounting PO
+            </a>
+            <button class="btn btn-primary" onclick="window.print()"
+                style="padding: 0.75rem 1.5rem; border-radius: 10px; font-weight: 800;">
+                <i class="fas fa-print"></i> Print Booking
+            </button>
     </div>
 </div>
 
