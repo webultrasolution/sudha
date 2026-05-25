@@ -129,28 +129,68 @@ $clients = $pdo->query("SELECT id, name FROM partners WHERE type = 'client' ORDE
                         <div style="font-size: 0.65rem; color: #94a3b8; margin-top: 2px;">#<?php echo $r['po_number']; ?></div>
                     <?php endif; ?>
                 </td>
+                <?php 
+                $has_multiple = count($ids) > 1;
+                $groupId = $r['po_number'] ? $r['po_number'] : 'rate-' . $ids[0];
+                ?>
                 <td>
-                    <?php foreach($ids as $i => $id): ?>
-                        <div style="margin-bottom: 5px; padding-bottom: 5px; border-bottom: 1px solid #f1f5f9;">
-                            <div style="font-size: 0.85rem; font-weight: 600;"><?php echo htmlspecialchars($sNames[$i]); ?></div>
-                            <small style="color: #64748b;"><?php echo $sCodes[$i]; ?> (<?php echo $widths[$i]; ?>x<?php echo $heights[$i]; ?> = <strong><?php echo floatval($widths[$i]) * floatval($heights[$i]); ?> SQFT</strong>)</small>
+                    <!-- First site (always visible) -->
+                    <div style="margin-bottom: 5px; padding-bottom: 5px; border-bottom: 1px solid #f1f5f9;">
+                        <div style="font-size: 0.85rem; font-weight: 600;"><?php echo htmlspecialchars($sNames[0]); ?></div>
+                        <small style="color: #64748b;"><?php echo $sCodes[0]; ?> (<?php echo $widths[0]; ?>x<?php echo $heights[0]; ?> = <strong><?php echo floatval($widths[0]) * floatval($heights[0]); ?> SQFT</strong>)</small>
+                    </div>
+                    
+                    <!-- Collapsible sites -->
+                    <?php if ($has_multiple): ?>
+                        <div class="collapsible-po-<?php echo $groupId; ?>" style="display: none;">
+                            <?php for($i = 1; $i < count($ids); $i++): ?>
+                                <div style="margin-bottom: 5px; padding-bottom: 5px; border-bottom: 1px solid #f1f5f9;">
+                                    <div style="font-size: 0.85rem; font-weight: 600;"><?php echo htmlspecialchars($sNames[$i]); ?></div>
+                                    <small style="color: #64748b;"><?php echo $sCodes[$i]; ?> (<?php echo $widths[$i]; ?>x<?php echo $heights[$i]; ?> = <strong><?php echo floatval($widths[$i]) * floatval($heights[$i]); ?> SQFT</strong>)</small>
+                                </div>
+                            <?php endfor; ?>
                         </div>
-                    <?php endforeach; ?>
+                        <a href="javascript:void(0);" onclick="togglePODetails('<?php echo $groupId; ?>')" id="toggle-btn-<?php echo $groupId; ?>" data-count="<?php echo (count($ids) - 1); ?>" style="font-size: 0.72rem; color: var(--primary); font-weight: 700; text-decoration: none; display: inline-flex; align-items: center; gap: 4px; margin-top: 4px; background: #f0fdfa; padding: 4px 8px; border-radius: 6px; border: 1px solid #ccfbf1;">
+                            <i class="fas fa-chevron-down"></i> + <?php echo (count($ids) - 1); ?> more site(s)
+                        </a>
+                    <?php endif; ?>
                 </td>
                 <td>
-                    <?php foreach($ids as $i => $id): ?>
-                        <div style="height: 38px; display: flex; align-items: center;">
-                            <span class="badge" style="background: #f1f5f9; color: #475569; font-size: 0.7rem;"><?php echo htmlspecialchars($mediaTypes[$i]); ?></span>
+                    <!-- First media type -->
+                    <div style="height: 38px; display: flex; align-items: center;">
+                        <span class="badge" style="background: #f1f5f9; color: #475569; font-size: 0.7rem;"><?php echo htmlspecialchars($mediaTypes[0]); ?></span>
+                    </div>
+                    
+                    <!-- Collapsible media types -->
+                    <?php if ($has_multiple): ?>
+                        <div class="collapsible-po-<?php echo $groupId; ?>" style="display: none;">
+                            <?php for($i = 1; $i < count($ids); $i++): ?>
+                                <div style="height: 38px; display: flex; align-items: center;">
+                                    <span class="badge" style="background: #f1f5f9; color: #475569; font-size: 0.7rem;"><?php echo htmlspecialchars($mediaTypes[$i]); ?></span>
+                                </div>
+                            <?php endfor; ?>
                         </div>
-                    <?php endforeach; ?>
+                    <?php endif; ?>
                 </td>
                 <td>
-                    <?php foreach($ids as $i => $id): ?>
-                        <div style="height: 38px; display: flex; flex-direction: column; justify-content: center;">
-                            <strong style="color: var(--primary);">₹<?php echo number_format(floatval($unitRates[$i]), 2); ?></strong>
-                            <div style="font-size: 0.65rem; color: #059669; font-weight: 700;">₹<?php echo number_format(floatval($unitRates[$i]) * floatval($widths[$i]) * floatval($heights[$i]), 2); ?></div>
+                    <!-- First rate -->
+                    <div style="height: 38px; display: flex; flex-direction: column; justify-content: center;">
+                        <strong style="color: var(--primary);">₹<?php echo number_format(floatval($unitRates[0]), 2); ?></strong>
+                        <div style="font-size: 0.65rem; color: #059669; font-weight: 700;">₹<?php echo number_format(floatval($unitRates[0]) * floatval($widths[0]) * floatval($heights[0]), 2); ?></div>
+                    </div>
+                    
+                    <!-- Collapsible rates -->
+                    <?php if ($has_multiple): ?>
+                        <div class="collapsible-po-<?php echo $groupId; ?>" style="display: none;">
+                            <?php for($i = 1; $i < count($ids); $i++): ?>
+                                <div style="height: 38px; display: flex; flex-direction: column; justify-content: center;">
+                                    <strong style="color: var(--primary);">₹<?php echo number_format(floatval($unitRates[$i]), 2); ?></strong>
+                                    <div style="font-size: 0.65rem; color: #059669; font-weight: 700;">₹<?php echo number_format(floatval($unitRates[$i]) * floatval($widths[$i]) * floatval($heights[$i]), 2); ?></div>
+                                </div>
+                            <?php endfor; ?>
                         </div>
-                    <?php endforeach; ?>
+                    <?php endif; ?>
+                    
                     <?php if(count($ids) > 1): ?>
                         <div style="margin-top: 10px; padding-top: 5px; border-top: 2px solid #e2e8f0;">
                             <div style="font-size: 0.65rem; color: #64748b; text-transform: uppercase; font-weight: 800;">Total Amount</div>
@@ -234,21 +274,24 @@ $clients = $pdo->query("SELECT id, name FROM partners WHERE type = 'client' ORDE
                             <?php endif; ?>
                         </div>
                         
-                        <?php if (count($ids) > 1): ?>
-                            <?php for($i = 1; $i < count($ids); $i++): ?>
-                                <div style="height: 38px; display: flex; align-items: center; gap: 8px;">
-                                    <?php if (canEdit('clients')): ?>
-                                    <a href="create_client_printing_po.php?action=edit&id=<?php echo $ids[$i]; ?>" class="btn-icon" style="color: #0284c7; background: #e0f2fe; padding: 6px; border-radius: 8px; font-size: 0.85rem; display: inline-flex; align-items: center; justify-content: center; width: 28px; height: 28px; border: none; text-decoration: none;" title="Edit">
-                                        <i class="fas fa-edit"></i>
-                                    </a>
-                                    <?php endif; ?>
-                                    <?php if (canDelete('clients')): ?>
-                                    <button class="btn-icon btn-delete" onclick="deleteRate(<?php echo $ids[$i]; ?>)" style="display: inline-flex; align-items: center; justify-content: center; width: 28px; height: 28px;" title="Delete">
-                                        <i class="fas fa-trash"></i>
-                                    </button>
-                                    <?php endif; ?>
-                                </div>
-                            <?php endfor; ?>
+                        <!-- Collapsible Actions -->
+                        <?php if ($has_multiple): ?>
+                            <div class="collapsible-po-<?php echo $groupId; ?>" style="display: none;">
+                                <?php for($i = 1; $i < count($ids); $i++): ?>
+                                    <div style="height: 38px; display: flex; align-items: center; gap: 8px;">
+                                        <?php if (canEdit('clients')): ?>
+                                        <a href="create_client_printing_po.php?action=edit&id=<?php echo $ids[$i]; ?>" class="btn-icon" style="color: #0284c7; background: #e0f2fe; padding: 6px; border-radius: 8px; font-size: 0.85rem; display: inline-flex; align-items: center; justify-content: center; width: 28px; height: 28px; border: none; text-decoration: none;" title="Edit">
+                                            <i class="fas fa-edit"></i>
+                                        </a>
+                                        <?php endif; ?>
+                                        <?php if (canDelete('clients')): ?>
+                                        <button class="btn-icon btn-delete" onclick="deleteRate(<?php echo $ids[$i]; ?>)" style="display: inline-flex; align-items: center; justify-content: center; width: 28px; height: 28px;" title="Delete">
+                                            <i class="fas fa-trash"></i>
+                                        </button>
+                                        <?php endif; ?>
+                                    </div>
+                                <?php endfor; ?>
+                            </div>
                         <?php endif; ?>
                         
                         <!-- Row-level Final Tax Invoice Action -->
@@ -538,6 +581,23 @@ function toggleConfFields() {
     const emailFields = document.getElementById('email_fields');
     if (poFields) poFields.style.display = type === 'po' ? 'block' : 'none';
     if (emailFields) emailFields.style.display = type === 'email' ? 'block' : 'none';
+}
+
+function togglePODetails(groupId) {
+    const elements = document.querySelectorAll('.collapsible-po-' + groupId);
+    const btn = document.getElementById('toggle-btn-' + groupId);
+    if (elements.length > 0) {
+        const isHidden = elements[0].style.display === 'none';
+        elements.forEach(el => {
+            el.style.display = isHidden ? 'block' : 'none';
+        });
+        const count = btn.getAttribute('data-count');
+        if (isHidden) {
+            btn.innerHTML = `<i class="fas fa-chevron-up"></i> Show less`;
+        } else {
+            btn.innerHTML = `<i class="fas fa-chevron-down"></i> + ${count} more site(s)`;
+        }
+    }
 }
 </script>
 
