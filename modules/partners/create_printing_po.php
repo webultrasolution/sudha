@@ -16,13 +16,34 @@ if ($action === 'edit') {
     requirePermission('vendors', 'add');
 }
 
+$po_number = isset($_GET['po_number']) ? clean($_GET['po_number']) : null;
+$rate_ids = isset($_GET['rate_ids']) && is_array($_GET['rate_ids']) ? $_GET['rate_ids'] : [];
+$vendor_id_get = isset($_GET['vendor_id']) ? intval($_GET['vendor_id']) : 0;
+
 $rateData = null;
-if ($id && $action === 'edit') {
-    $stmt = $pdo->prepare("SELECT * FROM vendor_printing_rates WHERE id = ?");
-    $stmt->execute([$id]);
-    $rateData = $stmt->fetch();
-    if (!$rateData) {
-        die("Rate record not found.");
+$selectedSitesData = [];
+
+if ($action === 'edit') {
+    if ($po_number) {
+        $stmt = $pdo->prepare("SELECT * FROM vendor_printing_rates WHERE po_number = ? AND vendor_id = ?");
+        $stmt->execute([$po_number, $vendor_id_get]);
+        $rows = $stmt->fetchAll();
+    } else if (!empty($rate_ids)) {
+        $in = str_repeat('?,', count($rate_ids) - 1) . '?';
+        $stmt = $pdo->prepare("SELECT * FROM vendor_printing_rates WHERE id IN ($in)");
+        $stmt->execute($rate_ids);
+        $rows = $stmt->fetchAll();
+    } else {
+        die("Invalid PO reference.");
+    }
+    
+    if (empty($rows)) {
+        die("Vendor PO not found.");
+    }
+    
+    $rateData = $rows[0];
+    foreach($rows as $r) {
+        $selectedSitesData[$r['site_id']] = $r['rate_per_sqft'];
     }
     $pageTitle = 'Edit Printing PO';
 }
@@ -43,63 +64,24 @@ include_once __DIR__ . '/../../includes/header.php';
 <div class="card" style="border-radius: 20px; box-shadow: 0 10px 30px rgba(0,0,0,0.05); padding: 0; overflow: hidden; background: #fff;">
 
     <form method="POST" action="printing_rates.php" id="rateForm" style="display: flex; flex-direction: column; margin: 0;">
-        <input type="hidden" name="action" id="formAction" value="<?php echo htmlspecialchars($action); ?>">
-        <input type="hidden" name="id" id="rateId" value="<?php echo htmlspecialchars($id); ?>">
-        
         <?php if ($action === 'edit'): ?>
-            <!-- Sleek Single-Column Card for Edit Mode -->
-            <div style="max-width: 650px; margin: 3rem auto; padding: 2.5rem; background: #f8fafc; border-radius: 20px; border: 1px solid #e2e8f0; width: 100%; box-sizing: border-box;">
-                <div class="form-group" style="margin-bottom: 2rem;">
-                    <label style="font-weight: 800; color: #1e293b; font-size: 0.75rem; margin-bottom: 0.75rem; display: block; text-transform: uppercase; letter-spacing: 0.05em;">1. Select Vendor</label>
-                    <select name="vendor_id" id="f_vendor" required style="background: #fff; border: 2px solid #e2e8f0; border-radius: 10px; padding: 0.85rem 1rem; width: 100%; font-weight: 600; font-size: 0.95rem;">
-                        <option value="">Choose Printing Partner...</option>
-                        <?php foreach ($vendors as $v): ?>
-                            <option value="<?php echo $v['id']; ?>" <?php echo ($rateData && $rateData['vendor_id'] == $v['id']) ? 'selected' : ''; ?>>
-                                <?php echo htmlspecialchars($v['name']); ?>
-                            </option>
-                        <?php endforeach; ?>
-                    </select>
-                </div>
-
-                <div class="form-group" style="margin-bottom: 2rem;">
-                    <label style="font-weight: 800; color: #1e293b; font-size: 0.75rem; margin-bottom: 0.75rem; display: block; text-transform: uppercase; letter-spacing: 0.05em;">2. Select Site</label>
-                    <select name="site_id" id="f_site" style="background: #fff; border: 2px solid #e2e8f0; border-radius: 10px; padding: 0.85rem 1rem; width: 100%; font-weight: 600; font-size: 0.95rem;">
-                        <option value="">Generic / All Sites</option>
-                    </select>
-                </div>
-
-                <div class="form-group" style="margin-bottom: 2rem;">
-                    <label style="font-weight: 800; color: #1e293b; font-size: 0.75rem; margin-bottom: 0.75rem; display: block; text-transform: uppercase; letter-spacing: 0.05em;">3. Media Type</label>
-                    <select name="media_type" id="f_media" style="background: #fff; border: 2px solid #e2e8f0; border-radius: 10px; padding: 0.85rem 1rem; width: 100%; font-weight: 600; font-size: 0.95rem; height: 50px;">
-                        <option value="Flex" <?php echo (!$rateData || $rateData['media_type'] === 'Flex') ? 'selected' : ''; ?>>Flex</option>
-                        <option value="Vinyl" <?php echo ($rateData && $rateData['media_type'] === 'Vinyl') ? 'selected' : ''; ?>>Vinyl</option>
-                        <option value="Star Flex" <?php echo ($rateData && $rateData['media_type'] === 'Star Flex') ? 'selected' : ''; ?>>Star Flex</option>
-                        <option value="Backlit Flex" <?php echo ($rateData && ($rateData['media_type'] === 'Backlit Flex' || $rateData['media_type'] === 'Backlit')) ? 'selected' : ''; ?>>Backlit</option>
-                        <option value="One Way Vision" <?php echo ($rateData && ($rateData['media_type'] === 'One Way Vision' || $rateData['media_type'] === 'OWV')) ? 'selected' : ''; ?>>OWV</option>
-                        <option value="Canvas" <?php echo ($rateData && $rateData['media_type'] === 'Canvas') ? 'selected' : ''; ?>>Canvas</option>
-                    </select>
-                </div>
-
-                <div class="form-group" style="margin-bottom: 2rem;">
-                    <label style="font-weight: 800; color: #1e293b; font-size: 0.75rem; margin-bottom: 0.75rem; display: block; text-transform: uppercase; letter-spacing: 0.05em;">4. Rate (₹ per SQFT)</label>
-                    <div style="position: relative;">
-                        <span style="position: absolute; left: 15px; top: 50%; transform: translateY(-50%); font-weight: 800; color: #94a3b8;">₹</span>
-                        <input type="number" step="0.01" name="rate_per_sqft" id="f_rate" min="0" placeholder="0.00" value="<?php echo $rateData ? htmlspecialchars($rateData['rate_per_sqft']) : ''; ?>" style="padding-left: 35px; font-size: 1.2rem; font-weight: 900; color: #0d9488; border: 2px solid #e2e8f0; border-radius: 10px; width: 100%; height: 50px;">
-                    </div>
-                </div>
-
-                <div id="sqft_display" style="display: none; background: #0f172a; padding: 1.5rem; border-radius: 16px; color: white; box-shadow: 0 10px 20px rgba(0,0,0,0.15); margin-top: 2rem;">
-                    <div style="display: flex; justify-content: space-between; margin-bottom: 0.75rem; border-bottom: 1px solid rgba(255,255,255,0.1); padding-bottom: 0.5rem;">
-                        <span style="color: #94a3b8; font-size: 0.65rem; font-weight: 800; text-transform: uppercase; letter-spacing: 0.1em;">TOTAL AREA</span>
-                        <strong id="sqft_value" style="color: #fff; font-size: 1.2rem; font-weight: 800;">0 SQFT</strong>
-                    </div>
-                    <div style="display: flex; justify-content: space-between; align-items: baseline;">
-                        <span style="color: #94a3b8; font-size: 0.65rem; font-weight: 800; text-transform: uppercase; letter-spacing: 0.1em;">ESTIMATED PRICE</span>
-                        <strong id="total_price_value" style="color: #2dd4bf; font-size: 1.6rem; font-weight: 900;">₹0.00</strong>
-                    </div>
-                </div>
+            <?php if ($po_number): ?>
+                <input type="hidden" name="po_number" value="<?php echo htmlspecialchars($po_number); ?>">
+            <?php else: ?>
+                <?php foreach($rate_ids as $r_id): ?>
+                    <input type="hidden" name="rate_ids[]" value="<?php echo htmlspecialchars($r_id); ?>">
+                <?php endforeach; ?>
+            <?php endif; ?>
+        <?php endif; ?>
+        
+        <div style="background: #f8fafc; padding: 1.5rem 2.5rem; border-bottom: 1px solid #e2e8f0;">
+            <label style="font-weight: 800; color: #1e293b; font-size: 0.75rem; margin-bottom: 0.75rem; display: block; text-transform: uppercase; letter-spacing: 0.05em;">Master Rate (₹ per SQFT)</label>
+            <div style="position: relative; max-width: 300px;">
+                <span style="position: absolute; left: 15px; top: 50%; transform: translateY(-50%); font-weight: 800; color: #94a3b8;">₹</span>
+                <input type="number" step="0.01" name="rate_per_sqft" id="f_rate" min="0" placeholder="0.00" value="<?php echo $rateData ? htmlspecialchars($rateData['rate_per_sqft']) : ''; ?>" style="padding-left: 35px; font-size: 1.2rem; font-weight: 900; color: #0d9488; border: 2px solid #e2e8f0; border-radius: 10px; width: 100%; height: 50px;">
             </div>
-        <?php else: ?>
+            <p style="color: #64748b; font-size: 0.75rem; margin-top: 0.5rem; font-weight: 600;">Setting this will apply to all checked sites below. You can also specify individual rates.</p>
+        </div>
             <!-- Full-Width Horizontal Header Config Panel -->
             <div style="background: #f8fafc; padding: 1rem 2.5rem; border-bottom: 1px solid #e2e8f0; display: grid; grid-template-columns: 1fr 1fr; gap: 2rem; align-items: start;">
                 <!-- Column 1: Select Vendor -->
@@ -256,7 +238,6 @@ include_once __DIR__ . '/../../includes/header.php';
                         </div>
                     </div>
                 </div>
-        <?php endif; ?>
 
         <div style="background: #f8fafc; padding: 1.5rem 2.5rem; border-top: 1px solid #f1f5f9; display: flex; justify-content: space-between; align-items: center; position: sticky; bottom: 0; z-index: 100; box-shadow: 0 -4px 12px rgba(0,0,0,0.05);">
             <?php if ($action !== 'edit'): ?>
@@ -345,6 +326,7 @@ const sitesData = <?php echo json_encode($sites); ?>;
 const vendorsData = <?php echo json_encode($vendors); ?>;
 const isEditMode = <?php echo $action === 'edit' ? 'true' : 'false'; ?>;
 const initialRateData = <?php echo $rateData ? json_encode($rateData) : 'null'; ?>;
+const selectedSitesData = <?php echo json_encode($selectedSitesData); ?>;
 
 document.getElementById('f_vendor').addEventListener('change', filterSitesByVendor);
 document.getElementById('f_site').addEventListener('change', calculateTotal);
@@ -401,7 +383,7 @@ function filterSitesByVendor() {
     siteSelect.innerHTML = '<option value="">Generic / All Sites</option>';
     siteList.innerHTML = '';
     
-    const displaySites = isEditMode && vendorId ? sitesData.filter(s => s.vendor_id == vendorId) : sitesData;
+    const displaySites = sitesData;
 
     if (displaySites.length === 0) {
         siteList.innerHTML = '<div style="color: #94a3b8; font-size: 0.8rem; padding: 10px; text-align: center; grid-column: 1 / -1;">No sites found in system.</div>';
@@ -471,6 +453,13 @@ function filterSitesByVendor() {
             updateBucketUI();
         };
 
+        if (isEditMode && selectedSitesData[s.id] !== undefined) {
+            chk.checked = true;
+            item.classList.add('selected');
+            rateInput.value = selectedSitesData[s.id];
+            rateInput.dataset.touched = 'true';
+        }
+
         siteList.appendChild(item);
     });
     
@@ -480,7 +469,6 @@ function filterSitesByVendor() {
 }
 
 function filterSitesInModal() {
-    if (isEditMode) return;
     
     const q = document.getElementById('siteSearch').value.toLowerCase();
     
@@ -551,7 +539,6 @@ function filterSitesInModal() {
 }
 
 function resetFilters() {
-    if (isEditMode) return;
     
     document.getElementById('siteSearch').value = '';
     
@@ -577,23 +564,12 @@ function calculateTotal() {
     let totalSqft = 0;
     let netAmount = 0;
     
-    if (isEditMode) {
-        const siteId = document.getElementById('f_site').value;
-        if (siteId) {
-            const site = sitesData.find(s => s.id == siteId);
-            if (site && site.width && site.height) {
-                totalSqft = parseFloat(site.width) * parseFloat(site.height);
-                netAmount = totalSqft * rate;
-            }
-        }
-    } else {
-        document.querySelectorAll('.site-chk-input:checked').forEach(chk => {
-            const sqft = parseFloat(chk.dataset.sqft) || 0;
-            const indRate = parseFloat(chk.closest('.site-item').querySelector('.site-individual-rate').value) || rate;
-            totalSqft += sqft;
-            netAmount += (sqft * indRate);
-        });
-    }
+    document.querySelectorAll('.site-chk-input:checked').forEach(chk => {
+        const sqft = parseFloat(chk.dataset.sqft) || 0;
+        const indRate = parseFloat(chk.closest('.site-item').querySelector('.site-individual-rate').value) || rate;
+        totalSqft += sqft;
+        netAmount += (sqft * indRate);
+    });
     
     if (totalSqft > 0) {
         const sqftValEl = document.getElementById('sqft_value');
@@ -630,7 +606,6 @@ function toggleSearchCriteria() {
 }
 
 document.getElementById('rateForm').addEventListener('submit', function(e) {
-    if (isEditMode) return;
     
     const checked = document.querySelectorAll('.site-chk-input:checked');
     if (checked.length === 0) {
