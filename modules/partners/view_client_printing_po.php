@@ -201,19 +201,19 @@ unset($item);
             <div style="margin-bottom: 1.5rem; padding-bottom: 1.5rem; border-bottom: 1px solid #f1f5f9;">
                 <h3 style="font-size: 0.85rem; color: #64748b; text-transform: uppercase; letter-spacing: 1px; margin: 0 0 1rem 0; font-weight: 800;">Invoice Reference</h3>
                 <div style="display: flex; flex-direction: column; gap: 1rem;">
-                    <?php if ($first['custom_invoice_number']): ?>
+                    <?php if (!empty($first['custom_invoice_number'])): ?>
                     <div style="display: flex; justify-content: space-between; align-items: center;">
                         <span style="color: #64748b; font-size: 0.85rem;">Custom Invoice #</span>
                         <strong style="color: #0f172a; font-size: 0.9rem;"><?php echo htmlspecialchars($first['custom_invoice_number']); ?></strong>
                     </div>
                     <?php endif; ?>
-                    <?php if ($first['custom_invoice_date']): ?>
+                    <?php if (!empty($first['custom_invoice_date'])): ?>
                     <div style="display: flex; justify-content: space-between; align-items: center;">
                         <span style="color: #64748b; font-size: 0.85rem;">Invoice Date</span>
                         <strong style="color: #0f172a; font-size: 0.9rem;"><?php echo date('d M Y', strtotime($first['custom_invoice_date'])); ?></strong>
                     </div>
                     <?php endif; ?>
-                    <?php if ($first['customer_po_no']): ?>
+                    <?php if (!empty($first['customer_po_no'])): ?>
                     <div style="display: flex; justify-content: space-between; align-items: center;">
                         <span style="color: #64748b; font-size: 0.85rem;">Customer PO #</span>
                         <strong style="color: #0f172a; font-size: 0.9rem;"><?php echo htmlspecialchars($first['customer_po_no']); ?></strong>
