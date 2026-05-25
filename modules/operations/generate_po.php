@@ -118,9 +118,13 @@ if ($mode === 'direct') {
 } else if ($mode === 'saved_po') {
     // Fetch Items from po_items
     $itemSql = "
-        SELECT pi.*, pi.cost as purchase_amount, s.name as site_name, s.site_code, s.location, s.city, s.width, s.height, s.light_type, s.hsn_code, s.vendor_gst, s.type as media_type
+        SELECT pi.*, pi.cost as purchase_amount, 
+               COALESCE(bi.custom_site_name, s.name) as site_name, s.site_code, 
+               COALESCE(bi.custom_location, s.location) as location, s.city, s.width, s.height, s.light_type, s.hsn_code, s.vendor_gst, s.type as media_type
         FROM po_items pi
         JOIN sites s ON pi.site_id = s.id
+        LEFT JOIN purchase_orders po ON pi.po_id = po.id
+        LEFT JOIN booking_items bi ON po.campaign_id = bi.booking_id AND pi.site_id = bi.site_id
         WHERE pi.po_id = ?
     ";
     $itemParams = [$po_id];
@@ -160,7 +164,7 @@ if ($mode === 'direct') {
 
     if ($booking_id) {
         $itemSql = "
-            SELECT bi.*, s.name as site_name, s.site_code, s.location, s.city, s.width, s.height, s.light_type, s.hsn_code, s.vendor_gst, s.type as media_type
+            SELECT bi.*, COALESCE(bi.custom_site_name, s.name) as site_name, s.site_code, COALESCE(bi.custom_location, s.location) as location, s.city, s.width, s.height, s.light_type, s.hsn_code, s.vendor_gst, s.type as media_type
             FROM booking_items bi
             JOIN sites s ON bi.site_id = s.id
             WHERE bi.booking_id = ? AND s.vendor_id = ?

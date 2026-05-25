@@ -32,7 +32,7 @@ if (!$b) {
 
 // Fetch Items from booking_items
 $stmtItems = $pdo->prepare("
-    SELECT bi.*, s.site_code, s.name as site_name, COALESCE(bi.custom_location, s.location) as location, s.city, s.type as media_type, s.owner_type, 
+    SELECT bi.*, s.site_code, COALESCE(bi.custom_site_name, s.name) as site_name, COALESCE(bi.custom_location, s.location) as location, s.city, s.type as media_type, s.owner_type, 
            s.width, s.height, s.light_type, s.vendor_id, v.name as vendor_name, v.contact_person as vendor_contact,
            o.status as op_status, o.id as op_id
     FROM booking_items bi
@@ -324,7 +324,12 @@ $stmtCheckPO = $pdo->prepare("SELECT id, approval_status FROM purchase_orders WH
                 ?>
                 <tr>
                     <td>
-                        <div style="font-weight: 800; color: #1e293b; margin-bottom: 2px;"><?php echo htmlspecialchars($item['site_name'] ?? ''); ?></div>
+                        <div style="font-weight: 800; color: #1e293b; margin-bottom: 2px; display: flex; align-items: center;">
+                            <span id="site-name-<?php echo $item['id']; ?>"><?php echo htmlspecialchars($item['site_name'] ?? ''); ?></span>
+                            <?php if (canEdit('bookings')): ?>
+                                <button onclick="editSiteName(<?php echo $item['id']; ?>, '<?php echo addslashes(htmlspecialchars($item['site_name'] ?? '')); ?>')" style="background: none; border: none; color: var(--primary); cursor: pointer; padding: 0; margin-left: 6px; font-size: 0.75rem;" title="Edit Site Name"><i class="fas fa-edit"></i></button>
+                            <?php endif; ?>
+                        </div>
                         <div style="font-size: 0.75rem; color: #64748b; margin-bottom: 6px; display: flex; align-items: center; gap: 6px;">
                             <span id="site-loc-<?php echo $item['id']; ?>"><?php echo htmlspecialchars($item['location'] ?? ''); ?></span>
                             <?php if (canEdit('bookings')): ?>
@@ -1659,6 +1664,40 @@ $stmtCheckPO = $pdo->prepare("SELECT id, approval_status FROM purchase_orders WH
                 document.getElementById('site-loc-' + itemId).innerText = result.value;
                 Swal.fire({
                     toast: true, position: 'top-end', icon: 'success', title: 'Location updated!', showConfirmButton: false, timer: 1500
+                });
+            }
+        });
+    }
+
+    function editSiteName(itemId, currentName) {
+        Swal.fire({
+            title: 'Edit Site Name',
+            input: 'text',
+            inputValue: currentName,
+            showCancelButton: true,
+            confirmButtonText: 'Save',
+            showLoaderOnConfirm: true,
+            preConfirm: (newName) => {
+                return fetch('../../ajax/update_booking_item_name.php', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+                    body: `item_id=${itemId}&site_name=${encodeURIComponent(newName)}`
+                })
+                .then(response => response.json())
+                .then(data => {
+                    if (!data.success) throw new Error(data.message);
+                    return newName;
+                })
+                .catch(error => {
+                    Swal.showValidationMessage(`Request failed: ${error}`);
+                });
+            },
+            allowOutsideClick: () => !Swal.isLoading()
+        }).then((result) => {
+            if (result.isConfirmed) {
+                document.getElementById('site-name-' + itemId).innerText = result.value;
+                Swal.fire({
+                    toast: true, position: 'top-end', icon: 'success', title: 'Site Name updated!', showConfirmButton: false, timer: 1500
                 });
             }
         });
