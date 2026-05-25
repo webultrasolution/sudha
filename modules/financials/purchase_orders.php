@@ -1,4 +1,30 @@
 <?php
+// Handle AJAX Actions before any output
+if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action']) && $_POST['action'] === 'delete') {
+    include_once __DIR__ . '/../../config/db.php';
+    include_once __DIR__ . '/../../includes/functions.php';
+    checkAuth();
+    requirePermission('financials', 'delete');
+    header('Content-Type: application/json');
+    $id = intval($_POST['id']);
+    try {
+        $pdo->beginTransaction();
+        
+        $pdo->prepare("DELETE FROM po_items WHERE po_id = ?")->execute([$id]);
+        $pdo->prepare("DELETE FROM po_attachments WHERE po_id = ?")->execute([$id]);
+        $pdo->prepare("DELETE FROM purchase_orders WHERE id = ?")->execute([$id]);
+        
+        logActivity('deleted PO', 'financials', $id, "Purchase Order #$id was deleted.");
+        
+        $pdo->commit();
+        echo json_encode(['success' => true]);
+    } catch (Exception $e) {
+        $pdo->rollBack();
+        echo json_encode(['success' => false, 'message' => $e->getMessage()]);
+    }
+    exit;
+}
+
 $activePage = 'pos';
 $pageTitle = 'Purchase Order Management';
 include_once __DIR__ . '/../../includes/header.php';
@@ -183,6 +209,9 @@ $vendorsList = $pdo->query("SELECT id, name FROM partners WHERE type = 'vendor' 
                     <?php else: ?>
                         <span class="btn-icon" title="Locked (Awaiting Approval)" style="color: #cbd5e1; cursor: not-allowed;"><i class="fas fa-lock"></i></span>
                     <?php endif; ?>
+                    <?php if (canDelete('financials')): ?>
+                    <button class="btn-icon" onclick="deletePO(<?php echo $p['id']; ?>)" title="Delete PO" style="color: #ef4444;"><i class="fas fa-trash"></i></button>
+                    <?php endif; ?>
                 </td>
             </tr>
             <?php endforeach; ?>
@@ -305,6 +334,32 @@ function handlePOUpload(input) {
     .catch(err => {
         console.error(err);
         Swal.fire('Error', 'Network error. Please try again.', 'error');
+    });
+}
+
+function deletePO(id) {
+    Swal.fire({
+        title: 'Delete Purchase Order?',
+        text: "This will permanently remove the PO and all its items.",
+        icon: 'warning',
+        showCancelButton: true,
+        confirmButtonColor: '#ef4444',
+        cancelButtonColor: '#475569',
+        confirmButtonText: 'Yes, delete it'
+    }).then((result) => {
+        if (result.isConfirmed) {
+            fetch('purchase_orders.php', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+                body: `action=delete&id=${id}`
+            }).then(r => r.json()).then(res => {
+                if (res.success) {
+                    Swal.fire('Deleted!', 'Purchase Order has been deleted.', 'success').then(() => location.reload());
+                } else {
+                    Swal.fire('Error', res.message, 'error');
+                }
+            });
+        }
     });
 }
 </script>
