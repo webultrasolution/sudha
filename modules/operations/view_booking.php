@@ -1090,7 +1090,10 @@ $stmtCheckPO = $pdo->prepare("SELECT id, approval_status FROM purchase_orders WH
                 <?php endif; ?>
 
                 <label style="display:block; font-size: 0.75rem; font-weight: 700; color: #64748b; margin-bottom: 5px;">INVOICE NUMBER</label>
-                <input id="custom_invoice_number" class="swal2-input" placeholder="e.g. INV-2026-001 (Leave empty to auto-generate)" style="margin: 0 0 1rem 0; width: 100%; box-sizing: border-box;">
+                <input id="custom_invoice_number" class="swal2-input" placeholder="e.g. SCR/26-27/001 (Leave empty to auto-generate)" style="margin: 0 0 1rem 0; width: 100%; box-sizing: border-box;">
+
+                <label style="display:block; font-size: 0.75rem; font-weight: 700; color: #64748b; margin-bottom: 5px;">INVOICE DATE</label>
+                <input id="custom_invoice_date" type="date" class="swal2-input" value="<?php echo date('Y-m-d'); ?>" style="margin: 0 0 1rem 0; width: 100%; box-sizing: border-box;">
 
                 <label style="display:block; font-size: 0.75rem; font-weight: 700; color: #64748b; margin-bottom: 5px;">CONFIRMATION TYPE</label>
                 <select id="confirmation_type" class="swal2-input" style="margin: 0 0 1rem 0; width: 100%; box-sizing: border-box;" onchange="toggleConfFields()">
@@ -1125,6 +1128,7 @@ $stmtCheckPO = $pdo->prepare("SELECT id, approval_status FROM purchase_orders WH
                 const email_date = document.getElementById('email_date').value;
                 const po_file = document.getElementById('customer_po_file').files[0];
                 const customInvoiceNo = document.getElementById('custom_invoice_number').value;
+                const customInvoiceDate = document.getElementById('custom_invoice_date').value;
 
                 if (type === 'po') {
                     if (!po_no) { Swal.showValidationMessage(`Customer PO Number is mandatory`); return false; }
@@ -1145,6 +1149,7 @@ $stmtCheckPO = $pdo->prepare("SELECT id, approval_status FROM purchase_orders WH
                 formData.append('customer_po_date', po_date);
                 formData.append('email_date', email_date);
                 formData.append('custom_invoice_number', customInvoiceNo);
+                formData.append('custom_invoice_date', customInvoiceDate);
                 formData.append('customer_po_file', po_file);
                 
                 const billingGstinSelect = document.getElementById('invoice_billing_gstin');

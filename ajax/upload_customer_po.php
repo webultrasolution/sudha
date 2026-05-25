@@ -70,13 +70,39 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             if (!empty($custom_invoice_number)) {
                 $invNo = $custom_invoice_number;
             } else {
-                $invNo = 'INV/' . date('Y') . '/' . str_pad($booking_id, 4, '0', STR_PAD_LEFT);
+                // Calculate Indian Financial Year (Apr to Mar)
+                $currentMonth = (int)date('m');
+                $currentYearShort = (int)date('y');
+                
+                if ($currentMonth >= 4) {
+                    $fy = $currentYearShort . '-' . str_pad($currentYearShort + 1, 2, '0', STR_PAD_LEFT);
+                } else {
+                    $fy = str_pad($currentYearShort - 1, 2, '0', STR_PAD_LEFT) . '-' . $currentYearShort;
+                }
+                
+                $prefix = 'SCR/' . $fy . '/';
+                
+                // Fetch highest serial number for this financial year
+                $stmtMax = $pdo->prepare("SELECT invoice_number FROM invoices WHERE invoice_number LIKE ? ORDER BY id DESC LIMIT 1");
+                $stmtMax->execute([$prefix . '%']);
+                $lastInvoice = $stmtMax->fetchColumn();
+                
+                if ($lastInvoice) {
+                    $parts = explode('/', $lastInvoice);
+                    $lastNum = (int)end($parts);
+                    $nextNum = $lastNum + 1;
+                } else {
+                    $nextNum = 1;
+                }
+                
+                $invNo = $prefix . str_pad($nextNum, 3, '0', STR_PAD_LEFT);
             }
             
+            $custom_invoice_date = clean($_POST['custom_invoice_date'] ?? date('Y-m-d'));
             $approvalStatus = $isAdmin ? 'approved' : 'pending_approval';
             
-            $stmtInsert = $pdo->prepare("INSERT INTO invoices (invoice_number, booking_id, type, sub_total, total_amount, payment_status, approval_status) VALUES (?, ?, 'tax', ?, ?, 'unpaid', ?)");
-            $stmtInsert->execute([$invNo, $booking_id, $bookingData['total_amount'], $bookingData['grand_total'], $approvalStatus]);
+            $stmtInsert = $pdo->prepare("INSERT INTO invoices (invoice_number, booking_id, type, sub_total, total_amount, payment_status, approval_status, invoice_date) VALUES (?, ?, 'tax', ?, ?, 'unpaid', ?, ?)");
+            $stmtInsert->execute([$invNo, $booking_id, $bookingData['total_amount'], $bookingData['grand_total'], $approvalStatus, $custom_invoice_date]);
             
             $invoiceId = $pdo->lastInsertId();
             
