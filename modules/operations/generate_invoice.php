@@ -345,7 +345,6 @@ $gst = calculateGST($subtotal, $isInterState);
             </div>
         </div>
 
-        <div class="table-title">DISPLAY:</div>
 
         <table>
             <thead>

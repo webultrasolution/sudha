@@ -66,11 +66,6 @@ $invoices = $invoices->fetchAll();
 <div class="card">
     <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1.5rem;">
         <h2 style="font-size: 1.25rem;"><i class="fas fa-file-invoice-dollar"></i> Tax Invoices & Receivables</h2>
-        <?php if (canAdd('financials')): ?>
-        <a href="invoice_create.php" class="btn btn-primary">
-            <i class="fas fa-plus"></i> Generate New Invoice
-        </a>
-        <?php endif; ?>
     </div>
 
     <table class="table">
