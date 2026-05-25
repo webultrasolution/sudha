@@ -13,6 +13,9 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     $po_date = clean($_POST['customer_po_date'] ?? '');
     $email_date = clean($_POST['email_date'] ?? '');
     
+    $custom_invoice_number = clean($_POST['custom_invoice_number'] ?? '');
+    $custom_invoice_date = clean($_POST['custom_invoice_date'] ?? '');
+
     if (!$client_id) {
         echo json_encode(['success' => false, 'message' => 'Invalid Client ID']);
         exit;
@@ -43,11 +46,11 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     // Determine the update condition: by group po_number or individual rate IDs
     if (!empty($po_number)) {
         $sql = "UPDATE client_printing_rates 
-                SET confirmation_type = ?, customer_po_no = ?, customer_po_date = ?, email_date = ?, " . $setStatus 
+                SET confirmation_type = ?, customer_po_no = ?, customer_po_date = ?, email_date = ?, custom_invoice_number = ?, custom_invoice_date = ?, " . $setStatus 
                 . ($file_path ? ", customer_po_file = ?" : "") . 
                 " WHERE po_number = ? AND client_id = ?";
         
-        $params = [$type, $po_no ?: null, $po_date ?: null, $email_date ?: null];
+        $params = [$type, $po_no ?: null, $po_date ?: null, $email_date ?: null, $custom_invoice_number ?: null, $custom_invoice_date ?: null];
         if ($file_path) $params[] = $file_path;
         $params[] = $po_number;
         $params[] = $client_id;
@@ -72,11 +75,11 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         
         $placeholders = implode(',', array_fill(0, count($rate_ids), '?'));
         $sql = "UPDATE client_printing_rates 
-                SET confirmation_type = ?, customer_po_no = ?, customer_po_date = ?, email_date = ?, " . $setStatus 
+                SET confirmation_type = ?, customer_po_no = ?, customer_po_date = ?, email_date = ?, custom_invoice_number = ?, custom_invoice_date = ?, " . $setStatus 
                 . ($file_path ? ", customer_po_file = ?" : "") . 
                 " WHERE id IN ($placeholders)";
         
-        $params = [$type, $po_no ?: null, $po_date ?: null, $email_date ?: null];
+        $params = [$type, $po_no ?: null, $po_date ?: null, $email_date ?: null, $custom_invoice_number ?: null, $custom_invoice_date ?: null];
         if ($file_path) $params[] = $file_path;
         $params = array_merge($params, $rate_ids);
         
