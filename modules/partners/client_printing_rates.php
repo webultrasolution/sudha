@@ -99,7 +99,6 @@ $clients = $pdo->query("SELECT id, name FROM partners WHERE type = 'client' ORDE
                 <th>Site / Dimension</th>
                 <th>Media Type</th>
                 <th>Rate (per SQFT)</th>
-                <th>Attachments</th>
                 <th style="text-align: right;">Actions</th>
             </tr>
         </thead>
@@ -198,59 +197,7 @@ $clients = $pdo->query("SELECT id, name FROM partners WHERE type = 'client' ORDE
                         </div>
                     <?php endif; ?>
                 </td>
-                <td>
-                    <?php if (!empty($r['po_number'])): ?>
-                    <div style="display: flex; flex-direction: column; gap: 8px;">
-                        <!-- Invoice Attachments Section -->
-                        <div style="display: flex; align-items: center; flex-wrap: wrap; gap: 4px;">
-                            <span style="font-size: 0.65rem; font-weight: 800; color: #94a3b8; text-transform: uppercase; margin-right: 4px; width: 100px; text-align: right;">Client Invoice:</span>
-                            <?php 
-                            if (!empty($r['attachments'])): 
-                                $files = explode('||', $r['attachments']);
-                                foreach ($files as $file):
-                                    $ext = strtolower(pathinfo($file, PATHINFO_EXTENSION));
-                                    $icon = 'fa-file';
-                                    if (in_array($ext, ['jpg', 'jpeg', 'png'])) $icon = 'fa-file-image';
-                                    if ($ext === 'pdf') $icon = 'fa-file-pdf';
-                            ?>
-                                    <a href="../../uploads/pos/<?php echo urlencode($file); ?>" target="_blank" class="attachment-badge" title="<?php echo htmlspecialchars($file); ?>">
-                                        <i class="fas <?php echo $icon; ?>"></i>
-                                    </a>
-                            <?php 
-                                endforeach;
-                            endif; 
-                            ?>
-                            <?php if (canEdit('clients')): ?>
-                            <button class="btn-upload-row" onclick="triggerUpload('<?php echo $r['po_number']; ?>')" title="Upload Client Invoice/Scan">
-                                <i class="fas fa-cloud-upload-alt"></i> Upload
-                            </button>
-                            <?php endif; ?>
-                        </div>
-                        
-                        <!-- Client Tax Invoice Section -->
-                        <div style="display: flex; align-items: center; flex-wrap: wrap; gap: 4px;">
-                            <span style="font-size: 0.65rem; font-weight: 800; color: #94a3b8; text-transform: uppercase; margin-right: 4px; width: 100px; text-align: right;">Tax Invoice:</span>
-                            <?php if (!empty($r['client_tax_order'])): 
-                                $ext = strtolower(pathinfo($r['client_tax_order'], PATHINFO_EXTENSION));
-                                $icon = 'fa-file';
-                                if (in_array($ext, ['jpg', 'jpeg', 'png'])) $icon = 'fa-file-image';
-                                if ($ext === 'pdf') $icon = 'fa-file-pdf';
-                            ?>
-                                <a href="../../uploads/pos/tax_orders/<?php echo urlencode($r['client_tax_order']); ?>" target="_blank" class="attachment-badge" style="background: #e0e7ff; color: #4f46e5;" title="Tax Invoice: <?php echo htmlspecialchars($r['client_tax_order']); ?>">
-                                    <i class="fas <?php echo $icon; ?>"></i>
-                                </a>
-                            <?php endif; ?>
-                            <?php if (canEdit('clients')): ?>
-                            <button class="btn-upload-row" style="background: #eef2ff; color: #4f46e5; border-color: #c7d2fe;" onclick="triggerTaxOrderUpload('<?php echo $r['po_number']; ?>')" title="Upload Tax Invoice">
-                                <i class="fas fa-cloud-upload-alt"></i> Upload
-                            </button>
-                            <?php endif; ?>
-                        </div>
-                    </div>
-                    <?php else: ?>
-                    <span style="color: #94a3b8; font-size: 0.75rem;">Requires PO</span>
-                    <?php endif; ?>
-                </td>
+
                 <td style="text-align: right;">
                     <div style="display: flex; flex-direction: column; gap: 5px; align-items: flex-end;">
                         <!-- Group PDF Action -->
