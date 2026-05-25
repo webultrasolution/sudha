@@ -73,6 +73,15 @@ $company_signature = getSetting('company_signature', 'signature.png');
 $po_number = "CPPO/" . date('y') . "-" . date('y', strtotime('+1 year')) . "/" . str_pad($client_id, 3, '0', STR_PAD_LEFT) . "-" . date('dHi');
 $po_date = date('d-m-Y');
 
+if ($preview && !empty($rates)) {
+    if (!empty($rates[0]['custom_invoice_number'])) {
+        $po_number = $rates[0]['custom_invoice_number'];
+    }
+    if (!empty($rates[0]['custom_invoice_date']) && $rates[0]['custom_invoice_date'] !== '0000-00-00') {
+        $po_date = date('d-m-Y', strtotime($rates[0]['custom_invoice_date']));
+    }
+}
+
 // ============================
 // SELECTION FORM (Not Preview)
 // ============================
