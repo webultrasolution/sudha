@@ -325,7 +325,12 @@ $stmtCheckPO = $pdo->prepare("SELECT id, approval_status FROM purchase_orders WH
                 <tr>
                     <td>
                         <div style="font-weight: 800; color: #1e293b; margin-bottom: 2px;"><?php echo htmlspecialchars($item['site_name'] ?? ''); ?></div>
-                        <div style="font-size: 0.75rem; color: #64748b; margin-bottom: 6px;"><?php echo htmlspecialchars($item['location'] ?? ''); ?></div>
+                        <div style="font-size: 0.75rem; color: #64748b; margin-bottom: 6px; display: flex; align-items: center; gap: 6px;">
+                            <span id="site-loc-<?php echo $item['site_id']; ?>"><?php echo htmlspecialchars($item['location'] ?? ''); ?></span>
+                            <?php if (canEdit('bookings')): ?>
+                                <button onclick="editSiteLocation(<?php echo $item['site_id']; ?>, '<?php echo addslashes(htmlspecialchars($item['location'] ?? '')); ?>')" style="background: none; border: none; color: var(--primary); cursor: pointer; padding: 0; font-size: 0.75rem;" title="Edit Location"><i class="fas fa-edit"></i></button>
+                            <?php endif; ?>
+                        </div>
                         <div
                             style="font-size: 0.7rem; color: #94a3b8; text-transform: uppercase; font-weight: 600; display: flex; align-items: center; gap: 0.5rem; flex-wrap: wrap;">
                             <?php echo $item['media_type']; ?> • <?php echo $item['light_type']; ?>
@@ -1619,6 +1624,40 @@ $stmtCheckPO = $pdo->prepare("SELECT id, approval_status FROM purchase_orders WH
             if (e.key === 'Escape') closeLightbox();
         }
     });
+
+    function editSiteLocation(siteId, currentLoc) {
+        Swal.fire({
+            title: 'Edit Site Location',
+            input: 'text',
+            inputValue: currentLoc,
+            showCancelButton: true,
+            confirmButtonText: 'Save',
+            showLoaderOnConfirm: true,
+            preConfirm: (newLoc) => {
+                return fetch('../../ajax/update_site_location.php', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+                    body: `site_id=${siteId}&location=${encodeURIComponent(newLoc)}`
+                })
+                .then(response => response.json())
+                .then(data => {
+                    if (!data.success) throw new Error(data.message);
+                    return newLoc;
+                })
+                .catch(error => {
+                    Swal.showValidationMessage(`Request failed: ${error}`);
+                });
+            },
+            allowOutsideClick: () => !Swal.isLoading()
+        }).then((result) => {
+            if (result.isConfirmed) {
+                document.getElementById('site-loc-' + siteId).innerText = result.value;
+                Swal.fire({
+                    toast: true, position: 'top-end', icon: 'success', title: 'Location updated!', showConfirmButton: false, timer: 1500
+                });
+            }
+        });
+    }
 </script>
 
 <?php include_once __DIR__ . '/../../includes/footer.php'; ?>
