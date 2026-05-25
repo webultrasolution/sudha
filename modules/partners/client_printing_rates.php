@@ -29,10 +29,63 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action'])) {
             header("Location: client_printing_rates.php?msg=added"); exit;
         } else {
             requirePermission('clients', 'edit');
-            $id = intval($_POST['id']);
-            $site_id = !empty($_POST['site_id']) ? intval($_POST['site_id']) : null;
-            $stmt = $pdo->prepare("UPDATE client_printing_rates SET client_id=?, site_id=?, media_type=?, rate_per_sqft=? WHERE id=?");
-            $stmt->execute([$client_id, $site_id, $media_type, $rate, $id]);
+            
+            $po_number = !empty($_POST['po_number']) ? clean($_POST['po_number']) : null;
+            $rate_ids_post = isset($_POST['rate_ids']) ? $_POST['rate_ids'] : [];
+            
+            if (!$po_number) {
+                $po_number = "CPPO-" . date('ymd') . "-" . rand(100, 999);
+                // Assign this new PO number to legacy records first so they are grouped
+                if (!empty($rate_ids_post)) {
+                    $in = str_repeat('?,', count($rate_ids_post) - 1) . '?';
+                    $upd_legacy = $pdo->prepare("UPDATE client_printing_rates SET po_number = ? WHERE id IN ($in)");
+                    $upd_legacy->execute(array_merge([$po_number], $rate_ids_post));
+                }
+            }
+            
+            $site_ids = !empty($_POST['site_ids']) ? $_POST['site_ids'] : [];
+            $individual_rates = $_POST['individual_rates'] ?? [];
+            
+            $stmt = $pdo->prepare("SELECT id, site_id FROM client_printing_rates WHERE po_number = ? AND client_id = ?");
+            $stmt->execute([$po_number, $client_id]);
+            $existing = $stmt->fetchAll(PDO::FETCH_KEY_PAIR); // [id => site_id]
+            $existing_site_to_id = array_flip($existing); // [site_id => id]
+            
+            $posted_sites = [];
+            foreach ($site_ids as $site_id) {
+                if (empty($site_id)) continue;
+                $site_id = intval($site_id);
+                $posted_sites[] = $site_id;
+                
+                $this_rate = (isset($individual_rates[$site_id]) && $individual_rates[$site_id] !== '') ? floatval($individual_rates[$site_id]) : $rate;
+                
+                if (isset($existing_site_to_id[$site_id])) {
+                    // Update
+                    $upd = $pdo->prepare("UPDATE client_printing_rates SET media_type=?, rate_per_sqft=? WHERE id=?");
+                    $upd->execute([$media_type, $this_rate, $existing_site_to_id[$site_id]]);
+                } else {
+                    // Insert
+                    $meta = $pdo->prepare("SELECT customer_po_no, customer_po_date, email_date, is_final_invoice, approval_status, custom_invoice_number, custom_invoice_date FROM client_printing_rates WHERE po_number = ? AND client_id = ? LIMIT 1");
+                    $meta->execute([$po_number, $client_id]);
+                    $m = $meta->fetch();
+                    
+                    if ($m) {
+                        $ins = $pdo->prepare("INSERT INTO client_printing_rates (client_id, site_id, media_type, rate_per_sqft, po_number, customer_po_no, customer_po_date, email_date, is_final_invoice, approval_status, custom_invoice_number, custom_invoice_date) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)");
+                        $ins->execute([$client_id, $site_id, $media_type, $this_rate, $po_number, $m['customer_po_no'], $m['customer_po_date'], $m['email_date'], $m['is_final_invoice'], $m['approval_status'], $m['custom_invoice_number'], $m['custom_invoice_date']]);
+                    } else {
+                        $ins = $pdo->prepare("INSERT INTO client_printing_rates (client_id, site_id, media_type, rate_per_sqft, po_number) VALUES (?, ?, ?, ?, ?)");
+                        $ins->execute([$client_id, $site_id, $media_type, $this_rate, $po_number]);
+                    }
+                }
+            }
+            
+            // Delete removed
+            foreach ($existing_site_to_id as $es_site => $es_id) {
+                if (!in_array($es_site, $posted_sites)) {
+                    $pdo->prepare("DELETE FROM client_printing_rates WHERE id = ?")->execute([$es_id]);
+                }
+            }
+            
             header("Location: client_printing_rates.php?msg=updated"); exit;
         }
     } elseif ($_POST['action'] === 'delete') {
@@ -188,7 +241,15 @@ $clients = $pdo->query("SELECT id, name FROM partners WHERE type = 'client' ORDE
                         <?php endif; ?>
 
                         <?php if (canEdit('clients')): ?>
-                        <a href="create_client_printing_po.php?action=edit&id=<?php echo $ids[0]; ?>" class="btn-icon" style="color: #0284c7;" title="Edit">
+                        <?php 
+                            $editUrl = "create_client_printing_po.php?action=edit&client_id=" . $r['client_id'];
+                            if ($r['po_number']) {
+                                $editUrl .= "&po_number=" . urlencode($r['po_number']);
+                            } else {
+                                foreach($ids as $id) $editUrl .= "&rate_ids[]=" . $id;
+                            }
+                        ?>
+                        <a href="<?php echo $editUrl; ?>" class="btn-icon" style="color: #0284c7;" title="Edit">
                             <i class="fas fa-edit"></i>
                         </a>
                         <?php endif; ?>
