@@ -12,7 +12,7 @@ if (!$booking_id) {
 }
 
 // Check Invoice Approval Status
-$stmtInvCheck = $pdo->prepare("SELECT approval_status FROM invoices WHERE booking_id = ? AND type = 'tax' LIMIT 1");
+$stmtInvCheck = $pdo->prepare("SELECT * FROM invoices WHERE booking_id = ? AND type = 'tax' LIMIT 1");
 $stmtInvCheck->execute([$booking_id]);
 $invoiceData = $stmtInvCheck->fetch();
 
@@ -325,12 +325,12 @@ $gst = calculateGST($subtotal, $isInterState);
                     <span class="info-label">Invoice No.</span>
                     <span class="info-sep">:</span>
                     <span
-                        class="info-value">SCR/<?php echo date('y', strtotime($b['created_at'])); ?>-<?php echo date('y', strtotime($b['created_at'] . ' +1 year')); ?>/<?php echo str_pad($b['id'], 3, '0', STR_PAD_LEFT); ?></span>
+                        class="info-value"><?php echo !empty($invoiceData['invoice_number']) ? $invoiceData['invoice_number'] : ('SCR/' . date('y', strtotime($b['created_at'])) . '-' . date('y', strtotime($b['created_at'] . ' +1 year')) . '/' . str_pad($b['id'], 3, '0', STR_PAD_LEFT)); ?></span>
                 </div>
                 <div class="info-row">
                     <span class="info-label">Invoice Date</span>
                     <span class="info-sep">:</span>
-                    <span class="info-value"><?php echo date('d-m-Y'); ?></span>
+                    <span class="info-value"><?php echo (!empty($invoiceData['invoice_date']) && $invoiceData['invoice_date'] !== '0000-00-00') ? date('d-m-Y', strtotime($invoiceData['invoice_date'])) : date('d-m-Y'); ?></span>
                 </div>
                 <div class="info-row">
                     <span class="info-label">PAN No.</span>
