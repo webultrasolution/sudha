@@ -50,9 +50,14 @@ $partners = $stmt->fetchAll();
         <tbody>
             <?php foreach ($partners as $p): 
                 if ($type == 'client') {
-                    // Total Billed to Client (Invoices)
-                    $stmtBilled = $pdo->prepare("SELECT SUM(i.total_amount) FROM invoices i JOIN bookings b ON i.booking_id = b.id WHERE b.client_id = ?");
-                    $stmtBilled->execute([$p['id']]);
+                    // Total Billed to Client (Invoices + Printing POs)
+                    $stmtBilled = $pdo->prepare("
+                        SELECT 
+                            (SELECT COALESCE(SUM(i.total_amount), 0) FROM invoices i JOIN bookings b ON i.booking_id = b.id WHERE b.client_id = ?)
+                            +
+                            (SELECT COALESCE(SUM(r.rate_per_sqft * COALESCE(s.width, 0) * COALESCE(s.height, 0)), 0) FROM client_printing_rates r LEFT JOIN sites s ON r.site_id = s.id WHERE r.client_id = ?)
+                    ");
+                    $stmtBilled->execute([$p['id'], $p['id']]);
                     $totalBilled = $stmtBilled->fetchColumn() ?: 0;
 
                     // Total Paid by Client (Receivables)
@@ -60,9 +65,14 @@ $partners = $stmt->fetchAll();
                     $stmtPaid->execute([$p['id']]);
                     $totalPaid = $stmtPaid->fetchColumn() ?: 0;
                 } else {
-                    // Total Billed by Vendor (Purchase Orders) — use fallback calc if total_amount is null/0
-                    $stmtBilled = $pdo->prepare("SELECT SUM(COALESCE(NULLIF(total_amount, 0), po_amount + COALESCE(cgst_amount,0) + COALESCE(sgst_amount,0) + COALESCE(igst_amount,0))) FROM purchase_orders WHERE vendor_id = ?");
-                    $stmtBilled->execute([$p['id']]);
+                    // Total Billed by Vendor (Purchase Orders and Printing POs) — use fallback calc if total_amount is null/0
+                    $stmtBilled = $pdo->prepare("
+                        SELECT 
+                            (SELECT COALESCE(SUM(COALESCE(NULLIF(total_amount, 0), po_amount + COALESCE(cgst_amount,0) + COALESCE(sgst_amount,0) + COALESCE(igst_amount,0))), 0) FROM purchase_orders WHERE vendor_id = ?)
+                            +
+                            (SELECT COALESCE(SUM(r.rate_per_sqft * COALESCE(s.width, 0) * COALESCE(s.height, 0)), 0) FROM vendor_printing_rates r LEFT JOIN sites s ON r.site_id = s.id WHERE r.vendor_id = ?)
+                    ");
+                    $stmtBilled->execute([$p['id'], $p['id']]);
                     $totalBilled = $stmtBilled->fetchColumn() ?: 0;
 
                     // Total Paid to Vendor (Payables)
