@@ -292,13 +292,15 @@ $gst = calculateGST($subtotal, $isInterState);
                 <div class="info-row">
                     <span class="info-label">Campaign</span>
                     <span class="info-sep">:</span>
-                    <span class="info-value"><strong><?php echo htmlspecialchars($b['campaign_name'] ?? 'N/A'); ?></strong></span>
+                    <span
+                        class="info-value"><strong><?php echo htmlspecialchars($b['campaign_name'] ?? 'N/A'); ?></strong></span>
                 </div>
 
                 <div style="margin-top: 15px;">
                     <div class="section-title">Client Details:</div>
                     <div style="font-weight: bold; font-size: 12px; margin-bottom: 2px;">
-                        <?php echo $b['client_name']; ?></div>
+                        <?php echo $b['client_name']; ?>
+                    </div>
                     <div style="width: 250px;"><?php echo $b['client_address']; ?></div>
                     <div class="info-row" style="margin-top: 5px;">
                         <span class="info-label">Place of Supply</span>
@@ -353,7 +355,6 @@ $gst = calculateGST($subtotal, $isInterState);
                     <th style="width: 70px;">HSN/SAC<br>Code</th>
                     <th style="width: 70px;">SIZE</th>
                     <th style="width: 100px;">PERIOD</th>
-                    <th style="width: 80px;">AMOUNT<br>PER MONTH</th>
                     <th style="width: 90px;">Amount(₹)</th>
                 </tr>
             </thead>
@@ -362,10 +363,6 @@ $gst = calculateGST($subtotal, $isInterState);
                     // Safe Date Handling
                     $sDate = (!empty($item['start_date']) && $item['start_date'] != '0000-00-00') ? $item['start_date'] : $b['start_date'];
                     $eDate = (!empty($item['end_date']) && $item['end_date'] != '0000-00-00') ? $item['end_date'] : $b['end_date'];
-
-                    // Amount Per Month Calculation
-                    $days = $item['days'] ?: 1;
-                    $amtPerMonth = ($item['amount'] / $days) * 30;
                     ?>
                     <tr>
                         <td><?php echo $idx + 1; ?></td>
@@ -383,40 +380,41 @@ $gst = calculateGST($subtotal, $isInterState);
                             <?php echo date('d.m.Y', strtotime($sDate)); ?> to<br>
                             <?php echo date('d.m.Y', strtotime($eDate)); ?>
                         </td>
-                        <td style="font-weight: 600;"><?php echo number_format($amtPerMonth, 2); ?></td>
                         <td style="text-align: right; padding-right: 10px; font-weight: bold;">
-                            <?php echo number_format($item['amount'], 2); ?></td>
+                            <?php echo number_format($item['amount'], 2); ?>
+                        </td>
                     </tr>
                 <?php endforeach; ?>
 
                 <tr class="gst-row">
-                    <td colspan="6" style="text-align: right; padding-right: 10px;">Taxable Amount</td>
+                    <td colspan="5" style="text-align: right; padding-right: 10px;">Taxable Amount</td>
                     <td style="text-align: right; padding-right: 10px;"><?php echo number_format($subtotal, 2); ?></td>
                 </tr>
                 <?php if ($isInterState): ?>
                     <tr class="gst-row">
-                        <td colspan="6" style="text-align: right; padding-right: 10px;">IGST (18%)</td>
+                        <td colspan="5" style="text-align: right; padding-right: 10px;">IGST (18%)</td>
                         <td style="text-align: right; padding-right: 10px;"><?php echo number_format($gst['igst'], 2); ?>
                         </td>
                     </tr>
                 <?php else: ?>
                     <tr class="gst-row">
-                        <td colspan="6" style="text-align: right; padding-right: 10px;">CGST (9%)</td>
+                        <td colspan="5" style="text-align: right; padding-right: 10px;">CGST (9%)</td>
                         <td style="text-align: right; padding-right: 10px;"><?php echo number_format($gst['cgst'], 2); ?>
                         </td>
                     </tr>
                     <tr class="gst-row">
-                        <td colspan="6" style="text-align: right; padding-right: 10px;">SGST (9%)</td>
+                        <td colspan="5" style="text-align: right; padding-right: 10px;">SGST (9%)</td>
                         <td style="text-align: right; padding-right: 10px;"><?php echo number_format($gst['sgst'], 2); ?>
                         </td>
                     </tr>
                 <?php endif; ?>
 
                 <tr class="totals-row">
-                    <td colspan="6" style="text-align: right; padding-right: 10px; font-size: 12px;">Total Invoice Value
+                    <td colspan="5" style="text-align: right; padding-right: 10px; font-size: 12px;">Total Invoice Value
                     </td>
                     <td style="text-align: right; padding-right: 10px; font-size: 12px;">
-                        <?php echo number_format($b['grand_total'], 2); ?></td>
+                        <?php echo number_format($b['grand_total'], 2); ?>
+                    </td>
                 </tr>
             </tbody>
         </table>

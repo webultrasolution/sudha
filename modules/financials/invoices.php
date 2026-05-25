@@ -1,12 +1,8 @@
 <?php
-$activePage = 'invoices';
-$pageTitle = 'Financials - Invoices';
-include_once __DIR__ . '/../../includes/header.php';
-
-// Enforce View Permission at Page Level
-requirePermission('financials', 'view');
-
 if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action']) && $_POST['action'] === 'delete') {
+    include_once __DIR__ . '/../../config/db.php';
+    include_once __DIR__ . '/../../includes/functions.php';
+    checkAuth();
     requirePermission('financials', 'delete');
     header('Content-Type: application/json');
     $id = intval($_POST['id']);
@@ -22,17 +18,11 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action']) && $_POST['
             $bookingId = $invoiceData['booking_id'];
             $invoiceNumber = $invoiceData['invoice_number'];
             
-            // Delete associated ledger entries
-            $pdo->prepare("DELETE FROM client_ledgers WHERE reference_id = ? AND reference_type = 'invoice'")->execute([$id]);
-            
             // Delete invoice items
             $pdo->prepare("DELETE FROM invoice_items WHERE invoice_id = ?")->execute([$id]);
             
             // Delete the invoice itself
             $pdo->prepare("DELETE FROM invoices WHERE id = ?")->execute([$id]);
-            
-            // Reset booking status so it can be re-invoiced
-            $pdo->prepare("UPDATE bookings SET is_finalized = 0, invoice_finalized_date = NULL WHERE id = ?")->execute([$bookingId]);
             
             logActivity('deleted invoice', 'financials', $id, "Invoice $invoiceNumber was deleted. Booking #$bookingId reverted to editable state.");
         }
@@ -45,6 +35,13 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action']) && $_POST['
     }
     exit;
 }
+
+$activePage = 'invoices';
+$pageTitle = 'Financials - Invoices';
+include_once __DIR__ . '/../../includes/header.php';
+
+// Enforce View Permission at Page Level
+requirePermission('financials', 'view');
 
 // Pagination Logic
 $limit = 10;
