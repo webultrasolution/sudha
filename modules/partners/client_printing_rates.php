@@ -65,6 +65,8 @@ $rates = $pdo->query("
         GROUP_CONCAT(COALESCE(s.height, 0) SEPARATOR '||') as heights,
         GROUP_CONCAT(r.media_type SEPARATOR '||') as media_types,
         GROUP_CONCAT(r.rate_per_sqft SEPARATOR '||') as rates,
+        MIN(r.created_at) as created_at,
+        SUM(r.rate_per_sqft * COALESCE(s.width, 0) * COALESCE(s.height, 0)) as total_amount,
         MAX(r.attachments) as attachments,
         MAX(r.client_tax_order) as client_tax_order,
         MAX(r.is_final_invoice) as is_final_invoice,
@@ -95,182 +97,110 @@ $clients = $pdo->query("SELECT id, name FROM partners WHERE type = 'client' ORDE
     <table class="table">
         <thead>
             <tr>
+                <th>Invoice / PO #</th>
                 <th>Client</th>
-                <th>Site / Dimension</th>
-                <th>Media Type</th>
-                <th>Rate (per SQFT)</th>
-                <th style="text-align: right;">Actions</th>
+                <th>Date</th>
+                <th>Amount</th>
+                <th>Status</th>
+                <th>Actions</th>
             </tr>
         </thead>
         <tbody>
-            <?php foreach ($rates as $r): ?>
-            <?php 
-                $ids = explode('||', $r['rate_ids']);
-                $sNames = explode('||', $r['site_names']);
-                $sCodes = explode('||', $r['site_codes']);
-                $widths = explode('||', $r['widths']);
-                $heights = explode('||', $r['heights']);
-                $mediaTypes = explode('||', $r['media_types']);
-                $unitRates = explode('||', $r['rates']);
-                
-                $totalGroupSqft = 0;
-                $totalGroupAmount = 0;
-                foreach($ids as $i => $id) {
-                    $sqft = floatval($widths[$i]) * floatval($heights[$i]);
-                    $totalGroupSqft += $sqft;
-                    $totalGroupAmount += ($sqft * floatval($unitRates[$i]));
-                }
-            ?>
-            <tr class="rate-row" data-client-id="<?php echo $r['client_id']; ?>">
-                <td>
-                    <strong><?php echo htmlspecialchars($r['client_name'], ENT_QUOTES, 'UTF-8', false); ?></strong>
-                    <?php if($r['po_number']): ?>
-                        <div style="font-size: 0.65rem; color: #94a3b8; margin-top: 2px;">#<?php echo $r['po_number']; ?></div>
-                    <?php endif; ?>
-                </td>
+            <?php if (empty($rates)): ?>
+                <tr>
+                    <td colspan="6" style="text-align: center; color: var(--secondary); padding: 2rem;">No client printing invoices found.</td>
+                </tr>
+            <?php else: ?>
+                <?php foreach ($rates as $r): ?>
                 <?php 
-                $has_multiple = count($ids) > 1;
-                $groupId = $r['po_number'] ? $r['po_number'] : 'rate-' . $ids[0];
+                    $ids = explode('||', $r['rate_ids']);
+                    
+                    // Re-calculate Total Amount
+                    $widths = explode('||', $r['widths']);
+                    $heights = explode('||', $r['heights']);
+                    $unitRates = explode('||', $r['rates']);
+                    
+                    $totalGroupAmount = 0;
+                    foreach($ids as $i => $id) {
+                        $sqft = floatval($widths[$i]) * floatval($heights[$i]);
+                        $totalGroupAmount += ($sqft * floatval($unitRates[$i]));
+                    }
                 ?>
-                <td>
-                    <!-- First site (always visible) -->
-                    <div style="margin-bottom: 5px; padding-bottom: 5px; border-bottom: 1px solid #f1f5f9;">
-                        <div style="font-size: 0.85rem; font-weight: 600;"><?php echo htmlspecialchars($sNames[0]); ?></div>
-                        <small style="color: #64748b;"><?php echo $sCodes[0]; ?> (<?php echo $widths[0]; ?>x<?php echo $heights[0]; ?> = <strong><?php echo floatval($widths[0]) * floatval($heights[0]); ?> SQFT</strong>)</small>
-                    </div>
-                    
-                    <!-- Collapsible sites -->
-                    <?php if ($has_multiple): ?>
-                        <div class="collapsible-po-<?php echo $groupId; ?>" style="display: none;">
-                            <?php for($i = 1; $i < count($ids); $i++): ?>
-                                <div style="margin-bottom: 5px; padding-bottom: 5px; border-bottom: 1px solid #f1f5f9;">
-                                    <div style="font-size: 0.85rem; font-weight: 600;"><?php echo htmlspecialchars($sNames[$i]); ?></div>
-                                    <small style="color: #64748b;"><?php echo $sCodes[$i]; ?> (<?php echo $widths[$i]; ?>x<?php echo $heights[$i]; ?> = <strong><?php echo floatval($widths[$i]) * floatval($heights[$i]); ?> SQFT</strong>)</small>
-                                </div>
-                            <?php endfor; ?>
-                        </div>
-                        <a href="javascript:void(0);" onclick="togglePODetails('<?php echo $groupId; ?>')" id="toggle-btn-<?php echo $groupId; ?>" data-count="<?php echo (count($ids) - 1); ?>" style="font-size: 0.72rem; color: var(--primary); font-weight: 700; text-decoration: none; display: inline-flex; align-items: center; gap: 4px; margin-top: 4px; background: #f0fdfa; padding: 4px 8px; border-radius: 6px; border: 1px solid #ccfbf1;">
-                            <i class="fas fa-chevron-down"></i> + <?php echo (count($ids) - 1); ?> more site(s)
+                <tr>
+                    <td>
+                        <?php if($r['po_number']): ?>
+                            <strong>#<?php echo $r['po_number']; ?></strong>
+                        <?php else: ?>
+                            <span style="color: #cbd5e1; font-weight: 400;">N/A</span>
+                        <?php endif; ?>
+                    </td>
+                    <td>
+                        <div style="font-weight: 700; color: #1e293b;"><?php echo htmlspecialchars($r['client_name'], ENT_QUOTES, 'UTF-8', false); ?></div>
+                    </td>
+                    <td>
+                        <?php echo date('d M Y', strtotime($r['created_at'])); ?>
+                    </td>
+                    <td style="font-weight: 800; color: #059669; white-space: nowrap;">
+                        ₹<?php echo number_format($totalGroupAmount, 2); ?>
+                    </td>
+                    <td>
+                        <?php if ($r['approval_status'] === 'pending_approval'): ?>
+                            <span style="background: #fff7ed; color: #c2410c; border: 1px solid #fed7aa; padding: 0.15rem 0.5rem; border-radius: 50px; font-size: 0.6rem; font-weight: 800; display: inline-flex; align-items: center; gap: 4px; animation: pulse-approval 2s infinite;" title="Pending Admin Approval">
+                                <i class="fas fa-clock"></i> Awaiting Approval
+                            </span>
+                        <?php elseif ($r['is_final_invoice']): ?>
+                            <span style="background: #f0fdf4; color: #15803d; border: 1px solid #dcfce7; padding: 0.15rem 0.5rem; border-radius: 50px; font-size: 0.6rem; font-weight: 800; display: inline-flex; align-items: center; gap: 4px;">
+                                <i class="fas fa-check-circle"></i> Final Invoice
+                            </span>
+                        <?php else: ?>
+                            <span style="background: #e0f2fe; color: #0369a1; border: 1px solid #bae6fd; padding: 0.15rem 0.5rem; border-radius: 50px; font-size: 0.6rem; font-weight: 800; display: inline-flex; align-items: center; gap: 4px;">
+                                <i class="fas fa-file-invoice"></i> Proforma
+                            </span>
+                        <?php endif; ?>
+                    </td>
+                    <td>
+                        <?php 
+                            $viewUrl = "view_client_printing_po.php?client_id=" . $r['client_id'];
+                            if ($r['po_number']) {
+                                $viewUrl .= "&po_number=" . urlencode($r['po_number']);
+                            } else {
+                                foreach($ids as $id) $viewUrl .= "&rate_ids[]=" . $id;
+                            }
+                        ?>
+                        <a href="<?php echo $viewUrl; ?>" class="btn-icon" style="color: #0d9488;" title="View Details">
+                            <i class="fas fa-eye"></i>
                         </a>
-                    <?php endif; ?>
-                </td>
-                <td>
-                    <!-- First media type -->
-                    <div style="height: 38px; display: flex; align-items: center;">
-                        <span class="badge" style="background: #f1f5f9; color: #475569; font-size: 0.7rem;"><?php echo htmlspecialchars($mediaTypes[0]); ?></span>
-                    </div>
-                    
-                    <!-- Collapsible media types -->
-                    <?php if ($has_multiple): ?>
-                        <div class="collapsible-po-<?php echo $groupId; ?>" style="display: none;">
-                            <?php for($i = 1; $i < count($ids); $i++): ?>
-                                <div style="height: 38px; display: flex; align-items: center;">
-                                    <span class="badge" style="background: #f1f5f9; color: #475569; font-size: 0.7rem;"><?php echo htmlspecialchars($mediaTypes[$i]); ?></span>
-                                </div>
-                            <?php endfor; ?>
-                        </div>
-                    <?php endif; ?>
-                </td>
-                <td>
-                    <!-- First rate -->
-                    <div style="height: 38px; display: flex; flex-direction: column; justify-content: center;">
-                        <strong style="color: var(--primary);">₹<?php echo number_format(floatval($unitRates[0]), 2); ?></strong>
-                        <div style="font-size: 0.65rem; color: #059669; font-weight: 700;">₹<?php echo number_format(floatval($unitRates[0]) * floatval($widths[0]) * floatval($heights[0]), 2); ?></div>
-                    </div>
-                    
-                    <!-- Collapsible rates -->
-                    <?php if ($has_multiple): ?>
-                        <div class="collapsible-po-<?php echo $groupId; ?>" style="display: none;">
-                            <?php for($i = 1; $i < count($ids); $i++): ?>
-                                <div style="height: 38px; display: flex; flex-direction: column; justify-content: center;">
-                                    <strong style="color: var(--primary);">₹<?php echo number_format(floatval($unitRates[$i]), 2); ?></strong>
-                                    <div style="font-size: 0.65rem; color: #059669; font-weight: 700;">₹<?php echo number_format(floatval($unitRates[$i]) * floatval($widths[$i]) * floatval($heights[$i]), 2); ?></div>
-                                </div>
-                            <?php endfor; ?>
-                        </div>
-                    <?php endif; ?>
-                    
-                    <?php if(count($ids) > 1): ?>
-                        <div style="margin-top: 10px; padding-top: 5px; border-top: 2px solid #e2e8f0;">
-                            <div style="font-size: 0.65rem; color: #64748b; text-transform: uppercase; font-weight: 800;">Total Amount</div>
-                            <strong style="color: #0f172a; font-size: 0.9rem;">₹<?php echo number_format($totalGroupAmount, 2); ?></strong>
-                        </div>
-                    <?php endif; ?>
-                </td>
-
-                <td style="text-align: right;">
-                    <div style="display: flex; flex-direction: column; gap: 5px; align-items: flex-end;">
-                        <!-- Group PDF Action -->
-                        <div style="height: 38px; display: flex; align-items: center; gap: 8px;">
+                        
+                        <?php if ($r['is_final_invoice']): ?>
                             <?php 
-                                $pdfUrl = "../operations/client_printing.php?client_id=" . $r['client_id'] . "&preview=1";
-                                foreach($ids as $pdfId) $pdfUrl .= "&rate_ids[]=" . $pdfId;
+                                $taxInvUrl = "../operations/client_printing.php?client_id=" . $r['client_id'] . "&preview=1&is_final=1";
+                                foreach($ids as $id) $taxInvUrl .= "&rate_ids[]=" . $id;
                             ?>
-                            <a href="<?php echo $pdfUrl; ?>" target="_blank" class="btn-icon" style="color: #ef4444; background: #fee2e2; padding: 6px; border-radius: 8px; font-size: 0.85rem; display: inline-flex; align-items: center; justify-content: center; width: 28px; height: 28px; border: none; text-decoration: none;" title="Download Group Client PO">
+                            <a href="<?php echo $taxInvUrl; ?>" target="_blank" class="btn-icon" style="color: #10b981;" title="View Final Tax Invoice">
                                 <i class="fas fa-file-pdf"></i>
                             </a>
-                            <?php if (canEdit('clients')): ?>
-                            <a href="create_client_printing_po.php?action=edit&id=<?php echo $ids[0]; ?>" class="btn-icon" style="color: #0284c7; background: #e0f2fe; padding: 6px; border-radius: 8px; font-size: 0.85rem; display: inline-flex; align-items: center; justify-content: center; width: 28px; height: 28px; border: none; text-decoration: none;" title="Edit">
-                                <i class="fas fa-edit"></i>
-                            </a>
-                            <?php endif; ?>
-                            <?php if (canDelete('clients')): ?>
-                            <button class="btn-icon btn-delete" onclick="deleteRate(<?php echo $ids[0]; ?>)" style="display: inline-flex; align-items: center; justify-content: center; width: 28px; height: 28px;" title="Delete">
-                                <i class="fas fa-trash"></i>
+                        <?php else: ?>
+                            <?php if (canEdit('clients') && $r['approval_status'] !== 'pending_approval'): ?>
+                            <button class="btn-icon" onclick="openPrintingInvoicePopup('<?php echo htmlspecialchars($r['po_number'] ?? '', ENT_QUOTES); ?>', <?php echo $r['client_id']; ?>, '<?php echo implode(',', $ids); ?>')" style="color: #0f172a;" title="Generate Final Tax Invoice">
+                                <i class="fas fa-file-invoice-dollar"></i>
                             </button>
                             <?php endif; ?>
-                        </div>
-                        
-                        <!-- Collapsible Actions -->
-                        <?php if ($has_multiple): ?>
-                            <div class="collapsible-po-<?php echo $groupId; ?>" style="display: none;">
-                                <?php for($i = 1; $i < count($ids); $i++): ?>
-                                    <div style="height: 38px; display: flex; align-items: center; gap: 8px;">
-                                        <?php if (canEdit('clients')): ?>
-                                        <a href="create_client_printing_po.php?action=edit&id=<?php echo $ids[$i]; ?>" class="btn-icon" style="color: #0284c7; background: #e0f2fe; padding: 6px; border-radius: 8px; font-size: 0.85rem; display: inline-flex; align-items: center; justify-content: center; width: 28px; height: 28px; border: none; text-decoration: none;" title="Edit">
-                                            <i class="fas fa-edit"></i>
-                                        </a>
-                                        <?php endif; ?>
-                                        <?php if (canDelete('clients')): ?>
-                                        <button class="btn-icon btn-delete" onclick="deleteRate(<?php echo $ids[$i]; ?>)" style="display: inline-flex; align-items: center; justify-content: center; width: 28px; height: 28px;" title="Delete">
-                                            <i class="fas fa-trash"></i>
-                                        </button>
-                                        <?php endif; ?>
-                                    </div>
-                                <?php endfor; ?>
-                            </div>
+                        <?php endif; ?>
+
+                        <?php if (canEdit('clients')): ?>
+                        <a href="create_client_printing_po.php?action=edit&id=<?php echo $ids[0]; ?>" class="btn-icon" style="color: #0284c7;" title="Edit">
+                            <i class="fas fa-edit"></i>
+                        </a>
                         <?php endif; ?>
                         
-                        <!-- Row-level Final Tax Invoice Action -->
-                        <div style="margin-top: 10px; padding-top: 5px; border-top: 1px solid #e2e8f0; display: flex; justify-content: flex-end; gap: 8px; width: 100%;">
-                            <?php if ($r['approval_status'] === 'pending_approval'): ?>
-                                <button class="btn" style="background: #f8fafc; color: #94a3b8; padding: 4px 10px; border-radius: 6px; font-size: 0.75rem; font-weight: 700; border: 1px solid #cbd5e1; cursor: not-allowed; display: inline-flex; align-items: center; gap: 4px;" title="Pending Admin Approval">
-                                    <i class="fas fa-lock"></i> Pending Approval
-                                </button>
-                            <?php elseif ($r['is_final_invoice']): ?>
-                                <?php 
-                                    $taxInvUrl = "../operations/client_printing.php?client_id=" . $r['client_id'] . "&preview=1&is_final=1";
-                                    foreach($ids as $id) $taxInvUrl .= "&rate_ids[]=" . $id;
-                                ?>
-                                <a href="<?php echo $taxInvUrl; ?>" target="_blank" class="btn" style="background: #10b981; color: white; padding: 4px 10px; border-radius: 6px; font-size: 0.75rem; font-weight: 700; display: inline-flex; align-items: center; gap: 4px; text-decoration: none;" title="View Final Tax Invoice">
-                                    <i class="fas fa-eye"></i> View Tax Invoice
-                                </a>
-                            <?php else: ?>
-                                <?php if (canEdit('clients')): ?>
-                                <button class="btn" onclick="openPrintingInvoicePopup('<?php echo htmlspecialchars($r['po_number'] ?? '', ENT_QUOTES); ?>', <?php echo $r['client_id']; ?>, '<?php echo implode(',', $ids); ?>')" style="background: #0f172a; color: white; padding: 4px 10px; border-radius: 6px; font-size: 0.75rem; font-weight: 700; border: none; cursor: pointer; display: inline-flex; align-items: center; gap: 4px;" title="Final Tax Invoice">
-                                    <i class="fas fa-file-invoice-dollar"></i> Final Tax Invoice
-                                </button>
-                                <?php endif; ?>
-                            <?php endif; ?>
-                        </div>
-                    </div>
-                </td>
-            </tr>
-            <?php endforeach; ?>
-            <?php if (empty($rates)): ?>
-            <tr>
-                <td colspan="6" style="text-align: center; padding: 2rem; color: #94a3b8;">No Client Printing Invoices found.</td>
-            </tr>
+                        <?php if (canDelete('clients')): ?>
+                        <button class="btn-icon btn-delete" onclick="deleteRate(<?php echo $ids[0]; ?>)" title="Delete">
+                            <i class="fas fa-trash"></i>
+                        </button>
+                        <?php endif; ?>
+                    </td>
+                </tr>
+                <?php endforeach; ?>
             <?php endif; ?>
         </tbody>
     </table>

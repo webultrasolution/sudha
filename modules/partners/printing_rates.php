@@ -65,6 +65,8 @@ $rates = $pdo->query("
         GROUP_CONCAT(COALESCE(s.height, 0) SEPARATOR '||') as heights,
         GROUP_CONCAT(r.media_type SEPARATOR '||') as media_types,
         GROUP_CONCAT(r.rate_per_sqft SEPARATOR '||') as rates,
+        MIN(r.created_at) as created_at,
+        SUM(r.rate_per_sqft * COALESCE(s.width, 0) * COALESCE(s.height, 0)) as total_amount,
         MAX(r.attachments) as attachments,
         MAX(r.client_tax_order) as client_tax_order
     FROM vendor_printing_rates r
@@ -101,214 +103,78 @@ $sizes = $pdo->query("SELECT DISTINCT CONCAT(width, 'x', height) as size FROM si
     <table class="table">
         <thead>
             <tr>
+                <th>PO Number</th>
                 <th>Vendor</th>
-                <th>Site / Dimension</th>
-                <th>Media Type</th>
-                <th>Rate (per SQFT)</th>
-                <th>Attachments</th>
-                <th style="text-align: right;">Actions</th>
+                <th>Date</th>
+                <th>Amount</th>
+                <th>Actions</th>
             </tr>
         </thead>
         <tbody>
-            <?php foreach ($rates as $r): ?>
-            <?php 
-                $ids = explode('||', $r['rate_ids']);
-                $sNames = explode('||', $r['site_names']);
-                $sCodes = explode('||', $r['site_codes']);
-                $widths = explode('||', $r['widths']);
-                $heights = explode('||', $r['heights']);
-                $mediaTypes = explode('||', $r['media_types']);
-                $unitRates = explode('||', $r['rates']);
-                
-                $totalGroupSqft = 0;
-                $totalGroupAmount = 0;
-                foreach($ids as $i => $id) {
-                    $sqft = floatval($widths[$i]) * floatval($heights[$i]);
-                    $totalGroupSqft += $sqft;
-                    $totalGroupAmount += ($sqft * floatval($unitRates[$i]));
-                }
-            ?>
-            <tr class="rate-row" data-vendor-id="<?php echo $r['vendor_id']; ?>">
-                <td>
-                    <strong><?php echo htmlspecialchars($r['vendor_name']); ?></strong>
-                    <?php if($r['po_number']): ?>
-                        <div style="font-size: 0.65rem; color: #94a3b8; margin-top: 2px;">#<?php echo $r['po_number']; ?></div>
-                    <?php endif; ?>
-                </td>
-                <?php 
-                $has_multiple = count($ids) > 1;
-                $groupId = $r['po_number'] ? $r['po_number'] : 'rate-' . $ids[0];
-                ?>
-                <td>
-                    <!-- First site (always visible) -->
-                    <div style="margin-bottom: 5px; padding-bottom: 5px; border-bottom: 1px solid #f1f5f9;">
-                        <div style="font-size: 0.85rem; font-weight: 600;"><?php echo htmlspecialchars($sNames[0]); ?></div>
-                        <small style="color: #64748b;"><?php echo $sCodes[0]; ?> (<?php echo $widths[0]; ?>x<?php echo $heights[0]; ?> = <strong><?php echo floatval($widths[0]) * floatval($heights[0]); ?> SQFT</strong>)</small>
-                    </div>
-                    
-                    <!-- Collapsible sites -->
-                    <?php if ($has_multiple): ?>
-                        <div class="collapsible-po-<?php echo $groupId; ?>" style="display: none;">
-                            <?php for($i = 1; $i < count($ids); $i++): ?>
-                                <div style="margin-bottom: 5px; padding-bottom: 5px; border-bottom: 1px solid #f1f5f9;">
-                                    <div style="font-size: 0.85rem; font-weight: 600;"><?php echo htmlspecialchars($sNames[$i]); ?></div>
-                                    <small style="color: #64748b;"><?php echo $sCodes[$i]; ?> (<?php echo $widths[$i]; ?>x<?php echo $heights[$i]; ?> = <strong><?php echo floatval($widths[$i]) * floatval($heights[$i]); ?> SQFT</strong>)</small>
-                                </div>
-                            <?php endfor; ?>
-                        </div>
-                        <a href="javascript:void(0);" onclick="togglePODetails('<?php echo $groupId; ?>')" id="toggle-btn-<?php echo $groupId; ?>" data-count="<?php echo (count($ids) - 1); ?>" style="font-size: 0.72rem; color: var(--primary); font-weight: 700; text-decoration: none; display: inline-flex; align-items: center; gap: 4px; margin-top: 4px; background: #f0fdfa; padding: 4px 8px; border-radius: 6px; border: 1px solid #ccfbf1;">
-                            <i class="fas fa-chevron-down"></i> + <?php echo (count($ids) - 1); ?> more site(s)
-                        </a>
-                    <?php endif; ?>
-                </td>
-                <td>
-                    <!-- First media type -->
-                    <div style="height: 38px; display: flex; align-items: center;">
-                        <span class="badge" style="background: #f1f5f9; color: #475569; font-size: 0.7rem;"><?php echo htmlspecialchars($mediaTypes[0]); ?></span>
-                    </div>
-                    
-                    <!-- Collapsible media types -->
-                    <?php if ($has_multiple): ?>
-                        <div class="collapsible-po-<?php echo $groupId; ?>" style="display: none;">
-                            <?php for($i = 1; $i < count($ids); $i++): ?>
-                                <div style="height: 38px; display: flex; align-items: center;">
-                                    <span class="badge" style="background: #f1f5f9; color: #475569; font-size: 0.7rem;"><?php echo htmlspecialchars($mediaTypes[$i]); ?></span>
-                                </div>
-                            <?php endfor; ?>
-                        </div>
-                    <?php endif; ?>
-                </td>
-                <td>
-                    <!-- First rate -->
-                    <div style="height: 38px; display: flex; flex-direction: column; justify-content: center;">
-                        <strong style="color: var(--primary);">₹<?php echo number_format(floatval($unitRates[0]), 2); ?></strong>
-                        <div style="font-size: 0.65rem; color: #059669; font-weight: 700;">₹<?php echo number_format(floatval($unitRates[0]) * floatval($widths[0]) * floatval($heights[0]), 2); ?></div>
-                    </div>
-                    
-                    <!-- Collapsible rates -->
-                    <?php if ($has_multiple): ?>
-                        <div class="collapsible-po-<?php echo $groupId; ?>" style="display: none;">
-                            <?php for($i = 1; $i < count($ids); $i++): ?>
-                                <div style="height: 38px; display: flex; flex-direction: column; justify-content: center;">
-                                    <strong style="color: var(--primary);">₹<?php echo number_format(floatval($unitRates[$i]), 2); ?></strong>
-                                    <div style="font-size: 0.65rem; color: #059669; font-weight: 700;">₹<?php echo number_format(floatval($unitRates[$i]) * floatval($widths[$i]) * floatval($heights[$i]), 2); ?></div>
-                                </div>
-                            <?php endfor; ?>
-                        </div>
-                    <?php endif; ?>
-                    
-                    <?php if(count($ids) > 1): ?>
-                        <div style="margin-top: 10px; padding-top: 5px; border-top: 2px solid #e2e8f0;">
-                            <div style="font-size: 0.65rem; color: #64748b; text-transform: uppercase; font-weight: 800;">Total Amount</div>
-                            <strong style="color: #0f172a; font-size: 0.9rem;">₹<?php echo number_format($totalGroupAmount, 2); ?></strong>
-                        </div>
-                    <?php endif; ?>
-                </td>
-                <td>
-                    <?php if (!empty($r['po_number'])): ?>
-                    <div style="display: flex; flex-direction: column; gap: 8px;">
-                        <!-- Invoice Attachments Section -->
-                        <div style="display: flex; align-items: center; flex-wrap: wrap; gap: 4px;">
-                            <span style="font-size: 0.65rem; font-weight: 800; color: #94a3b8; text-transform: uppercase; margin-right: 4px; width: 100px; text-align: right;">Vendor Invoice:</span>
-                            <?php 
-                            if (!empty($r['attachments'])): 
-                                $files = explode('||', $r['attachments']);
-                                foreach ($files as $file):
-                                    $ext = strtolower(pathinfo($file, PATHINFO_EXTENSION));
-                                    $icon = 'fa-file';
-                                    if (in_array($ext, ['jpg', 'jpeg', 'png'])) $icon = 'fa-file-image';
-                                    if ($ext === 'pdf') $icon = 'fa-file-pdf';
-                            ?>
-                                    <a href="../../uploads/pos/<?php echo urlencode($file); ?>" target="_blank" class="attachment-badge" title="<?php echo htmlspecialchars($file); ?>">
-                                        <i class="fas <?php echo $icon; ?>"></i>
-                                        <span style="font-size: 0.65rem; margin-left: 4px;"><?php echo htmlspecialchars(strlen(basename($file)) > 15 ? substr(basename($file), 0, 15) . '...' : basename($file)); ?></span>
-                                    </a>
-                            <?php 
-                                endforeach;
-                            endif; 
-                            ?>
-                            <?php if (canEdit('vendors')): ?>
-                            <button class="btn-upload-row" onclick="triggerUpload('<?php echo $r['po_number']; ?>')" title="Upload Vendor Invoice/Scan">
-                                <i class="fas fa-cloud-upload-alt"></i> Upload
-                            </button>
-                            <?php endif; ?>
-                        </div>
-                        
-                        <!-- Client Tax Invoice Section -->
-                        <div style="display: flex; align-items: center; flex-wrap: wrap; gap: 4px;">
-                            <span style="font-size: 0.65rem; font-weight: 800; color: #94a3b8; text-transform: uppercase; margin-right: 4px; width: 100px; text-align: right;">Tax Invoice:</span>
-                            <?php if (!empty($r['client_tax_order'])): 
-                                $ext = strtolower(pathinfo($r['client_tax_order'], PATHINFO_EXTENSION));
-                                $icon = 'fa-file';
-                                if (in_array($ext, ['jpg', 'jpeg', 'png'])) $icon = 'fa-file-image';
-                                if ($ext === 'pdf') $icon = 'fa-file-pdf';
-                            ?>
-                                <a href="../../uploads/pos/tax_orders/<?php echo urlencode($r['client_tax_order']); ?>" target="_blank" class="attachment-badge" style="background: #e0e7ff; color: #4f46e5;" title="Tax Invoice: <?php echo htmlspecialchars($r['client_tax_order']); ?>">
-                                    <i class="fas <?php echo $icon; ?>"></i>
-                                    <span style="font-size: 0.65rem; margin-left: 4px;"><?php echo htmlspecialchars(strlen(basename($r['client_tax_order'])) > 15 ? substr(basename($r['client_tax_order']), 0, 15) . '...' : basename($r['client_tax_order'])); ?></span>
-                                </a>
-                            <?php endif; ?>
-                            <?php if (canEdit('vendors')): ?>
-                            <button class="btn-upload-row" style="background: #eef2ff; color: #4f46e5; border-color: #c7d2fe;" onclick="triggerTaxOrderUpload('<?php echo $r['po_number']; ?>')" title="Upload Tax Invoice">
-                                <i class="fas fa-cloud-upload-alt"></i> Upload
-                            </button>
-                            <?php endif; ?>
-                        </div>
-                    </div>
-                    <?php else: ?>
-                    <span style="color: #94a3b8; font-size: 0.75rem;">Requires PO</span>
-                    <?php endif; ?>
-                </td>
-                <td style="text-align: right;">
-                    <div style="display: flex; flex-direction: column; gap: 5px; align-items: flex-end;">
-                        <!-- First Action -->
-                        <div style="height: 38px; display: flex; align-items: center; gap: 8px;">
-                            <?php 
-                                $pdfUrl = "../operations/generate_printing_po.php?vendor_id=" . $r['vendor_id'] . "&preview=1";
-                                foreach($ids as $id) $pdfUrl .= "&rate_ids[]=" . $id;
-                            ?>
-                            <a href="<?php echo $pdfUrl; ?>" target="_blank" class="btn-icon" style="color: #ef4444; background: #fee2e2; padding: 6px; border-radius: 8px; font-size: 0.85rem; display: inline-flex; align-items: center; justify-content: center; width: 28px; height: 28px; border: none; text-decoration: none;" title="Download Group PO">
-                                <i class="fas fa-file-pdf"></i>
-                            </a>
-                            <?php if (canEdit('vendors')): ?>
-                            <a href="create_printing_po.php?action=edit&id=<?php echo $ids[0]; ?>" class="btn-icon" style="color: #0284c7; background: #e0f2fe; padding: 6px; border-radius: 8px; font-size: 0.85rem; display: inline-flex; align-items: center; justify-content: center; width: 28px; height: 28px; border: none; text-decoration: none;" title="Edit">
-                                <i class="fas fa-edit"></i>
-                            </a>
-                            <?php endif; ?>
-                            <?php if (canDelete('vendors')): ?>
-                            <button class="btn-icon btn-delete" onclick="deleteRate(<?php echo $ids[0]; ?>)" style="display: inline-flex; align-items: center; justify-content: center; width: 28px; height: 28px;" title="Delete">
-                                <i class="fas fa-trash"></i>
-                            </button>
-                            <?php endif; ?>
-                        </div>
-                        
-                        <!-- Collapsible Actions -->
-                        <?php if ($has_multiple): ?>
-                            <div class="collapsible-po-<?php echo $groupId; ?>" style="display: none;">
-                                <?php for($i = 1; $i < count($ids); $i++): ?>
-                                    <div style="height: 38px; display: flex; align-items: center; gap: 8px;">
-                                        <?php if (canEdit('vendors')): ?>
-                                        <a href="create_printing_po.php?action=edit&id=<?php echo $ids[$i]; ?>" class="btn-icon" style="color: #0284c7; background: #e0f2fe; padding: 6px; border-radius: 8px; font-size: 0.85rem; display: inline-flex; align-items: center; justify-content: center; width: 28px; height: 28px; border: none; text-decoration: none;" title="Edit">
-                                            <i class="fas fa-edit"></i>
-                                        </a>
-                                        <?php endif; ?>
-                                        <?php if (canDelete('vendors')): ?>
-                                        <button class="btn-icon btn-delete" onclick="deleteRate(<?php echo $ids[$i]; ?>)" style="display: inline-flex; align-items: center; justify-content: center; width: 28px; height: 28px;" title="Delete">
-                                            <i class="fas fa-trash"></i>
-                                        </button>
-                                        <?php endif; ?>
-                                    </div>
-                                <?php endfor; ?>
-                            </div>
-                        <?php endif; ?>
-                    </div>
-                </td>
-            </tr>
-            <?php endforeach; ?>
             <?php if (empty($rates)): ?>
-            <tr>
-                <td colspan="6" style="text-align: center; padding: 2rem; color: #94a3b8;">No Printing POs found.</td>
-            </tr>
+                <tr>
+                    <td colspan="5" style="text-align: center; color: var(--secondary); padding: 2rem;">No Vendor Printing POs found.</td>
+                </tr>
+            <?php else: ?>
+                <?php foreach ($rates as $r): ?>
+                <?php 
+                    $ids = explode('||', $r['rate_ids']);
+                    
+                    // Re-calculate Total Amount
+                    $widths = explode('||', $r['widths']);
+                    $heights = explode('||', $r['heights']);
+                    $unitRates = explode('||', $r['rates']);
+                    
+                    $totalGroupAmount = 0;
+                    foreach($ids as $i => $id) {
+                        $sqft = floatval($widths[$i]) * floatval($heights[$i]);
+                        $totalGroupAmount += ($sqft * floatval($unitRates[$i]));
+                    }
+                ?>
+                <tr>
+                    <td>
+                        <?php if($r['po_number']): ?>
+                            <strong>#<?php echo $r['po_number']; ?></strong>
+                        <?php else: ?>
+                            <span style="color: #cbd5e1; font-weight: 400;">N/A</span>
+                        <?php endif; ?>
+                    </td>
+                    <td>
+                        <div style="font-weight: 700; color: #1e293b;"><?php echo htmlspecialchars($r['vendor_name']); ?></div>
+                    </td>
+                    <td>
+                        <?php echo date('d M Y', strtotime($r['created_at'])); ?>
+                    </td>
+                    <td style="font-weight: 800; color: #059669; white-space: nowrap;">
+                        ₹<?php echo number_format($totalGroupAmount, 2); ?>
+                    </td>
+                    <td>
+                        <?php 
+                            $viewUrl = "view_vendor_printing_po.php?vendor_id=" . $r['vendor_id'];
+                            if ($r['po_number']) {
+                                $viewUrl .= "&po_number=" . urlencode($r['po_number']);
+                            } else {
+                                foreach($ids as $id) $viewUrl .= "&rate_ids[]=" . $id;
+                            }
+                        ?>
+                        <a href="<?php echo $viewUrl; ?>" class="btn-icon" style="color: #0d9488;" title="View Details">
+                            <i class="fas fa-eye"></i>
+                        </a>
+                        
+                        <?php if (canEdit('vendors')): ?>
+                        <a href="create_printing_po.php?action=edit&id=<?php echo $ids[0]; ?>" class="btn-icon" style="color: #0284c7;" title="Edit">
+                            <i class="fas fa-edit"></i>
+                        </a>
+                        <?php endif; ?>
+                        
+                        <?php if (canDelete('vendors')): ?>
+                        <button class="btn-icon btn-delete" onclick="deleteRate(<?php echo $ids[0]; ?>)" title="Delete">
+                            <i class="fas fa-trash"></i>
+                        </button>
+                        <?php endif; ?>
+                    </td>
+                </tr>
+                <?php endforeach; ?>
             <?php endif; ?>
         </tbody>
     </table>
