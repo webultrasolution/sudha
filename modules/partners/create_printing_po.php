@@ -70,6 +70,7 @@ include_once __DIR__ . '/../../includes/header.php';
 <div class="card" style="border-radius: 20px; box-shadow: 0 10px 30px rgba(0,0,0,0.05); padding: 0; overflow: hidden; background: #fff;">
 
     <form method="POST" action="printing_rates.php" id="rateForm" style="display: flex; flex-direction: column; margin: 0;">
+        <input type="hidden" name="action" value="<?php echo htmlspecialchars($action); ?>">
         <?php if ($action === 'edit'): ?>
             <?php if ($po_number): ?>
                 <input type="hidden" name="po_number" value="<?php echo htmlspecialchars($po_number); ?>">
@@ -80,14 +81,7 @@ include_once __DIR__ . '/../../includes/header.php';
             <?php endif; ?>
         <?php endif; ?>
         
-        <div style="background: #f8fafc; padding: 1.5rem 2.5rem; border-bottom: 1px solid #e2e8f0;">
-            <label style="font-weight: 800; color: #1e293b; font-size: 0.75rem; margin-bottom: 0.75rem; display: block; text-transform: uppercase; letter-spacing: 0.05em;">Master Rate (₹ per SQFT)</label>
-            <div style="position: relative; max-width: 300px;">
-                <span style="position: absolute; left: 15px; top: 50%; transform: translateY(-50%); font-weight: 800; color: #94a3b8;">₹</span>
-                <input type="number" step="0.01" name="rate_per_sqft" id="f_rate" min="0" placeholder="0.00" value="<?php echo $rateData ? htmlspecialchars($rateData['rate_per_sqft']) : ''; ?>" style="padding-left: 35px; font-size: 1.2rem; font-weight: 900; color: #0d9488; border: 2px solid #e2e8f0; border-radius: 10px; width: 100%; height: 50px;">
-            </div>
-            <p style="color: #64748b; font-size: 0.75rem; margin-top: 0.5rem; font-weight: 600;">Setting this will apply to all checked sites below. You can also specify individual rates.</p>
-        </div>
+        <input type="hidden" name="rate_per_sqft" id="f_rate" value="0">
             <!-- Full-Width Horizontal Header Config Panel -->
             <div style="background: #f8fafc; padding: 1rem 2.5rem; border-bottom: 1px solid #e2e8f0; display: grid; grid-template-columns: 1fr 1fr; gap: 2rem; align-items: start;">
                 <!-- Column 1: Select Vendor -->
