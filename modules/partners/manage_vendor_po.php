@@ -166,6 +166,7 @@ include_once __DIR__ . '/../../includes/header.php';
         <div class="po-card-header">
             <h3><i class="fas fa-map-marker-alt" style="color: var(--primary); margin-right: 0.5rem;"></i> Select Sites (<span id="total-site-count"><?php echo count($sites); ?></span> owned)</h3>
             <div style="display: flex; align-items: center; gap: 1rem;">
+                <input type="text" id="siteSearch" placeholder="Search by Code, City, or Location..." onkeyup="filterSites()" style="padding: 0.4rem 0.8rem; border-radius: 8px; border: 1px solid #e2e8f0; font-size: 0.8rem; width: 250px; outline: none;">
                 <div style="background: #ccfbf1; color: var(--primary-dark); padding: 0.35rem 0.75rem; border-radius: 8px; font-weight: 800; font-size: 0.75rem;">
                     Selected: <span id="sel-count">0</span>
                 </div>
@@ -275,6 +276,20 @@ include_once __DIR__ . '/../../includes/header.php';
 </div>
 
 <script>
+function filterSites() {
+    const filter = document.getElementById('siteSearch').value.toLowerCase();
+    const rows = document.querySelectorAll('.site-select-table tbody tr');
+    
+    rows.forEach(row => {
+        const text = row.innerText.toLowerCase();
+        if (text.includes(filter)) {
+            row.style.display = '';
+        } else {
+            row.style.display = 'none';
+        }
+    });
+}
+
 function getSelectedSites() {
     const checked = document.querySelectorAll('.cb-site:checked');
     let sites = [];
