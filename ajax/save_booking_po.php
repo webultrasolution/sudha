@@ -39,9 +39,7 @@ try {
     // 2. Check if PO already exists
     $stmtCheck = $pdo->prepare("SELECT id FROM purchase_orders WHERE campaign_id = ? AND vendor_id = ?");
     $stmtCheck->execute([$booking_id, $vendor_id]);
-    if ($stmtCheck->fetchColumn()) {
-        throw new Exception("PO already exists for this vendor on this booking.");
-    }
+    $existingPoId = $stmtCheck->fetchColumn();
 
     // 3. Fetch all sites for this vendor on this booking
     $stmtItems = $pdo->prepare("
@@ -77,40 +75,63 @@ try {
     }
     $grandTotal = $subtotal + $cgst + $sgst;
 
-    // 5. Generate PO Number
-    $poNum = 'BPO-' . date('Ymd') . '-' . rand(100, 999);
-
     // Admin approves instantly; non-admin goes to queue
     $poStatus       = $isAdmin ? 'approved' : 'pending';
     $approvalStatus = $isAdmin ? 'approved' : 'pending_approval';
 
-    // 6. Insert PO
-    $stmtPO = $pdo->prepare("
-        INSERT INTO purchase_orders 
-        (campaign_id, vendor_id, customer_id, employee_id, campaign_name, po_number, po_date, po_amount, cgst_amount, sgst_amount, total_amount, status, approval_status) 
-        VALUES (?, ?, ?, ?, ?, ?, CURDATE(), ?, ?, ?, ?, ?, ?)
-    ");
-    $stmtPO->execute([
-        $booking_id,
-        $vendor_id,
-        $booking['client_id'],
-        $_SESSION['user_id'] ?? 0,
-        $booking['campaign_name'],
-        $poNum,
-        $subtotal,
-        $cgst,
-        $sgst,
-        $grandTotal,
-        $poStatus,
-        $approvalStatus
-    ]);
-    
-    $poId = $pdo->lastInsertId();
+    if ($existingPoId) {
+        $poId = $existingPoId;
+        $stmtPOUpdate = $pdo->prepare("
+            UPDATE purchase_orders 
+            SET po_amount = ?, cgst_amount = ?, sgst_amount = ?, total_amount = ?, status = ?, approval_status = ?
+            WHERE id = ?
+        ");
+        $stmtPOUpdate->execute([
+            $subtotal,
+            $cgst,
+            $sgst,
+            $grandTotal,
+            $poStatus,
+            $approvalStatus,
+            $poId
+        ]);
+        
+        // Delete old items to replace them
+        $pdo->prepare("DELETE FROM po_items WHERE po_id = ?")->execute([$poId]);
+        
+        $poNum = $pdo->query("SELECT po_number FROM purchase_orders WHERE id = $poId")->fetchColumn();
+    } else {
+        // 5. Generate PO Number
+        $poNum = 'BPO-' . date('Ymd') . '-' . rand(100, 999);
 
-    // Create approval request for non-admin
-    if (!$isAdmin) {
-        $stmtAR = $pdo->prepare("INSERT INTO approval_requests (entity_type, entity_id, entity_ref, requested_by, status) VALUES ('purchase_order', ?, ?, ?, 'pending')");
-        $stmtAR->execute([$poId, $poNum, $_SESSION['user_id'] ?? 0]);
+        // 6. Insert PO
+        $stmtPO = $pdo->prepare("
+            INSERT INTO purchase_orders 
+            (campaign_id, vendor_id, customer_id, employee_id, campaign_name, po_number, po_date, po_amount, cgst_amount, sgst_amount, total_amount, status, approval_status, type) 
+            VALUES (?, ?, ?, ?, ?, ?, CURDATE(), ?, ?, ?, ?, ?, ?, 'system')
+        ");
+        $stmtPO->execute([
+            $booking_id,
+            $vendor_id,
+            $booking['client_id'],
+            $_SESSION['user_id'] ?? 0,
+            $booking['campaign_name'],
+            $poNum,
+            $subtotal,
+            $cgst,
+            $sgst,
+            $grandTotal,
+            $poStatus,
+            $approvalStatus
+        ]);
+        
+        $poId = $pdo->lastInsertId();
+
+        // Create approval request for non-admin
+        if (!$isAdmin) {
+            $stmtAR = $pdo->prepare("INSERT INTO approval_requests (entity_type, entity_id, entity_ref, requested_by, status) VALUES ('purchase_order', ?, ?, ?, 'pending')");
+            $stmtAR->execute([$poId, $poNum, $_SESSION['user_id'] ?? 0]);
+        }
     }
 
     // 7. Insert Items — always use booking-level dates as fallback
