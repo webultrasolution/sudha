@@ -46,11 +46,18 @@ if ($pType == 'client') {
           
           UNION ALL
           
-          SELECT i.id, 'invoice' as type, i.created_at as date, i.invoice_number as ref, 
-                 i.sub_total as base_amt, (i.cgst + i.sgst + i.igst) as tax_amount, i.total_amount as total_amt, 
-                 i.total_amount as debit, 0 as credit, 'Billed' as status, i.approval_status
-          FROM invoices i
-          WHERE i.client_id = ? AND (i.booking_id IS NULL OR i.booking_id = 0)
+          UNION ALL
+          
+          SELECT MIN(r.id) as id, 'invoice' as type, DATE(MIN(r.created_at)) as date, COALESCE(r.po_number, CONCAT('RATE-', MIN(r.id))) as ref,
+                 SUM(r.rate_per_sqft * COALESCE(s.width, 0) * COALESCE(s.height, 0)) as base_amt,
+                 0 as tax_amount,
+                 SUM(r.rate_per_sqft * COALESCE(s.width, 0) * COALESCE(s.height, 0)) as total_amt,
+                 SUM(r.rate_per_sqft * COALESCE(s.width, 0) * COALESCE(s.height, 0)) as debit,
+                 0 as credit, 'Billed' as status, 'approved' as approval_status
+          FROM client_printing_rates r
+          LEFT JOIN sites s ON r.site_id = s.id
+          WHERE r.client_id = ?
+          GROUP BY COALESCE(r.po_number, r.id)
     ");
     $stmtInv->execute([$partner_id, $partner_id]);
     $invoices = $stmtInv->fetchAll();
@@ -67,8 +74,21 @@ if ($pType == 'client') {
                0 as credit, status
         FROM purchase_orders 
         WHERE vendor_id = ?
+        
+        UNION ALL
+        
+        SELECT MIN(r.id) as id, 'po' as type, DATE(MIN(r.created_at)) as date, COALESCE(r.po_number, CONCAT('RATE-', MIN(r.id))) as ref,
+               SUM(r.rate_per_sqft * COALESCE(s.width, 0) * COALESCE(s.height, 0)) as base_amt,
+               0 as tax_amount,
+               SUM(r.rate_per_sqft * COALESCE(s.width, 0) * COALESCE(s.height, 0)) as total_amt,
+               SUM(r.rate_per_sqft * COALESCE(s.width, 0) * COALESCE(s.height, 0)) as debit,
+               0 as credit, 'approved' as status
+        FROM vendor_printing_rates r
+        LEFT JOIN sites s ON r.site_id = s.id
+        WHERE r.vendor_id = ?
+        GROUP BY COALESCE(r.po_number, r.id)
     ");
-    $stmtPO->execute([$partner_id]);
+    $stmtPO->execute([$partner_id, $partner_id]);
     $pos = $stmtPO->fetchAll();
     foreach ($pos as $po) {
         $ledgerEntries[] = $po;
