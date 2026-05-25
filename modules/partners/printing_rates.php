@@ -160,13 +160,14 @@ $sizes = $pdo->query("SELECT DISTINCT CONCAT(width, 'x', height) as size FROM si
                 <th>Vendor</th>
                 <th>Date</th>
                 <th>Amount</th>
+                <th style="text-align: center; font-size: 0.75rem; text-transform: uppercase; letter-spacing: 0.05em; color: #475569;">Invoice Attachments</th>
                 <th>Actions</th>
             </tr>
         </thead>
         <tbody>
             <?php if (empty($rates)): ?>
                 <tr>
-                    <td colspan="5" style="text-align: center; color: var(--secondary); padding: 2rem;">No Vendor Printing POs found.</td>
+                    <td colspan="6" style="text-align: center; color: var(--secondary); padding: 2rem;">No Vendor Printing POs found.</td>
                 </tr>
             <?php else: ?>
                 <?php foreach ($rates as $r): ?>
@@ -200,6 +201,63 @@ $sizes = $pdo->query("SELECT DISTINCT CONCAT(width, 'x', height) as size FROM si
                     </td>
                     <td style="font-weight: 800; color: #059669; white-space: nowrap;">
                         ₹<?php echo number_format($totalGroupAmount, 2); ?>
+                    </td>
+                    <td>
+                        <div style="display: flex; flex-direction: column; gap: 8px;">
+                            <!-- Invoice Attachments Section -->
+                            <div style="display: flex; align-items: center; flex-wrap: wrap; gap: 4px;">
+                                <span style="font-size: 0.65rem; font-weight: 800; color: #94a3b8; text-transform: uppercase; margin-right: 4px; width: 80px; text-align: right; display: inline-block;">Invoice:</span>
+                                <?php
+                                if (!empty($r['attachments'])):
+                                    $atts = json_decode($r['attachments'], true);
+                                    if ($atts && count($atts) > 0): 
+                                        $file = $atts[0]['path'];
+                                        $ext = strtolower(pathinfo($file, PATHINFO_EXTENSION));
+                                        $icon = 'fa-file';
+                                        if (in_array($ext, ['jpg', 'jpeg', 'png'])) $icon = 'fa-file-image';
+                                        if ($ext === 'pdf') $icon = 'fa-file-pdf';
+                                        ?>
+                                        <a href="<?php echo htmlspecialchars($file); ?>" target="_blank"
+                                            class="attachment-badge" title="View Attachment">
+                                            <i class="fas <?php echo $icon; ?>"></i>
+                                        </a>
+                                        <?php
+                                    endif;
+                                endif;
+                                ?>
+                                <?php if (canEdit('vendors') && $r['po_number']): ?>
+                                    <button class="btn-upload-row" onclick="triggerUpload('<?php echo htmlspecialchars($r['po_number'], ENT_QUOTES); ?>')"
+                                        title="Upload Invoice/Scan">
+                                        <i class="fas fa-cloud-upload-alt"></i> Upload
+                                    </button>
+                                <?php endif; ?>
+                            </div>
+
+                            <!-- Tax Invoice Section -->
+                            <div style="display: flex; align-items: center; flex-wrap: wrap; gap: 4px;">
+                                <span style="font-size: 0.65rem; font-weight: 800; color: #94a3b8; text-transform: uppercase; margin-right: 4px; width: 80px; text-align: right; display: inline-block;">Tax Invoice:</span>
+                                <?php if (!empty($r['client_tax_order'])):
+                                    $file = $r['client_tax_order'];
+                                    $ext = strtolower(pathinfo($file, PATHINFO_EXTENSION));
+                                    $icon = 'fa-file';
+                                    if (in_array($ext, ['jpg', 'jpeg', 'png'])) $icon = 'fa-file-image';
+                                    if ($ext === 'pdf') $icon = 'fa-file-pdf';
+                                    ?>
+                                    <a href="../../uploads/pos/tax_orders/<?php echo urlencode($file); ?>"
+                                        target="_blank" class="attachment-badge" style="background: #e0e7ff; color: #4f46e5;"
+                                        title="View Tax Invoice">
+                                        <i class="fas <?php echo $icon; ?>"></i>
+                                    </a>
+                                <?php endif; ?>
+                                <?php if (canEdit('vendors') && $r['po_number']): ?>
+                                    <button class="btn-upload-row"
+                                        style="background: #eef2ff; color: #4f46e5; border-color: #c7d2fe;"
+                                        onclick="triggerTaxOrderUpload('<?php echo htmlspecialchars($r['po_number'], ENT_QUOTES); ?>')" title="Upload Tax Invoice">
+                                        <i class="fas fa-cloud-upload-alt"></i> Upload
+                                    </button>
+                                <?php endif; ?>
+                            </div>
+                        </div>
                     </td>
                     <td>
                         <?php 

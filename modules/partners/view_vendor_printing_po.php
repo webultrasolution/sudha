@@ -108,8 +108,8 @@ unset($item);
     </div>
 </div>
 
-<div class="row">
-    <div class="col-md-8">
+<div style="display: grid; grid-template-columns: 3fr 1fr; gap: 2rem;">
+    <div>
         <!-- Sites Table -->
         <div class="card" style="margin-bottom: 2rem;">
             <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1.5rem;">
@@ -173,7 +173,7 @@ unset($item);
         </div>
     </div>
     
-    <div class="col-md-4">
+    <div>
         <!-- Vendor Details -->
         <div class="card" style="margin-bottom: 1.5rem; padding: 1.5rem;">
             <div style="margin-bottom: 1.5rem; padding-bottom: 1.5rem; border-bottom: 1px solid #f1f5f9;">
@@ -191,7 +191,125 @@ unset($item);
                 </div>
             </div>
         </div>
+
+        <!-- Invoice & Attachments Card -->
+        <div class="card no-print" style="margin-bottom: 1.5rem; padding: 1.5rem;">
+            <h3 style="font-size: 1rem; margin-bottom: 1rem;"><i class="fas fa-file-invoice"></i> Vendor Invoice</h3>
+            <?php if (!empty($first['vendor_invoice_no'])): ?>
+                <div style="background: #f0fdf4; padding: 1rem; border-radius: 8px; border: 1px solid #bbf7d0; margin-bottom: 1rem;">
+                    <small style="color: #166534;">Invoice Received</small>
+                    <div style="font-weight: 700;"><?php echo htmlspecialchars($first['vendor_invoice_no']); ?></div>
+                    <small><?php echo date('d M Y', strtotime($first['vendor_invoice_date'])); ?></small>
+                </div>
+            <?php else: ?>
+                <?php if (canEdit('vendors') && $first['po_number']): ?>
+                <form id="invoiceForm" style="margin-bottom: 1.5rem;">
+                    <div class="form-group" style="margin-bottom: 0.75rem;">
+                        <label style="font-size: 0.75rem;">Inv Number</label>
+                        <input type="text" id="v_inv_no" class="p-input" required>
+                    </div>
+                    <div class="form-group" style="margin-bottom: 0.75rem;">
+                        <label style="font-size: 0.75rem;">Inv Date</label>
+                        <input type="date" id="v_inv_date" class="p-input" required>
+                    </div>
+                    <button type="button" class="btn btn-primary" style="width: 100%; margin-top: 0.5rem;" onclick="updateVendorInvoice()">
+                        Update Details
+                    </button>
+                </form>
+                <?php else: ?>
+                    <p style="font-size: 0.85rem; color: #94a3b8; font-style: italic;">No vendor invoice details recorded or draft PO.</p>
+                <?php endif; ?>
+            <?php endif; ?>
+
+            <h3 style="font-size: 1rem; margin-top: 2rem; margin-bottom: 1rem;"><i class="fas fa-paperclip"></i> Attachments</h3>
+            <div id="attachments-list">
+                <?php 
+                $atts = !empty($first['attachments']) ? json_decode($first['attachments'], true) : [];
+                foreach ($atts as $att): 
+                    $file = $att['path'];
+                    $ext = strtolower(pathinfo($file, PATHINFO_EXTENSION));
+                    $icon = 'fa-file';
+                    if (in_array($ext, ['jpg', 'jpeg', 'png'])) $icon = 'fa-file-image';
+                    if ($ext === 'pdf') $icon = 'fa-file-pdf';
+                ?>
+                    <div style="display: flex; align-items: center; gap: 0.5rem; padding: 0.5rem; border-bottom: 1px solid #f1f5f9; font-size: 0.85rem;">
+                        <i class="fas <?php echo $icon; ?>" style="color: #ef4444;"></i>
+                        <span style="flex: 1; overflow: hidden; text-overflow: ellipsis;"><?php echo basename($file); ?></span>
+                        <a href="<?php echo htmlspecialchars($file); ?>" target="_blank" class="btn-icon"><i class="fas fa-download"></i></a>
+                    </div>
+                <?php endforeach; ?>
+                <?php if (empty($atts)): ?>
+                    <p style="font-size: 0.8rem; color: #94a3b8;">No documents attached.</p>
+                <?php endif; ?>
+            </div>
+            
+            <?php if (canEdit('vendors') && $first['po_number']): ?>
+            <form id="uploadForm" enctype="multipart/form-data" style="margin-top: 1rem;">
+                <input type="file" id="po_file" style="display: none;" onchange="uploadPOFile()">
+                <button type="button" class="btn" style="width: 100%; border: 1px dashed var(--primary); color: var(--primary);" onclick="document.getElementById('po_file').click()">
+                    <i class="fas fa-upload"></i> Upload Invoice/Scan
+                </button>
+            </form>
+            <?php endif; ?>
+        </div>
     </div>
 </div>
+
+<style>
+.p-input { width: 100%; padding: 0.5rem; border: 1px solid #cbd5e1; border-radius: 6px; font-family: inherit; margin-top: 0.25rem; font-size: 0.85rem; }
+@media print {
+    .sidebar, .header, .btn-primary, .btn-secondary, .no-print { display: none !important; }
+    .main-content { margin: 0; padding: 0; width: 100% !important; }
+    .card { border: none; box-shadow: none; }
+    body { background: white; }
+}
+</style>
+
+<script>
+function updateVendorInvoice() {
+    const no = document.getElementById('v_inv_no').value;
+    const dt = document.getElementById('v_inv_date').value;
+    if(!no || !dt) return alert('Fill invoice details');
+
+    const formData = new FormData();
+    formData.append('po_number', '<?php echo addslashes($first['po_number'] ?? ''); ?>');
+    formData.append('no', no);
+    formData.append('date', dt);
+
+    fetch('../../ajax/update_printing_po_invoice.php', {
+        method: 'POST',
+        body: formData
+    }).then(r => r.json()).then(res => {
+        if(res.success) location.reload();
+        else alert(res.message);
+    });
+}
+
+function uploadPOFile() {
+    const file = document.getElementById('po_file').files[0];
+    if(!file) return;
+
+    const formData = new FormData();
+    formData.append('po_number', '<?php echo addslashes($first['po_number'] ?? ''); ?>');
+    formData.append('file', file);
+
+    Swal.fire({
+        title: 'Uploading...',
+        allowOutsideClick: false,
+        didOpen: () => { Swal.showLoading(); }
+    });
+
+    fetch('../../ajax/upload_printing_attachment.php', {
+        method: 'POST',
+        body: formData
+    }).then(r => r.json()).then(res => {
+        if(res.success) {
+            Swal.fire('Uploaded', 'File attached successfully.', 'success').then(() => location.reload());
+        } else {
+            Swal.fire('Error', res.message || 'Upload failed', 'error');
+        }
+    });
+}
+</script>
 
 <?php include_once __DIR__ . '/../../includes/footer.php'; ?>

@@ -115,8 +115,8 @@ unset($item);
     </div>
 </div>
 
-<div class="row">
-    <div class="col-md-8">
+<div style="display: grid; grid-template-columns: 3fr 1fr; gap: 2rem;">
+    <div>
         <!-- Sites Table -->
         <div class="card" style="margin-bottom: 2rem;">
             <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1.5rem;">
@@ -180,7 +180,7 @@ unset($item);
         </div>
     </div>
     
-    <div class="col-md-4">
+    <div>
         <!-- Client Details -->
         <div class="card" style="margin-bottom: 1.5rem; padding: 1.5rem;">
             <div style="margin-bottom: 1.5rem; padding-bottom: 1.5rem; border-bottom: 1px solid #f1f5f9;">
