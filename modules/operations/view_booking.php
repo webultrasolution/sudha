@@ -364,6 +364,11 @@ $stmtCheckPO = $pdo->prepare("SELECT id, approval_status FROM purchase_orders WH
                                                     style="background: #3b82f6; color: white; width: 26px; height: 26px; border-radius: 6px; border: none; cursor: pointer; display: flex; align-items: center; justify-content: center; font-size: 0.7rem;">
                                                     <i class="fas fa-envelope"></i>
                                                 </button>
+                                                <button onclick="saveAndGeneratePO(<?php echo $b['id']; ?>, <?php echo $item['vendor_id']; ?>)"
+                                                    title="Update PO Details"
+                                                    style="background: #f59e0b; color: white; width: 26px; height: 26px; border-radius: 6px; border: none; cursor: pointer; display: flex; align-items: center; justify-content: center; font-size: 0.7rem;">
+                                                    <i class="fas fa-sync-alt"></i>
+                                                </button>
                                             <?php endif; ?>
                                             <a href="https://wa.me/<?php echo preg_replace('/[^0-9]/', '', $item['vendor_phone'] ?? ''); ?>?text=Dear <?php echo urlencode($item['vendor_name'] ?? 'Vendor'); ?>, Please find the Purchase Order for Campaign: <?php echo urlencode($b['campaign_name'] ?? 'General'); ?>. Booking Ref: #BK-<?php echo str_pad($b['id'], 4, '0', STR_PAD_LEFT); ?>. Thank you."
                                                 target="_blank" title="Send via WhatsApp"
