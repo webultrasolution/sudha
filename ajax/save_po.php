@@ -47,8 +47,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
         // 2. Insert PO
         $stmt = $pdo->prepare("
-            INSERT INTO purchase_orders (campaign_id, vendor_id, entity_id, employee_id, po_number, po_date, po_amount, cgst_amount, sgst_amount, total_amount, status, approval_status) 
-            VALUES (?, ?, ?, ?, CURDATE(), ?, ?, ?, ?, ?, ?)
+            INSERT INTO purchase_orders (campaign_id, vendor_id, entity_id, employee_id, po_number, po_date, po_amount, cgst_amount, sgst_amount, total_amount, status, approval_status, type) 
+            VALUES (?, ?, ?, ?, ?, CURDATE(), ?, ?, ?, ?, ?, ?, 'system')
         ");
         $stmt->execute([
             $data['campaignId'],
