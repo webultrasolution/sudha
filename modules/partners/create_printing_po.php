@@ -61,6 +61,12 @@ $sizes = $pdo->query("SELECT DISTINCT CONCAT(width, 'x', height) as size FROM si
 include_once __DIR__ . '/../../includes/header.php';
 ?>
 
+<div style="margin-bottom: 1.5rem;">
+    <a href="printing_rates.php" class="btn btn-secondary" style="background: white; border: 1px solid #cbd5e1; color: #475569; padding: 0.5rem 1rem; border-radius: 8px; font-weight: 600; text-decoration: none;">
+        <i class="fas fa-arrow-left"></i> Back to List
+    </a>
+</div>
+
 <div class="card" style="border-radius: 20px; box-shadow: 0 10px 30px rgba(0,0,0,0.05); padding: 0; overflow: hidden; background: #fff;">
 
     <form method="POST" action="printing_rates.php" id="rateForm" style="display: flex; flex-direction: column; margin: 0;">
