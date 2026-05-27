@@ -211,6 +211,11 @@ $vendors = $pdo->query("SELECT id, name FROM partners WHERE type = 'vendor' ORDE
 <div class="card">
     <div style="display: flex; justify-content: flex-end; gap: 1rem; margin-bottom: 1rem;">
         <?php if (canAdd('inventory')): ?>
+            <?php if (hasRole('admin')): ?>
+            <a href="../admin/media_types.php" class="btn btn-secondary" style="background: #f8fafc; color: #475569; border: 1px solid #cbd5e1; text-decoration: none;">
+                <i class="fas fa-list-alt"></i> Manage Media Types
+            </a>
+            <?php endif; ?>
             <button class="btn btn-secondary" onclick="openImportModal()"
                 style="background: #f1f5f9; color: #475569; border: 1px solid #e2e8f0;">
                 <i class="fas fa-file-import"></i> Bulk Import

@@ -47,11 +47,11 @@ $activeEntity = getActiveEntity();
                     <?php if (canView('inventory')): ?>
                     <li><a href="<?php echo BASE_URL; ?>modules/inventory/sites.php" class="<?php echo $activePage == 'sites' ? 'active-sub' : ''; ?>"><i class="fas fa-map-marked-alt"></i> Site/Location</a></li>
                     <?php endif; ?>
-                    <?php if (canView('vendors')): ?>
-                    <li><a href="<?php echo BASE_URL; ?>modules/partners/vendors.php" class="<?php echo $activePage == 'vendors' ? 'active-sub' : ''; ?>"><i class="fas fa-truck-loading"></i> Vendors</a></li>
-                    <?php endif; ?>
                     <?php if (hasRole('admin')): ?>
                     <li><a href="<?php echo BASE_URL; ?>modules/admin/media_types.php" class="<?php echo $activePage == 'media_types' ? 'active-sub' : ''; ?>"><i class="fas fa-list-alt"></i> Media Types</a></li>
+                    <?php endif; ?>
+                    <?php if (canView('vendors')): ?>
+                    <li><a href="<?php echo BASE_URL; ?>modules/partners/vendors.php" class="<?php echo $activePage == 'vendors' ? 'active-sub' : ''; ?>"><i class="fas fa-truck-loading"></i> Vendors</a></li>
                     <?php endif; ?>
                 </ul>
             </li>
