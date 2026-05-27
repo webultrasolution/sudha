@@ -37,18 +37,15 @@ $activeEntity = getActiveEntity();
             <!-- Master Data Submenu -->
             <?php if (canView('clients') || canView('inventory') || canView('vendors')): ?>
             <li class="nav-item has-submenu">
-                <a href="#" class="nav-link submenu-toggle <?php echo in_array($activePage, ['clients', 'sites', 'vendors', 'media_types']) ? 'active submenu-open' : ''; ?>">
+                <a href="#" class="nav-link submenu-toggle <?php echo in_array($activePage, ['clients', 'sites', 'vendors']) ? 'active submenu-open' : ''; ?>">
                     <i class="fas fa-database"></i> <span>Master Data</span> <i class="fas fa-chevron-down toggle-icon" style="margin-left: auto; font-size: 0.8rem;"></i>
                 </a>
-                <ul class="submenu" style="<?php echo in_array($activePage, ['clients', 'sites', 'vendors', 'media_types']) ? 'display: block;' : 'display: none;'; ?>">
+                <ul class="submenu" style="<?php echo in_array($activePage, ['clients', 'sites', 'vendors']) ? 'display: block;' : 'display: none;'; ?>">
                     <?php if (canView('clients')): ?>
                     <li><a href="<?php echo BASE_URL; ?>modules/partners/clients.php" class="<?php echo $activePage == 'clients' ? 'active-sub' : ''; ?>"><i class="fas fa-building"></i> Company/Client</a></li>
                     <?php endif; ?>
                     <?php if (canView('inventory')): ?>
                     <li><a href="<?php echo BASE_URL; ?>modules/inventory/sites.php" class="<?php echo $activePage == 'sites' ? 'active-sub' : ''; ?>"><i class="fas fa-map-marked-alt"></i> Site/Location</a></li>
-                    <?php endif; ?>
-                    <?php if (hasRole('admin')): ?>
-                    <li><a href="<?php echo BASE_URL; ?>modules/admin/media_types.php" class="<?php echo $activePage == 'media_types' ? 'active-sub' : ''; ?>"><i class="fas fa-list-alt"></i> Media Types</a></li>
                     <?php endif; ?>
                     <?php if (canView('vendors')): ?>
                     <li><a href="<?php echo BASE_URL; ?>modules/partners/vendors.php" class="<?php echo $activePage == 'vendors' ? 'active-sub' : ''; ?>"><i class="fas fa-truck-loading"></i> Vendors</a></li>
@@ -180,11 +177,10 @@ $activeEntity = getActiveEntity();
                 <button class="menu-toggle" onclick="toggleSidebar()" style="background: var(--primary); color: white; border: none; padding: 0.5rem 0.75rem; border-radius: 6px; cursor: pointer;">
                     <i class="fas fa-bars"></i>
                 </button>
-                <?php else: ?>
-                <a href="javascript:history.back()" class="btn btn-secondary" style="border: none; background: #e2e8f0; border-radius: 8px; width: 40px; height: 40px; display: flex; align-items: center; justify-content: center; color: #475569; text-decoration: none;">
+                <?php endif; ?>
+                <a href="javascript:history.back()" class="btn btn-secondary" style="border: none; background: #e2e8f0; border-radius: 8px; width: 40px; height: 40px; display: flex; align-items: center; justify-content: center; color: #475569; text-decoration: none;" title="Go Back">
                     <i class="fas fa-arrow-left"></i>
                 </a>
-                <?php endif; ?>
                 <h1 style="font-size: 1.25rem; font-weight: 800; color: #0f172a; margin: 0;"><?php echo isset($pageTitle) ? $pageTitle : 'Dashboard'; ?></h1>
             </div>
             <div class="user-info hide-mobile" style="display: flex; align-items: center; gap: 1.5rem;">
