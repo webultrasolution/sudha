@@ -371,6 +371,7 @@ $gst = calculateGST($subtotal, $isInterState);
                                 $parts = [];
                                 if (!empty(trim($item['city']))) $parts[] = trim($item['city']);
                                 if (!empty(trim($item['site_name']))) $parts[] = trim($item['site_name']);
+                                if (!empty(trim($item['location']))) $parts[] = trim($item['location']);
                                 if (!empty(trim($item['media_type']))) $parts[] = trim($item['media_type']);
                                 echo htmlspecialchars(implode(', ', $parts));
                                 ?>
