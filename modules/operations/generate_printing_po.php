@@ -28,13 +28,21 @@ $rates = $stmtR->fetchAll();
 $preview = isset($_GET['preview']) && $_GET['preview'] === '1';
 $selected_rate_ids = isset($_GET['rate_ids']) ? array_map('intval', $_GET['rate_ids']) : [];
 $po_remark = $_GET['remark'] ?? '';
+$po_number_filter = $_GET['po_number'] ?? '';
 
-// If preview mode, filter only selected rates
-if ($preview && !empty($selected_rate_ids)) {
-    $rates = array_filter($rates, function($r) use ($selected_rate_ids) {
-        return in_array($r['id'], $selected_rate_ids);
-    });
-    $rates = array_values($rates);
+// If preview mode, filter only selected rates or by po_number
+if ($preview) {
+    if (!empty($selected_rate_ids)) {
+        $rates = array_filter($rates, function($r) use ($selected_rate_ids) {
+            return in_array($r['id'], $selected_rate_ids);
+        });
+        $rates = array_values($rates);
+    } elseif (!empty($po_number_filter)) {
+        $rates = array_filter($rates, function($r) use ($po_number_filter) {
+            return $r['po_number'] === $po_number_filter;
+        });
+        $rates = array_values($rates);
+    }
 }
 
 // Company Settings
