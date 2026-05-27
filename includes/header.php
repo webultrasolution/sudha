@@ -37,10 +37,10 @@ $activeEntity = getActiveEntity();
             <!-- Master Data Submenu -->
             <?php if (canView('clients') || canView('inventory') || canView('vendors')): ?>
             <li class="nav-item has-submenu">
-                <a href="#" class="nav-link submenu-toggle <?php echo in_array($activePage, ['clients', 'sites', 'vendors']) ? 'active submenu-open' : ''; ?>">
+                <a href="#" class="nav-link submenu-toggle <?php echo in_array($activePage, ['clients', 'sites', 'vendors', 'media_types']) ? 'active submenu-open' : ''; ?>">
                     <i class="fas fa-database"></i> <span>Master Data</span> <i class="fas fa-chevron-down toggle-icon" style="margin-left: auto; font-size: 0.8rem;"></i>
                 </a>
-                <ul class="submenu" style="<?php echo in_array($activePage, ['clients', 'sites', 'vendors']) ? 'display: block;' : 'display: none;'; ?>">
+                <ul class="submenu" style="<?php echo in_array($activePage, ['clients', 'sites', 'vendors', 'media_types']) ? 'display: block;' : 'display: none;'; ?>">
                     <?php if (canView('clients')): ?>
                     <li><a href="<?php echo BASE_URL; ?>modules/partners/clients.php" class="<?php echo $activePage == 'clients' ? 'active-sub' : ''; ?>"><i class="fas fa-building"></i> Company/Client</a></li>
                     <?php endif; ?>
@@ -49,6 +49,9 @@ $activeEntity = getActiveEntity();
                     <?php endif; ?>
                     <?php if (canView('vendors')): ?>
                     <li><a href="<?php echo BASE_URL; ?>modules/partners/vendors.php" class="<?php echo $activePage == 'vendors' ? 'active-sub' : ''; ?>"><i class="fas fa-truck-loading"></i> Vendors</a></li>
+                    <?php endif; ?>
+                    <?php if (hasRole('admin')): ?>
+                    <li><a href="<?php echo BASE_URL; ?>modules/admin/media_types.php" class="<?php echo $activePage == 'media_types' ? 'active-sub' : ''; ?>"><i class="fas fa-list-alt"></i> Media Types</a></li>
                     <?php endif; ?>
                 </ul>
             </li>
