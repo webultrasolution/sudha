@@ -55,7 +55,7 @@ if (!empty($b['billing_gstin']) && $b['billing_gstin'] !== $b['client_gstin'] &&
 
 // Fetch Items
 $stmtItems = $pdo->prepare("
-    SELECT bi.*, s.name as site_name, s.site_code, s.location, s.city, s.width, s.height, s.light_type, s.hsn_code, s.type as media_type
+    SELECT bi.*, COALESCE(bi.custom_site_name, s.name) as site_name, s.site_code, COALESCE(bi.custom_location, s.location) as location, s.city, s.width, s.height, s.light_type, s.hsn_code, s.type as media_type
     FROM booking_items bi
     JOIN sites s ON bi.site_id = s.id
     WHERE bi.booking_id = ?

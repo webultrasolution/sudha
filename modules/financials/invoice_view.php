@@ -42,7 +42,7 @@ if (!empty($invoice['billing_gstin']) && $invoice['billing_gstin'] !== $invoice[
 
 // Fetch Items (from the linked booking)
 $stmtItems = $pdo->prepare("
-    SELECT bi.*, s.name as site_name, s.location, s.site_code, s.type as site_type
+    SELECT bi.*, COALESCE(bi.custom_site_name, s.name) as site_name, COALESCE(bi.custom_location, s.location) as location, s.site_code, s.type as site_type
     FROM booking_items bi
     JOIN sites s ON bi.site_id = s.id
     WHERE bi.booking_id = ?
