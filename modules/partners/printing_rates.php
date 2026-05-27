@@ -209,15 +209,15 @@ $sizes = $pdo->query("SELECT DISTINCT CONCAT(width, 'x', height) as size FROM si
                                 <span style="font-size: 0.65rem; font-weight: 800; color: #94a3b8; text-transform: uppercase; margin-right: 4px; width: 80px; text-align: right; display: inline-block;">Invoice:</span>
                                 <?php
                                 if (!empty($r['attachments'])):
-                                    $atts = json_decode($r['attachments'], true);
-                                    if ($atts && count($atts) > 0): 
-                                        $file = $atts[0]['path'];
+                                    $atts = explode('||', $r['attachments']);
+                                    if (count($atts) > 0): 
+                                        $file = $atts[0];
                                         $ext = strtolower(pathinfo($file, PATHINFO_EXTENSION));
                                         $icon = 'fa-file';
                                         if (in_array($ext, ['jpg', 'jpeg', 'png'])) $icon = 'fa-file-image';
                                         if ($ext === 'pdf') $icon = 'fa-file-pdf';
                                         ?>
-                                        <a href="<?php echo htmlspecialchars($file); ?>" target="_blank"
+                                        <a href="../../uploads/pos/<?php echo rawurlencode($file); ?>" target="_blank"
                                             class="attachment-badge" title="View Attachment">
                                             <i class="fas <?php echo $icon; ?>"></i>
                                         </a>

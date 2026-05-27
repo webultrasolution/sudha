@@ -169,7 +169,9 @@ $vendorsList = $pdo->query("SELECT id, name FROM partners WHERE type = 'vendor' 
                             <!-- Invoice Attachments Section -->
                             <div style="display: flex; align-items: center; flex-wrap: wrap; gap: 4px;">
                                 <span
-                                    style="font-size: 0.65rem; font-weight: 800; color: #94a3b8; text-transform: uppercase; margin-right: 4px; width: 80px; text-align: right; display: inline-block;">Invoice:</span>
+                                    style="font-size: 0.65rem; font-weight: 800; color: #94a3b8; text-transform:
+                                         uppercase; margin-right: 4px; width: 95px; text-align: right; display: inline-block;">Vendor
+                                    Invoice:</span>
                                 <?php
                                 if (!empty($p['attachments'])):
                                     $files = explode('||', $p['attachments']);
@@ -200,7 +202,7 @@ $vendorsList = $pdo->query("SELECT id, name FROM partners WHERE type = 'vendor' 
                             <!-- Client Tax Invoice Section -->
                             <div style="display: flex; align-items: center; flex-wrap: wrap; gap: 4px;">
                                 <span
-                                    style="font-size: 0.65rem; font-weight: 800; color: #94a3b8; text-transform: uppercase; margin-right: 4px; width: 80px; text-align: right; display: inline-block;">Tax
+                                    style="font-size: 0.65rem; font-weight: 800; color: #94a3b8; text-transform: uppercase; margin-right: 4px; width: 95px; text-align: right; display: inline-block;">Tax
                                     Invoice:</span>
                                 <?php if (!empty($p['client_tax_order'])):
                                     $ext = strtolower(pathinfo($p['client_tax_order'], PATHINFO_EXTENSION));
