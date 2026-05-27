@@ -18,6 +18,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action'])) {
     $pincode = clean($_POST['pincode'] ?? '');
     $gstin = clean($_POST['gstin']);
     $pan = clean($_POST['pan']);
+    $msme = clean($_POST['msme'] ?? '');
+    $cin = clean($_POST['cin'] ?? '');
     $billing_address = clean($_POST['billing_address']);
     $payment_terms = clean($_POST['payment_terms']);
     $business_type = clean($_POST['business_type'] ?? '');
@@ -31,14 +33,14 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action'])) {
 
     if ($_POST['action'] === 'add') {
         requirePermission('vendors', 'add');
-        $stmt = $pdo->prepare("INSERT INTO partners (name, business_type, contact_person, phone, email, address, city, state, district, pincode, gstin, additional_gst, pan, billing_address, payment_terms, status, type) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'vendor')");
-        $stmt->execute([$name, $business_type, $contact, $phone, $email, $address, $city, $state, $district, $pincode, $gstin, $additional_gst, $pan, $billing_address, $payment_terms, $status]);
+        $stmt = $pdo->prepare("INSERT INTO partners (name, business_type, contact_person, phone, email, address, city, state, district, pincode, gstin, additional_gst, pan, msme, cin, billing_address, payment_terms, status, type) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'vendor')");
+        $stmt->execute([$name, $business_type, $contact, $phone, $email, $address, $city, $state, $district, $pincode, $gstin, $additional_gst, $pan, $msme, $cin, $billing_address, $payment_terms, $status]);
         header("Location: vendors.php?msg=added"); exit;
     } elseif ($_POST['action'] === 'edit') {
         requirePermission('vendors', 'edit');
         $id = intval($_POST['id']);
-        $stmt = $pdo->prepare("UPDATE partners SET name=?, business_type=?, contact_person=?, phone=?, email=?, address=?, city=?, state=?, district=?, pincode=?, gstin=?, additional_gst=?, pan=?, billing_address=?, payment_terms=?, status=? WHERE id=?");
-        $stmt->execute([$name, $business_type, $contact, $phone, $email, $address, $city, $state, $district, $pincode, $gstin, $additional_gst, $pan, $billing_address, $payment_terms, $status, $id]);
+        $stmt = $pdo->prepare("UPDATE partners SET name=?, business_type=?, contact_person=?, phone=?, email=?, address=?, city=?, state=?, district=?, pincode=?, gstin=?, additional_gst=?, pan=?, msme=?, cin=?, billing_address=?, payment_terms=?, status=? WHERE id=?");
+        $stmt->execute([$name, $business_type, $contact, $phone, $email, $address, $city, $state, $district, $pincode, $gstin, $additional_gst, $pan, $msme, $cin, $billing_address, $payment_terms, $status, $id]);
         header("Location: vendors.php?msg=updated"); exit;
     } elseif ($_POST['action'] === 'delete') {
         requirePermission('vendors', 'delete');
@@ -209,6 +211,10 @@ $indian_states = ["Andhra Pradesh", "Arunachal Pradesh", "Assam", "Bihar", "Chha
                         <textarea name="additional_gst" id="f_additional_gst" style="display: none;"></textarea>
                     </div>
                     <div class="form-group"><label id="f_pan_label">PAN</label><input type="text" name="pan" id="f_pan"></div>
+                    <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 1rem;">
+                        <div class="form-group"><label>MSME Udyam No</label><input type="text" name="msme" id="f_msme" placeholder="Optional"></div>
+                        <div class="form-group"><label>CIN Number</label><input type="text" name="cin" id="f_cin" placeholder="Optional"></div>
+                    </div>
                     <div class="form-group"><label>Payment Terms</label><input type="text" name="payment_terms" id="f_terms" placeholder="e.g. 30 Days Net"></div>
                     <div class="form-group"><label>Billing/Payment Address</label><textarea name="billing_address" id="f_billing" rows="2"></textarea></div>
                 </div>
@@ -281,8 +287,10 @@ function editVendor(v) {
     document.getElementById('f_state').value = v.state;
     document.getElementById('f_district').value = v.district || '';
     document.getElementById('f_pincode').value = v.pincode || '';
-    document.getElementById('f_gstin').value = v.gstin;
-    document.getElementById('f_pan').value = v.pan;
+    document.getElementById('f_gstin').value = v.gstin || '';
+    document.getElementById('f_pan').value = v.pan || '';
+    document.getElementById('f_msme').value = v.msme || '';
+    document.getElementById('f_cin').value = v.cin || '';
     document.getElementById('f_billing').value = v.billing_address;
     document.getElementById('f_terms').value = v.payment_terms;
     document.getElementById('f_business_type').value = v.business_type || '';
