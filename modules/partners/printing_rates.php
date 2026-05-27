@@ -243,7 +243,7 @@ $sizes = $pdo->query("SELECT DISTINCT CONCAT(width, 'x', height) as size FROM si
                                     if (in_array($ext, ['jpg', 'jpeg', 'png'])) $icon = 'fa-file-image';
                                     if ($ext === 'pdf') $icon = 'fa-file-pdf';
                                     ?>
-                                    <a href="../../uploads/pos/tax_orders/<?php echo urlencode($file); ?>"
+                                    <a href="../../uploads/pos/tax_orders/<?php echo rawurlencode($file); ?>"
                                         target="_blank" class="attachment-badge" style="background: #e0e7ff; color: #4f46e5;"
                                         title="View Tax Invoice">
                                         <i class="fas <?php echo $icon; ?>"></i>
