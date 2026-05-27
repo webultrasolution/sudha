@@ -367,10 +367,13 @@ $gst = calculateGST($subtotal, $isInterState);
                         <td><?php echo $idx + 1; ?></td>
                         <td style="text-align: left; padding-left: 10px;">
                             <div style="font-weight: bold;">
-                                <?php echo htmlspecialchars($item['city'] ?? ''); ?>,
-                                <?php echo htmlspecialchars($item['site_name'] ?? ''); ?>,
-                                <?php echo htmlspecialchars($item['location'] ?? ''); ?>,
-                                <?php echo htmlspecialchars($item['media_type'] ?? ''); ?>
+                                <?php 
+                                $parts = [];
+                                if (!empty(trim($item['city']))) $parts[] = trim($item['city']);
+                                if (!empty(trim($item['site_name']))) $parts[] = trim($item['site_name']);
+                                if (!empty(trim($item['media_type']))) $parts[] = trim($item['media_type']);
+                                echo htmlspecialchars(implode(', ', $parts));
+                                ?>
                             </div>
                         </td>
                         <td><?php echo $item['hsn_code'] ?: '998366'; ?></td>
