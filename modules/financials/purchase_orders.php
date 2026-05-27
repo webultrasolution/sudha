@@ -181,7 +181,7 @@ $vendorsList = $pdo->query("SELECT id, name FROM partners WHERE type = 'vendor' 
                                         if ($ext === 'pdf')
                                             $icon = 'fa-file-pdf';
                                         ?>
-                                        <a href="../../uploads/pos/<?php echo urlencode($file); ?>" target="_blank"
+                                        <a href="../../uploads/pos/<?php echo rawurlencode($file); ?>" target="_blank"
                                             class="attachment-badge" title="<?php echo htmlspecialchars($file); ?>">
                                             <i class="fas <?php echo $icon; ?>"></i>
                                         </a>
@@ -210,7 +210,7 @@ $vendorsList = $pdo->query("SELECT id, name FROM partners WHERE type = 'vendor' 
                                     if ($ext === 'pdf')
                                         $icon = 'fa-file-pdf';
                                     ?>
-                                    <a href="../../uploads/pos/tax_orders/<?php echo urlencode($p['client_tax_order']); ?>"
+                                    <a href="../../uploads/pos/tax_orders/<?php echo rawurlencode($p['client_tax_order']); ?>"
                                         target="_blank" class="attachment-badge" style="background: #e0e7ff; color: #4f46e5;"
                                         title="Tax Invoice: <?php echo htmlspecialchars($p['client_tax_order']); ?>">
                                         <i class="fas <?php echo $icon; ?>"></i>

@@ -440,7 +440,7 @@ $pendingPayments = count($payments);
                     </td>
                     <td>
                         <?php if ($cp['customer_po_file']): ?>
-                            <a href="../../uploads/customer_pos/<?php echo urlencode($cp['customer_po_file']); ?>" target="_blank" style="display: inline-flex; align-items: center; gap: 5px; color: #0284c7; background: #f0f9ff; padding: 4px 10px; border-radius: 6px; font-size: 0.75rem; font-weight: 700; text-decoration: none;">
+                            <a href="../../uploads/customer_pos/<?php echo rawurlencode($cp['customer_po_file']); ?>" target="_blank" style="display: inline-flex; align-items: center; gap: 5px; color: #0284c7; background: #f0f9ff; padding: 4px 10px; border-radius: 6px; font-size: 0.75rem; font-weight: 700; text-decoration: none;">
                                 <i class="fas fa-file-pdf"></i> View Attachment
                             </a>
                         <?php else: ?>
