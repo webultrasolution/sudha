@@ -19,6 +19,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action'])) {
     $gstin = clean($_POST['gstin']);
     $additional_gst = clean($_POST['additional_gst'] ?? '');
     $pan = clean($_POST['pan']);
+    $msme = clean($_POST['msme'] ?? '');
+    $cin = clean($_POST['cin'] ?? '');
     $billing_address = clean($_POST['billing_address']);
     $business_type = clean($_POST['business_type'] ?? '');
     $status = clean($_POST['status'] ?? 'active');
@@ -30,14 +32,14 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action'])) {
 
     if ($_POST['action'] === 'add') {
         requirePermission('clients', 'add');
-        $stmt = $pdo->prepare("INSERT INTO partners (name, business_type, contact_person, phone, email, address, city, state, district, pincode, gstin, additional_gst, pan, billing_address, status, type) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'client')");
-        $stmt->execute([$name, $business_type, $contact, $phone, $email, $address, $city, $state, $district, $pincode, $gstin, $additional_gst, $pan, $billing_address, $status]);
+        $stmt = $pdo->prepare("INSERT INTO partners (name, business_type, contact_person, phone, email, address, city, state, district, pincode, gstin, additional_gst, pan, msme, cin, billing_address, status, type) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'client')");
+        $stmt->execute([$name, $business_type, $contact, $phone, $email, $address, $city, $state, $district, $pincode, $gstin, $additional_gst, $pan, $msme, $cin, $billing_address, $status]);
         header("Location: clients.php?msg=added"); exit;
     } elseif ($_POST['action'] === 'edit') {
         requirePermission('clients', 'edit');
         $id = intval($_POST['id']);
-        $stmt = $pdo->prepare("UPDATE partners SET name=?, business_type=?, contact_person=?, phone=?, email=?, address=?, city=?, state=?, district=?, pincode=?, gstin=?, additional_gst=?, pan=?, billing_address=?, status=? WHERE id=?");
-        $stmt->execute([$name, $business_type, $contact, $phone, $email, $address, $city, $state, $district, $pincode, $gstin, $additional_gst, $pan, $billing_address, $status, $id]);
+        $stmt = $pdo->prepare("UPDATE partners SET name=?, business_type=?, contact_person=?, phone=?, email=?, address=?, city=?, state=?, district=?, pincode=?, gstin=?, additional_gst=?, pan=?, msme=?, cin=?, billing_address=?, status=? WHERE id=?");
+        $stmt->execute([$name, $business_type, $contact, $phone, $email, $address, $city, $state, $district, $pincode, $gstin, $additional_gst, $pan, $msme, $cin, $billing_address, $status, $id]);
         header("Location: clients.php?msg=updated"); exit;
     } elseif ($_POST['action'] === 'delete') {
         requirePermission('clients', 'delete');
@@ -229,6 +231,10 @@ $indian_states = ["Andhra Pradesh", "Arunachal Pradesh", "Assam", "Bihar", "Chha
                         <textarea name="additional_gst" id="f_additional_gst" style="display: none;"></textarea>
                     </div>
                     <div class="form-group"><label id="f_pan_label">PAN</label><input type="text" name="pan" id="f_pan"></div>
+                    <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 1rem;">
+                        <div class="form-group"><label>MSME Udyam No</label><input type="text" name="msme" id="f_msme" placeholder="Optional"></div>
+                        <div class="form-group"><label>CIN Number</label><input type="text" name="cin" id="f_cin" placeholder="Optional"></div>
+                    </div>
                     <div class="form-group"><label>Status</label>
                         <select name="status" id="f_status">
                             <option value="active">Active</option>
@@ -307,8 +313,10 @@ function editClient(c) {
     document.getElementById('f_state').value = c.state;
     document.getElementById('f_district').value = c.district || '';
     document.getElementById('f_pincode').value = c.pincode || '';
-    document.getElementById('f_gstin').value = c.gstin;
-    document.getElementById('f_pan').value = c.pan;
+    document.getElementById('f_gstin').value = c.gstin || '';
+    document.getElementById('f_pan').value = c.pan || '';
+    document.getElementById('f_msme').value = c.msme || '';
+    document.getElementById('f_cin').value = c.cin || '';
     document.getElementById('f_additional_gst').value = c.additional_gst || '';
     document.getElementById('f_billing').value = c.billing_address;
     document.getElementById('f_status').value = c.status || 'active';
