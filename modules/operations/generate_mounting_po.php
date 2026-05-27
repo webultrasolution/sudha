@@ -18,7 +18,7 @@ $vendors = $pdo->query("SELECT id, name FROM partners WHERE type = 'vendor' ORDE
 
 // Fetch Sites for this booking
 $stmtS = $pdo->prepare("
-    SELECT bi.*, s.name as site_name, s.site_code, s.location, s.city, s.width, s.height, s.type as media_type, s.hsn_code, s.vendor_gst
+    SELECT bi.*, COALESCE(bi.custom_site_name, s.name) as site_name, s.site_code, COALESCE(bi.custom_location, s.location) as location, s.city, s.width, s.height, s.type as media_type, s.hsn_code, s.vendor_gst
     FROM booking_items bi
     JOIN sites s ON bi.site_id = s.id
     WHERE bi.booking_id = ?
