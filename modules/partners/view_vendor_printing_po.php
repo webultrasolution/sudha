@@ -225,6 +225,7 @@ unset($item);
             <div id="attachments-list">
                 <?php 
                 $atts = !empty($first['attachments']) ? json_decode($first['attachments'], true) : [];
+                if (!is_array($atts)) $atts = [];
                 foreach ($atts as $att): 
                     $file = $att['path'];
                     $ext = strtolower(pathinfo($file, PATHINFO_EXTENSION));
