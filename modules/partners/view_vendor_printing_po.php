@@ -224,10 +224,8 @@ unset($item);
             <h3 style="font-size: 1rem; margin-top: 2rem; margin-bottom: 1rem;"><i class="fas fa-paperclip"></i> Attachments</h3>
             <div id="attachments-list">
                 <?php 
-                $atts = !empty($first['attachments']) ? json_decode($first['attachments'], true) : [];
-                if (!is_array($atts)) $atts = [];
-                foreach ($atts as $att): 
-                    $file = $att['path'];
+                $atts = !empty($first['attachments']) ? explode('||', $first['attachments']) : [];
+                foreach ($atts as $file): 
                     $ext = strtolower(pathinfo($file, PATHINFO_EXTENSION));
                     $icon = 'fa-file';
                     if (in_array($ext, ['jpg', 'jpeg', 'png'])) $icon = 'fa-file-image';
@@ -235,8 +233,8 @@ unset($item);
                 ?>
                     <div style="display: flex; align-items: center; gap: 0.5rem; padding: 0.5rem; border-bottom: 1px solid #f1f5f9; font-size: 0.85rem;">
                         <i class="fas <?php echo $icon; ?>" style="color: #ef4444;"></i>
-                        <span style="flex: 1; overflow: hidden; text-overflow: ellipsis;"><?php echo basename($file); ?></span>
-                        <a href="<?php echo htmlspecialchars($file); ?>" target="_blank" class="btn-icon"><i class="fas fa-download"></i></a>
+                        <span style="flex: 1; overflow: hidden; text-overflow: ellipsis;"><?php echo htmlspecialchars(basename($file)); ?></span>
+                        <a href="../../uploads/pos/<?php echo rawurlencode($file); ?>" target="_blank" class="btn-icon"><i class="fas fa-download"></i></a>
                     </div>
                 <?php endforeach; ?>
                 <?php if (empty($atts)): ?>
