@@ -175,8 +175,8 @@ $light_types = $pdo->query("SELECT DISTINCT light_type FROM sites WHERE light_ty
 $sizes = $pdo->query("SELECT DISTINCT CONCAT(width, 'x', height) as size FROM sites WHERE width > 0 AND height > 0 ORDER BY size")->fetchAll(PDO::FETCH_COLUMN);
 $media_types = $pdo->query("SELECT DISTINCT type FROM sites WHERE type IS NOT NULL AND type != '' ORDER BY type")->fetchAll(PDO::FETCH_COLUMN);
 
-// 
-
+// Fetch Media Types Master List for Add/Edit Form
+$all_media_types = $pdo->query("SELECT name FROM media_types ORDER BY name ASC")->fetchAll(PDO::FETCH_COLUMN);
 
 // Counts for Tabs
 $counts = [
@@ -473,12 +473,9 @@ $vendors = $pdo->query("SELECT id, name FROM partners WHERE type = 'vendor' ORDE
                     <label>Media Type</label>
                     <select name="type" id="f_type" required>
                         <option value="">Select Type</option>
-                        <option value="Billboard">Billboard</option>
-                        <option value="Unipole">Unipole</option>
-                        <option value="Gantry">Gantry</option>
-                        <option value="BQS">Bus Shelter (BQS)</option>
-                        <option value="DCP">Digital City Panel (DCP)</option>
-                        <option value="LED Screen">LED Screen</option>
+                        <?php foreach ($all_media_types as $mt): ?>
+                            <option value="<?php echo htmlspecialchars($mt); ?>"><?php echo htmlspecialchars($mt); ?></option>
+                        <?php endforeach; ?>
                     </select>
                 </div>
                 <div class="form-group">
