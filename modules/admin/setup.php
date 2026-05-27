@@ -28,7 +28,7 @@ try {
 
     // 3. Create Demo Sites
     $sites = [
-        ['S-001', 'Elite Hoarding - MG Road', 'MG Road Junction', 'Bangalore', 'Hoarding', 40, 20, 'HA', 150000, 100000],
+        ['S-001', 'Elite Billboard - MG Road', 'MG Road Junction', 'Bangalore', 'Billboard', 40, 20, 'HA', 150000, 100000],
         ['S-002', 'Airport Unipole - Gate 1', 'NH-44 Airport Road', 'Bangalore', 'Unipole', 20, 10, 'TA', 80000, 50000],
         ['S-003', 'Bus Queen Square - Central', 'Majestic Bus Stand', 'Bangalore', 'BQS', 10, 8, 'HA', 25000, 15000]
     ];
@@ -58,7 +58,8 @@ $output = ob_get_clean();
 
 <div class="card" style="max-width: 700px; margin: 0 auto; padding: 3rem;">
     <div style="text-align: center; margin-bottom: 2.5rem;">
-        <div style="width: 64px; height: 64px; background: rgba(28, 173, 169, 0.1); color: var(--primary); border-radius: 20px; display: flex; align-items: center; justify-content: center; margin: 0 auto 1.5rem; font-size: 2rem;">
+        <div
+            style="width: 64px; height: 64px; background: rgba(28, 173, 169, 0.1); color: var(--primary); border-radius: 20px; display: flex; align-items: center; justify-content: center; margin: 0 auto 1.5rem; font-size: 2rem;">
             <i class="fas fa-rocket"></i>
         </div>
         <h2 style="font-size: 1.75rem; color: var(--dark);">CRM Initialization</h2>
@@ -70,7 +71,8 @@ $output = ob_get_clean();
     </div>
 
     <div style="margin-top: 3rem; text-align: center; border-top: 1px solid #f1f5f9; padding-top: 2rem;">
-        <p style="margin-bottom: 1.5rem; font-size: 0.875rem; color: var(--secondary);">The environment is now ready for operations.</p>
+        <p style="margin-bottom: 1.5rem; font-size: 0.875rem; color: var(--secondary);">The environment is now ready for
+            operations.</p>
         <a href="<?php echo BASE_URL; ?>login.php" class="btn btn-primary" style="width: 100%; padding: 1rem;">
             Go to Login Portal <i class="fas fa-arrow-right" style="margin-left: 0.5rem;"></i>
         </a>
@@ -78,19 +80,34 @@ $output = ob_get_clean();
 </div>
 
 <style>
-.setup-msg {
-    display: flex;
-    align-items: center;
-    gap: 1rem;
-    padding: 1rem 1.25rem;
-    border-radius: 12px;
-    font-size: 0.9375rem;
-    font-weight: 500;
-}
-.setup-msg i { font-size: 1.1rem; }
-.setup-msg.success { background: #dcfce7; color: #166534; }
-.setup-msg.info { background: #e0f2fe; color: #0369a1; }
-.setup-msg.error { background: #fee2e2; color: #991b1b; }
+    .setup-msg {
+        display: flex;
+        align-items: center;
+        gap: 1rem;
+        padding: 1rem 1.25rem;
+        border-radius: 12px;
+        font-size: 0.9375rem;
+        font-weight: 500;
+    }
+
+    .setup-msg i {
+        font-size: 1.1rem;
+    }
+
+    .setup-msg.success {
+        background: #dcfce7;
+        color: #166534;
+    }
+
+    .setup-msg.info {
+        background: #e0f2fe;
+        color: #0369a1;
+    }
+
+    .setup-msg.error {
+        background: #fee2e2;
+        color: #991b1b;
+    }
 </style>
 
 <?php include_once __DIR__ . '/../../includes/footer.php'; ?>
