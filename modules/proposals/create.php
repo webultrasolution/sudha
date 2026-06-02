@@ -1403,7 +1403,7 @@ function updateSliderImage() {
     const lbImg = document.getElementById('lightbox-img');
     const lbBadge = document.getElementById('lightbox-badge');
     if(lbImg) {
-        lbImg.src = baseUrl + currentImages[currentImgIndex];
+        lbImg.src = imgBaseUrl + currentImages[currentImgIndex];
         if(lbBadge) {
             lbBadge.innerText = (currentImgIndex + 1) + " / " + currentImages.length;
             lbBadge.style.display = currentImages.length > 1 ? 'block' : 'none';

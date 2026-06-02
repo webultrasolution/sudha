@@ -37,18 +37,19 @@ if ($pType == 'client') {
 
     // 2. Fetch Invoices
     $stmtInv = $pdo->prepare("
-          SELECT i.id, 'invoice' as type, i.created_at as date, i.invoice_number as ref, 
-                 i.sub_total as base_amt, (i.cgst + i.sgst + i.igst) as tax_amount, i.total_amount as total_amt, 
+          SELECT i.id, 'invoice' as type, i.created_at as date, i.invoice_number as ref,
+                 '' as remark,
+                 i.sub_total as base_amt, (i.cgst + i.sgst + i.igst) as tax_amount, i.total_amount as total_amt,
                  i.total_amount as debit, 0 as credit, 'Billed' as status, i.approval_status
           FROM invoices i
           JOIN bookings b ON i.booking_id = b.id
           WHERE b.client_id = ?
-          
+
           UNION ALL
-          
-          UNION ALL
-          
-          SELECT MIN(r.id) as id, 'invoice' as type, DATE(MIN(r.created_at)) as date, COALESCE(r.po_number, CONCAT('RATE-', MIN(r.id))) as ref,
+
+          SELECT MIN(r.id) as id, 'invoice' as type, DATE(MIN(r.created_at)) as date,
+                 COALESCE(r.po_number, CONCAT('RATE-', MIN(r.id))) as ref,
+                 '' as remark,
                  SUM(r.rate_per_sqft * COALESCE(s.width, 0) * COALESCE(s.height, 0)) as base_amt,
                  0 as tax_amount,
                  SUM(r.rate_per_sqft * COALESCE(s.width, 0) * COALESCE(s.height, 0)) as total_amt,
@@ -58,8 +59,23 @@ if ($pType == 'client') {
           LEFT JOIN sites s ON r.site_id = s.id
           WHERE r.client_id = ?
           GROUP BY COALESCE(r.po_number, r.id)
+
+          UNION ALL
+
+          SELECT MIN(m.id) as id, 'invoice' as type, DATE(MIN(m.created_at)) as date,
+                 COALESCE(m.custom_invoice_number, m.po_number, CONCAT('CMI-', MIN(m.id))) as ref,
+                 '' as remark,
+                 SUM(m.rate_per_sqft * COALESCE(s.width, 0) * COALESCE(s.height, 0)) as base_amt,
+                 SUM(m.rate_per_sqft * COALESCE(s.width, 0) * COALESCE(s.height, 0)) * 0.18 as tax_amount,
+                 SUM(m.rate_per_sqft * COALESCE(s.width, 0) * COALESCE(s.height, 0)) * 1.18 as total_amt,
+                 SUM(m.rate_per_sqft * COALESCE(s.width, 0) * COALESCE(s.height, 0)) * 1.18 as debit,
+                 0 as credit, 'Mounting' as status, 'approved' as approval_status
+          FROM client_mounting_rates m
+          LEFT JOIN sites s ON m.site_id = s.id
+          WHERE m.client_id = ?
+          GROUP BY COALESCE(m.po_number, m.id)
     ");
-    $stmtInv->execute([$partner_id, $partner_id]);
+    $stmtInv->execute([$partner_id, $partner_id, $partner_id]);
     $invoices = $stmtInv->fetchAll();
     foreach ($invoices as $inv) {
         $ledgerEntries[] = $inv;
@@ -99,10 +115,11 @@ if ($pType == 'client') {
 $pMode = ($pType == 'client') ? 'receivable' : 'payable';
 $dbType = ($pType == 'client') ? 'receivable' : 'payable';
 $stmtPay = $pdo->prepare("
-    SELECT id, 'payment' as type, payment_date as date, transaction_id as ref, 
-           amount as base_amt, 0 as tax_amount, amount as total_amt, 
+    SELECT id, 'payment' as type, payment_date as date, transaction_id as ref,
+           notes as remark,
+           amount as base_amt, 0 as tax_amount, amount as total_amt,
            0 as debit, amount as credit, payment_mode as status, approval_status
-    FROM payments 
+    FROM payments
     WHERE partner_id = ? AND type = ? AND approval_status = 'approved'
 ");
 $stmtPay->execute([$partner_id, $dbType]);
@@ -220,10 +237,15 @@ $balanceLabel = $pType == 'client' ? 'DUE' : 'PAYABLE';
                 </td>
                 <td style="padding: 1rem;">
                     <div style="font-weight: 700; color: #0f172a; font-size: 0.85rem;">
-                        <?php echo $item['ref'] ?: 'N/A'; ?>
+                        <?php echo htmlspecialchars($item['ref'] ?: 'N/A'); ?>
                     </div>
+                    <?php if (!empty($item['remark'])): ?>
+                        <div style="font-size: 0.7rem; color: #0d9488; font-style: italic; margin-top: 2px;">
+                            <i class="fas fa-sticky-note" style="font-size:0.6rem;"></i> <?php echo htmlspecialchars($item['remark']); ?>
+                        </div>
+                    <?php endif; ?>
                     <?php if ($item['status']): ?>
-                        <div style="font-size: 0.65rem; color: #94a3b8; text-transform: capitalize;"><?php echo $item['status']; ?></div>
+                        <div style="font-size: 0.65rem; color: #94a3b8; text-transform: capitalize; margin-top: 1px;"><?php echo $item['status']; ?></div>
                     <?php endif; ?>
                 </td>
                 <td style="padding: 1rem; text-align: right; font-weight: 600; color: #475569; font-size: 0.85rem;">
@@ -241,7 +263,18 @@ $balanceLabel = $pType == 'client' ? 'DUE' : 'PAYABLE';
                 <td style="padding: 1rem; text-align: right; font-weight: 900; color: <?php echo $balance > 0 ? '#e11d48' : '#059669'; ?>; font-size: 0.9rem;">
                     <?php echo formatCurrency(abs($balance)); ?> <span style="font-size: 0.65rem; opacity: 0.8;"><?php echo $balanceLabel; ?></span>
                 </td>
-                <td style="padding: 1rem; text-align: right;" class="no-print">
+                <td style="padding: 1rem; text-align: right; white-space: nowrap;" class="no-print">
+                    <?php if (($item['type'] === 'invoice' || $item['type'] === 'po') && $pType === 'client' && canAdd('financials')): ?>
+                        <button onclick="receiveAgainstInvoice(<?php echo $partner_id; ?>, <?php echo floatval($item['total_amt']); ?>, '<?php echo addslashes(htmlspecialchars($item['ref'])); ?>')"
+                            style="background:#ecfdf5; color:#059669; border:1px solid #d1fae5; padding:0.25rem 0.7rem; border-radius:6px; font-size:0.7rem; font-weight:800; cursor:pointer; display:inline-flex; align-items:center; gap:4px;">
+                            <i class="fas fa-hand-holding-usd"></i> Receive
+                        </button>
+                    <?php endif; ?>
+                    <?php if (($item['type'] === 'invoice' || $item['type'] === 'po') && canAdd('financials')): ?>
+                        <a href="#" onclick="viewInvoice('<?php echo addslashes($item['ref']); ?>')" style="color:#0d9488; font-size:0.7rem; font-weight:800; text-decoration:none; margin-left:4px;" class="btn-icon" title="View">
+                            <i class="fas fa-eye"></i>
+                        </a>
+                    <?php endif; ?>
                     <?php if ($item['type'] === 'payment' && canDelete('financials')): ?>
                         <button onclick="deletePayment(<?php echo $item['id']; ?>)" class="btn-icon btn-delete" title="Delete Payment" style="color: #ef4444; border: none; background: none; cursor: pointer;">
                             <i class="fas fa-trash-alt"></i>
@@ -356,7 +389,9 @@ function addPayment(clientId, type) {
                         '<option value="UPI">UPI</option>' +
                     '</select>' +
                     '<label style="display:block; font-size: 0.75rem; font-weight: 700; color: #64748b; margin-bottom: 5px;">REFERENCE / TRANS ID</label>' +
-                    '<input id="pay_ref" class="swal2-input" placeholder="e.g. Bank Ref No." style="margin: 0 0 1rem 0; width: 100%;">' +
+                    '<input id="pay_ref" class="swal2-input" placeholder="e.g. UTR / Cheque No / Bank Ref" style="margin: 0 0 1rem 0; width: 100%;">' +
+                    '<label style="display:block; font-size: 0.75rem; font-weight: 700; color: #64748b; margin-bottom: 5px;">REMARK (optional)</label>' +
+                    '<input id="pay_remark" class="swal2-input" placeholder="e.g. Against Invoice SCR/26-27/001" style="margin: 0; width: 100%;">' +
                 '</div>',
             showCancelButton: true,
             confirmButtonText: 'Save Transaction',
@@ -379,6 +414,7 @@ function addPayment(clientId, type) {
                 params.append('amount', amount);
                 params.append('payment_date', date);
                 params.append('reference_no', ref);
+                params.append('notes', document.getElementById('pay_remark') ? document.getElementById('pay_remark').value : '');
                 params.append('payment_mode', mode);
                 params.append('doc_id', docId);
                 params.append('type', type);
@@ -414,6 +450,66 @@ function addPayment(clientId, type) {
         });
     });
 }
+function receiveAgainstInvoice(clientId, invoiceAmount, invoiceRef) {
+    Swal.fire({
+        title: 'Record Receipt',
+        html:
+            '<div style="text-align:left;">' +
+                '<div style="background:#ecfdf5; border-radius:8px; padding:10px 14px; margin-bottom:1rem; font-size:0.8rem; color:#065f46; font-weight:700;">' +
+                    '<i class="fas fa-file-invoice-dollar"></i> Against Invoice: <strong>' + invoiceRef + '</strong>' +
+                '</div>' +
+                '<label style="display:block;font-size:0.75rem;font-weight:700;color:#64748b;margin-bottom:5px;">AMOUNT (₹)</label>' +
+                '<input id="rp_amount" type="number" class="swal2-input" value="' + invoiceAmount + '" style="margin:0 0 1rem 0;width:100%;">' +
+                '<label style="display:block;font-size:0.75rem;font-weight:700;color:#64748b;margin-bottom:5px;">DATE</label>' +
+                '<input id="rp_date" type="date" class="swal2-input" value="<?php echo date('Y-m-d'); ?>" style="margin:0 0 1rem 0;width:100%;">' +
+                '<label style="display:block;font-size:0.75rem;font-weight:700;color:#64748b;margin-bottom:5px;">PAYMENT MODE</label>' +
+                '<select id="rp_mode" class="swal2-input" style="margin:0 0 1rem 0;width:100%;">' +
+                    '<option value="NEFT">Bank Transfer (NEFT/IMPS)</option>' +
+                    '<option value="Cheque">Cheque</option>' +
+                    '<option value="Cash">Cash</option>' +
+                    '<option value="UPI">UPI</option>' +
+                '</select>' +
+                '<label style="display:block;font-size:0.75rem;font-weight:700;color:#64748b;margin-bottom:5px;">REFERENCE / TRANS ID</label>' +
+                '<input id="rp_ref" class="swal2-input" placeholder="e.g. UTR / Cheque No / Bank Ref" style="margin:0 0 1rem 0;width:100%;">' +
+                '<label style="display:block;font-size:0.75rem;font-weight:700;color:#64748b;margin-bottom:5px;">REMARK</label>' +
+                '<input id="rp_remark" class="swal2-input" placeholder="e.g. Against ' + invoiceRef + '" value="Against ' + invoiceRef + '" style="margin:0;width:100%;">' +
+            '</div>',
+        showCancelButton: true,
+        confirmButtonText: '<i class="fas fa-check"></i> Save Receipt',
+        confirmButtonColor: '#0d9488',
+        showLoaderOnConfirm: true,
+        preConfirm: () => {
+            const amount = document.getElementById('rp_amount').value;
+            if (!amount || amount <= 0) { Swal.showValidationMessage('Enter a valid amount'); return false; }
+            const params = new URLSearchParams();
+            params.append('client_id', clientId);
+            params.append('amount', amount);
+            params.append('payment_date', document.getElementById('rp_date').value);
+            params.append('payment_mode', document.getElementById('rp_mode').value);
+            params.append('reference_no', document.getElementById('rp_ref').value);
+            params.append('notes', document.getElementById('rp_remark').value);
+            params.append('type', 'receivable');
+            params.append('doc_id', '');
+            return fetch('../../ajax/save_payment.php', {
+                method:'POST', headers:{'Content-Type':'application/x-www-form-urlencoded'}, body: params.toString()
+            }).then(r => r.json()).then(d => { if(!d.success) throw new Error(d.message); return d; })
+            .catch(e => { Swal.showValidationMessage('Failed: ' + e.message); });
+        }
+    }).then(result => {
+        if (result.isConfirmed) {
+            if (result.value?.approval_status === 'pending_approval') {
+                Swal.fire('Sent for Approval!', 'Receipt submitted for admin approval.', 'info').then(() => location.reload());
+            } else {
+                Swal.fire('Success', 'Receipt recorded successfully.', 'success').then(() => location.reload());
+            }
+        }
+    });
+}
+
+function viewInvoice(ref) {
+    // placeholder — extend as needed
+}
+
 function deletePayment(id) {
     Swal.fire({
         title: 'Delete this transaction?',

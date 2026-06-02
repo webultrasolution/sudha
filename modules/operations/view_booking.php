@@ -178,10 +178,6 @@ $vendors = $pdo->query("SELECT id, name FROM partners WHERE type = 'vendor' AND 
                 <i class="fas fa-file-invoice-dollar"></i> Final Tax Invoice
             </button>
         <?php endif; ?>
-            <a href="generate_mounting_po.php?booking_id=<?php echo $id; ?>" class="btn"
-                style="background: #0d9488; color: white; padding: 0.75rem 1.5rem; border-radius: 10px; font-weight: 800; text-decoration: none; display: flex; align-items: center; gap: 0.5rem;">
-                <i class="fas fa-tools"></i> Generate Mounting PO
-            </a>
             <button class="btn btn-primary" onclick="window.print()"
                 style="padding: 0.75rem 1.5rem; border-radius: 10px; font-weight: 800;">
                 <i class="fas fa-print"></i> Print Booking
@@ -282,16 +278,20 @@ $stmtCheckPO = $pdo->prepare("SELECT id, approval_status FROM purchase_orders WH
             <p style="margin: 0; font-size: 0.8rem; color: #64748b; margin-top: 0.25rem;">Review and adjust individual
                 assets for this booking.</p>
         </div>
-        <div style="display: flex; gap: 1rem;">
+        <div style="display: flex; gap: 1rem; align-items: center;">
             <div style="position: relative;">
                 <i class="fas fa-search"
                     style="position: absolute; left: 1rem; top: 50%; transform: translateY(-50%); color: #94a3b8; font-size: 0.85rem;"></i>
                 <input type="text" id="tableSearch" placeholder="Search in booking..." class="p-input"
                     style="width: 250px; padding-left: 2.5rem; height: 38px; border-radius: 8px;">
             </div>
+            <a href="generate_mounting_po.php?booking_id=<?php echo $id; ?>"
+                style="background: #0d9488; color: white; padding: 0 1.25rem; border-radius: 8px; font-weight: 800; text-decoration: none; display: flex; align-items: center; gap: 0.5rem; height: 38px; font-size: 0.85rem; white-space: nowrap;">
+                <i class="fas fa-tools"></i> Generate Mounting PO
+            </a>
             <?php if ((!$invoiceFinalized || $isAdmin) && canEdit('bookings')): ?>
                 <button class="btn btn-secondary" onclick="openAddSiteModal()"
-                    style="height: 38px; border-radius: 8px; margin-right: 0.5rem; background: #f1f5f9; color: #475569; border: 1px solid #e2e8f0;"><i
+                    style="height: 38px; border-radius: 8px; background: #f1f5f9; color: #475569; border: 1px solid #e2e8f0;"><i
                         class="fas fa-plus-circle text-primary"></i> Add Sites</button>
             <?php endif; ?>
         </div>

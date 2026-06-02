@@ -26,6 +26,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action'])) {
         $facing = clean($_POST['facing']);
         $light_type = clean($_POST['light_type']);
         $hsn_code = clean($_POST['hsn_code'] ?? '998366');
+        $mounting_hsn = clean($_POST['mounting_hsn'] ?? '');
         $vendor_gst = clean($_POST['vendor_gst'] ?? '');
         $grade = clean($_POST['grade']);
         $available_from = !empty($_POST['available_from']) ? $_POST['available_from'] : date('Y-m-d');
@@ -33,8 +34,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action'])) {
         if ($_POST['action'] === 'add_site') {
             requirePermission('inventory', 'add');
             try {
-                $stmt = $pdo->prepare("INSERT INTO sites (site_code, name, location, area, city, district, latitude, longitude, type, width, height, facing, light_type, hsn_code, vendor_gst, grade, owner_type, vendor_id, card_rate, purchase_rate, available_from) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)");
-                $stmt->execute([$code, $name, $location, $area, $city, $district, $latitude, $longitude, $type, $width, $height, $facing, $light_type, $hsn_code, $vendor_gst, $grade, $owner_type, $vendor_id, $card_rate, $purchase_rate, $available_from]);
+                $stmt = $pdo->prepare("INSERT INTO sites (site_code, name, location, area, city, district, latitude, longitude, type, width, height, facing, light_type, hsn_code, mounting_hsn, vendor_gst, grade, owner_type, vendor_id, card_rate, purchase_rate, available_from) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)");
+                $stmt->execute([$code, $name, $location, $area, $city, $district, $latitude, $longitude, $type, $width, $height, $facing, $light_type, $hsn_code, $mounting_hsn, $vendor_gst, $grade, $owner_type, $vendor_id, $card_rate, $purchase_rate, $available_from]);
                 $site_id = $pdo->lastInsertId();
 
                 // Handle Multi-Image Upload
@@ -62,8 +63,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action'])) {
             requirePermission('inventory', 'edit');
             $id = intval($_POST['id']);
             try {
-                $stmt = $pdo->prepare("UPDATE sites SET site_code=?, name=?, location=?, area=?, city=?, district=?, latitude=?, longitude=?, type=?, width=?, height=?, facing=?, light_type=?, hsn_code=?, vendor_gst=?, grade=?, owner_type=?, vendor_id=?, card_rate=?, purchase_rate=?, available_from=? WHERE id=?");
-                $stmt->execute([$code, $name, $location, $area, $city, $district, $latitude, $longitude, $type, $width, $height, $facing, $light_type, $hsn_code, $vendor_gst, $grade, $owner_type, $vendor_id, $card_rate, $purchase_rate, $available_from, $id]);
+                $stmt = $pdo->prepare("UPDATE sites SET site_code=?, name=?, location=?, area=?, city=?, district=?, latitude=?, longitude=?, type=?, width=?, height=?, facing=?, light_type=?, hsn_code=?, mounting_hsn=?, vendor_gst=?, grade=?, owner_type=?, vendor_id=?, card_rate=?, purchase_rate=?, available_from=? WHERE id=?");
+                $stmt->execute([$code, $name, $location, $area, $city, $district, $latitude, $longitude, $type, $width, $height, $facing, $light_type, $hsn_code, $mounting_hsn, $vendor_gst, $grade, $owner_type, $vendor_id, $card_rate, $purchase_rate, $available_from, $id]);
 
                 // Handle Multi-Image Upload (New)
                 if (!empty($_FILES['site_images']['name'][0])) {
@@ -538,8 +539,13 @@ $vendors = $pdo->query("SELECT id, name FROM partners WHERE type = 'vendor' ORDE
                     <input type="text" name="vendor_gst" id="f_vendor_gst" placeholder="Branch GSTIN">
                 </div>
                 <div class="form-group">
-                    <label>HSN / SAC Code</label>
+                    <label>HSN / SAC Code (Space Rental)</label>
                     <input type="text" name="hsn_code" id="f_hsn" value="998366" placeholder="e.g. 998366">
+                </div>
+
+                <div class="form-group">
+                    <label>Mounting HSN Code</label>
+                    <input type="text" name="mounting_hsn" id="f_mounting_hsn" placeholder="e.g. 995479">
                 </div>
 
                 <div class="form-group">
@@ -1176,6 +1182,7 @@ $vendors = $pdo->query("SELECT id, name FROM partners WHERE type = 'vendor' ORDE
         document.getElementById('h_input').value = site.height;
         document.getElementById('f_light').value = site.light_type;
         document.getElementById('f_hsn').value = site.hsn_code || '998366';
+        document.getElementById('f_mounting_hsn').value = site.mounting_hsn || '';
         document.getElementById('f_vendor_gst').value = site.vendor_gst || '';
         document.getElementById('f_facing').value = site.facing;
         document.getElementById('f_grade').value = site.grade;

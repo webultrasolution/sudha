@@ -61,3 +61,47 @@ Stack trace:
 #0 D:\xampp\htdocs\easy-outdoor-crm\login.php(17): PDO->prepare('SELECT * FROM u...')
 #1 {main}
   thrown in D:\xampp\htdocs\easy-outdoor-crm\login.php on line 17
+[02-Jun-2026 20:57:02 Asia/Kolkata] PHP Deprecated:  htmlspecialchars(): Passing null to parameter #1 ($string) of type string is deprecated in D:\xampp\htdocs\easy-outdoor-crm\modules\operations\generate_mounting_po.php on line 85
+[02-Jun-2026 20:57:02 Asia/Kolkata] PHP Deprecated:  htmlspecialchars(): Passing null to parameter #1 ($string) of type string is deprecated in D:\xampp\htdocs\easy-outdoor-crm\modules\operations\generate_mounting_po.php on line 115
+[02-Jun-2026 20:59:32 Asia/Kolkata] PHP Deprecated:  htmlspecialchars(): Passing null to parameter #1 ($string) of type string is deprecated in D:\xampp\htdocs\easy-outdoor-crm\modules\operations\generate_mounting_po.php on line 85
+[02-Jun-2026 20:59:32 Asia/Kolkata] PHP Deprecated:  htmlspecialchars(): Passing null to parameter #1 ($string) of type string is deprecated in D:\xampp\htdocs\easy-outdoor-crm\modules\operations\generate_mounting_po.php on line 115
+[02-Jun-2026 20:59:48 Asia/Kolkata] PHP Deprecated:  htmlspecialchars(): Passing null to parameter #1 ($string) of type string is deprecated in D:\xampp\htdocs\easy-outdoor-crm\modules\operations\generate_mounting_po.php on line 85
+[02-Jun-2026 20:59:48 Asia/Kolkata] PHP Deprecated:  htmlspecialchars(): Passing null to parameter #1 ($string) of type string is deprecated in D:\xampp\htdocs\easy-outdoor-crm\modules\operations\generate_mounting_po.php on line 115
+[02-Jun-2026 20:59:48 Asia/Kolkata] PHP Deprecated:  htmlspecialchars(): Passing null to parameter #1 ($string) of type string is deprecated in D:\xampp\htdocs\easy-outdoor-crm\modules\operations\generate_mounting_po.php on line 85
+[02-Jun-2026 20:59:48 Asia/Kolkata] PHP Deprecated:  htmlspecialchars(): Passing null to parameter #1 ($string) of type string is deprecated in D:\xampp\htdocs\easy-outdoor-crm\modules\operations\generate_mounting_po.php on line 115
+[02-Jun-2026 21:01:55 Asia/Kolkata] PHP Deprecated:  htmlspecialchars(): Passing null to parameter #1 ($string) of type string is deprecated in D:\xampp\htdocs\easy-outdoor-crm\modules\operations\generate_mounting_po.php on line 85
+[02-Jun-2026 21:01:55 Asia/Kolkata] PHP Deprecated:  htmlspecialchars(): Passing null to parameter #1 ($string) of type string is deprecated in D:\xampp\htdocs\easy-outdoor-crm\modules\operations\generate_mounting_po.php on line 115
+[02-Jun-2026 21:05:01 Asia/Kolkata] PHP Deprecated:  htmlspecialchars(): Passing null to parameter #1 ($string) of type string is deprecated in D:\xampp\htdocs\easy-outdoor-crm\modules\operations\generate_mounting_po.php on line 85
+[02-Jun-2026 21:05:01 Asia/Kolkata] PHP Deprecated:  htmlspecialchars(): Passing null to parameter #1 ($string) of type string is deprecated in D:\xampp\htdocs\easy-outdoor-crm\modules\operations\generate_mounting_po.php on line 115
+[02-Jun-2026 17:45:55 Europe/Berlin] PHP Warning:  Undefined variable $vendors in D:\xampp\htdocs\easy-outdoor-crm\modules\operations\create_mounting_po.php on line 145
+[02-Jun-2026 17:45:55 Europe/Berlin] PHP Warning:  foreach() argument must be of type array|object, null given in D:\xampp\htdocs\easy-outdoor-crm\modules\operations\create_mounting_po.php on line 145
+[02-Jun-2026 17:45:55 Europe/Berlin] PHP Warning:  Undefined variable $vendors in D:\xampp\htdocs\easy-outdoor-crm\modules\operations\create_mounting_po.php on line 295
+[02-Jun-2026 17:46:15 Europe/Berlin] PHP Warning:  Undefined variable $vendors in D:\xampp\htdocs\easy-outdoor-crm\modules\operations\create_mounting_po.php on line 295
+[02-Jun-2026 18:39:12 Europe/Berlin] PHP Fatal error:  Uncaught PDOException: SQLSTATE[42000]: Syntax error or access violation: 1064 You have an error in your SQL syntax; check the manual that corresponds to your MariaDB server version for the right syntax to use near 'UNION ALL
+          
+          SELECT MIN(r.id) as id, 'invoice' as type, D...' at line 10 in D:\xampp\htdocs\easy-outdoor-crm\modules\financials\partner_ledger.php:39
+Stack trace:
+#0 D:\xampp\htdocs\easy-outdoor-crm\modules\financials\partner_ledger.php(39): PDO->prepare('\r\n          SEL...')
+#1 {main}
+  thrown in D:\xampp\htdocs\easy-outdoor-crm\modules\financials\partner_ledger.php on line 39
+[02-Jun-2026 18:39:16 Europe/Berlin] PHP Fatal error:  Uncaught PDOException: SQLSTATE[42000]: Syntax error or access violation: 1064 You have an error in your SQL syntax; check the manual that corresponds to your MariaDB server version for the right syntax to use near 'UNION ALL
+          
+          SELECT MIN(r.id) as id, 'invoice' as type, D...' at line 10 in D:\xampp\htdocs\easy-outdoor-crm\modules\financials\partner_ledger.php:39
+Stack trace:
+#0 D:\xampp\htdocs\easy-outdoor-crm\modules\financials\partner_ledger.php(39): PDO->prepare('\r\n          SEL...')
+#1 {main}
+  thrown in D:\xampp\htdocs\easy-outdoor-crm\modules\financials\partner_ledger.php on line 39
+[02-Jun-2026 18:39:40 Europe/Berlin] PHP Fatal error:  Uncaught PDOException: SQLSTATE[42000]: Syntax error or access violation: 1064 You have an error in your SQL syntax; check the manual that corresponds to your MariaDB server version for the right syntax to use near 'UNION ALL
+          
+          SELECT MIN(r.id) as id, 'invoice' as type, D...' at line 10 in D:\xampp\htdocs\easy-outdoor-crm\modules\financials\partner_ledger.php:39
+Stack trace:
+#0 D:\xampp\htdocs\easy-outdoor-crm\modules\financials\partner_ledger.php(39): PDO->prepare('\r\n          SEL...')
+#1 {main}
+  thrown in D:\xampp\htdocs\easy-outdoor-crm\modules\financials\partner_ledger.php on line 39
+[02-Jun-2026 18:39:47 Europe/Berlin] PHP Fatal error:  Uncaught PDOException: SQLSTATE[42000]: Syntax error or access violation: 1064 You have an error in your SQL syntax; check the manual that corresponds to your MariaDB server version for the right syntax to use near 'UNION ALL
+          
+          SELECT MIN(r.id) as id, 'invoice' as type, D...' at line 10 in D:\xampp\htdocs\easy-outdoor-crm\modules\financials\partner_ledger.php:39
+Stack trace:
+#0 D:\xampp\htdocs\easy-outdoor-crm\modules\financials\partner_ledger.php(39): PDO->prepare('\r\n          SEL...')
+#1 {main}
+  thrown in D:\xampp\htdocs\easy-outdoor-crm\modules\financials\partner_ledger.php on line 39
