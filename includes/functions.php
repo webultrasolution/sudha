@@ -222,31 +222,36 @@ function updateInvoicePayment($invoiceId, $status) {
 /**
  * Generate Pagination HTML
  */
-function renderPagination($currentPage, $totalPages, $baseUrl, $paramName = 'page') {
+function renderPagination($currentPage, $totalPages, $baseUrl, $paramName = 'page', $extraParams = []) {
     if ($totalPages <= 1) return '';
-    
+
+    $queryString = '';
+    if (!empty($extraParams)) {
+        $queryString = http_build_query($extraParams) . '&';
+    }
+
     $html = '<div class="pagination">';
-    
+
     // Previous Link
     if ($currentPage > 1) {
-        $html .= '<a href="' . $baseUrl . '?' . $paramName . '=' . ($currentPage - 1) . '" class="page-link" title="Previous Page">&laquo;</a>';
+        $html .= '<a href="' . $baseUrl . '?' . $queryString . $paramName . '=' . ($currentPage - 1) . '" class="page-link" title="Previous Page">&laquo;</a>';
     } else {
         $html .= '<span class="page-link disabled">&laquo;</span>';
     }
-    
+
     // Page Numbers
     for ($i = 1; $i <= $totalPages; $i++) {
         $activeClass = ($i == $currentPage) ? 'active' : '';
-        $html .= '<a href="' . $baseUrl . '?' . $paramName . '=' . $i . '" class="page-link ' . $activeClass . '">' . $i . '</a>';
+        $html .= '<a href="' . $baseUrl . '?' . $queryString . $paramName . '=' . $i . '" class="page-link ' . $activeClass . '">' . $i . '</a>';
     }
-    
+
     // Next Link
     if ($currentPage < $totalPages) {
-        $html .= '<a href="' . $baseUrl . '?' . $paramName . '=' . ($currentPage + 1) . '" class="page-link" title="Next Page">&raquo;</a>';
+        $html .= '<a href="' . $baseUrl . '?' . $queryString . $paramName . '=' . ($currentPage + 1) . '" class="page-link" title="Next Page">&raquo;</a>';
     } else {
         $html .= '<span class="page-link disabled">&raquo;</span>';
     }
-    
+
     $html .= '</div>';
     return $html;
 }

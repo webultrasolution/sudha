@@ -31,29 +31,163 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action']) && $_POST['
     exit;
 }
 
+// Handle Duplicate
+if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action']) && $_POST['action'] === 'duplicate') {
+    requirePermission('bookings', 'add');
+    header('Content-Type: application/json');
+    $id = intval($_POST['id']);
+
+    $stmt = $pdo->prepare("SELECT * FROM bookings WHERE id = ?");
+    $stmt->execute([$id]);
+    $originalBooking = $stmt->fetch(PDO::FETCH_ASSOC);
+
+    if (!$originalBooking) {
+        echo json_encode(['success' => false, 'message' => 'Original booking not found.']);
+        exit;
+    }
+
+    try {
+        $pdo->beginTransaction();
+
+        $insertBooking = $pdo->prepare(
+            "INSERT INTO bookings (proposal_id, client_id, campaign_name, start_date, end_date, total_amount, tax_amount, grand_total, printing_cost, mounting_cost, status, approval_status, confirmation_type, customer_po_no, customer_po_date, email_date, customer_po_file, mounting_date, brand_name, external_po, contact_person, billing_gstin, tax_type)
+             VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'pending', 'pending_approval', ?, NULL, NULL, NULL, NULL, NULL, ?, '', ?, ?, ?)"
+        );
+
+        $insertBooking->execute([
+            $originalBooking['proposal_id'],
+            $originalBooking['client_id'],
+            $originalBooking['campaign_name'],
+            $originalBooking['start_date'],
+            $originalBooking['end_date'],
+            $originalBooking['total_amount'],
+            $originalBooking['tax_amount'],
+            $originalBooking['grand_total'],
+            $originalBooking['printing_cost'],
+            $originalBooking['mounting_cost'],
+            $originalBooking['confirmation_type'],
+            $originalBooking['brand_name'],
+            $originalBooking['contact_person'],
+            $originalBooking['billing_gstin'],
+            $originalBooking['tax_type']
+        ]);
+
+        $newBookingId = $pdo->lastInsertId();
+
+        $itemStmt = $pdo->prepare("SELECT proposal_item_id, site_id, purchase_rate, sale_rate, start_date, end_date, days, purchase_amount, amount, selected_image, printing_vendor_id, printing_rate, printing_amount, custom_location, custom_site_name FROM booking_items WHERE booking_id = ?");
+        $itemStmt->execute([$id]);
+        $insertItem = $pdo->prepare(
+            "INSERT INTO booking_items (booking_id, proposal_item_id, site_id, purchase_rate, sale_rate, start_date, end_date, days, purchase_amount, amount, selected_image, printing_vendor_id, printing_rate, printing_amount, custom_location, custom_site_name)
+             VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)"
+        );
+
+        while ($item = $itemStmt->fetch(PDO::FETCH_ASSOC)) {
+            $insertItem->execute([
+                $newBookingId,
+                $item['proposal_item_id'],
+                $item['site_id'],
+                $item['purchase_rate'],
+                $item['sale_rate'],
+                $item['start_date'],
+                $item['end_date'],
+                $item['days'],
+                $item['purchase_amount'],
+                $item['amount'],
+                $item['selected_image'],
+                $item['printing_vendor_id'],
+                $item['printing_rate'],
+                $item['printing_amount'],
+                $item['custom_location'],
+                $item['custom_site_name']
+            ]);
+        }
+
+        $operationStmt = $pdo->prepare("SELECT site_id, assigned_mounter_id FROM operations WHERE booking_id = ?");
+        $operationStmt->execute([$id]);
+        $insertOperation = $pdo->prepare(
+            "INSERT INTO operations (booking_id, site_id, assigned_mounter_id, mounting_date, status, field_team_notes, proof_image)
+             VALUES (?, ?, ?, NULL, 'pending', NULL, NULL)"
+        );
+
+        while ($operation = $operationStmt->fetch(PDO::FETCH_ASSOC)) {
+            $insertOperation->execute([
+                $newBookingId,
+                $operation['site_id'],
+                $operation['assigned_mounter_id']
+            ]);
+        }
+
+        $pdo->commit();
+
+        echo json_encode(['success' => true, 'booking_id' => $newBookingId]);
+    } catch (Exception $e) {
+        $pdo->rollBack();
+        echo json_encode(['success' => false, 'message' => $e->getMessage()]);
+    }
+    exit;
+}
+
 $activePage = 'bookings';
 $pageTitle = 'Campaign Execution';
 include_once __DIR__ . '/../../includes/header.php';
 
-// Fetch Bookings
-$bookings = $pdo->query("
+$clientFilter = isset($_GET['client_id']) ? intval($_GET['client_id']) : 0;
+$campaignFilter = trim($_GET['campaign_name'] ?? '');
+
+$where = 'WHERE 1=1';
+$params = [];
+if ($clientFilter) {
+    $where .= ' AND b.client_id = ?';
+    $params[] = $clientFilter;
+}
+if ($campaignFilter !== '') {
+    $where .= ' AND b.campaign_name LIKE ?';
+    $params[] = '%' . $campaignFilter . '%';
+}
+
+$bookings = $pdo->prepare("
     SELECT b.*, p.proposal_number, c.name as client_name
     FROM bookings b 
     LEFT JOIN proposals p ON b.proposal_id = p.id 
     LEFT JOIN partners c ON b.client_id = c.id 
+    $where
     ORDER BY b.id DESC
-")->fetchAll();
+");
+$bookings->execute($params);
+$bookings = $bookings->fetchAll();
+
+$clients = $pdo->query("SELECT id, name FROM partners WHERE type = 'client' ORDER BY name ASC")->fetchAll();
 ?>
 
 <div class="card">
     <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1.5rem;">
-        <h2 style="font-size: 1.25rem;">Active Bookings</h2>
+        <h2 style="font-size: 1.25rem;">Bookings</h2>
         <?php if (canAdd('bookings')): ?>
         <a href="direct_booking.php" class="btn btn-primary">
             <i class="fas fa-plus"></i> Direct Booking
         </a>
         <?php endif; ?>
     </div>
+
+    <form method="get" action="bookings.php" style="display:flex; flex-wrap: wrap; gap:1rem; align-items:flex-end; margin-bottom:1.5rem;">
+        <div style="display:flex; flex-direction:column; gap:0.35rem;">
+            <label style="font-size:0.85rem; color:#475569; font-weight:600;">Client</label>
+            <select name="client_id" style="padding:0.75rem 0.95rem; border-radius:0.75rem; border:1px solid #d1d5db; min-width:220px;">
+                <option value="">All Clients</option>
+                <?php foreach ($clients as $client): ?>
+                    <option value="<?php echo $client['id']; ?>" <?php echo $clientFilter === intval($client['id']) ? 'selected' : ''; ?>><?php echo htmlspecialchars($client['name']); ?></option>
+                <?php endforeach; ?>
+            </select>
+        </div>
+        <div style="display:flex; flex-direction:column; gap:0.35rem; min-width:280px;">
+            <label style="font-size:0.85rem; color:#475569; font-weight:600;">Campaign Name</label>
+            <input type="text" name="campaign_name" value="<?php echo htmlspecialchars($campaignFilter); ?>" placeholder="Search campaign..." style="padding:0.75rem 0.95rem; border-radius:0.75rem; border:1px solid #d1d5db; min-width:280px;">
+        </div>
+        <div style="display:flex; gap:0.75rem;">
+            <button type="submit" class="btn btn-primary" style="padding:0.85rem 1.25rem;">Filter</button>
+            <a href="bookings.php" class="btn" style="background:#f8fafc; color:#475569; border:1px solid #cbd5e1; padding:0.85rem 1.25rem; text-decoration:none;">Reset</a>
+        </div>
+    </form>
 
     <table class="table">
         <thead>
@@ -131,6 +265,9 @@ $bookings = $pdo->query("
                     </td>
                     <td>
                         <a href="mounting.php?booking_id=<?php echo $b['id']; ?>" class="btn-icon btn-view" title="View Operations"><i class="fas fa-clipboard-list"></i></a>
+                        <?php if (canAdd('bookings')): ?>
+                        <button class="btn-icon btn-copy" onclick="duplicateBooking(<?php echo $b['id']; ?>)" title="Copy Booking"><i class="fas fa-copy"></i></button>
+                        <?php endif; ?>
                         <?php if (canDelete('bookings')): ?>
                         <button class="btn-icon btn-delete" onclick="deleteBooking(<?php echo $b['id']; ?>)"><i class="fas fa-trash"></i></button>
                         <?php endif; ?>
@@ -172,6 +309,36 @@ function deleteBooking(id) {
                 body: `action=delete&id=${id}`
             }).then(() => {
                 Swal.fire('Deleted!', 'Booking has been cancelled and removed.', 'success').then(() => location.reload());
+            });
+        }
+    });
+}
+
+function duplicateBooking(id) {
+    Swal.fire({
+        title: 'Duplicate Booking?',
+        text: 'This will create a new pending booking copy for editing and publishing later.',
+        icon: 'question',
+        showCancelButton: true,
+        confirmButtonColor: '#0f172a',
+        cancelButtonColor: '#6b7280',
+        confirmButtonText: 'Create Copy'
+    }).then((result) => {
+        if (result.isConfirmed) {
+            fetch('bookings.php', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+                body: `action=duplicate&id=${id}`
+            })
+            .then(r => r.json())
+            .then(res => {
+                if (res.success) {
+                    Swal.fire('Copied!', 'A new booking draft has been created.', 'success').then(() => {
+                        window.location.href = `view_booking.php?id=${res.booking_id}`;
+                    });
+                } else {
+                    Swal.fire('Error', res.message || 'Could not duplicate booking.', 'error');
+                }
             });
         }
     });

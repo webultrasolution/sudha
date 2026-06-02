@@ -39,7 +39,23 @@ include_once __DIR__ . '/../../includes/header.php';
 $limit = 10;
 $page = isset($_GET['page']) ? (int)$_GET['page'] : 1;
 $offset = ($page - 1) * $limit;
-$totalProposals = $pdo->query("SELECT COUNT(*) FROM proposals")->fetchColumn();
+$clientFilter = isset($_GET['client_id']) ? intval($_GET['client_id']) : 0;
+$campaignFilter = trim($_GET['campaign_name'] ?? '');
+
+$where = 'WHERE 1=1';
+$params = [];
+if ($clientFilter) {
+    $where .= ' AND p.client_id = ?';
+    $params[] = $clientFilter;
+}
+if ($campaignFilter !== '') {
+    $where .= ' AND p.campaign_name LIKE ?';
+    $params[] = '%' . $campaignFilter . '%';
+}
+
+$totalProposals = $pdo->prepare("SELECT COUNT(*) FROM proposals p $where");
+$totalProposals->execute($params);
+$totalProposals = $totalProposals->fetchColumn();
 $totalPages = ceil($totalProposals / $limit);
 
 $proposals = $pdo->prepare("
@@ -47,11 +63,16 @@ $proposals = $pdo->prepare("
     FROM proposals p 
     JOIN partners c ON p.client_id = c.id 
     LEFT JOIN users u ON p.created_by = u.id 
+    $where 
     ORDER BY p.id DESC
     LIMIT ? OFFSET ?
 ");
-$proposals->execute([$limit, $offset]);
+$params[] = $limit;
+$params[] = $offset;
+$proposals->execute($params);
 $proposals = $proposals->fetchAll();
+
+$clients = $pdo->query("SELECT id, name FROM partners WHERE type = 'client' ORDER BY name ASC")->fetchAll();
 ?>
 
 <div class="card">
@@ -63,6 +84,26 @@ $proposals = $proposals->fetchAll();
         </a>
         <?php endif; ?>
     </div>
+
+    <form method="get" action="proposals.php" style="display: flex; flex-wrap: wrap; gap: 1rem; align-items: flex-end; margin-bottom: 1.5rem;">
+        <div style="display:flex; flex-direction:column; gap:0.35rem;">
+            <label style="font-size:0.85rem; color:#475569; font-weight:600;">Client</label>
+            <select name="client_id" style="padding:0.75rem 0.95rem; border-radius:0.75rem; border:1px solid #d1d5db; min-width:220px;">
+                <option value="">All Clients</option>
+                <?php foreach ($clients as $client): ?>
+                    <option value="<?php echo $client['id']; ?>" <?php echo $clientFilter === intval($client['id']) ? 'selected' : ''; ?>><?php echo htmlspecialchars($client['name']); ?></option>
+                <?php endforeach; ?>
+            </select>
+        </div>
+        <div style="display:flex; flex-direction:column; gap:0.35rem; min-width:280px;">
+            <label style="font-size:0.85rem; color:#475569; font-weight:600;">Campaign Name</label>
+            <input type="text" name="campaign_name" value="<?php echo htmlspecialchars($campaignFilter); ?>" placeholder="Search campaign..." style="padding:0.75rem 0.95rem; border-radius:0.75rem; border:1px solid #d1d5db; min-width:280px;">
+        </div>
+        <div style="display:flex; gap:0.75rem;">
+            <button type="submit" class="btn btn-primary" style="padding:0.85rem 1.25rem;">Filter</button>
+            <a href="proposals.php" class="btn" style="background:#f8fafc; color:#475569; border:1px solid #cbd5e1; padding:0.85rem 1.25rem; text-decoration:none;">Reset</a>
+        </div>
+    </form>
 
     <table class="table">
         <thead>
@@ -165,7 +206,7 @@ $proposals = $proposals->fetchAll();
             <?php endif; ?>
         </tbody>
     </table>
-    <?php echo renderPagination($page, $totalPages, 'proposals.php'); ?>
+    <?php echo renderPagination($page, $totalPages, 'proposals.php', 'page', ['client_id' => $clientFilter, 'campaign_name' => $campaignFilter]); ?>
 </div>
 
 <style>
