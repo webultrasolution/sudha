@@ -35,15 +35,31 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             $logo = $logoName;
         }
     }
+    
+    $letterhead = $_POST['existing_letterhead'] ?? '';
+    if (!empty($_FILES['letterhead']['name'])) {
+        $letterheadName = 'entity_lh_' . time() . '_' . $_FILES['letterhead']['name'];
+        if (move_uploaded_file($_FILES['letterhead']['tmp_name'], $uploadDir . $letterheadName)) {
+            $letterhead = $letterheadName;
+        }
+    }
+
+    $signature = $_POST['existing_signature'] ?? '';
+    if (!empty($_FILES['signature']['name'])) {
+        $signatureName = 'entity_sig_' . time() . '_' . $_FILES['signature']['name'];
+        if (move_uploaded_file($_FILES['signature']['tmp_name'], $uploadDir . $signatureName)) {
+            $signature = $signatureName;
+        }
+    }
 
     try {
         if ($id > 0) {
-            $stmt = $pdo->prepare("UPDATE entities SET name=?, gstin=?, pan=?, address=?, bank_details=?, logo=? WHERE id=?");
-            $stmt->execute([$name, $gstin, $pan, $address, $bank_details, $logo, $id]);
+            $stmt = $pdo->prepare("UPDATE entities SET name=?, gstin=?, pan=?, address=?, bank_details=?, logo=?, letterhead=?, signature=? WHERE id=?");
+            $stmt->execute([$name, $gstin, $pan, $address, $bank_details, $logo, $letterhead, $signature, $id]);
             $message = "Entity updated successfully!";
         } else {
-            $stmt = $pdo->prepare("INSERT INTO entities (name, gstin, pan, address, bank_details, logo) VALUES (?, ?, ?, ?, ?, ?)");
-            $stmt->execute([$name, $gstin, $pan, $address, $bank_details, $logo]);
+            $stmt = $pdo->prepare("INSERT INTO entities (name, gstin, pan, address, bank_details, logo, letterhead, signature) VALUES (?, ?, ?, ?, ?, ?, ?, ?)");
+            $stmt->execute([$name, $gstin, $pan, $address, $bank_details, $logo, $letterhead, $signature]);
             $message = "New Entity added successfully!";
         }
     } catch (Exception $e) {
@@ -120,6 +136,8 @@ include_once __DIR__ . '/../../includes/header.php';
         <form method="POST" enctype="multipart/form-data">
             <input type="hidden" name="id" id="entityId">
             <input type="hidden" name="existing_logo" id="existingLogo">
+            <input type="hidden" name="existing_letterhead" id="existingLetterhead">
+            <input type="hidden" name="existing_signature" id="existingSignature">
             
             <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 1.5rem; margin-bottom: 1.5rem;">
                 <div class="form-group" style="grid-column: span 2;">
@@ -142,9 +160,17 @@ include_once __DIR__ . '/../../includes/header.php';
                     <label>Bank Details</label>
                     <textarea name="bank_details" id="entityBank" rows="2" placeholder="Account No, IFSC, etc..."></textarea>
                 </div>
-                <div class="form-group" style="grid-column: span 2;">
+                <div class="form-group">
                     <label>Brand Logo</label>
                     <input type="file" name="logo" accept="image/*">
+                </div>
+                <div class="form-group">
+                    <label>Full Letterhead</label>
+                    <input type="file" name="letterhead" accept="image/*,application/pdf">
+                </div>
+                <div class="form-group" style="grid-column: span 2;">
+                    <label>Digital Signature</label>
+                    <input type="file" name="signature" accept="image/*">
                 </div>
             </div>
             
@@ -177,6 +203,8 @@ function openModal() {
     document.getElementById('entityAddress').value = '';
     document.getElementById('entityBank').value = '';
     document.getElementById('existingLogo').value = '';
+    document.getElementById('existingLetterhead').value = '';
+    document.getElementById('existingSignature').value = '';
     document.getElementById('entityModal').style.display = 'flex';
 }
 
@@ -193,6 +221,8 @@ function editEntity(entity) {
     document.getElementById('entityAddress').value = entity.address || '';
     document.getElementById('entityBank').value = entity.bank_details || '';
     document.getElementById('existingLogo').value = entity.logo || '';
+    document.getElementById('existingLetterhead').value = entity.letterhead || '';
+    document.getElementById('existingSignature').value = entity.signature || '';
     document.getElementById('entityModal').style.display = 'flex';
 }
 </script>

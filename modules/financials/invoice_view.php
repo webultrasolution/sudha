@@ -10,11 +10,12 @@ $id = isset($_GET['id']) ? intval($_GET['id']) : 0;
 
 // Fetch Invoice
 $stmt = $pdo->prepare("
-    SELECT i.*, b.id as booking_id, b.billing_gstin, c.name as client_name, c.email as client_email, c.phone as client_phone, c.address as client_address, c.gstin as client_gstin, c.additional_gst, p.proposal_number, p.start_date, p.end_date
+    SELECT i.*, b.id as booking_id, b.billing_gstin, c.name as client_name, c.email as client_email, c.phone as client_phone, c.address as client_address, c.gstin as client_gstin, c.additional_gst, p.proposal_number, p.start_date, p.end_date, e.name as entity_name, e.address as entity_address, e.gstin as entity_gstin
     FROM invoices i
     JOIN bookings b ON i.booking_id = b.id
     LEFT JOIN proposals p ON b.proposal_id = p.id
     JOIN partners c ON b.client_id = c.id
+    LEFT JOIN entities e ON i.entity_id = e.id
     WHERE i.id = ?
 ");
 $stmt->execute([$id]);
@@ -69,12 +70,12 @@ $items = $stmtItems->fetchAll();
 
 <div style="display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 1.5rem; margin-bottom: 2rem;">
     <div class="card">
-        <h3 style="font-size: 0.75rem; text-transform: uppercase; letter-spacing: 0.05em; color: #94a3b8; margin-bottom: 1rem; border-bottom: 1px solid #f1f5f9; padding-bottom: 0.5rem;">From: Sudha Creative</h3>
+        <h3 style="font-size: 0.75rem; text-transform: uppercase; letter-spacing: 0.05em; color: #94a3b8; margin-bottom: 1rem; border-bottom: 1px solid #f1f5f9; padding-bottom: 0.5rem;">From: <?php echo !empty($invoice['entity_id']) ? htmlspecialchars($invoice['entity_name']) : 'Sudha Creative'; ?></h3>
         <div style="line-height: 1.6; font-size: 0.9rem;">
-            <strong style="color: var(--primary);"><?php echo COMPANY_NAME; ?></strong><br>
-            <?php echo COMPANY_ADDRESS; ?><br>
-            <?php echo COMPANY_CITY; ?><br>
-            <strong style="color: #475569;">GSTIN: <?php echo COMPANY_GSTIN; ?></strong>
+            <strong style="color: var(--primary);"><?php echo !empty($invoice['entity_id']) ? htmlspecialchars($invoice['entity_name']) : COMPANY_NAME; ?></strong><br>
+            <?php echo !empty($invoice['entity_id']) ? htmlspecialchars($invoice['entity_address']) : COMPANY_ADDRESS; ?><br>
+            <?php if (empty($invoice['entity_id'])) echo COMPANY_CITY . '<br>'; ?>
+            <strong style="color: #475569;">GSTIN: <?php echo !empty($invoice['entity_id']) ? htmlspecialchars($invoice['entity_gstin']) : COMPANY_GSTIN; ?></strong>
         </div>
     </div>
     <div class="card">

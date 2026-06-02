@@ -15,6 +15,8 @@ $bookings = $pdo->query("
     WHERE b.status != 'completed' 
     ORDER BY b.id DESC
 ")->fetchAll();
+
+$entities = $pdo->query("SELECT id, name FROM entities ORDER BY name ASC")->fetchAll();
 ?>
 
 <div class="card" style="max-width: 800px; margin: 0 auto;">
@@ -48,6 +50,15 @@ $bookings = $pdo->query("
             <div class="form-group">
                 <label>3. Invoice Date</label>
                 <input type="date" id="invoice_date" class="form-control" value="<?php echo date('Y-m-d'); ?>">
+            </div>
+            <div class="form-group">
+                <label>4. Billing Entity</label>
+                <select id="entity_id" class="form-control">
+                    <option value="">-- Default Company Settings --</option>
+                    <?php foreach ($entities as $e): ?>
+                        <option value="<?php echo $e['id']; ?>"><?php echo $e['name']; ?></option>
+                    <?php endforeach; ?>
+                </select>
             </div>
         </div>
 
@@ -108,7 +119,8 @@ function saveInvoice() {
     const data = {
         booking_id: bookingId,
         type: type,
-        date: document.getElementById('invoice_date').value
+        date: document.getElementById('invoice_date').value,
+        entity_id: document.getElementById('entity_id').value
     };
 
     fetch('../../ajax/save_invoice.php', {

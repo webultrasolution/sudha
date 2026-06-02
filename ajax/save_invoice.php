@@ -12,6 +12,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     $data = json_decode(file_get_contents('php://input'), true);
     $bookingId = intval($data['booking_id']);
     $type = clean($data['type']);
+    $entityId = !empty($data['entity_id']) ? intval($data['entity_id']) : null;
 
     try {
         // Fetch Booking/Proposal details for financials
@@ -36,8 +37,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         $approvalStatus = $isAdmin ? 'approved' : 'pending_approval';
 
         $stmtInv = $pdo->prepare("
-            INSERT INTO invoices (invoice_number, booking_id, type, sub_total, cgst, sgst, igst, total_amount, payment_status, approval_status) 
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?, 'unpaid', ?)
+            INSERT INTO invoices (invoice_number, booking_id, entity_id, type, sub_total, cgst, sgst, igst, total_amount, payment_status, approval_status) 
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, 'unpaid', ?)
         ");
         
         // Simplified GST logic: Split 18% into 9/9 for Intra-state
@@ -48,6 +49,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         $stmtInv->execute([
             $invNum,
             $bookingId,
+            $entityId,
             $type,
             $fin['total_amount'],
             $cgst,

@@ -36,11 +36,11 @@ if ($action === 'edit') {
     } else {
         die("Invalid PO reference.");
     }
-    
+
     if (empty($rows)) {
         die("Vendor PO not found.");
     }
-    
+
     $rateData = $rows[0];
     foreach($rows as $r) {
         $selectedSitesData[$r['site_id']] = $r['rate_per_sqft'];
@@ -49,7 +49,15 @@ if ($action === 'edit') {
 }
 
 $vendors = $pdo->query("SELECT id, name FROM partners WHERE type = 'vendor' ORDER BY name ASC")->fetchAll();
-$sites = $pdo->query("SELECT id, name, site_code, width, height, vendor_id, city, state, type, light_type, owner_type, status FROM sites ORDER BY site_code ASC")->fetchAll();
+$sites = $pdo->query("
+    SELECT s.id, s.name, s.site_code, s.width, s.height, s.vendor_id, s.city, s.state, s.type, s.light_type, s.owner_type, s.status, s.location,
+        p.name as vendor_name,
+        (SELECT GROUP_CONCAT(filename) FROM site_images WHERE site_id = s.id) as all_images,
+        (SELECT filename FROM site_images WHERE site_id = s.id LIMIT 1) as thumbnail
+    FROM sites s
+    LEFT JOIN partners p ON s.vendor_id = p.id
+    ORDER BY s.site_code ASC
+")->fetchAll();
 
 // Fetch filter values
 $cities = $pdo->query("SELECT DISTINCT city FROM sites WHERE city IS NOT NULL AND city != '' ORDER BY city")->fetchAll(PDO::FETCH_COLUMN);
@@ -80,7 +88,7 @@ include_once __DIR__ . '/../../includes/header.php';
                 <?php endforeach; ?>
             <?php endif; ?>
         <?php endif; ?>
-        
+
         <input type="hidden" name="rate_per_sqft" id="f_rate" value="0">
             <!-- Full-Width Horizontal Header Config Panel -->
             <div style="background: #f8fafc; padding: 1rem 2.5rem; border-bottom: 1px solid #e2e8f0; display: grid; grid-template-columns: 1fr 1fr; gap: 2rem; align-items: start;">
@@ -123,8 +131,7 @@ include_once __DIR__ . '/../../includes/header.php';
                                 <span style="font-size: 0.65rem; color: #94a3b8; font-weight: 500; text-transform: none;">Pick sites to apply rates</span>
                             </div>
                         </label>
-                        
-                        <!-- Hidden / unused in add mode but kept for js bindings -->
+
                         <select name="site_id" id="f_site" style="display: none;">
                             <option value="">Generic / All Sites</option>
                         </select>
@@ -139,7 +146,7 @@ include_once __DIR__ . '/../../includes/header.php';
                                         <span style="font-weight: 800; color: #0d9488; font-size: 0.65rem; text-transform: uppercase; letter-spacing: 0.05em; display: flex; align-items: center; gap: 6px;">
                                             <i class="fas fa-filter"></i> Filters
                                         </span>
-                                        
+
                                         <!-- Ownership -->
                                         <div style="display: flex; align-items: center; gap: 0.75rem;">
                                             <label style="font-size: 0.55rem; font-weight: 800; color: #475569; margin: 0; text-transform: uppercase; letter-spacing: 0.025em;">Ownership:</label>
@@ -149,7 +156,7 @@ include_once __DIR__ . '/../../includes/header.php';
                                                 <label style="font-size: 0.65rem; font-weight: 600; display: flex; align-items: center; gap: 4px; cursor: pointer; color: #1e293b; margin: 0;"><input type="radio" name="ownership" value="TA" onchange="filterSitesInModal()" style="width: 12px; height: 12px; accent-color: #0d9488; cursor: pointer;"> Vendor</label>
                                             </div>
                                         </div>
-                                        
+
                                         <div style="display: flex; align-items: center; gap: 0.75rem;">
                                             <label style="font-size: 0.55rem; font-weight: 800; color: #475569; margin: 0; text-transform: uppercase; letter-spacing: 0.025em;">Availability:</label>
                                             <div style="display: flex; gap: 0.75rem;">
@@ -157,7 +164,7 @@ include_once __DIR__ . '/../../includes/header.php';
                                                 <label style="font-size: 0.65rem; font-weight: 600; display: flex; align-items: center; gap: 4px; cursor: pointer; color: #1e293b; margin: 0;"><input type="radio" name="availability" value="all" onchange="filterSitesInModal()" style="width: 12px; height: 12px; accent-color: #0d9488; cursor: pointer;"> All</label>
                                             </div>
                                         </div>
-                                        
+
                                         <!-- Vendor Dropdown (Hidden by default) -->
                                         <div id="vendor_filter_group" style="display: none; align-items: center; gap: 0.75rem;">
                                             <label style="font-size: 0.55rem; font-weight: 800; color: #475569; margin: 0; text-transform: uppercase; letter-spacing: 0.025em;">Vendor:</label>
@@ -169,12 +176,12 @@ include_once __DIR__ . '/../../includes/header.php';
                                             </select>
                                         </div>
                                     </div>
-                                    
+
                                     <button type="button" onclick="resetFilters()" style="background: none; border: none; color: #ef4444; font-size: 0.6rem; font-weight: 800; cursor: pointer; display: flex; align-items: center; gap: 4px; padding: 0; text-transform: uppercase;">
                                         <i class="fas fa-undo"></i> Reset
                                     </button>
                                 </div>
-                                
+
                                 <!-- Search & Dropdowns Grid -->
                                 <div style="display: grid; grid-template-columns: 2fr 1fr 1fr 1fr 1fr 1fr; gap: 0.5rem; align-items: flex-end;">
                                     <div style="margin-bottom: 0;">
@@ -226,28 +233,52 @@ include_once __DIR__ . '/../../includes/header.php';
                                 </div>
                             </div>
 
-                            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1.25rem;">
+                            <!-- Select All + Count Header -->
+                            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 0.75rem;">
                                 <label style="display: flex; align-items: center; cursor: pointer; font-size: 0.75rem; font-weight: 800; color: #0d9488; margin: 0; background: #fff; padding: 6px 12px; border-radius: 20px; border: 1.5px solid #0d9488; transition: all 0.2s;">
                                     <input type="checkbox" id="selectAllSites" style="width: 16px; height: 16px; margin-right: 8px; accent-color: #0d9488; cursor: pointer;"> SELECT ALL (<span id="filtered_sites_count">0</span> matching)
                                 </label>
+                                <?php if ($action !== 'edit'): ?>
+                                <button type="button" onclick="openBucket()" id="review-bucket-btn" style="background: #f0fdfa; border: 1.5px solid #0d9488; color: #0d9488; padding: 6px 14px; border-radius: 20px; font-weight: 800; display: flex; align-items: center; gap: 8px; cursor: pointer; font-size: 0.75rem;">
+                                    <i class="fas fa-shopping-basket"></i>
+                                    Selected: <span id="selected-count-btm" style="background: #0d9488; color: white; padding: 0.1rem 0.5rem; border-radius: 4px; font-size: 0.7rem;">0</span>
+                                </button>
+                                <?php endif; ?>
                             </div>
 
-                            <div id="site_checkbox_list" class="site-grid" style="flex: 1; max-height: 480px; overflow-y: auto; border: 1px solid #f1f5f9; border-radius: 12px; background: #fff;">
-                                <div style="grid-column: 1 / -1; color: #94a3b8; font-size: 0.9rem; padding: 4rem; text-align: center; font-style: italic;">Select a vendor to see sites...</div>
+                            <!-- Table-based site list -->
+                            <div id="site_checkbox_list" style="flex: 1; max-height: 520px; overflow-y: auto; border: 1px solid #f1f5f9; border-radius: 12px; background: #fff;">
+                                <table class="po-site-table" id="site-table" style="width: 100%; border-collapse: separate; border-spacing: 0;">
+                                    <thead style="background: white; position: sticky; top: 0; z-index: 10;">
+                                        <tr style="border-bottom: 2px solid #f1f5f9;">
+                                            <th style="width: 40px; padding: 0.8rem 1rem; font-size: 0.7rem; font-weight: 800; color: #475569; text-transform: uppercase; text-align: center;">#</th>
+                                            <th style="width: 50px; padding: 0.8rem 1rem; font-size: 0.7rem; font-weight: 800; color: #475569; text-transform: uppercase; text-align: center;"><i class="far fa-check-square"></i></th>
+                                            <th style="width: 130px; padding: 0.8rem 1rem; font-size: 0.7rem; font-weight: 800; color: #475569; text-transform: uppercase;">PREVIEW</th>
+                                            <th style="padding: 0.8rem 1rem; font-size: 0.7rem; font-weight: 800; color: #475569; text-transform: uppercase;">CITY / CODE</th>
+                                            <th style="padding: 0.8rem 1rem; font-size: 0.7rem; font-weight: 800; color: #475569; text-transform: uppercase;">ASSET DETAILS</th>
+                                            <th style="padding: 0.8rem 1rem; font-size: 0.7rem; font-weight: 800; color: #475569; text-transform: uppercase;">SIZE</th>
+                                            <th style="padding: 0.8rem 1rem; font-size: 0.7rem; font-weight: 800; color: #475569; text-transform: uppercase; width: 140px;">RATE ₹/SQFT</th>
+                                            <th style="padding: 0.8rem 1rem; font-size: 0.7rem; font-weight: 800; color: #475569; text-transform: uppercase; text-align: right; width: 130px;">TOTAL</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody id="site-rows-body">
+                                        <tr><td colspan="8" style="text-align: center; padding: 4rem; color: #94a3b8; font-size: 0.9rem; font-style: italic;">Select a vendor to see sites...</td></tr>
+                                    </tbody>
+                                </table>
+                            </div>
+
+                            <!-- Pagination Bar -->
+                            <div id="po-pagination-wrap" style="padding: 0.75rem 1rem; display: flex; justify-content: space-between; align-items: center; background: #f8fafc; border: 1px solid #f1f5f9; border-top: none; border-radius: 0 0 12px 12px;">
+                                <div style="font-size: 0.75rem; font-weight: 700; color: #64748b;">
+                                    Showing <span id="po-pg-start">0</span>–<span id="po-pg-end">0</span> of <span id="po-pg-total">0</span> sites
+                                </div>
+                                <div id="po-pg-numbers" style="display: flex; gap: 0.35rem; align-items: center;"></div>
                             </div>
                         </div>
                     </div>
                 </div>
 
-        <div style="background: #f8fafc; padding: 1.5rem 2.5rem; border-top: 1px solid #f1f5f9; display: flex; justify-content: space-between; align-items: center; position: sticky; bottom: 0; z-index: 100; box-shadow: 0 -4px 12px rgba(0,0,0,0.05);">
-            <?php if ($action !== 'edit'): ?>
-                <button type="button" onclick="openBucket()" id="review-bucket-btn" style="background: #f0fdfa; border: 1.5px solid #0d9488; color: #0d9488; padding: 0.75rem 1.5rem; border-radius: 10px; font-weight: 800; display: flex; align-items: center; gap: 8px; cursor: pointer; transition: all 0.2s; font-size: 0.9rem; outline: none;">
-                    <i class="fas fa-shopping-basket"></i>
-                    Review Selection (<span id="selected-count-btm">0</span>)
-                </button>
-            <?php else: ?>
-                <div></div>
-            <?php endif; ?>
+        <div style="background: #f8fafc; padding: 1.5rem 2.5rem; border-top: 1px solid #f1f5f9; display: flex; justify-content: flex-end; align-items: center; position: sticky; bottom: 0; z-index: 100; box-shadow: 0 -4px 12px rgba(0,0,0,0.05);">
             <div>
                 <a href="printing_rates.php" class="btn" style="font-weight: 700; color: #64748b; margin-right: 1.5rem; font-size: 1rem; border: none; background: transparent; padding: 0.5rem 1.5rem; text-decoration: none;">Discard Changes</a>
                 <button type="submit" class="btn btn-primary" style="background: #0d9488; color: white; border: none; padding: 1rem 3rem; border-radius: 12px; font-weight: 800; font-size: 1.1rem; transition: all 0.2s; box-shadow: 0 4px 12px rgba(13, 148, 136, 0.2); cursor: pointer;">
@@ -260,7 +291,7 @@ include_once __DIR__ . '/../../includes/header.php';
 
 <!-- SELECTION BUCKET (Slide-out Drawer) -->
 <div id="bucket-backdrop" onclick="closeBucket()" style="position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.4); backdrop-filter: blur(4px); z-index: 2000; display: none;"></div>
-<div id="selection-bucket-panel" style="position: fixed; top: 0; right: -1400px; width: 1000px; max-width: 90vw; height: 100%; background: white; z-index: 2001; box-shadow: -10px 0 30px rgba(0,0,0,0.1); transition: all 0.4s cubic-bezier(0.4, 0, 0.2, 1); display: flex; flex-direction: column; box-sizing: border-box;">
+<div id="selection-bucket-panel" style="position: fixed; top: 0; right: -1400px; width: 1200px; max-width: 95vw; height: 100%; background: white; z-index: 2001; box-shadow: -10px 0 30px rgba(0,0,0,0.1); transition: all 0.4s cubic-bezier(0.4, 0, 0.2, 1); display: flex; flex-direction: column; box-sizing: border-box;">
     <div class="p-header" style="display: flex; justify-content: space-between; align-items: center; padding: 1.5rem; background: #0d9488; color: white; border: none; margin: 0;">
         <div style="display: flex; align-items: center; gap: 1rem;">
             <i class="fas fa-shopping-basket" style="font-size: 1.2rem;"></i>
@@ -277,48 +308,42 @@ include_once __DIR__ . '/../../includes/header.php';
         <i class="fas fa-shopping-cart" style="font-size: 3rem; margin-bottom: 1rem; display: block; opacity: 0.3;"></i>
         Your bucket is empty. Select assets from the list.
     </div>
-    <div id="bucket-list" style="flex: 1; overflow-y: auto; padding: 1rem;">
-        <!-- Selected items injected here -->
-    </div>
+    <div id="bucket-list" style="flex: 1; overflow-y: auto; padding: 1rem;"></div>
     <div style="padding: 1.5rem; border-top: 1px solid #e2e8f0; background: #f8fafc;">
         <button type="button" onclick="closeBucket()" class="btn btn-primary" style="width: 100%; height: 45px; border-radius: 10px; font-weight: 800; background: #0d9488; border: none; color: white; cursor: pointer;">CONTINUE SELECTION</button>
     </div>
 </div>
 
 <style>
-.media-pills { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; }
-.media-pill { 
-    padding: 10px 5px; text-align: center; background: #fff; border: 1.5px solid #e2e8f0; 
-    border-radius: 8px; font-size: 0.75rem; font-weight: 700; cursor: pointer; transition: all 0.2s; color: #64748b;
-}
-.media-pill:hover { border-color: #0d9488; color: #0d9488; background: #f0fdfa; }
-.media-pill.active { background: #0d9488; color: #fff; border-color: #0d9488; box-shadow: 0 4px 6px -1px rgba(13, 148, 136, 0.3); }
+.po-site-table { width: 100%; border-collapse: collapse; }
+.po-site-table th { background: white; border-bottom: 2px solid #f1f5f9; }
+.po-site-table td { padding: 0.7rem 1rem; vertical-align: middle; border-bottom: 1px solid #f8fafc; }
 
-.site-grid {
-    display: grid;
-    grid-template-columns: repeat(auto-fill, minmax(320px, 1fr));
-    gap: 1.25rem;
-    padding: 1.5rem;
+.site-row { transition: background 0.15s; cursor: default; }
+.site-row:hover { background: #f8fafc !important; }
+.site-row.selected { background: #f0fdfa !important; }
+
+.site-chk-input { width: 18px !important; height: 18px !important; accent-color: #0d9488; cursor: pointer; }
+
+.site-rate-input {
+    width: 100px; height: 30px; font-size: 0.85rem; font-weight: 800;
+    border-radius: 6px; border: 1.5px solid #e2e8f0; padding: 0 0.4rem;
+    color: #0d9488; text-align: right; background: #f8fafc;
+    transition: border-color 0.2s, background 0.2s;
 }
-.site-item { 
-    display: flex; align-items: center; padding: 15px; border-radius: 12px; cursor: pointer; 
-    border: 2px solid #f1f5f9; transition: all 0.2s; background: #fff; position: relative;
-    box-sizing: border-box;
-}
-.site-item:hover { border-color: #0d9488; box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.05); transform: translateY(-2px); }
-.site-item.selected { border-color: #0d9488; background: #f0fdfa; }
-.site-item input[type="checkbox"] { width: 20px !important; height: 20px !important; accent-color: #0d9488; margin: 0; cursor: pointer; }
-.site-item .site-info { flex: 1; min-width: 0; padding: 0 12px; }
-.site-item .site-info label { margin: 0; color: #0f172a; font-size: 0.9rem; font-weight: 800; text-transform: none; letter-spacing: normal; cursor: pointer; line-height: 1.3; }
-.site-item .site-info small { color: #64748b; font-size: 0.75rem; display: block; margin-top: 5px; font-weight: 500; }
-.site-item .rate-input-wrap { width: 100px; }
-.site-item .rate-input-wrap input { 
-    padding: 8px 10px; font-size: 0.95rem; border-radius: 8px; border: 2px solid #f1f5f9; 
-    text-align: right; font-weight: 900; color: #0d9488; background: #f8fafc; width: 100%;
-}
-.site-item .rate-input-wrap input:focus { background: #fff; border-color: #0d9488; outline: none; }
+.site-rate-input:focus { background: #fff; border-color: #0d9488; outline: none; }
 
 .btn-primary:hover { background: #0f766e !important; transform: translateY(-2px); box-shadow: 0 12px 20px -5px rgba(13, 148, 136, 0.4) !important; }
+
+.po-pg-btn {
+    min-width: 30px; height: 30px; border: 1px solid #e2e8f0; background: white;
+    border-radius: 7px; cursor: pointer; font-weight: 700; font-size: 0.78rem;
+    transition: all 0.2s; color: #475569; display: flex; align-items: center; justify-content: center; padding: 0 6px;
+}
+.po-pg-btn:hover:not(:disabled) { border-color: #0d9488; color: #0d9488; background: #f0fdfa; }
+.po-pg-btn.active { background: #0d9488; color: white; border-color: #0d9488; box-shadow: 0 3px 8px rgba(13,148,136,0.25); }
+.po-pg-btn:disabled { opacity: 0.35; cursor: not-allowed; }
+.po-pg-dots { color: #94a3b8; font-weight: 800; padding: 0 2px; font-size: 0.8rem; }
 </style>
 
 <script>
@@ -327,17 +352,89 @@ const vendorsData = <?php echo json_encode($vendors); ?>;
 const isEditMode = <?php echo $action === 'edit' ? 'true' : 'false'; ?>;
 const initialRateData = <?php echo $rateData ? json_encode($rateData) : 'null'; ?>;
 const selectedSitesData = <?php echo json_encode($selectedSitesData); ?>;
+const baseUrl = "<?php echo BASE_URL; ?>";
+let currentPage = 1;
+const pageSize = 10;
+
+function renderPagination() {
+    const allRows = Array.from(document.querySelectorAll('tr.site-row'));
+    const activeRows = allRows.filter(r => !r.classList.contains('search-hidden'));
+
+    const total = activeRows.length;
+    const start = (currentPage - 1) * pageSize;
+    const end = Math.min(start + pageSize, total);
+
+    // Hide all first
+    allRows.forEach(r => r.style.display = 'none');
+
+    // Renumber and show current page
+    activeRows.forEach((r, i) => {
+        const sno = r.querySelector('.sno-cell');
+        if (sno) sno.innerText = i + 1;
+    });
+    activeRows.slice(start, end).forEach(r => r.style.display = '');
+
+    // Update info
+    const pgStart = document.getElementById('po-pg-start');
+    const pgEnd   = document.getElementById('po-pg-end');
+    const pgTotal = document.getElementById('po-pg-total');
+    if (pgStart) pgStart.innerText = total === 0 ? 0 : start + 1;
+    if (pgEnd)   pgEnd.innerText   = end;
+    if (pgTotal) pgTotal.innerText = total;
+
+    // Update "X matching" badge
+    const countEl = document.getElementById('filtered_sites_count');
+    if (countEl) countEl.innerText = total;
+
+    updatePgControls(total);
+}
+
+function updatePgControls(total) {
+    const totalPages = Math.ceil(total / pageSize);
+    const container = document.getElementById('po-pg-numbers');
+    if (!container) return;
+    container.innerHTML = '';
+    if (totalPages <= 1) return;
+
+    const btn = (html, disabled, active, cb) => {
+        const b = document.createElement('button');
+        b.type = 'button';
+        b.className = 'po-pg-btn' + (active ? ' active' : '');
+        b.innerHTML = html;
+        b.disabled = disabled;
+        if (!disabled) b.onclick = cb;
+        return b;
+    };
+    const dots = () => { const s = document.createElement('span'); s.className = 'po-pg-dots'; s.innerText = '…'; return s; };
+
+    container.appendChild(btn('<i class="fas fa-angle-double-left"></i>', currentPage === 1, false, () => { currentPage = 1; renderPagination(); }));
+    container.appendChild(btn('<i class="fas fa-angle-left"></i>', currentPage === 1, false, () => { currentPage--; renderPagination(); }));
+
+    let sp = Math.max(1, currentPage - 2);
+    let ep = Math.min(totalPages, sp + 4);
+    if (ep - sp < 4) sp = Math.max(1, ep - 4);
+
+    if (sp > 1) { container.appendChild(btn('1', false, false, () => { currentPage = 1; renderPagination(); })); if (sp > 2) container.appendChild(dots()); }
+    for (let i = sp; i <= ep; i++) { const pg = i; container.appendChild(btn(i, false, i === currentPage, () => { currentPage = pg; renderPagination(); })); }
+    if (ep < totalPages) { if (ep < totalPages - 1) container.appendChild(dots()); container.appendChild(btn(totalPages, false, false, () => { currentPage = totalPages; renderPagination(); })); }
+
+    container.appendChild(btn('<i class="fas fa-angle-right"></i>', currentPage === totalPages, false, () => { currentPage++; renderPagination(); }));
+    container.appendChild(btn('<i class="fas fa-angle-double-right"></i>', currentPage === totalPages, false, () => { currentPage = totalPages; renderPagination(); }));
+}
 
 document.getElementById('f_vendor').addEventListener('change', filterSitesByVendor);
 document.getElementById('f_site').addEventListener('change', calculateTotal);
+
 const rateEl = document.getElementById('f_rate');
 if (rateEl) {
     rateEl.addEventListener('input', function() {
         const val = this.value;
         document.querySelectorAll('.site-chk-input:checked').forEach(chk => {
-            const rateInput = chk.closest('.site-item').querySelector('.site-individual-rate');
-            if (rateInput.dataset.touched !== 'true') {
+            const row = chk.closest('tr.site-row');
+            const rateInput = row.querySelector('.site-rate-input');
+            if (rateInput && rateInput.dataset.touched !== 'true') {
                 rateInput.value = val;
+                updateRowTotal(row);
             }
         });
         calculateTotal();
@@ -346,21 +443,21 @@ if (rateEl) {
 }
 
 document.getElementById('selectAllSites').addEventListener('change', function() {
-    const rateEl = document.getElementById('f_rate');
-    const masterRate = rateEl ? rateEl.value : '';
-    document.querySelectorAll('.site-chk-input').forEach(chk => {
-        if (chk.closest('.site-item').style.display !== 'none') {
-            chk.checked = this.checked;
-            const rateInput = chk.closest('.site-item').querySelector('.site-individual-rate');
-            const item = chk.closest('.site-item');
-            if (this.checked) {
-                item.classList.add('selected');
-                if (masterRate && rateInput.dataset.touched !== 'true') {
-                    rateInput.value = masterRate;
-                }
-            } else {
-                item.classList.remove('selected');
+    const masterRate = document.getElementById('f_rate').value;
+    document.querySelectorAll('tr.site-row').forEach(tr => {
+        if (tr.classList.contains('search-hidden') || tr.style.display === 'none') return;
+        const chk = tr.querySelector('.site-chk-input');
+        const rateInput = tr.querySelector('.site-rate-input');
+        if (!chk) return;
+        chk.checked = this.checked;
+        if (this.checked) {
+            tr.classList.add('selected');
+            if (masterRate && rateInput && rateInput.dataset.touched !== 'true') {
+                rateInput.value = masterRate;
+                updateRowTotal(tr);
             }
+        } else {
+            tr.classList.remove('selected');
         }
     });
     calculateTotal();
@@ -369,78 +466,123 @@ document.getElementById('selectAllSites').addEventListener('change', function() 
 
 function setMedia(val) {
     const selectEl = document.getElementById('f_media');
-    if (selectEl) {
-        selectEl.value = val;
-    }
+    if (selectEl) selectEl.value = val;
+}
+
+function updateRowTotal(tr) {
+    const chk = tr.querySelector('.site-chk-input');
+    const rateInput = tr.querySelector('.site-rate-input');
+    const totalCell = tr.querySelector('.row-total-cell');
+    if (!chk || !rateInput || !totalCell) return;
+    const sqft = parseFloat(chk.dataset.sqft) || 0;
+    const rate = parseFloat(rateInput.value) || 0;
+    const total = sqft * rate;
+    totalCell.innerText = total > 0 ? '₹' + total.toLocaleString(undefined, {maximumFractionDigits: 0}) : '₹0';
 }
 
 function filterSitesByVendor() {
     const vendorId = document.getElementById('f_vendor').value;
     const siteSelect = document.getElementById('f_site');
-    const siteList = document.getElementById('site_checkbox_list');
-    
-    // Clear current UI
-    siteSelect.innerHTML = '<option value="">Generic / All Sites</option>';
-    siteList.innerHTML = '';
-    
-    const displaySites = sitesData;
+    const tbody = document.getElementById('site-rows-body');
 
-    if (displaySites.length === 0) {
-        siteList.innerHTML = '<div style="color: #94a3b8; font-size: 0.8rem; padding: 10px; text-align: center; grid-column: 1 / -1;">No sites found in system.</div>';
+    siteSelect.innerHTML = '<option value="">Generic / All Sites</option>';
+    tbody.innerHTML = '';
+
+    if (sitesData.length === 0) {
+        tbody.innerHTML = '<tr><td colspan="8" style="text-align: center; padding: 4rem; color: #94a3b8; font-size: 0.9rem;">No sites found in system.</td></tr>';
+        return;
     }
 
-    displaySites.forEach(s => {
+    sitesData.forEach((s, index) => {
         const siteVendor = vendorsData.find(v => v.id == s.vendor_id);
-        const vName = siteVendor ? siteVendor.name : '';
+        const vName = s.vendor_name || (siteVendor ? siteVendor.name : '');
+        const sqft = parseFloat(s.width) * parseFloat(s.height);
+        const isOwnVendor = (vendorId && s.vendor_id == vendorId);
 
-        // Add to dropdown (for Edit)
+        // Dropdown option (for edit mode)
         const option = document.createElement('option');
         option.value = s.id;
         option.text = `${s.site_code} - ${s.name} (${s.width}x${s.height})`;
         siteSelect.add(option);
 
-        // Add to Checkbox List (for Add)
-        const item = document.createElement('div');
-        item.className = 'site-item';
-        item.dataset.id = s.id;
-        item.dataset.code = s.site_code || '';
-        item.dataset.name = s.name || '';
-        item.dataset.city = s.city || '';
-        item.dataset.state = s.state || '';
-        item.dataset.type = s.type || '';
-        item.dataset.illumination = s.light_type || '';
-        item.dataset.owner = s.owner_type || '';
-        item.dataset.status = s.status || '';
-        item.dataset.size = `${s.width}x${s.height}`;
-        item.dataset.vendorId = s.vendor_id || '';
-        
-        const isSelectedVendor = (vendorId && s.vendor_id == vendorId);
-        if (isSelectedVendor) item.style.background = '#f0fdfa';
+        // Thumbnail
+        const allImgs = s.all_images || s.thumbnail || '';
+        const thumbHtml = s.thumbnail
+            ? `<div style="position: relative; width: 120px; height: 75px;">
+                <img src="${baseUrl}uploads/sites/${s.thumbnail}"
+                     onclick="openLightboxSlider('${allImgs}', '${s.id}')"
+                     style="width: 100%; height: 100%; border-radius: 8px; object-fit: cover; border: 1px solid #e2e8f0; cursor: pointer; transition: transform 0.2s; box-shadow: 0 2px 4px rgba(0,0,0,0.08);">
+               </div>`
+            : `<div style="width: 80px; height: 50px; border-radius: 8px; background: #f8fafc; border: 1px dashed #e2e8f0; display: flex; align-items: center; justify-content: center; font-size: 0.6rem; color: #94a3b8; font-weight: 700;">No Img</div>`;
 
-        item.innerHTML = `
-            <input type="checkbox" name="site_ids[]" value="${s.id}" class="site-chk-input" data-sqft="${parseFloat(s.width) * parseFloat(s.height)}">
-            <div class="site-info">
-                <label>${s.site_code} - ${s.name} ${isSelectedVendor ? '<span style="color:#0d9488; font-size:0.55rem; background:#ccfbf1; padding:2px 6px; border-radius:10px; margin-left:4px;">OWN</span>' : ''}</label>
-                <small>${s.width}x${s.height} = <strong>${parseFloat(s.width) * parseFloat(s.height)} SQFT</strong> • ${vName}</small>
-            </div>
-            <div class="rate-input-wrap">
-                <input type="number" step="0.01" name="individual_rates[${s.id}]" class="site-individual-rate" placeholder="₹" data-touched="false">
-            </div>
+        // Tags
+        const typeBadge = s.type ? `<span style="background: #ecfdf5; color: #059669; padding: 0.1rem 0.4rem; border-radius: 4px; font-size: 0.55rem; font-weight: 800; text-transform: uppercase;">${s.type}</span>` : '';
+        const lightBadge = s.light_type ? `<span style="background: #f1f5f9; color: #475569; padding: 0.1rem 0.4rem; border-radius: 4px; font-size: 0.55rem; font-weight: 800; text-transform: uppercase;">${s.light_type}</span>` : '';
+        const ownerLabel = s.owner_type + (isOwnVendor && vName ? ' - ' + vName : '');
+        const ownerBadge = s.owner_type ? `<span style="background: #f1f5f9; color: #475569; padding: 0.1rem 0.4rem; border-radius: 4px; font-size: 0.55rem; font-weight: 800; text-transform: uppercase;">${ownerLabel}</span>` : '';
+        const ownBadge = isOwnVendor ? `<span style="color:#0d9488; font-size:0.55rem; background:#ccfbf1; padding:2px 6px; border-radius:10px; margin-left:4px;">OWN</span>` : '';
+
+        const tr = document.createElement('tr');
+        tr.className = 'site-row';
+        tr.dataset.id = s.id;
+        tr.dataset.code = s.site_code || '';
+        tr.dataset.name = s.name || '';
+        tr.dataset.city = s.city || '';
+        tr.dataset.state = s.state || '';
+        tr.dataset.type = s.type || '';
+        tr.dataset.illumination = s.light_type || '';
+        tr.dataset.owner = s.owner_type || '';
+        tr.dataset.status = s.status || '';
+        tr.dataset.size = `${s.width}x${s.height}`;
+        tr.dataset.vendorId = s.vendor_id || '';
+        tr.dataset.thumbnail = s.thumbnail || '';
+        tr.dataset.images = s.all_images || s.thumbnail || '';
+        tr.dataset.location = s.location || '';
+        tr.dataset.width = s.width || '';
+        tr.dataset.height = s.height || '';
+
+        tr.innerHTML = `
+            <td class="sno-cell" style="padding: 0.6rem 1rem; font-weight: 700; color: #64748b; text-align: center; font-size: 0.85rem;">${index + 1}</td>
+            <td style="padding: 0.6rem 1rem; text-align: center;">
+                <input type="checkbox" name="site_ids[]" value="${s.id}" class="site-chk-input" data-sqft="${sqft}">
+            </td>
+            <td style="padding: 0.6rem 1rem;">${thumbHtml}</td>
+            <td style="padding: 0.6rem 1rem;">
+                <div style="font-weight: 800; color: #1e293b; font-size: 0.8rem; margin-bottom: 2px;">${s.city || ''}</div>
+                <div style="color: #f97316; font-size: 0.7rem; font-weight: 800;">${s.site_code}</div>
+            </td>
+            <td style="padding: 0.6rem 1rem;">
+                <div style="font-weight: 800; color: #1e293b; font-size: 0.8rem; margin-bottom: 2px;">${s.name}${ownBadge}</div>
+                ${s.location ? `<div style="font-size: 0.65rem; color: #64748b; margin-bottom: 3px; line-height: 1.1;">${s.location}</div>` : ''}
+                <div style="display: flex; gap: 0.3rem; flex-wrap: wrap; align-items: center; margin-top: 2px;">${typeBadge}${lightBadge}${ownerBadge}</div>
+            </td>
+            <td style="padding: 0.6rem 1rem;">
+                <div style="font-weight: 800; color: #1e293b; font-size: 0.8rem;">${s.width}' x ${s.height}'</div>
+                <div style="font-size: 0.65rem; color: #94a3b8; font-weight: 700;">${sqft.toLocaleString()} SQFT</div>
+            </td>
+            <td style="padding: 0.6rem 1rem;">
+                <div style="font-size: 0.5rem; color: #0d9488; font-weight: 900; text-transform: uppercase; margin-bottom: 3px;">Offer Rate</div>
+                <input type="number" step="0.01" name="individual_rates[${s.id}]" class="site-rate-input" placeholder="₹" data-touched="false">
+            </td>
+            <td style="padding: 0.6rem 1rem; text-align: right;">
+                <div style="font-size: 0.55rem; color: #64748b; font-weight: 800; text-transform: uppercase;">Total</div>
+                <div class="row-total-cell" style="font-weight: 900; color: #0d9488; font-size: 0.9rem;">₹0</div>
+            </td>
         `;
-        
-        const chk = item.querySelector('.site-chk-input');
-        const rateInput = item.querySelector('.site-individual-rate');
-        
+
+        const chk = tr.querySelector('.site-chk-input');
+        const rateInput = tr.querySelector('.site-rate-input');
+
         chk.onchange = function() {
-            const rateEl = document.getElementById('f_rate');
-            const masterRate = rateEl ? rateEl.value : '';
+            const masterRate = document.getElementById('f_rate').value;
             if (this.checked) {
-                item.classList.add('selected');
+                tr.classList.add('selected');
                 if (masterRate && rateInput.dataset.touched !== 'true') {
                     rateInput.value = masterRate;
+                    updateRowTotal(tr);
                 }
             } else {
-                item.classList.remove('selected');
+                tr.classList.remove('selected');
             }
             calculateTotal();
             updateBucketUI();
@@ -449,128 +591,116 @@ function filterSitesByVendor() {
         rateInput.oninput = function() {
             this.dataset.touched = 'true';
             if (this.value !== '') chk.checked = true;
+            if (this.value !== '') tr.classList.add('selected');
+            updateRowTotal(tr);
             calculateTotal();
             updateBucketUI();
         };
 
         if (isEditMode && selectedSitesData[s.id] !== undefined) {
             chk.checked = true;
-            item.classList.add('selected');
+            tr.classList.add('selected');
             rateInput.value = selectedSitesData[s.id];
             rateInput.dataset.touched = 'true';
+            updateRowTotal(tr);
         }
 
-        siteList.appendChild(item);
+        tbody.appendChild(tr);
     });
-    
+
     filterSitesInModal();
     calculateTotal();
     updateBucketUI();
 }
 
 function filterSitesInModal() {
-    
     const q = document.getElementById('siteSearch').value.toLowerCase();
-    
-    // Get radio values
+
     const ownershipEl = document.querySelector('input[name="ownership"]:checked');
     const ownership = ownershipEl ? ownershipEl.value : 'all';
-    
+
     const vendorGroup = document.getElementById('vendor_filter_group');
     if (vendorGroup) {
         vendorGroup.style.display = (ownership === 'TA') ? 'flex' : 'none';
         if (ownership !== 'TA') document.getElementById('filter_vendor').value = '';
     }
-    
+
     const availabilityEl = document.querySelector('input[name="availability"]:checked');
     const availability = availabilityEl ? availabilityEl.value : 'all';
-    
-    // Get selects
+
     const media = document.getElementById('filter_media').value;
     const state = document.getElementById('filter_state').value;
     const city = document.getElementById('filter_city').value;
     const light = document.getElementById('filter_light').value;
     const size = document.getElementById('filter_size').value;
     const vendorId = document.getElementById('filter_vendor') ? document.getElementById('filter_vendor').value : '';
-    
-    let visibleCount = 0;
-    
-    document.querySelectorAll('.site-item').forEach(item => {
-        const itemCode = (item.dataset.code || '').toLowerCase();
-        const itemName = (item.dataset.name || '').toLowerCase();
-        const itemCity = (item.dataset.city || '').toLowerCase();
-        const itemState = (item.dataset.state || '').toLowerCase();
-        const itemType = item.dataset.type || '';
-        const itemIllum = item.dataset.illumination || '';
-        const itemOwner = item.dataset.owner || '';
-        const itemStatus = item.dataset.status || '';
-        const itemSize = item.dataset.size || '';
-        const itemVendor = item.dataset.vendorId || '';
-        
-        const matchesSearch = !q || 
-            itemCode.includes(q) || 
-            itemName.includes(q) || 
-            itemCity.includes(q) || 
-            itemState.includes(q);
-            
+
+    document.querySelectorAll('tr.site-row').forEach(row => {
+        const itemCode = (row.dataset.code || '').toLowerCase();
+        const itemName = (row.dataset.name || '').toLowerCase();
+        const itemCity = (row.dataset.city || '').toLowerCase();
+        const itemState = (row.dataset.state || '').toLowerCase();
+        const itemType = row.dataset.type || '';
+        const itemIllum = row.dataset.illumination || '';
+        const itemOwner = row.dataset.owner || '';
+        const itemStatus = row.dataset.status || '';
+        const itemSize = row.dataset.size || '';
+        const itemVendor = row.dataset.vendorId || '';
+
+        const matchesSearch = !q || itemCode.includes(q) || itemName.includes(q) || itemCity.includes(q) || itemState.includes(q);
         const matchesOwnership = ownership === 'all' || itemOwner === ownership;
-        const matchesAvailability = availability === 'all' || 
-            (availability === 'available' && itemStatus.toLowerCase() === 'available');
-            
+        const matchesAvailability = availability === 'all' || (availability === 'available' && itemStatus.toLowerCase() === 'available');
         const matchesMedia = !media || itemType === media;
         const matchesState = !state || itemState.toLowerCase() === state.toLowerCase();
         const matchesCity = !city || itemCity.toLowerCase() === city.toLowerCase();
         const matchesLight = !light || itemIllum === light;
         const matchesSize = !size || itemSize === size;
         const matchesVendor = !vendorId || itemVendor == vendorId;
-        
+
         if (matchesSearch && matchesOwnership && matchesVendor && matchesAvailability && matchesMedia && matchesState && matchesCity && matchesLight && matchesSize) {
-            item.style.display = 'flex';
-            visibleCount++;
+            row.classList.remove('search-hidden');
         } else {
-            item.style.display = 'none';
+            row.classList.add('search-hidden');
         }
     });
-    
-    const countEl = document.getElementById('filtered_sites_count');
-    if (countEl) {
-        countEl.innerText = visibleCount;
-    }
+
+    currentPage = 1;
+    renderPagination();
 }
 
 function resetFilters() {
-    
     document.getElementById('siteSearch').value = '';
-    
+
     const ownerAll = document.querySelector('input[name="ownership"][value="all"]');
     if (ownerAll) ownerAll.checked = true;
-    
+
     const availAvail = document.querySelector('input[name="availability"][value="available"]');
     if (availAvail) availAvail.checked = true;
-    
+
     document.getElementById('filter_media').value = '';
     document.getElementById('filter_state').value = '';
     document.getElementById('filter_city').value = '';
     document.getElementById('filter_light').value = '';
     document.getElementById('filter_size').value = '';
     if (document.getElementById('filter_vendor')) document.getElementById('filter_vendor').value = '';
-    
+
     filterSitesInModal();
 }
 
 function calculateTotal() {
-    const rateEl = document.getElementById('f_rate');
-    const rate = rateEl ? (parseFloat(rateEl.value) || 0) : 0;
+    const masterRate = parseFloat(document.getElementById('f_rate').value) || 0;
     let totalSqft = 0;
     let netAmount = 0;
-    
+
     document.querySelectorAll('.site-chk-input:checked').forEach(chk => {
+        const row = chk.closest('tr.site-row');
         const sqft = parseFloat(chk.dataset.sqft) || 0;
-        const indRate = parseFloat(chk.closest('.site-item').querySelector('.site-individual-rate').value) || rate;
+        const rateInput = row ? row.querySelector('.site-rate-input') : null;
+        const indRate = (rateInput ? parseFloat(rateInput.value) : 0) || masterRate;
         totalSqft += sqft;
         netAmount += (sqft * indRate);
     });
-    
+
     if (totalSqft > 0) {
         const sqftValEl = document.getElementById('sqft_value');
         const totalPriceEl = document.getElementById('total_price_value');
@@ -589,7 +719,7 @@ function toggleSearchCriteria() {
     const icon = document.getElementById('toggleSearchIcon');
     const text = document.getElementById('toggleSearchText');
     const btn = document.getElementById('toggleSearchBtn');
-    
+
     if (panel.style.display === 'none') {
         panel.style.display = 'block';
         icon.className = 'fas fa-eye-slash';
@@ -606,7 +736,6 @@ function toggleSearchCriteria() {
 }
 
 document.getElementById('rateForm').addEventListener('submit', function(e) {
-    
     const checked = document.querySelectorAll('.site-chk-input:checked');
     if (checked.length === 0) {
         e.preventDefault();
@@ -632,24 +761,31 @@ function closeBucket() {
 }
 
 function uncheckSiteInBucket(siteId) {
-    const chk = document.querySelector(`.site-item[data-id="${siteId}"] .site-chk-input`);
-    if (chk) {
-        chk.checked = false;
-        chk.closest('.site-item').classList.remove('selected');
-        calculateTotal();
-        updateBucketUI();
+    const row = document.querySelector(`tr.site-row[data-id="${siteId}"]`);
+    if (row) {
+        const chk = row.querySelector('.site-chk-input');
+        if (chk) {
+            chk.checked = false;
+            row.classList.remove('selected');
+            calculateTotal();
+            updateBucketUI();
+        }
     }
 }
 
 function syncRateFromBucket(siteId, rate) {
-    const item = document.querySelector(`.site-item[data-id="${siteId}"]`);
-    if (item) {
-        const rateInput = item.querySelector('.site-individual-rate');
-        const chk = item.querySelector('.site-chk-input');
+    const row = document.querySelector(`tr.site-row[data-id="${siteId}"]`);
+    if (row) {
+        const rateInput = row.querySelector('.site-rate-input');
+        const chk = row.querySelector('.site-chk-input');
         if (rateInput) {
             rateInput.value = rate;
             rateInput.dataset.touched = 'true';
-            if (rate !== '' && chk) chk.checked = true;
+            if (rate !== '' && chk) {
+                chk.checked = true;
+                row.classList.add('selected');
+            }
+            updateRowTotal(row);
             calculateTotal();
             updateBucketUI();
         }
@@ -661,85 +797,115 @@ function updateBucketUI() {
     const emptyMsg = document.getElementById('bucket-empty-msg');
     const bucketCount = document.getElementById('bucket-count');
     const selectedCountBtm = document.getElementById('selected-count-btm');
-    
+
     const checkedCheckboxes = document.querySelectorAll('.site-chk-input:checked');
     const count = checkedCheckboxes.length;
-    
+
     if (bucketCount) bucketCount.innerText = count;
     if (selectedCountBtm) selectedCountBtm.innerText = count;
-    
+
     if (count === 0) {
         if (emptyMsg) emptyMsg.style.display = 'block';
         if (bucketList) bucketList.innerHTML = '';
         return;
     }
-    
+
     if (emptyMsg) emptyMsg.style.display = 'none';
-    
+
     let html = `
-        <table class="crs-table selection-table" style="width: 100%; border-collapse: separate; border-spacing: 0 0.5rem; text-align: left; font-family: inherit;">
-            <thead>
+        <table style="width: 100%; border-collapse: collapse; font-family: inherit;">
+            <thead style="background: white; position: sticky; top: 0; z-index: 10;">
                 <tr style="border-bottom: 2px solid #f1f5f9;">
-                    <th style="width: 40px; padding: 0.8rem 1rem; font-size: 0.75rem; font-weight: 800; color: #94a3b8; text-transform: uppercase;">#</th>
-                    <th style="width: 50px; padding: 0.8rem 1rem; font-size: 0.75rem; font-weight: 800; color: #94a3b8; text-transform: uppercase;">Remove</th>
-                    <th style="padding: 0.8rem 1rem; font-size: 0.75rem; font-weight: 800; color: #94a3b8; text-transform: uppercase;">Site Code</th>
-                    <th style="padding: 0.8rem 1rem; font-size: 0.75rem; font-weight: 800; color: #94a3b8; text-transform: uppercase;">Site Name</th>
-                    <th style="padding: 0.8rem 1rem; font-size: 0.75rem; font-weight: 800; color: #94a3b8; text-transform: uppercase;">Dimension / SQFT</th>
-                    <th style="padding: 0.8rem 1rem; font-size: 0.75rem; font-weight: 800; color: #94a3b8; text-transform: uppercase; width: 120px;">Rate (₹/SQFT)</th>
-                    <th style="padding: 0.8rem 1rem; text-align: right; font-size: 0.75rem; font-weight: 800; color: #94a3b8; text-transform: uppercase; width: 150px;">Total (₹)</th>
+                    <th style="width: 40px; padding: 0.8rem 1rem; font-size: 0.7rem; font-weight: 800; color: #475569; text-transform: uppercase;">#</th>
+                    <th style="width: 50px; padding: 0.8rem 1rem; font-size: 0.7rem; font-weight: 800; color: #475569; text-transform: uppercase;">ACT</th>
+                    <th style="width: 110px; padding: 0.8rem 1rem; font-size: 0.7rem; font-weight: 800; color: #475569; text-transform: uppercase;">PREVIEW</th>
+                    <th style="padding: 0.8rem 1rem; font-size: 0.7rem; font-weight: 800; color: #475569; text-transform: uppercase;">CITY / CODE</th>
+                    <th style="padding: 0.8rem 1rem; font-size: 0.7rem; font-weight: 800; color: #475569; text-transform: uppercase;">ASSET DETAILS</th>
+                    <th style="padding: 0.8rem 1rem; font-size: 0.7rem; font-weight: 800; color: #475569; text-transform: uppercase;">SIZE</th>
+                    <th style="padding: 0.8rem 1rem; font-size: 0.7rem; font-weight: 800; color: #475569; text-transform: uppercase; width: 140px;">RATE ₹/SQFT</th>
+                    <th style="padding: 0.8rem 1rem; text-align: right; font-size: 0.7rem; font-weight: 800; color: #475569; text-transform: uppercase; width: 130px;">TOTAL</th>
                 </tr>
             </thead>
             <tbody>
     `;
-    
+
     checkedCheckboxes.forEach((chk, index) => {
-        const item = chk.closest('.site-item');
-        const siteId = item.dataset.id;
-        const siteCode = item.dataset.code;
-        const siteName = item.dataset.name;
-        const sizeStr = item.dataset.size;
-        const sqftVal = parseFloat(chk.dataset.sqft) || 0;
-        
-        const gridRateInput = item.querySelector('.site-individual-rate');
-        const fRateEl = document.getElementById('f_rate');
-        const currentRate = gridRateInput.value || (fRateEl ? fRateEl.value : '') || 0;
-        const totalCost = sqftVal * currentRate;
-        
+        const row = chk.closest('tr.site-row');
+        if (!row) return;
+        const siteId    = row.dataset.id;
+        const siteCode  = row.dataset.code;
+        const siteName  = row.dataset.name;
+        const siteCity  = row.dataset.city || '';
+        const siteType  = row.dataset.type || '';
+        const siteLight = row.dataset.illumination || '';
+        const siteOwner = row.dataset.owner || '';
+        const siteW     = row.dataset.width || '';
+        const siteH     = row.dataset.height || '';
+        const siteLoc   = row.dataset.location || '';
+        const thumb     = row.dataset.thumbnail || '';
+        const sqftVal   = parseFloat(chk.dataset.sqft) || 0;
+
+        const rowImages = row.dataset.images || thumb;
+        const thumbHtml = thumb
+            ? `<div style="width: 90px; height: 58px; position: relative;">
+                <img src="${baseUrl}uploads/sites/${thumb}"
+                     onclick="openLightboxSlider('${rowImages}', '${siteId}')"
+                     style="width: 100%; height: 100%; border-radius: 8px; object-fit: cover; border: 1px solid #e2e8f0; box-shadow: 0 2px 4px rgba(0,0,0,0.08); cursor: pointer; transition: transform 0.2s;" onmouseover="this.style.transform='scale(1.05)'" onmouseout="this.style.transform='scale(1)'">
+               </div>`
+            : `<div style="width: 70px; height: 44px; border-radius: 8px; background: #f8fafc; border: 1px dashed #e2e8f0; display: flex; align-items: center; justify-content: center; font-size: 0.6rem; color: #94a3b8; font-weight: 700;">No Img</div>`;
+
+        const typeBadge  = siteType  ? `<span style="background:#ecfdf5;color:#059669;padding:0.1rem 0.4rem;border-radius:4px;font-size:0.55rem;font-weight:800;text-transform:uppercase;">${siteType}</span>` : '';
+        const lightBadge = siteLight ? `<span style="background:#f1f5f9;color:#475569;padding:0.1rem 0.4rem;border-radius:4px;font-size:0.55rem;font-weight:800;text-transform:uppercase;">${siteLight}</span>` : '';
+        const ownerBadge = siteOwner ? `<span style="background:#f1f5f9;color:#475569;padding:0.1rem 0.4rem;border-radius:4px;font-size:0.55rem;font-weight:800;text-transform:uppercase;">${siteOwner}</span>` : '';
+
+        const gridRateInput = row.querySelector('.site-rate-input');
+        const masterRateEl  = document.getElementById('f_rate');
+        const currentRate   = (gridRateInput ? gridRateInput.value : '') || (masterRateEl ? masterRateEl.value : '') || 0;
+        const totalCost     = sqftVal * parseFloat(currentRate);
+
         html += `
-            <tr style="background: #f8fafc; border-radius: 8px;">
-                <td style="font-weight: 700; color: #64748b; padding: 0.8rem 1rem; border-radius: 8px 0 0 8px;">${index + 1}</td>
-                <td style="padding: 0.8rem 1rem;">
+            <tr style="border-bottom: 1px solid #f1f5f9; transition: background 0.15s;" onmouseover="this.style.background='#f8fafc'" onmouseout="this.style.background='white'">
+                <td style="padding: 0.7rem 1rem; font-weight: 700; color: #64748b; font-size: 0.85rem;">${index + 1}</td>
+                <td style="padding: 0.7rem 1rem;">
                     <button type="button" onclick="uncheckSiteInBucket('${siteId}')" style="background: #fee2e2; color: #ef4444; border: none; width: 28px; height: 28px; border-radius: 6px; cursor: pointer; display: flex; align-items: center; justify-content: center; transition: all 0.2s;">
-                        <i class="fas fa-trash-alt" style="font-size: 0.75rem;"></i>
+                        <i class="fas fa-trash-alt" style="font-size: 0.7rem;"></i>
                     </button>
                 </td>
-                <td style="padding: 0.8rem 1rem; font-weight: 800; color: #f97316; font-size: 0.85rem;">${siteCode}</td>
-                <td style="padding: 0.8rem 1rem; font-weight: 600; color: #1e293b; font-size: 0.85rem;">${siteName}</td>
-                <td style="padding: 0.8rem 1rem;">
-                    <div style="font-weight: 700; color: #1e293b; font-size: 0.8rem;">${sizeStr}</div>
-                    <small style="color: #64748b; font-size: 0.7rem; font-weight: 600;">${sqftVal.toLocaleString()} SQFT</small>
+                <td style="padding: 0.7rem 1rem;">${thumbHtml}</td>
+                <td style="padding: 0.7rem 1rem;">
+                    <div style="font-weight: 800; color: #1e293b; font-size: 0.8rem; margin-bottom: 2px;">${siteCity}</div>
+                    <div style="color: #f97316; font-size: 0.7rem; font-weight: 800;">${siteCode}</div>
                 </td>
-                <td style="padding: 0.8rem 1rem;">
-                    <input type="number" step="0.01" value="${gridRateInput.value}" 
+                <td style="padding: 0.7rem 1rem; max-width: 220px;">
+                    <div style="font-weight: 800; color: #1e293b; font-size: 0.8rem; margin-bottom: 2px;">${siteName}</div>
+                    ${siteLoc ? `<div style="font-size: 0.65rem; color: #64748b; margin-bottom: 3px; line-height: 1.1;">${siteLoc}</div>` : ''}
+                    <div style="display:flex; gap:0.25rem; flex-wrap:wrap; margin-top:2px;">${typeBadge}${lightBadge}${ownerBadge}</div>
+                </td>
+                <td style="padding: 0.7rem 1rem;">
+                    <div style="font-weight: 800; color: #1e293b; font-size: 0.8rem;">${siteW}' x ${siteH}'</div>
+                    <div style="font-size: 0.65rem; color: #94a3b8; font-weight: 700;">${sqftVal.toLocaleString()} SQFT</div>
+                </td>
+                <td style="padding: 0.7rem 1rem;">
+                    <div style="font-size: 0.5rem; color: #0d9488; font-weight: 900; text-transform: uppercase; margin-bottom: 3px;">Offer Rate</div>
+                    <input type="number" step="0.01" value="${gridRateInput ? gridRateInput.value : ''}"
                            oninput="syncRateFromBucket('${siteId}', this.value)"
                            placeholder="₹"
-                           style="width: 100px; height: 32px; font-size: 0.85rem; font-weight: 800; border-radius: 6px; border: 1px solid #e2e8f0; padding: 0 0.4rem; color: #0d9488; text-align: right;">
+                           style="width: 100px; height: 30px; font-size: 0.85rem; font-weight: 800; border-radius: 6px; border: 1.5px solid #e2e8f0; padding: 0 0.4rem; color: #0d9488; text-align: right; background: #f8fafc;">
                 </td>
-                <td style="padding: 0.8rem 1rem; text-align: right; font-weight: 900; color: #0d9488; font-size: 0.95rem; border-radius: 0 8px 8px 0;">
+                <td style="padding: 0.7rem 1rem; text-align: right; font-weight: 900; color: #0d9488; font-size: 0.95rem;">
                     ₹${totalCost.toLocaleString(undefined, {minimumFractionDigits: 2, maximumFractionDigits: 2})}
                 </td>
             </tr>
         `;
     });
-    
+
     html += `</tbody></table>`;
     if (bucketList) bucketList.innerHTML = html;
 }
 
 document.addEventListener('DOMContentLoaded', () => {
-    // Initial Setup
     resetFilters();
-    
+
     if (isEditMode && initialRateData) {
         document.getElementById('f_vendor').value = initialRateData.vendor_id;
         filterSitesByVendor();
@@ -757,6 +923,124 @@ document.addEventListener('DOMContentLoaded', () => {
     }
     calculateTotal();
     updateBucketUI();
+});
+</script>
+
+<!-- Lightbox HTML -->
+<div id="po-lightbox" onclick="closeLightbox()" style="position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.95); z-index: 9999; display: none; align-items: center; justify-content: center; backdrop-filter: blur(10px);">
+    <div style="position: relative; max-width: 90%; max-height: 90%; display: flex; align-items: center; justify-content: center;" onclick="event.stopPropagation()">
+
+        <button class="lb-nav" id="lb-prev" onclick="prevSlide(event)" style="position: absolute; left: -75px; background: rgba(255,255,255,0.1); color: white; border: 1px solid rgba(255,255,255,0.2); width: 48px; height: 48px; border-radius: 50%; display: none; align-items: center; justify-content: center; cursor: pointer; font-size: 1.4rem; transition: all 0.3s;">
+            <i class="fas fa-chevron-left"></i>
+        </button>
+
+        <div style="position: relative;">
+            <img id="lb-img" src="" style="max-width: 100%; max-height: 85vh; border-radius: 16px; box-shadow: 0 30px 60px rgba(0,0,0,0.8); border: 2px solid rgba(255,255,255,0.15); display: block;">
+
+            <!-- Use as Primary Button -->
+            <button id="lb-primary-btn" onclick="setPrimaryImagePO(event)" style="position: absolute; top: 16px; left: 16px; background: #0d9488; color: white; border: none; padding: 0.5rem 1rem; border-radius: 10px; font-weight: 800; font-size: 0.8rem; cursor: pointer; display: flex; align-items: center; gap: 0.5rem; box-shadow: 0 8px 20px rgba(13,148,136,0.35); transition: all 0.2s;">
+                <i class="fas fa-check-circle"></i> Use as Primary Photo
+            </button>
+
+            <!-- Image counter -->
+            <div id="lb-badge" style="position: absolute; bottom: 16px; left: 50%; transform: translateX(-50%); background: rgba(0,0,0,0.7); color: white; padding: 5px 14px; border-radius: 50px; font-weight: 800; font-size: 0.8rem; backdrop-filter: blur(5px); border: 1px solid rgba(255,255,255,0.2); display: none;"></div>
+        </div>
+
+        <button class="lb-nav" id="lb-next" onclick="nextSlide(event)" style="position: absolute; right: -75px; background: rgba(255,255,255,0.1); color: white; border: 1px solid rgba(255,255,255,0.2); width: 48px; height: 48px; border-radius: 50%; display: none; align-items: center; justify-content: center; cursor: pointer; font-size: 1.4rem; transition: all 0.3s;">
+            <i class="fas fa-chevron-right"></i>
+        </button>
+
+        <div onclick="closeLightbox()" style="position: absolute; top: -55px; right: -55px; color: white; font-size: 2.5rem; cursor: pointer; opacity: 0.6; transition: opacity 0.2s;" onmouseover="this.style.opacity=1" onmouseout="this.style.opacity=0.6">&times;</div>
+    </div>
+</div>
+
+<script>
+let lbImages = [];
+let lbIndex = 0;
+let lbSiteId = null;
+
+function openLightboxSlider(imageString, siteId) {
+    if (!imageString) return;
+    lbSiteId = siteId;
+    lbImages = imageString.split(',').filter(i => i.trim() !== '');
+    lbIndex = 0;
+    renderLbImage();
+    document.getElementById('po-lightbox').style.display = 'flex';
+    document.body.style.overflow = 'hidden';
+    const showNav = lbImages.length > 1;
+    document.getElementById('lb-prev').style.display = showNav ? 'flex' : 'none';
+    document.getElementById('lb-next').style.display = showNav ? 'flex' : 'none';
+}
+
+function renderLbImage() {
+    const img = document.getElementById('lb-img');
+    const badge = document.getElementById('lb-badge');
+    const primaryBtn = document.getElementById('lb-primary-btn');
+    if (!img) return;
+    img.src = baseUrl + 'uploads/sites/' + lbImages[lbIndex];
+    badge.style.display = lbImages.length > 1 ? 'block' : 'none';
+    badge.innerText = (lbIndex + 1) + ' / ' + lbImages.length;
+
+    // Check if current image is already primary for this site
+    const row = document.querySelector(`tr.site-row[data-id="${lbSiteId}"]`);
+    const currentThumb = row ? row.dataset.thumbnail : '';
+    if (currentThumb && currentThumb === lbImages[lbIndex]) {
+        primaryBtn.innerHTML = '<i class="fas fa-check-double"></i> Selected as Primary';
+        primaryBtn.style.background = '#059669';
+    } else {
+        primaryBtn.innerHTML = '<i class="fas fa-check-circle"></i> Use as Primary Photo';
+        primaryBtn.style.background = '#0d9488';
+    }
+}
+
+function nextSlide(e) {
+    if (e) e.stopPropagation();
+    lbIndex = (lbIndex + 1) % lbImages.length;
+    renderLbImage();
+}
+
+function prevSlide(e) {
+    if (e) e.stopPropagation();
+    lbIndex = (lbIndex - 1 + lbImages.length) % lbImages.length;
+    renderLbImage();
+}
+
+function closeLightbox() {
+    document.getElementById('po-lightbox').style.display = 'none';
+    document.body.style.overflow = '';
+}
+
+function setPrimaryImagePO(e) {
+    if (e) e.stopPropagation();
+    const newThumb = lbImages[lbIndex];
+    if (!lbSiteId || !newThumb) return;
+
+    // Update data-thumbnail on the main table row
+    const row = document.querySelector(`tr.site-row[data-id="${lbSiteId}"]`);
+    if (row) {
+        row.dataset.thumbnail = newThumb;
+        // Update the visible thumbnail in the main table
+        const img = row.querySelector('td:nth-child(3) img');
+        if (img) img.src = baseUrl + 'uploads/sites/' + newThumb;
+    }
+
+    // Re-render bucket so it picks up the new thumbnail
+    updateBucketUI();
+
+    const btn = document.getElementById('lb-primary-btn');
+    btn.innerHTML = '<i class="fas fa-check-double"></i> Selected as Primary';
+    btn.style.background = '#059669';
+
+    Swal.fire({ icon: 'success', title: 'Primary Image Set', timer: 1200, showConfirmButton: false, toast: true, position: 'top-end' });
+}
+
+document.addEventListener('keydown', function(e) {
+    const lb = document.getElementById('po-lightbox');
+    if (lb && lb.style.display === 'flex') {
+        if (e.key === 'ArrowRight') nextSlide();
+        if (e.key === 'ArrowLeft') prevSlide();
+        if (e.key === 'Escape') closeLightbox();
+    }
 });
 </script>
 

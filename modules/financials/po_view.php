@@ -12,7 +12,7 @@ $po = $pdo->prepare("
     SELECT po.*, v.name as vendor_name, v.address as v_address, v.gstin as v_gstin, v.phone as v_phone,
            COALESCE(c.display_name, po.campaign_name) as camp_name, 
            COALESCE(c.project_id, 'Direct') as proj_id,
-           e.name as entity_name, e.logo as entity_logo, e.address as entity_address, e.gstin as entity_gstin, e.pan as entity_pan
+           e.name as entity_name, e.logo as entity_logo, e.address as entity_address, e.gstin as entity_gstin, e.pan as entity_pan, e.letterhead as entity_letterhead, e.signature as entity_signature
     FROM purchase_orders po
     JOIN partners v ON po.vendor_id = v.id
     LEFT JOIN campaigns c ON po.campaign_id = c.id
@@ -57,7 +57,7 @@ $poAttachments = $attachments->fetchAll();
         <!-- Header / Letterhead -->
         <?php 
         $has_entity = !empty($poData['entity_id']);
-        $header_logo = $has_entity && $poData['entity_logo'] ? $poData['entity_logo'] : getSetting('company_letterhead');
+        $header_logo = $has_entity && !empty($poData['entity_letterhead']) ? $poData['entity_letterhead'] : ($has_entity && !empty($poData['entity_logo']) ? $poData['entity_logo'] : getSetting('company_letterhead'));
         $header_name = $has_entity ? $poData['entity_name'] : getSetting('company_name');
         $header_addr = $has_entity ? $poData['entity_address'] : getSetting('company_address');
         

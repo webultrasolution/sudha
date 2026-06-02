@@ -16,7 +16,7 @@ $mode = $_GET['mode'] ?? '';
 if ($po_id) {
     $stmtB = $pdo->prepare("
         SELECT po.*, c.name as client_name, po.campaign_name as campaign_name, po.po_number as proposal_number, po.campaign_id,
-               e.name as entity_name, e.logo as entity_logo, e.address as entity_address, e.gstin as entity_gstin, e.pan as entity_pan
+               e.name as entity_name, e.logo as entity_logo, e.address as entity_address, e.gstin as entity_gstin, e.pan as entity_pan, e.letterhead as entity_letterhead, e.signature as entity_signature
         FROM purchase_orders po
         LEFT JOIN partners c ON po.customer_id = c.id
         LEFT JOIN entities e ON po.entity_id = e.id
@@ -215,9 +215,10 @@ $approval_badge = ($b['approval_status'] ?? '') === 'approved' ? '' : '<div styl
 
 // Setup Company / Entity Details
 $has_entity = !empty($b['entity_id']);
-$header_logo = $has_entity && !empty($b['entity_logo']) ? $b['entity_logo'] : getSetting('company_letterhead');
+$header_logo = $has_entity && !empty($b['entity_letterhead']) ? $b['entity_letterhead'] : ($has_entity && !empty($b['entity_logo']) ? $b['entity_logo'] : getSetting('company_letterhead'));
 $header_name = $has_entity ? $b['entity_name'] : getSetting('company_name', 'Sudha Creative & Advertising');
 $header_addr = $has_entity ? $b['entity_address'] : getSetting('company_address');
+$po_signature = $has_entity && !empty($b['entity_signature']) ? $b['entity_signature'] : getSetting('company_signature', 'signature.png');
 
 // Dynamic Category of Service Calculation
 $serviceCategory = 'Display on Billboards / Billboards';
@@ -821,13 +822,13 @@ function getStateName($gstin)
         <div style="border-top: 1px solid #000; display: flex; min-height: 125px; font-size: 10px;">
             <div
                 style="flex: 1; border-right: 1px solid #000; padding: 8px 10px; display: flex; flex-direction: column; justify-content: space-between; align-items: flex-start;">
-                <div style="font-weight: bold; text-transform: uppercase;">For
-                    <?php echo htmlspecialchars($company_name); ?></div>
-                <div style="position: relative; height: 70px; width: 100%; display: flex; align-items: center;">
-                    <img src="<?php echo BASE_URL; ?>assets/images/<?php echo $company_signature; ?>"
-                        style="height: 65px; display: block; margin-left: 10px;" onerror="this.style.display='none'">
+                <div>For <strong><?php echo $header_name; ?></strong></div>
+                <div style="margin-top: 30px;">
+                    <img src="<?php echo BASE_URL; ?>assets/images/<?php echo $po_signature; ?>"
+                        style="height: 40px; display: block; margin: 0 auto;" onerror="this.style.display='none'">
+                    <div style="border-top: 1px solid #000; width: 150px; margin: 5px auto 0;"></div>
+                    <div style="font-weight: bold; margin-top: 2px;">Authorised Signatory</div>
                 </div>
-                <div style="font-weight: bold;">Authorised Signatory</div>
             </div>
             <div
                 style="flex: 1; padding: 8px 10px; display: flex; flex-direction: column; justify-content: space-between; align-items: flex-start;">

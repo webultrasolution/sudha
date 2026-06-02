@@ -11,13 +11,23 @@ ini_set('error_log', __DIR__ . '/../php_error.log');
 
 // Database Configuration
 define('DB_HOST', 'localhost');
-define('DB_NAME', 'u511039083_sudha');
-define('DB_USER', 'u511039083_sudha');
-define('DB_PASS', 'dVq&1KmeM?0');
+
+if (in_array($_SERVER['HTTP_HOST'] ?? '', ['localhost', '127.0.0.1']) || php_sapi_name() === 'cli') {
+    // Local Configuration
+    define('DB_NAME', 'easy_outdoor_crm');
+    define('DB_USER', 'root');
+    define('DB_PASS', '');
+    define('BASE_URL', 'http://localhost/test5/');
+} else {
+    // Live Configuration
+    define('DB_NAME', 'u511039083_sudha');
+    define('DB_USER', 'u511039083_sudha');
+    define('DB_PASS', 'dVq&1KmeM?0');
+    define('BASE_URL', 'https://sudha.webultrasolution.io/');
+}
 
 // App Constants
 define('APP_NAME', 'Sudha Creative CRM');
-define('BASE_URL', 'https://sudha.webultrasolution.io/');
 define('GST_RATE', 18); // Default GST percentage
 
 // Company Details

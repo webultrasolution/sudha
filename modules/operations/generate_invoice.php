@@ -73,6 +73,20 @@ $company_email = getSetting('company_email', 'sudhacreativemalda@gmail.com');
 $company_letterhead = getSetting('company_letterhead');
 $company_signature = getSetting('company_signature', 'signature.png');
 
+if (!empty($invoiceData['entity_id'])) {
+    $stmtEntity = $pdo->prepare("SELECT * FROM entities WHERE id = ?");
+    $stmtEntity->execute([$invoiceData['entity_id']]);
+    $entity = $stmtEntity->fetch();
+    if ($entity) {
+        $company_name = $entity['name'];
+        if (!empty($entity['gstin'])) $company_gstin = $entity['gstin'];
+        if (!empty($entity['pan'])) $company_pan = $entity['pan'];
+        if (!empty($entity['address'])) $company_address = $entity['address'];
+        if (!empty($entity['letterhead'])) $company_letterhead = $entity['letterhead'];
+        if (!empty($entity['signature'])) $company_signature = $entity['signature'];
+    }
+}
+
 // Tax Calculation Logic
 $subtotal = $b['total_amount'];
 $isInterState = (strtolower(trim($b['client_state'])) !== 'west bengal');
