@@ -622,15 +622,44 @@ $stmtCheckPO = $pdo->prepare("SELECT id, approval_status FROM purchase_orders WH
 
     .p-input {
         width: 100%;
-        padding: 0.6rem;
-        border: 1px solid #e2e8f0;
+        padding: 0.5rem 0.6rem;
+        border: 1.5px solid #e2e8f0;
         border-radius: 8px;
         font-weight: 600;
-        font-size: 0.85rem;
+        font-size: 0.82rem;
+        color: #1e293b !important;
+        background-color: #ffffff !important;
+        font-family: inherit;
+        -webkit-text-fill-color: #1e293b !important;
+        opacity: 1 !important;
+        -webkit-appearance: auto;
+        appearance: auto;
+        transition: border-color 0.15s;
+    }
+    .p-input:focus {
+        outline: none;
+        border-color: #0d9488;
+        box-shadow: 0 0 0 2px rgba(13,148,136,0.1);
+    }
+    select.p-input,
+    select.p-input option,
+    select.p-input option:first-child {
+        color: #1e293b !important;
+        background: #ffffff !important;
+        -webkit-text-fill-color: #1e293b !important;
     }
 
     .search-group {
         margin-bottom: 0;
+    }
+
+    #modal-site-body tr {
+        cursor: pointer;
+        transition: background 0.15s, border-left 0.15s;
+        border-left: 3px solid transparent;
+    }
+    #modal-site-body tr:hover {
+        background: #f8fafc !important;
     }
 
     .crs-table th {
@@ -703,14 +732,14 @@ $stmtCheckPO = $pdo->prepare("SELECT id, approval_status FROM purchase_orders WH
                     style="font-size: 0.55rem; font-weight: 900; color: #94a3b8; margin-bottom: 0.2rem; text-transform: uppercase;">Search
                     Site / Code / Area</label>
                 <input type="text" id="modal-search" class="p-input" placeholder="Search..."
-                    oninput="modalFetchSites(1)" style="height: 30px; font-size: 0.75rem;">
+                    oninput="modalFetchSites(1)" style="height: 32px; font-size: 0.78rem; color: #1e293b !important; background: #fff; -webkit-text-fill-color: #1e293b;">
             </div>
             <div class="search-group">
                 <label
                     style="font-size: 0.55rem; font-weight: 900; color: #94a3b8; margin-bottom: 0.2rem; text-transform: uppercase;">Media</label>
                 <select id="modal-media" class="p-input" onchange="modalFetchSites(1)"
-                    style="height: 30px; font-size: 0.75rem;">
-                    <option value="">All</option>
+                    style="height: 32px; font-size: 0.78rem; color: #1e293b !important; background: #fff; -webkit-text-fill-color: #1e293b;">
+                    <option value="" style="color:#1e293b;">All</option>
                     <?php foreach ($mediaTypes as $mt): ?>
                         <option value="<?php echo $mt; ?>"><?php echo $mt; ?></option> <?php endforeach; ?>
                 </select>
@@ -719,8 +748,8 @@ $stmtCheckPO = $pdo->prepare("SELECT id, approval_status FROM purchase_orders WH
                 <label
                     style="font-size: 0.55rem; font-weight: 900; color: #94a3b8; margin-bottom: 0.2rem; text-transform: uppercase;">State</label>
                 <select id="modal-state" class="p-input" onchange="modalFetchSites(1)"
-                    style="height: 30px; font-size: 0.75rem;">
-                    <option value="">All</option>
+                    style="height: 32px; font-size: 0.78rem; color: #1e293b !important; background: #fff; -webkit-text-fill-color: #1e293b;">
+                    <option value="" style="color:#1e293b;">All</option>
                     <?php foreach ($states as $s): ?>
                         <option value="<?php echo $s; ?>"><?php echo $s; ?></option> <?php endforeach; ?>
                 </select>
@@ -729,8 +758,8 @@ $stmtCheckPO = $pdo->prepare("SELECT id, approval_status FROM purchase_orders WH
                 <label
                     style="font-size: 0.55rem; font-weight: 900; color: #94a3b8; margin-bottom: 0.2rem; text-transform: uppercase;">City</label>
                 <select id="modal-city" class="p-input" onchange="modalFetchSites(1)"
-                    style="height: 30px; font-size: 0.75rem;">
-                    <option value="">All</option>
+                    style="height: 32px; font-size: 0.78rem; color: #1e293b !important; background: #fff; -webkit-text-fill-color: #1e293b;">
+                    <option value="" style="color:#1e293b;">All</option>
                     <?php foreach ($cities as $c): ?>
                         <option value="<?php echo $c; ?>"><?php echo $c; ?></option> <?php endforeach; ?>
                 </select>
@@ -739,8 +768,8 @@ $stmtCheckPO = $pdo->prepare("SELECT id, approval_status FROM purchase_orders WH
                 <label
                     style="font-size: 0.55rem; font-weight: 900; color: #94a3b8; margin-bottom: 0.2rem; text-transform: uppercase;">Location</label>
                 <select id="modal-location" class="p-input" onchange="modalFetchSites(1)"
-                    style="height: 30px; font-size: 0.75rem;">
-                    <option value="">All</option>
+                    style="height: 32px; font-size: 0.78rem; color: #1e293b !important; background: #fff; -webkit-text-fill-color: #1e293b;">
+                    <option value="" style="color:#1e293b;">All</option>
                     <?php foreach ($locations as $loc): ?>
                         <option value="<?php echo htmlspecialchars($loc); ?>"><?php echo htmlspecialchars($loc); ?></option>
                     <?php endforeach; ?>
@@ -750,8 +779,8 @@ $stmtCheckPO = $pdo->prepare("SELECT id, approval_status FROM purchase_orders WH
                 <label
                     style="font-size: 0.55rem; font-weight: 900; color: #94a3b8; margin-bottom: 0.2rem; text-transform: uppercase;">Light</label>
                 <select id="modal-light" class="p-input" onchange="modalFetchSites(1)"
-                    style="height: 30px; font-size: 0.75rem;">
-                    <option value="">All</option>
+                    style="height: 32px; font-size: 0.78rem; color: #1e293b !important; background: #fff; -webkit-text-fill-color: #1e293b;">
+                    <option value="" style="color:#1e293b;">All</option>
                     <?php foreach ($illuminations as $il): ?>
                         <option value="<?php echo $il; ?>"><?php echo $il; ?></option> <?php endforeach; ?>
                 </select>
@@ -760,8 +789,8 @@ $stmtCheckPO = $pdo->prepare("SELECT id, approval_status FROM purchase_orders WH
                 <label
                     style="font-size: 0.55rem; font-weight: 900; color: #94a3b8; margin-bottom: 0.2rem; text-transform: uppercase;">Vendor</label>
                 <select id="modal-vendor" class="p-input" onchange="modalFetchSites(1)"
-                    style="height: 30px; font-size: 0.75rem;">
-                    <option value="">All</option>
+                    style="height: 32px; font-size: 0.78rem; color: #1e293b !important; background: #fff; -webkit-text-fill-color: #1e293b;">
+                    <option value="" style="color:#1e293b;">All</option>
                     <?php foreach ($vendors as $v): ?>
                         <option value="<?php echo $v['id']; ?>"><?php echo $v['name']; ?></option> <?php endforeach; ?>
                 </select>
@@ -1335,16 +1364,24 @@ $stmtCheckPO = $pdo->prepare("SELECT id, approval_status FROM purchase_orders WH
 
         if (!siteObj) return;
 
+        const row = document.getElementById('modal-row-' + siteId) || cb.closest('tr');
+
         if (cb.checked) {
             if (!modalSelectedSites.find(s => s.id == siteId)) {
                 const sCopy = { ...siteObj, image: siteObj.thumbnail || '' };
                 modalSelectedSites.push(sCopy);
             }
+            if (row) {
+                row.style.background = '#f0fdfa';
+                row.style.borderLeft = '3px solid #0d9488';
+            }
         } else {
             modalSelectedSites = modalSelectedSites.filter(s => s.id != siteId);
             if (showingBucketOnly) {
-                const row = cb.closest('tr');
                 if (row) row.remove();
+            } else if (row) {
+                row.style.background = 'white';
+                row.style.borderLeft = '3px solid transparent';
             }
         }
         updateModalSelectedCount();
@@ -1385,7 +1422,10 @@ $stmtCheckPO = $pdo->prepare("SELECT id, approval_status FROM purchase_orders WH
             }
 
             const row = document.createElement('tr');
-            row.style.background = 'white';
+            row.id = 'modal-row-' + s.id;
+            row.style.background = isChecked ? '#f0fdfa' : 'white';
+            row.style.transition = 'background 0.15s';
+            row.style.borderLeft = isChecked ? '3px solid #0d9488' : '3px solid transparent';
             row.innerHTML = `
             <td style="text-align:center; padding:1rem;">
                 <input type="checkbox" class="modal-site-checkbox" value="${s.id}" ${isChecked ? 'checked' : ''} onclick="toggleModalSite(this, ${s.id})" style="width:16px; height:16px; accent-color:var(--primary);">

@@ -1,6 +1,7 @@
 <?php
 include_once __DIR__ . '/../config/db.php';
 include_once __DIR__ . '/../includes/functions.php';
+include_once __DIR__ . '/../includes/trash_helper.php';
 if (session_status() === PHP_SESSION_NONE) session_start();
 
 header('Content-Type: application/json');
@@ -30,7 +31,12 @@ try {
     
     $proposalId = $item['proposal_id'];
 
-    $pdo->prepare("DELETE FROM proposal_items WHERE id = ?")->execute([$id]);
+    // Move proposal item to trash instead of permanent delete
+    $trashId = move_row_to_trash($pdo, 'proposal_items', 'id', $id, $_SESSION['user_id'] ?? null, 'Deleted via UI');
+    if (!$trashId) {
+        echo json_encode(['success' => false, 'message' => 'Failed to move item to trash']);
+        exit;
+    }
 
     // Recalculate proposal totals
     $stmtSums = $pdo->prepare("SELECT SUM(amount) as subtotal FROM proposal_items WHERE proposal_id = ?");

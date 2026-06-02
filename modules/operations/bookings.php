@@ -7,13 +7,21 @@ requirePermission('bookings', 'view');
 
 // Handle Delete
 if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action']) && $_POST['action'] === 'delete') {
+    include_once __DIR__ . '/../../includes/trash_helper.php';
     requirePermission('bookings', 'delete');
     header('Content-Type: application/json');
     $id = intval($_POST['id']);
     try {
         $pdo->beginTransaction();
-        $pdo->prepare("DELETE FROM operations WHERE booking_id = ?")->execute([$id]);
-        $pdo->prepare("DELETE FROM bookings WHERE id = ?")->execute([$id]);
+        $opStmt = $pdo->prepare("SELECT id FROM operations WHERE booking_id = ?");
+        $opStmt->execute([$id]);
+        while ($op = $opStmt->fetch(PDO::FETCH_ASSOC)) {
+            move_row_to_trash($pdo, 'operations', 'id', $op['id'], $_SESSION['user_id'] ?? null, 'Booking deleted - operation moved to trash');
+        }
+        $trashId = move_row_to_trash($pdo, 'bookings', 'id', $id, $_SESSION['user_id'] ?? null, 'Booking deleted via UI');
+        if (!$trashId) {
+            throw new Exception('Failed to move booking to trash');
+        }
         $pdo->commit();
         echo json_encode(['success' => true]);
     } catch (Exception $e) {

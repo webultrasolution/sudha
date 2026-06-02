@@ -105,3 +105,12 @@ Stack trace:
 #0 D:\xampp\htdocs\easy-outdoor-crm\modules\financials\partner_ledger.php(39): PDO->prepare('\r\n          SEL...')
 #1 {main}
   thrown in D:\xampp\htdocs\easy-outdoor-crm\modules\financials\partner_ledger.php on line 39
+[02-Jun-2026 19:46:30 Europe/Berlin] PHP Warning:  Undefined variable $tables in D:\xampp\htdocs\easy-outdoor-crm\modules\admin\trash.php on line 32
+[02-Jun-2026 19:46:30 Europe/Berlin] PHP Warning:  foreach() argument must be of type array|object, null given in D:\xampp\htdocs\easy-outdoor-crm\modules\admin\trash.php on line 32
+[02-Jun-2026 19:46:32 Europe/Berlin] PHP Warning:  Undefined variable $tables in D:\xampp\htdocs\easy-outdoor-crm\modules\admin\trash.php on line 32
+[02-Jun-2026 19:46:32 Europe/Berlin] PHP Warning:  foreach() argument must be of type array|object, null given in D:\xampp\htdocs\easy-outdoor-crm\modules\admin\trash.php on line 32
+[02-Jun-2026 19:50:09 Europe/Berlin] PHP Fatal error:  Uncaught PDOException: There is no active transaction in D:\xampp\htdocs\easy-outdoor-crm\modules\financials\invoices.php:38
+Stack trace:
+#0 D:\xampp\htdocs\easy-outdoor-crm\modules\financials\invoices.php(38): PDO->rollBack()
+#1 {main}
+  thrown in D:\xampp\htdocs\easy-outdoor-crm\modules\financials\invoices.php on line 38

@@ -1,6 +1,7 @@
 <?php
 include_once __DIR__ . '/../config/db.php';
 include_once __DIR__ . '/../includes/functions.php';
+include_once __DIR__ . '/../includes/trash_helper.php';
 if (session_status() === PHP_SESSION_NONE) session_start();
 
 header('Content-Type: application/json');
@@ -32,11 +33,17 @@ try {
     $bookingId = $item['booking_id'];
     $siteId = $item['site_id'];
 
-    // 1. Delete the item
-    $pdo->prepare("DELETE FROM booking_items WHERE id = ?")->execute([$id]);
+    // 1. Move the booking item to trash
+    $trashItemId = move_row_to_trash($pdo, 'booking_items', 'id', $id, $_SESSION['user_id'] ?? null, 'Deleted booking item');
+    if (!$trashItemId) throw new Exception('Failed to move booking item to trash');
 
-    // 2. Delete the corresponding operation task
-    $pdo->prepare("DELETE FROM operations WHERE booking_id = ? AND site_id = ?")->execute([$bookingId, $siteId]);
+    // 2. Move the corresponding operation task to trash (if exists)
+    $stmtOp = $pdo->prepare("SELECT id FROM operations WHERE booking_id = ? AND site_id = ? LIMIT 1");
+    $stmtOp->execute([$bookingId, $siteId]);
+    $op = $stmtOp->fetch(PDO::FETCH_ASSOC);
+    if ($op) {
+        move_row_to_trash($pdo, 'operations', 'id', $op['id'], $_SESSION['user_id'] ?? null, 'Deleted alongside booking item');
+    }
 
     // 3. Recalculate Booking Totals
     $stmtSums = $pdo->prepare("SELECT SUM(amount) as subtotal FROM booking_items WHERE booking_id = ?");

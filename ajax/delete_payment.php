@@ -1,6 +1,7 @@
 <?php
 include_once __DIR__ . '/../config/db.php';
 include_once __DIR__ . '/../includes/functions.php';
+include_once __DIR__ . '/../includes/trash_helper.php';
 
 header('Content-Type: application/json');
 
@@ -22,8 +23,11 @@ if (!$id) {
 }
 
 try {
-    $pdo->prepare("DELETE FROM payments WHERE id = ?")->execute([$id]);
+    $trashId = move_row_to_trash($pdo, 'payments', 'id', $id, $_SESSION['user_id'] ?? null, 'Payment deleted via UI');
+    if (!$trashId) {
+        throw new Exception('Failed to move payment to trash');
+    }
     echo json_encode(['success' => true]);
-} catch (PDOException $e) {
+} catch (Exception $e) {
     echo json_encode(['success' => false, 'message' => 'Database error: ' . $e->getMessage()]);
 }

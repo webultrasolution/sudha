@@ -7,13 +7,21 @@ requirePermission('proposals', 'view');
 
 // Handle Delete
 if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action']) && $_POST['action'] === 'delete') {
+    include_once __DIR__ . '/../../includes/trash_helper.php';
     requirePermission('proposals', 'delete');
     header('Content-Type: application/json');
     $id = intval($_POST['id']);
     try {
         $pdo->beginTransaction();
-        $pdo->prepare("DELETE FROM proposal_items WHERE proposal_id = ?")->execute([$id]);
-        $pdo->prepare("DELETE FROM proposals WHERE id = ?")->execute([$id]);
+        $itemStmt = $pdo->prepare("SELECT id FROM proposal_items WHERE proposal_id = ?");
+        $itemStmt->execute([$id]);
+        while ($item = $itemStmt->fetch(PDO::FETCH_ASSOC)) {
+            move_row_to_trash($pdo, 'proposal_items', 'id', $item['id'], $_SESSION['user_id'] ?? null, 'Proposal deleted - item moved to trash');
+        }
+        $trashId = move_row_to_trash($pdo, 'proposals', 'id', $id, $_SESSION['user_id'] ?? null, 'Proposal deleted via UI');
+        if (!$trashId) {
+            throw new Exception('Failed to move proposal to trash');
+        }
         $pdo->commit();
         echo json_encode(['success' => true]);
     } catch (Exception $e) {

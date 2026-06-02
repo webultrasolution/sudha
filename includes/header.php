@@ -99,11 +99,14 @@ $activeEntity = getActiveEntity();
             
             <!-- Tools & Insights Submenu -->
             <li class="nav-item has-submenu">
-                <a href="#" class="nav-link submenu-toggle <?php echo in_array($activePage, ['reports', 'resources', 'photofactory', 'entities', 'settings', 'approvals']) ? 'active submenu-open' : ''; ?>">
+                <a href="#" class="nav-link submenu-toggle <?php echo in_array($activePage, ['reports', 'resources', 'photofactory', 'entities', 'settings', 'approvals', 'trash']) ? 'active submenu-open' : ''; ?>">
                     <i class="fas fa-chart-line"></i> <span>Tools & Insights</span> <i class="fas fa-chevron-down toggle-icon" style="margin-left: auto; font-size: 0.8rem;"></i>
                 </a>
-                <ul class="submenu" style="<?php echo in_array($activePage, ['reports', 'resources', 'photofactory', 'entities', 'settings', 'approvals']) ? 'display: block;' : 'display: none;'; ?>">
+                <ul class="submenu" style="<?php echo in_array($activePage, ['reports', 'resources', 'photofactory', 'entities', 'settings', 'approvals', 'trash']) ? 'display: block;' : 'display: none;'; ?>">
                     <li><a href="<?php echo BASE_URL; ?>modules/reports/reports.php" class="<?php echo $activePage == 'reports' ? 'active-sub' : ''; ?>"><i class="fas fa-chart-pie"></i> Reports</a></li>
+                    <?php if (canView('inventory')): ?>
+                        <li><a href="<?php echo BASE_URL; ?>modules/admin/trash.php" class="<?php echo $activePage == 'trash' ? 'active-sub' : ''; ?>"><i class="fas fa-trash-alt"></i> Trash</a></li>
+                    <?php endif; ?>
                     <?php if (hasRole('admin')): ?>
                         <?php
                         // Fetch pending approval count for badge

@@ -90,12 +90,22 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action'])) {
         }
     } else if ($_POST['action'] === 'delete_site') {
         requirePermission('inventory', 'delete');
+        include_once __DIR__ . '/../../includes/trash_helper.php';
         $id = intval($_POST['id']);
         try {
-            // Also delete images from folder if needed, for now just DB cleanup
-            $pdo->prepare("DELETE FROM site_images WHERE site_id = ?")->execute([$id]);
-            $pdo->prepare("DELETE FROM sites WHERE id = ?")->execute([$id]);
-            echo json_encode(['success' => true]);
+            // Move site_images to trash first
+            $stmtImgs = $pdo->prepare("SELECT id FROM site_images WHERE site_id = ?");
+            $stmtImgs->execute([$id]);
+            $imgs = $stmtImgs->fetchAll(PDO::FETCH_ASSOC);
+            foreach ($imgs as $img) {
+                move_row_to_trash($pdo, 'site_images', 'id', $img['id'], $_SESSION['user_id'] ?? null, 'Site deleted - image moved to trash');
+            }
+
+            // Then move site row to trash
+            $trashId = move_row_to_trash($pdo, 'sites', 'id', $id, $_SESSION['user_id'] ?? null, 'Site deleted via inventory UI');
+            if (!$trashId) throw new Exception('Failed to move site to trash');
+
+            echo json_encode(['success' => true, 'trash_id' => $trashId]);
             exit;
         } catch (PDOException $e) {
             echo json_encode(['success' => false, 'message' => $e->getMessage()]);
@@ -215,6 +225,11 @@ $vendors = $pdo->query("SELECT id, name FROM partners WHERE type = 'vendor' ORDE
             <?php if (hasRole('admin')): ?>
             <a href="../admin/media_types.php" class="btn btn-secondary" style="background: #f8fafc; color: #475569; border: 1px solid #cbd5e1; text-decoration: none;">
                 <i class="fas fa-list-alt"></i> Manage Media Types
+            </a>
+            <?php endif; ?>
+            <?php if (hasRole('admin')): ?>
+            <a href="../admin/trash.php" class="btn btn-warning" style="background: #fffbeb; color: #92400e; border: 1px solid #fde68a; text-decoration: none;">
+                <i class="fas fa-trash-alt"></i> Trash
             </a>
             <?php endif; ?>
             <button class="btn btn-secondary" onclick="openImportModal()"

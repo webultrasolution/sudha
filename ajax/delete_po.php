@@ -1,6 +1,7 @@
 <?php
 include_once __DIR__ . '/../config/db.php';
 include_once __DIR__ . '/../includes/functions.php';
+include_once __DIR__ . '/../includes/trash_helper.php';
 
 header('Content-Type: application/json');
 
@@ -17,13 +18,19 @@ if (!$id) {
 }
 
 try {
-    // Delete PO (Cascade delete for PO items if database set up, otherwise manual)
-    // Checking if purchase_order_items exists
     $pdo->beginTransaction();
-    $pdo->prepare("DELETE FROM purchase_orders WHERE id = ?")->execute([$id]);
+    $itemStmt = $pdo->prepare("SELECT id FROM po_items WHERE po_id = ?");
+    $itemStmt->execute([$id]);
+    while ($item = $itemStmt->fetch(PDO::FETCH_ASSOC)) {
+        move_row_to_trash($pdo, 'po_items', 'id', $item['id'], $_SESSION['user_id'] ?? null, 'PO deleted - item moved to trash');
+    }
+    $trashId = move_row_to_trash($pdo, 'purchase_orders', 'id', $id, $_SESSION['user_id'] ?? null, 'Purchase order deleted via UI');
+    if (!$trashId) {
+        throw new Exception('Failed to move purchase order to trash');
+    }
     $pdo->commit();
     echo json_encode(['success' => true]);
-} catch (PDOException $e) {
+} catch (Exception $e) {
     if ($pdo->inTransaction()) $pdo->rollBack();
     echo json_encode(['success' => false, 'message' => 'Database error: ' . $e->getMessage()]);
 }

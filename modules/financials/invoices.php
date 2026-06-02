@@ -2,6 +2,7 @@
 if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action']) && $_POST['action'] === 'delete') {
     include_once __DIR__ . '/../../config/db.php';
     include_once __DIR__ . '/../../includes/functions.php';
+    include_once __DIR__ . '/../../includes/trash_helper.php';
     checkAuth();
     requirePermission('financials', 'delete');
     header('Content-Type: application/json');
@@ -17,12 +18,16 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action']) && $_POST['
         if ($invoiceData) {
             $bookingId = $invoiceData['booking_id'];
             $invoiceNumber = $invoiceData['invoice_number'];
+
+            // Move invoice items to trash first so they can be restored with the invoice
+            $itemStmt = $pdo->prepare("SELECT id FROM invoice_items WHERE invoice_id = ?");
+            $itemStmt->execute([$id]);
+            while ($item = $itemStmt->fetch(PDO::FETCH_ASSOC)) {
+                move_row_to_trash($pdo, 'invoice_items', 'id', $item['id'], $_SESSION['user_id'] ?? null, 'Invoice deleted - item moved to trash');
+            }
             
-            // Delete invoice items
-            $pdo->prepare("DELETE FROM invoice_items WHERE invoice_id = ?")->execute([$id]);
-            
-            // Delete the invoice itself
-            $pdo->prepare("DELETE FROM invoices WHERE id = ?")->execute([$id]);
+            // Move the invoice itself to trash
+            move_row_to_trash($pdo, 'invoices', 'id', $id, $_SESSION['user_id'] ?? null, 'Invoice deleted via invoice UI');
             
             logActivity('deleted invoice', 'financials', $id, "Invoice $invoiceNumber was deleted. Booking #$bookingId reverted to editable state.");
         }
@@ -66,6 +71,9 @@ $invoices = $invoices->fetchAll();
 <div class="card">
     <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1.5rem;">
         <h2 style="font-size: 1.25rem;"><i class="fas fa-file-invoice-dollar"></i> Tax Invoices & Receivables</h2>
+        <?php if (canView('inventory')): ?>
+        <a href="../admin/trash.php" class="btn btn-warning" style="background: #fef3c7; color: #92400e; border: 1px solid #fcd34d; text-decoration: none;">Trash</a>
+        <?php endif; ?>
     </div>
 
     <table class="table">

@@ -570,6 +570,10 @@ $printingRates = $pdo->query("SELECT * FROM vendor_printing_rates")->fetchAll(PD
 .site-row.selected { background: #f0fdfa !important; }
 .site-row.selected td { color: var(--primary); }
 
+/* Previously associated with this client (proposal/booking) */
+.site-row.already-associated { box-shadow: inset 0 0 0 3px rgba(250,204,21,0.06); }
+.site-row .assoc-badge { background: #fef3c7; color: #92400e; padding: 0.15rem 0.45rem; border-radius: 6px; font-size: 0.65rem; font-weight: 800; margin-left: 0.5rem; display: inline-block; }
+
 .asset-chk {
     width: 18px;
     height: 18px;
@@ -704,6 +708,35 @@ function handleClientChange() {
             gstContainer.style.display = 'none';
         }
     });
+
+    // Fetch sites already associated with this client and mark them in the list
+    fetch(`../../ajax/get_client_sites.php?id=${clientId}`)
+    .then(r => r.json())
+    .then(res => {
+        if (!res.success) return;
+
+        // Clear previous markers
+        document.querySelectorAll('#asset-body tr.site-row.already-associated').forEach(row => {
+            row.classList.remove('already-associated');
+            const b = row.querySelector('.assoc-badge'); if (b) b.remove();
+        });
+
+        res.sites.forEach(s => {
+            const row = document.getElementById('row-' + s.site_id);
+            if (!row) return;
+            row.classList.add('already-associated');
+
+            // Add a small badge into the asset details column (5th td)
+            const assetCell = row.querySelector('td:nth-child(5)');
+            if (assetCell && !assetCell.querySelector('.assoc-badge')) {
+                const span = document.createElement('span');
+                span.className = 'assoc-badge';
+                span.innerText = s.type === 'booking' ? 'Booked' : ('In Proposal ' + (s.ref || ''));
+                assetCell.appendChild(span);
+            }
+        });
+    })
+    .catch(e => console.error('Client sites fetch error', e));
 }
 
 function handleGstSelectionChange() {
