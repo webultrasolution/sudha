@@ -43,6 +43,7 @@ $stmtItems = $pdo->prepare("
 ");
 $stmtItems->execute([$id]);
 $items = $stmtItems->fetchAll();
+$existingBookingSiteIds = array_column($items, 'site_id');
 
 // Advanced Stats
 $totalSQFT = 0;
@@ -1303,6 +1304,9 @@ $stmtCheckPO = $pdo->prepare("SELECT id, approval_status FROM purchase_orders WH
         }
     }
 
+    const currentBookingId = <?php echo $id; ?>;
+    const existingBookingSiteIds = <?php echo json_encode($existingBookingSiteIds); ?>;
+
     function openAddSiteModal() {
         document.getElementById('addSiteModal').style.display = 'flex';
         document.body.style.overflow = 'hidden';
@@ -1340,7 +1344,7 @@ $stmtCheckPO = $pdo->prepare("SELECT id, approval_status FROM purchase_orders WH
         const ownership = document.querySelector('input[name="modal_ownership"]:checked').value;
         const availability = document.querySelector('input[name="modal_availability"]:checked').value;
 
-        const url = `../../ajax/fetch_sites.php?page=${page}&limit=${modalPageSize}&q=${encodeURIComponent(q)}&media=${encodeURIComponent(media)}&state=${encodeURIComponent(state)}&city=${encodeURIComponent(city)}&location=${encodeURIComponent(loc)}&light=${encodeURIComponent(light)}&vendor=${encodeURIComponent(vendor)}&ownership=${encodeURIComponent(ownership)}&availability=${encodeURIComponent(availability)}`;
+        const url = `../../ajax/fetch_sites.php?page=${page}&limit=${modalPageSize}&booking_id=${currentBookingId}&q=${encodeURIComponent(q)}&media=${encodeURIComponent(media)}&state=${encodeURIComponent(state)}&city=${encodeURIComponent(city)}&location=${encodeURIComponent(loc)}&light=${encodeURIComponent(light)}&vendor=${encodeURIComponent(vendor)}&ownership=${encodeURIComponent(ownership)}&availability=${encodeURIComponent(availability)}`;
 
         fetch(url)
             .then(r => r.json())
