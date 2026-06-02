@@ -29,9 +29,9 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             throw new Exception("Booking details not found.");
         }
 
-        // Generate Invoice Number
-        $prefix = ($type === 'tax') ? 'INV' : (($type === 'proforma') ? 'PI' : 'EST');
-        $invNum = $prefix . '-' . date('Ymd') . '-' . rand(100, 999);
+        // Generate Invoice Number using sequential document numbering rather than random ids
+        $prefix = ($type === 'tax') ? 'INV-' : (($type === 'proforma') ? 'PI-' : 'EST-');
+        $invNum = generateSequentialReference($pdo, 'invoices', 'invoice_number', $prefix, 5);
 
         // Insert Invoice
         $approvalStatus = $isAdmin ? 'approved' : 'pending_approval';

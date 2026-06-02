@@ -51,7 +51,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
     if ($act === 'add') {
         requirePermission('clients', 'add');
-        $po_new = "CMPO-" . date('ymd') . "-" . rand(100, 999);
+        $po_new = generateSequentialReference($pdo, 'client_mounting_rates', 'po_number', 'CMPO-', 5);
         foreach ($site_ids_p as $sid) {
             $sid   = !empty($sid) ? intval($sid) : null;
             $r_val = (isset($ind_rates[$sid]) && $ind_rates[$sid] !== '') ? floatval($ind_rates[$sid]) : $rate;
@@ -61,7 +61,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         header("Location: mounting.php?msg=added"); exit;
     } else {
         requirePermission('clients', 'edit');
-        $po_edit       = !empty($_POST['po_number']) ? clean($_POST['po_number']) : ("CMPO-" . date('ymd') . "-" . rand(100, 999));
+        $po_edit       = !empty($_POST['po_number']) ? clean($_POST['po_number']) : generateSequentialReference($pdo, 'client_mounting_rates', 'po_number', 'CMPO-', 5);
         $rate_ids_post = $_POST['rate_ids'] ?? [];
 
         if (!$po_edit && !empty($rate_ids_post)) {

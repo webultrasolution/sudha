@@ -80,6 +80,17 @@ function formatCurrency($amount) {
 }
 
 /**
+ * Generate a prefixed sequential reference using the next available table ID.
+ * This is useful for invoices, mounting POs, printing POs, and similar documents.
+ */
+function generateSequentialReference($pdo, $table, $column, $prefix, $padding = 4) {
+    $stmt = $pdo->prepare("SELECT MAX(id) FROM $table");
+    $stmt->execute();
+    $nextId = intval($stmt->fetchColumn()) + 1;
+    return $prefix . str_pad($nextId, $padding, '0', STR_PAD_LEFT);
+}
+
+/**
  * Check User Role
  */
 function hasRole($requiredRoles) {

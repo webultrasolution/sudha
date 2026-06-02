@@ -16,7 +16,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action'])) {
             requirePermission('clients', 'add');
             $site_ids = !empty($_POST['site_ids']) ? $_POST['site_ids'] : [null];
             $individual_rates = $_POST['individual_rates'] ?? [];
-            $po_number = "CPPO-" . date('ymd') . "-" . rand(100, 999);
+            $po_number = generateSequentialReference($pdo, 'client_printing_rates', 'po_number', 'CPPO-', 5);
             
             foreach ($site_ids as $site_id) {
                 $site_id = !empty($site_id) ? intval($site_id) : null;
@@ -34,7 +34,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action'])) {
             $rate_ids_post = isset($_POST['rate_ids']) ? $_POST['rate_ids'] : [];
             
             if (!$po_number) {
-                $po_number = "CPPO-" . date('ymd') . "-" . rand(100, 999);
+                $po_number = generateSequentialReference($pdo, 'client_printing_rates', 'po_number', 'CPPO-', 5);
                 // Assign this new PO number to legacy records first so they are grouped
                 if (!empty($rate_ids_post)) {
                     $in = str_repeat('?,', count($rate_ids_post) - 1) . '?';

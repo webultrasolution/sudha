@@ -99,8 +99,8 @@ try {
     $invoiceId = $stmtCheckInv->fetchColumn();
 
     if (!$invoiceId) {
-        // Generate a new Proforma Invoice
-        $invNum = 'PI-' . date('Ymd') . '-' . rand(100, 999);
+        // Generate a new Proforma Invoice using sequential numbering
+        $invNum = generateSequentialReference($pdo, 'invoices', 'invoice_number', 'PI-', 5);
         
         $cgst = $proposal['tax_amount'] / 2;
         $sgst = $proposal['tax_amount'] / 2;

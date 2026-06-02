@@ -16,7 +16,7 @@ $mode = $_GET['mode'] ?? '';
 if ($po_id) {
     $stmtB = $pdo->prepare("
         SELECT po.*, c.name as client_name, po.campaign_name as campaign_name, po.po_number as proposal_number, po.campaign_id,
-               e.name as entity_name, e.logo as entity_logo, e.address as entity_address, e.gstin as entity_gstin, e.pan as entity_pan, e.letterhead as entity_letterhead, e.signature as entity_signature
+               e.name as entity_name, e.logo as entity_logo, e.address as entity_address, e.gstin as entity_gstin, e.pan as entity_pan
         FROM purchase_orders po
         LEFT JOIN partners c ON po.customer_id = c.id
         LEFT JOIN entities e ON po.entity_id = e.id

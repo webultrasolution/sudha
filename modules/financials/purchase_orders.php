@@ -49,15 +49,7 @@ if (!empty($whereClauses)) {
 }
 
 // Fetch filtered POs with attachments
-$stmt = $pdo->prepare("
-    SELECT po.*, v.name as vendor_name, u.username as creator,
-           (SELECT GROUP_CONCAT(filename SEPARATOR '||') FROM po_attachments WHERE po_id = po.id) as attachments
-    FROM purchase_orders po 
-    JOIN partners v ON po.vendor_id = v.id 
-    LEFT JOIN users u ON po.employee_id = u.id 
-    $whereSql
-    ORDER BY po.id DESC
-");
+$stmt = $pdo->prepare("\n    SELECT po.*, po.campaign_name, v.name as vendor_name, u.username as creator,\n           (SELECT GROUP_CONCAT(filename SEPARATOR '||') FROM po_attachments WHERE po_id = po.id) as attachments\n    FROM purchase_orders po \n    JOIN partners v ON po.vendor_id = v.id \n    LEFT JOIN users u ON po.employee_id = u.id \n    $whereSql\n    ORDER BY po.id DESC\n");
 $stmt->execute($params);
 $pos = $stmt->fetchAll();
 
@@ -101,11 +93,6 @@ $vendorsList = $pdo->query("SELECT id, name FROM partners WHERE type = 'vendor' 
 <div class="card">
     <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1.5rem;">
         <h2 style="font-size: 1.25rem;">Vendor Purchase Orders</h2>
-        <?php if (canAdd('financials')): ?>
-            <a href="po_create.php" class="btn btn-primary">
-                <i class="fas fa-plus"></i> Create New PO
-            </a>
-        <?php endif; ?>
     </div>
 
     <!-- Single Hidden File Input for AJAX Uploads -->
@@ -116,6 +103,7 @@ $vendorsList = $pdo->query("SELECT id, name FROM partners WHERE type = 'vendor' 
         <thead>
             <tr>
                 <th>PO Number</th>
+                <th>Campaign</th>
                 <th>Vendor</th>
                 <th>Type</th>
                 <th>Date</th>
@@ -130,6 +118,7 @@ $vendorsList = $pdo->query("SELECT id, name FROM partners WHERE type = 'vendor' 
             <?php foreach ($pos as $p): ?>
                 <tr>
                     <td><strong><?php echo $p['po_number']; ?></strong></td>
+                    <td><?php echo htmlspecialchars($p['campaign_name'] ?: '—'); ?></td>
                     <td><?php echo $p['vendor_name']; ?></td>
                     <td>
                         <?php
