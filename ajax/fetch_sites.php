@@ -40,11 +40,12 @@ if ($vendor) { $where[] = "s.vendor_id = ?"; $params[] = $vendor; }
 if ($availability === 'available') { $where[] = "s.status = 'available'"; }
 if ($ownership !== 'all') { $where[] = "s.owner_type = ?"; $params[] = $ownership; }
 
-$bookingId = isset($_GET['booking_id']) ? intval($_GET['booking_id']) : 0;
-if ($bookingId) {
-    $where[] = "s.id NOT IN (SELECT site_id FROM booking_items WHERE booking_id = ?)";
-    $params[] = $bookingId;
-}
+// Already booked sites are no longer excluded from search results so they can be shown as selected in the modal
+// $bookingId = isset($_GET['booking_id']) ? intval($_GET['booking_id']) : 0;
+// if ($bookingId) {
+//     $where[] = "s.id NOT IN (SELECT site_id FROM booking_items WHERE booking_id = ?)";
+//     $params[] = $bookingId;
+// }
 
 if ($size) {
     $parts = explode('x', $size);
