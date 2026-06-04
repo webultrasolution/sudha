@@ -633,6 +633,7 @@ document.addEventListener('DOMContentLoaded', () => {
 });
 
 // Modal Logic for Adding Sites
+const existingProposalSiteIds = <?php echo json_encode(array_column($items, 'site_id')); ?>;
 let modalCurrentPage = 1;
 const modalPageSize = 50;
 let modalSelectedSites = [];
@@ -740,8 +741,8 @@ function toggleModalSite(cb, siteId) {
     updateModalSelectedCount();
     
     // Update select all checkbox state
-    const checkboxes = document.querySelectorAll('.modal-site-checkbox');
-    const checkedCount = document.querySelectorAll('.modal-site-checkbox:checked').length;
+    const checkboxes = document.querySelectorAll('.modal-site-checkbox:not(:disabled)');
+    const checkedCount = document.querySelectorAll('.modal-site-checkbox:not(:disabled):checked').length;
     document.getElementById('modal-select-all').checked = (checkboxes.length > 0 && checkboxes.length === checkedCount);
 }
 
@@ -755,7 +756,8 @@ function renderModalSites(sites, isBucket = false) {
     }
 
     sites.forEach(s => {
-        const isChecked = modalSelectedSites.some(ms => ms.id == s.id);
+        const isAlreadyBooked = existingProposalSiteIds.includes(parseInt(s.id));
+        const isChecked = isAlreadyBooked || modalSelectedSites.some(ms => ms.id == s.id);
         const savedSite = modalSelectedSites.find(ms => ms.id == s.id);
         const thumbToUse = savedSite ? savedSite.image : (s.thumbnail ? s.thumbnail : '');
         const thumbUrl = thumbToUse ? '../../uploads/sites/' + thumbToUse : 'https://via.placeholder.com/150x95?text=No+Img';
@@ -775,11 +777,24 @@ function renderModalSites(sites, isBucket = false) {
             imgHtml = `<div style="width: 100px; height: 60px; border-radius: 8px; background: #f8fafc; border: 1px dashed #e2e8f0; display: flex; align-items: center; justify-content: center; font-size: 0.6rem; color: #94a3b8; font-weight: 700;">No Img</div>`;
         }
 
+        let badgeHtml = `
+            <span style="background:#ecfdf5; color:#059669; padding:0.1rem 0.4rem; border-radius:4px; font-size:0.55rem; font-weight:800; text-transform:uppercase;">${s.type}</span>
+            <span style="background:#f1f5f9; color:#475569; padding:0.1rem 0.4rem; border-radius:4px; font-size:0.55rem; font-weight:800; text-transform:uppercase;">${s.owner_type}</span>
+        `;
+        if (isAlreadyBooked) {
+            badgeHtml += `
+                <span style="background:#e0f2fe; color:#0369a1; padding:0.1rem 0.4rem; border-radius:4px; font-size:0.55rem; font-weight:800; text-transform:uppercase; margin-left: 0.2rem;">Already Booked</span>
+            `;
+        }
+
         const row = document.createElement('tr');
-        row.style.background = 'white';
+        row.id = 'modal-row-' + s.id;
+        row.style.background = isAlreadyBooked ? '#f8fafc' : (isChecked ? '#f0fdfa' : 'white');
+        row.style.transition = 'background 0.15s';
+        row.style.borderLeft = isAlreadyBooked ? '3px solid #cbd5e1' : (isChecked ? '3px solid #0d9488' : '3px solid transparent');
         row.innerHTML = `
             <td style="text-align:center; padding:1rem;">
-                <input type="checkbox" class="modal-site-checkbox" value="${s.id}" ${isChecked ? 'checked' : ''} onclick="toggleModalSite(this, ${s.id})" style="width:16px; height:16px; accent-color:var(--primary);">
+                <input type="checkbox" class="modal-site-checkbox" value="${s.id}" ${isChecked ? 'checked' : ''} ${isAlreadyBooked ? 'disabled' : ''} onclick="toggleModalSite(this, ${s.id})" style="width:16px; height:16px; accent-color:var(--primary); cursor: ${isAlreadyBooked ? 'not-allowed' : 'pointer'};">
             </td>
             <td style="padding:1rem;">
                 ${imgHtml}
@@ -792,8 +807,7 @@ function renderModalSites(sites, isBucket = false) {
                 <div style="font-weight:800; color:#1e293b; font-size:0.8rem; margin-bottom:1px;">${s.name}</div>
                 <div style="font-size:0.65rem; color:#64748b; margin-bottom:4px; line-height:1.1;">${s.location}</div>
                 <div style="display: flex; gap: 0.3rem; align-items: center;">
-                    <span style="background:#ecfdf5; color:#059669; padding:0.1rem 0.4rem; border-radius:4px; font-size:0.55rem; font-weight:800; text-transform:uppercase;">${s.type}</span>
-                    <span style="background:#f1f5f9; color:#475569; padding:0.1rem 0.4rem; border-radius:4px; font-size:0.55rem; font-weight:800; text-transform:uppercase;">${s.owner_type}</span>
+                    ${badgeHtml}
                 </div>
             </td>
             <td style="padding:1rem;">
@@ -807,13 +821,13 @@ function renderModalSites(sites, isBucket = false) {
     });
     
     // Update select all state
-    const checkboxes = document.querySelectorAll('.modal-site-checkbox');
-    const checkedCount = document.querySelectorAll('.modal-site-checkbox:checked').length;
+    const checkboxes = document.querySelectorAll('.modal-site-checkbox:not(:disabled)');
+    const checkedCount = document.querySelectorAll('.modal-site-checkbox:not(:disabled):checked').length;
     document.getElementById('modal-select-all').checked = (checkboxes.length > 0 && checkboxes.length === checkedCount);
 }
 
 function toggleAllModalSites(source) {
-    const checkboxes = document.querySelectorAll('.modal-site-checkbox');
+    const checkboxes = document.querySelectorAll('.modal-site-checkbox:not(:disabled)');
     checkboxes.forEach(cb => {
         if (cb.checked !== source.checked) {
             cb.checked = source.checked;
