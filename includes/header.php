@@ -20,12 +20,15 @@ $activeEntity = getActiveEntity();
 <body>
     <?php if (!isset($hideSidebar) || !$hideSidebar): ?>
     <div class="sidebar">
-        <div class="sidebar-brand" style="margin-bottom: 1rem; padding: 0; margin-top: -0.5rem;">
+        <div class="sidebar-brand" style="margin-bottom: 1.5rem; padding: 0 0.5rem; margin-top: -0.5rem; display: flex; align-items: center; justify-content: space-between; gap: 0.5rem; width: 100%;">
             <?php if ($activeEntity && $activeEntity['logo']): ?>
-                <img src="<?php echo BASE_URL; ?>assets/images/<?php echo $activeEntity['logo']; ?>" alt="<?php echo htmlspecialchars($activeEntity['name']); ?>" class="sidebar-logo" style="max-width: 100px; max-height: 45px;">
+                <img src="<?php echo BASE_URL; ?>assets/images/<?php echo $activeEntity['logo']; ?>" alt="<?php echo htmlspecialchars($activeEntity['name']); ?>" class="sidebar-logo" style="max-width: 100px; max-height: 45px; margin: 0;">
             <?php else: ?>
-                <img src="<?php echo BASE_URL; ?>assets/img/LOGO.png" alt="Sudha Creative" class="sidebar-logo" style="max-width: 100px; max-height: 45px;">
+                <img src="<?php echo BASE_URL; ?>assets/img/LOGO.png" alt="Sudha Creative" class="sidebar-logo" style="max-width: 100px; max-height: 45px; margin: 0;">
             <?php endif; ?>
+            <button class="sidebar-toggle-btn" onclick="toggleSidebar()" title="Toggle Sidebar">
+                <i class="fas fa-bars"></i>
+            </button>
         </div>
         <ul class="nav-menu">
             <li class="nav-item">
@@ -144,10 +147,11 @@ $activeEntity = getActiveEntity();
         
         <script>
             function toggleSidebar() {
-                const sidebar = document.querySelector('.sidebar');
-                const mainContent = document.querySelector('.main-content');
-                sidebar.classList.toggle('active');
-                mainContent.classList.toggle('sidebar-active');
+                if (window.innerWidth > 1024) {
+                    document.body.classList.toggle('sidebar-collapsed');
+                } else {
+                    document.body.classList.toggle('sidebar-open');
+                }
             }
 
             document.addEventListener('DOMContentLoaded', function() {

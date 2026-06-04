@@ -111,6 +111,26 @@ body {
     z-index: 1000;
     border-right: 1px solid rgba(0,0,0,0.04);
     box-shadow: 4px 0 20px rgba(0,0,0,0.01);
+    transition: width 0.3s cubic-bezier(0.4, 0, 0.2, 1), padding 0.3s cubic-bezier(0.4, 0, 0.2, 1), transform 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.sidebar-toggle-btn {
+    background: transparent;
+    border: none;
+    color: var(--secondary);
+    font-size: 1.15rem;
+    cursor: pointer;
+    padding: 8px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    border-radius: 8px;
+    transition: all 0.2s ease;
+}
+
+.sidebar-toggle-btn:hover {
+    background: rgba(13, 148, 136, 0.08);
+    color: var(--primary);
 }
 
 .sidebar-brand {
@@ -275,6 +295,7 @@ body {
     flex: 1;
     padding: 1.5rem 2rem;
     max-width: 100%;
+    transition: margin-left 0.3s cubic-bezier(0.4, 0, 0.2, 1);
 }
 
 .header {
@@ -651,3 +672,44 @@ body {
 /* Animations */
 .fade-in { animation: fadeIn 0.5s ease-out forwards; }
 @keyframes fadeIn { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
+
+/* Desktop Sidebar Collapse */
+@media (min-width: 1025px) {
+    :root {
+        --sidebar-collapsed-width: 80px;
+    }
+    body.sidebar-collapsed .sidebar {
+        width: var(--sidebar-collapsed-width);
+        padding: 1.5rem 0.5rem;
+    }
+    body.sidebar-collapsed .sidebar-brand {
+        justify-content: center !important;
+        padding: 0.5rem 0 !important;
+    }
+    body.sidebar-collapsed .sidebar-brand::after {
+        left: 0.5rem;
+        right: 0.5rem;
+    }
+    body.sidebar-collapsed .sidebar-logo {
+        display: none !important;
+    }
+    body.sidebar-collapsed .nav-link {
+        justify-content: center;
+        padding: 0.85rem 0;
+    }
+    body.sidebar-collapsed .nav-link span {
+        display: none !important;
+    }
+    body.sidebar-collapsed .nav-link .toggle-icon {
+        display: none !important;
+    }
+    body.sidebar-collapsed .submenu {
+        display: none !important;
+    }
+    body.sidebar-collapsed .nav-link:hover {
+        transform: none !important;
+    }
+    body.sidebar-collapsed .main-content {
+        margin-left: var(--sidebar-collapsed-width);
+    }
+}

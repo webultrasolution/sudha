@@ -274,7 +274,6 @@ $slides_data = $items->fetchAll();
         <button class="control-btn" onclick="prevSlide()"><i class="fas fa-chevron-left"></i></button>
         <button class="control-btn" onclick="nextSlide()"><i class="fas fa-chevron-right"></i></button>
         <button class="control-btn" title="Full Screen" onclick="toggleFullScreen()"><i class="fas fa-expand"></i></button>
-        <button class="control-btn" title="Print to PDF" onclick="window.print()"><i class="fas fa-print"></i></button>
     </div>
 
     <!-- PPTX Generation Library -->
