@@ -8,11 +8,12 @@ ini_set('error_log', __DIR__ . '/../php_error.log');
 
 
 
+
 // Database Configuration
 define('DB_HOST', 'localhost');
 define('DB_NAME', 'u511039083_sudha');
 define('DB_USER', 'u511039083_sudha');
-define('DB_PASS', 'H7+iO8c6C');
+define('DB_PASS', 'dVq&1KmeM?0');
 
 // App Constants
 define('APP_NAME', 'Sudha Creative CRM');
