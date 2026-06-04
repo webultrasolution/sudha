@@ -37,24 +37,24 @@ if ($pType == 'client') {
 
     // 2. Fetch Invoices
     $stmtInv = $pdo->prepare("
-          SELECT i.id, 'invoice' as type, i.created_at as date, i.invoice_number as ref,
-                 '' as remark,
+          SELECT i.id, CONVERT('invoice' USING utf8mb4) COLLATE utf8mb4_unicode_ci as type, i.created_at as date, CONVERT(i.invoice_number USING utf8mb4) COLLATE utf8mb4_unicode_ci as ref,
+                 CONVERT('' USING utf8mb4) COLLATE utf8mb4_unicode_ci as remark,
                  i.sub_total as base_amt, (i.cgst + i.sgst + i.igst) as tax_amount, i.total_amount as total_amt,
-                 i.total_amount as debit, 0 as credit, 'Billed' as status, i.approval_status
+                 i.total_amount as debit, 0 as credit, CONVERT('Billed' USING utf8mb4) COLLATE utf8mb4_unicode_ci as status, CONVERT(i.approval_status USING utf8mb4) COLLATE utf8mb4_unicode_ci as approval_status
           FROM invoices i
           JOIN bookings b ON i.booking_id = b.id
           WHERE b.client_id = ?
 
           UNION ALL
 
-          SELECT MIN(r.id) as id, 'invoice' as type, DATE(MIN(r.created_at)) as date,
-                 COALESCE(r.po_number, CONCAT('RATE-', MIN(r.id))) as ref,
-                 '' as remark,
+          SELECT MIN(r.id) as id, CONVERT('invoice' USING utf8mb4) COLLATE utf8mb4_unicode_ci as type, DATE(MIN(r.created_at)) as date,
+                 COALESCE(CONVERT(r.po_number USING utf8mb4) COLLATE utf8mb4_unicode_ci, CONVERT(CONCAT('RATE-', MIN(r.id)) USING utf8mb4) COLLATE utf8mb4_unicode_ci) as ref,
+                 CONVERT('' USING utf8mb4) COLLATE utf8mb4_unicode_ci as remark,
                  SUM(r.rate_per_sqft * COALESCE(s.width, 0) * COALESCE(s.height, 0)) as base_amt,
                  0 as tax_amount,
                  SUM(r.rate_per_sqft * COALESCE(s.width, 0) * COALESCE(s.height, 0)) as total_amt,
                  SUM(r.rate_per_sqft * COALESCE(s.width, 0) * COALESCE(s.height, 0)) as debit,
-                 0 as credit, 'Billed' as status, 'approved' as approval_status
+                 0 as credit, CONVERT('Billed' USING utf8mb4) COLLATE utf8mb4_unicode_ci as status, CONVERT('approved' USING utf8mb4) COLLATE utf8mb4_unicode_ci as approval_status
           FROM client_printing_rates r
           LEFT JOIN sites s ON r.site_id = s.id
           WHERE r.client_id = ?
@@ -62,14 +62,14 @@ if ($pType == 'client') {
 
           UNION ALL
 
-          SELECT MIN(m.id) as id, 'invoice' as type, DATE(MIN(m.created_at)) as date,
-                 COALESCE(m.custom_invoice_number, m.po_number, CONCAT('CMI-', MIN(m.id))) as ref,
-                 '' as remark,
+          SELECT MIN(m.id) as id, CONVERT('invoice' USING utf8mb4) COLLATE utf8mb4_unicode_ci as type, DATE(MIN(m.created_at)) as date,
+                 COALESCE(CONVERT(m.custom_invoice_number USING utf8mb4) COLLATE utf8mb4_unicode_ci, CONVERT(m.po_number USING utf8mb4) COLLATE utf8mb4_unicode_ci, CONVERT(CONCAT('CMI-', MIN(m.id)) USING utf8mb4) COLLATE utf8mb4_unicode_ci) as ref,
+                 CONVERT('' USING utf8mb4) COLLATE utf8mb4_unicode_ci as remark,
                  SUM(m.rate_per_sqft * COALESCE(s.width, 0) * COALESCE(s.height, 0)) as base_amt,
                  SUM(m.rate_per_sqft * COALESCE(s.width, 0) * COALESCE(s.height, 0)) * 0.18 as tax_amount,
                  SUM(m.rate_per_sqft * COALESCE(s.width, 0) * COALESCE(s.height, 0)) * 1.18 as total_amt,
                  SUM(m.rate_per_sqft * COALESCE(s.width, 0) * COALESCE(s.height, 0)) * 1.18 as debit,
-                 0 as credit, 'Mounting' as status, 'approved' as approval_status
+                 0 as credit, CONVERT('Mounting' USING utf8mb4) COLLATE utf8mb4_unicode_ci as status, CONVERT('approved' USING utf8mb4) COLLATE utf8mb4_unicode_ci as approval_status
           FROM client_mounting_rates m
           LEFT JOIN sites s ON m.site_id = s.id
           WHERE m.client_id = ?
@@ -83,22 +83,23 @@ if ($pType == 'client') {
 } else {
     // Vendor Logic
     $stmtPO = $pdo->prepare("
-        SELECT id, 'po' as type, po_date as date, po_number as ref, 
+        SELECT id, CONVERT('po' USING utf8mb4) COLLATE utf8mb4_unicode_ci as type, po_date as date, CONVERT(po_number USING utf8mb4) COLLATE utf8mb4_unicode_ci as ref, 
                po_amount as base_amt, (COALESCE(cgst_amount,0) + COALESCE(sgst_amount,0) + COALESCE(igst_amount,0)) as tax_amount, 
                COALESCE(NULLIF(total_amount, 0), po_amount + COALESCE(cgst_amount,0) + COALESCE(sgst_amount,0) + COALESCE(igst_amount,0)) as total_amt, 
                COALESCE(NULLIF(total_amount, 0), po_amount + COALESCE(cgst_amount,0) + COALESCE(sgst_amount,0) + COALESCE(igst_amount,0)) as debit, 
-               0 as credit, status
+               0 as credit, CONVERT(status USING utf8mb4) COLLATE utf8mb4_unicode_ci as status
         FROM purchase_orders 
         WHERE vendor_id = ?
         
         UNION ALL
         
-        SELECT MIN(r.id) as id, 'po' as type, DATE(MIN(r.created_at)) as date, COALESCE(r.po_number, CONCAT('RATE-', MIN(r.id))) as ref,
+        SELECT MIN(r.id) as id, CONVERT('po' USING utf8mb4) COLLATE utf8mb4_unicode_ci as type, DATE(MIN(r.created_at)) as date, 
+               COALESCE(CONVERT(r.po_number USING utf8mb4) COLLATE utf8mb4_unicode_ci, CONVERT(CONCAT('RATE-', MIN(r.id)) USING utf8mb4) COLLATE utf8mb4_unicode_ci) as ref,
                SUM(r.rate_per_sqft * COALESCE(s.width, 0) * COALESCE(s.height, 0)) as base_amt,
                0 as tax_amount,
                SUM(r.rate_per_sqft * COALESCE(s.width, 0) * COALESCE(s.height, 0)) as total_amt,
                SUM(r.rate_per_sqft * COALESCE(s.width, 0) * COALESCE(s.height, 0)) as debit,
-               0 as credit, 'approved' as status
+               0 as credit, CONVERT('approved' USING utf8mb4) COLLATE utf8mb4_unicode_ci as status
         FROM vendor_printing_rates r
         LEFT JOIN sites s ON r.site_id = s.id
         WHERE r.vendor_id = ?

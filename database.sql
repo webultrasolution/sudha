@@ -48,6 +48,7 @@ CREATE TABLE IF NOT EXISTS `sites` (
   `facing` varchar(50) DEFAULT NULL,
   `light_type` enum('NL','BL','FL') DEFAULT 'NL',
   `hsn_code` varchar(10) DEFAULT '998366',
+  `mounting_hsn` varchar(50) DEFAULT NULL,
   `grade` enum('A','B','C') DEFAULT 'B',
   `owner_type` enum('HA','TA') DEFAULT 'HA',
   `vendor_id` int(11) DEFAULT NULL,

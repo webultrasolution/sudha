@@ -61,9 +61,13 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action'])) {
         }
 
         try {
-            $stmt = $pdo->prepare("DELETE FROM partners WHERE id = ?");
-            $stmt->execute([$id]);
-            echo json_encode(['success' => true]);
+            include_once __DIR__ . '/../../includes/trash_helper.php';
+            $trashId = move_row_to_trash($pdo, 'partners', 'id', $id, $_SESSION['user_id'] ?? null, ucfirst($type) . ' deleted via UI');
+            if ($trashId) {
+                echo json_encode(['success' => true]);
+            } else {
+                echo json_encode(['success' => false, 'message' => 'Failed to move partner to trash.']);
+            }
         } catch (PDOException $e) {
             echo json_encode(['success' => false, 'message' => 'This partner cannot be deleted because they are associated with existing sites, proposals, or invoices.']);
         }

@@ -15,12 +15,11 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     $entityId = !empty($data['entity_id']) ? intval($data['entity_id']) : null;
 
     try {
-        // Fetch Booking/Proposal details for financials
+        // Fetch Booking details directly for financials
         $stmt = $pdo->prepare("
-            SELECT p.total_amount, p.tax_amount, p.grand_total 
-            FROM bookings b 
-            JOIN proposals p ON b.proposal_id = p.id 
-            WHERE b.id = ?
+            SELECT total_amount, tax_amount, grand_total, tax_type 
+            FROM bookings 
+            WHERE id = ?
         ");
         $stmt->execute([$bookingId]);
         $fin = $stmt->fetch();
@@ -41,10 +40,19 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, 'unpaid', ?)
         ");
         
-        // Simplified GST logic: Split 18% into 9/9 for Intra-state
-        $cgst = $fin['tax_amount'] / 2;
-        $sgst = $fin['tax_amount'] / 2;
+        $tax_amount = floatval($fin['tax_amount'] ?? 0);
+        $tax_type = $fin['tax_type'] ?? 'igst';
+        
+        $cgst = 0;
+        $sgst = 0;
         $igst = 0;
+        
+        if ($tax_type === 'cgst_sgst') {
+            $cgst = $tax_amount / 2;
+            $sgst = $tax_amount / 2;
+        } else {
+            $igst = $tax_amount;
+        }
 
         $stmtInv->execute([
             $invNum,

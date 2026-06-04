@@ -132,8 +132,6 @@ $activeEntity = getActiveEntity();
                         <li><a href="<?php echo BASE_URL; ?>modules/users/permissions.php" class="<?php echo $activePage == 'users' ? 'active-sub' : ''; ?>"><i class="fas fa-user-shield"></i> Role Permissions</a></li>
                         <li><a href="<?php echo BASE_URL; ?>modules/admin/activity_logs.php" class="<?php echo $activePage == 'activity_logs' ? 'active-sub' : ''; ?>"><i class="fas fa-history"></i> System Activity Logs</a></li>
                     <?php endif; ?>
-                    <!-- <li><a href="<?php echo BASE_URL; ?>modules/admin/resources.php" class="<?php echo $activePage == 'resources' ? 'active-sub' : ''; ?>"><i class="fas fa-tools"></i> Resources</a></li>
-                    <li><a href="<?php echo BASE_URL; ?>modules/inventory/photofactory.php" class="<?php echo $activePage == 'photofactory' ? 'active-sub' : ''; ?>"><i class="fas fa-images"></i> Photofactory</a></li> -->
                 </ul>
             </li>
 

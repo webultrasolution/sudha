@@ -3,7 +3,8 @@ ALTER TABLE sites
 ADD COLUMN facing VARCHAR(50) AFTER height,
 ADD COLUMN light_type ENUM('BL', 'NL', 'FL') DEFAULT 'NL' AFTER facing,
 ADD COLUMN grade ENUM('A', 'B', 'C') DEFAULT 'B' AFTER light_type,
-ADD COLUMN available_from DATE AFTER status;
+ADD COLUMN available_from DATE AFTER status,
+ADD COLUMN mounting_hsn VARCHAR(50) DEFAULT NULL AFTER hsn_code;
 
 -- Update Proposals Table
 ALTER TABLE proposals

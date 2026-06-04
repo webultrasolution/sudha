@@ -350,7 +350,7 @@ $pendingPayments = count($payments);
                 <?php foreach ($invoices as $inv): ?>
                 <tr id="row-invoice-<?php echo $inv['id']; ?>">
                     <td style="font-weight: 700; color: var(--primary);">
-                        <a href="../operations/generate_invoice.php?booking_id=<?php echo $inv['booking_id']; ?>" target="_blank" style="text-decoration: none; color: var(--primary);">
+                        <a href="../operations/<?php echo $inv['type'] === 'ro' ? 'generate_ro_invoice.php' : 'generate_invoice.php'; ?>?booking_id=<?php echo $inv['booking_id']; ?>" target="_blank" style="text-decoration: none; color: var(--primary);">
                             <?php echo htmlspecialchars($inv['invoice_number']); ?>
                         </a>
                     </td>
@@ -359,12 +359,13 @@ $pendingPayments = count($payments);
                         $invType = $inv['type'] ?? 'tax';
                         if ($invType === 'proforma') echo '<span style="background: #fef3c7; color: #d97706; padding: 0.2rem 0.5rem; border-radius: 6px; font-size: 0.7rem; font-weight: 800;">PROFORMA</span>';
                         elseif ($invType === 'estimate') echo '<span style="background: #e0f2fe; color: #0284c7; padding: 0.2rem 0.5rem; border-radius: 6px; font-size: 0.7rem; font-weight: 800;">ESTIMATE</span>';
+                        elseif ($invType === 'ro') echo '<span style="background: #e2e8f0; color: #475569; padding: 0.2rem 0.5rem; border-radius: 6px; font-size: 0.7rem; font-weight: 800;">RO</span>';
                         else echo '<span style="background: #ecfdf5; color: #059669; padding: 0.2rem 0.5rem; border-radius: 6px; font-size: 0.7rem; font-weight: 800;">TAX</span>';
                         ?>
                     </td>
                     <td><?php echo htmlspecialchars($inv['client_name'] ?: '—'); ?></td>
                     <td>
-                        <?php if ($invType === 'tax'): ?>
+                        <?php if ($invType === 'tax' || $invType === 'ro'): ?>
                             <div style="font-size: 0.8rem;">
                                 <?php if ($inv['confirmation_type'] === 'email'): ?>
                                     <strong>Email Conf:</strong> <?php echo $inv['email_date'] ? date('d M Y', strtotime($inv['email_date'])) : 'N/A'; ?>

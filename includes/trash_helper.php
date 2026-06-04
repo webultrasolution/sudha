@@ -27,13 +27,20 @@ function move_row_to_trash($pdo, $table, $pk, $id, $userId = null, $reason = nul
     $row = $stmt->fetch(PDO::FETCH_ASSOC);
     if (!$row) return false;
 
-    // If this is a site image, attempt to move file to uploads/trash
-    if ($table === 'site_images' && !empty($row['filename'])) {
-        $src = __DIR__ . '/../uploads/sites/' . $row['filename'];
-        $dstDir = __DIR__ . '/../uploads/trash/';
-        if (!is_dir($dstDir)) @mkdir($dstDir, 0777, true);
-        $dst = $dstDir . $row['filename'];
-        if (file_exists($src)) @rename($src, $dst);
+    // If this is a site image or po attachment, attempt to move file to uploads/trash
+    if (!empty($row['filename'])) {
+        $src = null;
+        if ($table === 'site_images') {
+            $src = __DIR__ . '/../uploads/sites/' . $row['filename'];
+        } elseif ($table === 'po_attachments') {
+            $src = __DIR__ . '/../uploads/pos/' . $row['filename'];
+        }
+        if ($src) {
+            $dstDir = __DIR__ . '/../uploads/trash/';
+            if (!is_dir($dstDir)) @mkdir($dstDir, 0777, true);
+            $dst = $dstDir . $row['filename'];
+            if (file_exists($src)) @rename($src, $dst);
+        }
     }
 
     $ins = $pdo->prepare("INSERT INTO trash (table_name, row_id, pk_name, row_data, deleted_by, reason) VALUES (?, ?, ?, ?, ?, ?)");
@@ -87,13 +94,18 @@ function restore_trash_item($pdo, $trashId) {
         $upd->execute($updateVals);
     }
 
-    // If restoring a site image, and file exists in uploads/trash, move it back to uploads/sites
-    if ($trash['table_name'] === 'site_images' && isset($rowData['filename']) && !empty($rowData['filename'])) {
+    // Move files back to their respective folder upon restore
+    if (isset($rowData['filename']) && !empty($rowData['filename'])) {
         $trashPath = __DIR__ . '/../uploads/trash/' . $rowData['filename'];
-        $sitePath = __DIR__ . '/../uploads/sites/' . $rowData['filename'];
-        if (file_exists($trashPath)) {
-            if (!is_dir(dirname($sitePath))) @mkdir(dirname($sitePath), 0777, true);
-            @rename($trashPath, $sitePath);
+        $destPath = null;
+        if ($table === 'site_images') {
+            $destPath = __DIR__ . '/../uploads/sites/' . $rowData['filename'];
+        } elseif ($table === 'po_attachments') {
+            $destPath = __DIR__ . '/../uploads/pos/' . $rowData['filename'];
+        }
+        if ($destPath && file_exists($trashPath)) {
+            if (!is_dir(dirname($destPath))) @mkdir(dirname($destPath), 0777, true);
+            @rename($trashPath, $destPath);
         }
     }
 
@@ -110,6 +122,10 @@ function restore_trash_item($pdo, $trashId) {
         }
         if ($trash['table_name'] === 'purchase_orders') {
             restore_related_trash_rows($pdo, 'po_items', 'po_id', $rowData['id']);
+            restore_related_trash_rows($pdo, 'po_attachments', 'po_id', $rowData['id']);
+        }
+        if ($trash['table_name'] === 'sites') {
+            restore_related_trash_rows($pdo, 'site_images', 'site_id', $rowData['id']);
         }
     }
 
@@ -137,6 +153,22 @@ function restore_related_trash_rows($pdo, $childTable, $foreignKey, $foreignValu
         $insertSql = "INSERT INTO `$childTable` ($colSql) VALUES ($placeholders)";
         $ins = $pdo->prepare($insertSql);
         $ins->execute($values);
+
+        // Relocate files back if they exist in trash
+        if (isset($itemData['filename']) && !empty($itemData['filename'])) {
+            $trashPath = __DIR__ . '/../uploads/trash/' . $itemData['filename'];
+            $destPath = null;
+            if ($childTable === 'site_images') {
+                $destPath = __DIR__ . '/../uploads/sites/' . $itemData['filename'];
+            } elseif ($childTable === 'po_attachments') {
+                $destPath = __DIR__ . '/../uploads/pos/' . $itemData['filename'];
+            }
+            if ($destPath && file_exists($trashPath)) {
+                if (!is_dir(dirname($destPath))) @mkdir(dirname($destPath), 0777, true);
+                @rename($trashPath, $destPath);
+            }
+        }
+
         $del = $pdo->prepare("DELETE FROM trash WHERE id = ?");
         $del->execute([$item['id']]);
     }

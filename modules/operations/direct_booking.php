@@ -152,47 +152,47 @@ $printingRates = $pdo->query("SELECT * FROM vendor_printing_rates")->fetchAll(PD
                 </div>
             </div>
 
-            <div style="display: grid; grid-template-columns: 2.5fr 1fr 1fr 1fr 1fr 1fr 1fr; gap: 0.75rem; align-items: flex-end;">
-                <div class="form-group" style="margin-bottom: 0;">
+            <div style="display: flex; flex-wrap: wrap; gap: 0.5rem; margin-bottom: 0.5rem; align-items: flex-end; width: 100%;">
+                <div class="form-group" style="flex: 2 1 200px; min-width: 150px; margin-bottom: 0;">
                     <label style="font-size: 0.55rem; font-weight: 900; color: #94a3b8; text-transform: uppercase; margin-bottom: 0.4rem; display: block;">Search Site / Code / Area</label>
                     <input type="text" id="site-search" class="p-input" placeholder="Search by Site Name, Code, Location, City, State..." oninput="fetchSites(1)" style="height: 38px; font-size: 0.85rem; background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 8px;">
                 </div>
-                <div class="form-group" style="margin-bottom: 0;">
+                <div class="form-group" style="flex: 1 1 110px; min-width: 90px; margin-bottom: 0;">
                     <label style="font-size: 0.55rem; font-weight: 900; color: #94a3b8; text-transform: uppercase; margin-bottom: 0.4rem; display: block;">Media</label>
                     <select id="media_type" class="p-input" onchange="fetchSites(1)" style="height: 38px; font-size: 0.85rem; background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 8px;">
                         <option value="">All</option>
                         <?php foreach($mediaTypes as $mt): ?> <option value="<?php echo $mt; ?>"><?php echo $mt; ?></option> <?php endforeach; ?>
                     </select>
                 </div>
-                <div class="form-group" style="margin-bottom: 0;">
+                <div class="form-group" style="flex: 1 1 110px; min-width: 90px; margin-bottom: 0;">
                     <label style="font-size: 0.55rem; font-weight: 900; color: #94a3b8; text-transform: uppercase; margin-bottom: 0.4rem; display: block;">State</label>
                     <select id="filter-state" class="p-input" onchange="fetchSites(1)" style="height: 38px; font-size: 0.85rem; background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 8px;">
                         <option value="">All</option>
                         <?php foreach($states as $s): ?> <option value="<?php echo $s; ?>"><?php echo $s; ?></option> <?php endforeach; ?>
                     </select>
                 </div>
-                <div class="form-group" style="margin-bottom: 0;">
+                <div class="form-group" style="flex: 1 1 110px; min-width: 90px; margin-bottom: 0;">
                     <label style="font-size: 0.55rem; font-weight: 900; color: #94a3b8; text-transform: uppercase; margin-bottom: 0.4rem; display: block;">City</label>
                     <select id="filter-city" class="p-input" onchange="fetchSites(1)" style="height: 38px; font-size: 0.85rem; background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 8px;">
                         <option value="">All</option>
                         <?php foreach($cities as $c): ?> <option value="<?php echo $c; ?>"><?php echo $c; ?></option> <?php endforeach; ?>
                     </select>
                 </div>
-                <div class="form-group" style="margin-bottom: 0;">
+                <div class="form-group" style="flex: 1 1 110px; min-width: 90px; margin-bottom: 0;">
                     <label style="font-size: 0.55rem; font-weight: 900; color: #94a3b8; text-transform: uppercase; margin-bottom: 0.4rem; display: block;">Location</label>
                     <select id="filter-location" class="p-input" onchange="fetchSites(1)" style="height: 38px; font-size: 0.85rem; background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 8px;">
                         <option value="">All</option>
                         <?php foreach($locations as $loc): ?> <option value="<?php echo htmlspecialchars($loc); ?>"><?php echo htmlspecialchars($loc); ?></option> <?php endforeach; ?>
                     </select>
                 </div>
-                <div class="form-group" style="margin-bottom: 0;">
+                <div class="form-group" style="flex: 1 1 110px; min-width: 90px; margin-bottom: 0;">
                     <label style="font-size: 0.55rem; font-weight: 900; color: #94a3b8; text-transform: uppercase; margin-bottom: 0.4rem; display: block;">Light</label>
                     <select id="light_type" class="p-input" onchange="fetchSites(1)" style="height: 38px; font-size: 0.85rem; background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 8px;">
                         <option value="">All</option>
                         <?php foreach($illuminations as $il): ?> <option value="<?php echo $il; ?>"><?php echo $il; ?></option> <?php endforeach; ?>
                     </select>
                 </div>
-                <div class="form-group" style="margin-bottom: 0;">
+                <div class="form-group" style="flex: 1 1 110px; min-width: 90px; margin-bottom: 0;">
                     <label style="font-size: 0.55rem; font-weight: 900; color: #94a3b8; text-transform: uppercase; margin-bottom: 0.4rem; display: block;">Size</label>
                     <select id="filter-size" class="p-input" onchange="fetchSites(1)" style="height: 38px; font-size: 0.85rem; background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 8px;">
                         <option value="">All</option>

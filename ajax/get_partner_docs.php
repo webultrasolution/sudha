@@ -10,14 +10,14 @@ if (!$partner_id) {
 
 // Fetch Client Invoices
 $invoices = $pdo->prepare("
-    SELECT i.id, i.invoice_number, i.total_amount 
+    SELECT i.id, CONVERT(i.invoice_number USING utf8mb4) COLLATE utf8mb4_unicode_ci as invoice_number, i.total_amount 
     FROM invoices i
     JOIN bookings b ON i.booking_id = b.id
     WHERE b.client_id = ? 
     
     UNION ALL
     
-    SELECT MIN(r.id) as id, COALESCE(r.po_number, CONCAT('RATE-', MIN(r.id))) as invoice_number, 
+    SELECT MIN(r.id) as id, COALESCE(CONVERT(r.po_number USING utf8mb4) COLLATE utf8mb4_unicode_ci, CONVERT(CONCAT('RATE-', MIN(r.id)) USING utf8mb4) COLLATE utf8mb4_unicode_ci) as invoice_number, 
            SUM(r.rate_per_sqft * COALESCE(s.width, 0) * COALESCE(s.height, 0)) as total_amount
     FROM client_printing_rates r
     LEFT JOIN sites s ON r.site_id = s.id
@@ -30,13 +30,13 @@ $invoices->execute([$partner_id, $partner_id]);
 
 // Fetch Vendor POs
 $pos = $pdo->prepare("
-    SELECT id, po_number, COALESCE(total_amount, 0) as grand_total 
+    SELECT id, CONVERT(po_number USING utf8mb4) COLLATE utf8mb4_unicode_ci as po_number, COALESCE(total_amount, 0) as grand_total 
     FROM purchase_orders 
     WHERE vendor_id = ? 
     
     UNION ALL
     
-    SELECT MIN(r.id) as id, COALESCE(r.po_number, CONCAT('RATE-', MIN(r.id))) as po_number, 
+    SELECT MIN(r.id) as id, COALESCE(CONVERT(r.po_number USING utf8mb4) COLLATE utf8mb4_unicode_ci, CONVERT(CONCAT('RATE-', MIN(r.id)) USING utf8mb4) COLLATE utf8mb4_unicode_ci) as po_number, 
            SUM(r.rate_per_sqft * COALESCE(s.width, 0) * COALESCE(s.height, 0)) as grand_total
     FROM vendor_printing_rates r
     LEFT JOIN sites s ON r.site_id = s.id

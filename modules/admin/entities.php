@@ -10,9 +10,9 @@ $error = '';
 // Handle Entity Deletion
 if (isset($_GET['delete'])) {
     $id = (int)$_GET['delete'];
-    $stmt = $pdo->prepare("DELETE FROM entities WHERE id = ?");
-    if ($stmt->execute([$id])) {
-        $message = "Entity deleted successfully!";
+    include_once __DIR__ . '/../../includes/trash_helper.php';
+    if (move_row_to_trash($pdo, 'entities', 'id', $id, $_SESSION['user_id'] ?? null, 'Entity deleted via admin UI')) {
+        $message = "Entity moved to trash successfully!";
     }
 }
 

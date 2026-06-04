@@ -75,6 +75,13 @@ $stmtInvCheck = $pdo->prepare("SELECT id FROM invoices WHERE booking_id = ? AND 
 $stmtInvCheck->execute([$id]);
 $invoiceFinalized = (bool) $stmtInvCheck->fetchColumn();
 
+// Check if RO Invoice already exists — locks cost editing
+$stmtRoCheck = $pdo->prepare("SELECT id FROM invoices WHERE booking_id = ? AND type = 'ro' LIMIT 1");
+$stmtRoCheck->execute([$id]);
+$roFinalized = (bool) $stmtRoCheck->fetchColumn();
+
+$isLocked = $invoiceFinalized || $roFinalized;
+
 $isAdmin = ($_SESSION['user_role'] ?? '') === 'admin';
 
 // Fetch unique values for filter dropdowns
@@ -104,7 +111,7 @@ $vendors = $pdo->query("SELECT id, name FROM partners WHERE type = 'vendor' AND 
             <span style="font-size: 1.1rem; font-weight: 700; color: #1e293b;" id="display_campaign_name">
                 <?php echo htmlspecialchars($b['campaign_name'] ?: 'No Campaign Name'); ?>
             </span>
-            <?php if ((!$invoiceFinalized || $isAdmin) && canEdit('bookings')): ?>
+            <?php if ((!$isLocked || $isAdmin) && canEdit('bookings')): ?>
                 <button onclick="editCampaignName()" class="btn"
                     style="padding: 0.2rem 0.5rem; font-size: 0.7rem; border-radius: 4px; background: #e2e8f0; color: #475569; border: none; cursor: pointer; display: flex; align-items: center; gap: 0.3rem; margin-left: 0.5rem;">
                     <i class="fas fa-edit"></i> Edit Name
@@ -139,7 +146,7 @@ $vendors = $pdo->query("SELECT id, name FROM partners WHERE type = 'vendor' AND 
                 <i class="fas fa-building" style="color: #64748b; margin-right: 4px;"></i> 
                 Billing GSTIN: <strong><?php echo htmlspecialchars($b['billing_gstin'] ?: $b['primary_gstin']); ?></strong>
             </span>
-            <?php if ((!$invoiceFinalized || $isAdmin) && canEdit('bookings')): ?>
+            <?php if ((!$isLocked || $isAdmin) && canEdit('bookings')): ?>
                 <button onclick="editBillingGstin()" class="btn"
                     style="padding: 0.2rem 0.5rem; font-size: 0.7rem; border-radius: 4px; background: #e2e8f0; color: #475569; border: none; cursor: pointer; display: flex; align-items: center; gap: 0.3rem;">
                     <i class="fas fa-edit"></i> Edit GSTIN
@@ -179,6 +186,33 @@ $vendors = $pdo->query("SELECT id, name FROM partners WHERE type = 'vendor' AND 
                 <i class="fas fa-file-invoice-dollar"></i> Final Tax Invoice
             </button>
         <?php endif; ?>
+
+        <?php
+        // Check if RO invoice already exists
+        $stmtRoInv = $pdo->prepare("SELECT id, approval_status FROM invoices WHERE booking_id = ? AND type = 'ro' LIMIT 1");
+        $stmtRoInv->execute([$id]);
+        $existingRoInvoice = $stmtRoInv->fetch();
+
+        if ($existingRoInvoice): ?>
+            <?php if (($existingRoInvoice['approval_status'] ?? '') === 'approved' || $isAdmin): ?>
+                <a href="generate_ro_invoice.php?booking_id=<?php echo $id; ?>" target="_blank" class="btn"
+                    style="background: #10b981; color: white; padding: 0.75rem 1.5rem; border-radius: 10px; font-weight: 800; border: none; cursor: pointer; display: flex; align-items: center; gap: 0.5rem; text-decoration: none;">
+                    <i class="fas fa-eye"></i> View RO Invoice
+                </a>
+            <?php else: ?>
+                <button class="btn"
+                    style="background: #f8fafc; border: 1px solid #e2e8f0; color: #94a3b8; padding: 0.75rem 1.25rem; border-radius: 10px; font-weight: 700; font-size: 0.9rem; cursor: not-allowed; display: flex; align-items: center; gap: 0.5rem;"
+                    title="RO Invoice is awaiting admin approval.">
+                    <i class="fas fa-lock"></i> RO Invoice Pending Approval
+                </button>
+            <?php endif; ?>
+        <?php else: ?>
+            <a href="generate_ro_invoice.php?booking_id=<?php echo $id; ?>" target="_blank" class="btn"
+                style="background: #0f172a; color: white; padding: 0.75rem 1.5rem; border-radius: 10px; font-weight: 800; border: none; cursor: pointer; display: flex; align-items: center; gap: 0.5rem; text-decoration: none;">
+                <i class="fas fa-file-invoice-dollar"></i> Generate RO
+            </a>
+        <?php endif; ?>
+
             <button class="btn btn-primary" onclick="window.print()"
                 style="padding: 0.75rem 1.5rem; border-radius: 10px; font-weight: 800;">
                 <i class="fas fa-print"></i> Print Booking
@@ -206,9 +240,6 @@ $vendors = $pdo->query("SELECT id, name FROM partners WHERE type = 'vendor' AND 
         <div class="p-row"><span>Start
                 Date</span><strong><?php echo date('d M Y', strtotime($b['start_date'])); ?></strong></div>
         <div class="p-row"><span>End Date</span><strong><?php echo date('d M Y', strtotime($b['end_date'])); ?></strong>
-        </div>
-        <div class="p-row">
-            <span>Mounting</span><strong><?php echo $b['mounting_date'] ? date('d M Y', strtotime($b['mounting_date'])) : 'Pending'; ?></strong>
         </div>
     </div>
 
@@ -286,11 +317,7 @@ $stmtCheckPO = $pdo->prepare("SELECT id, approval_status FROM purchase_orders WH
                 <input type="text" id="tableSearch" placeholder="Search in booking..." class="p-input"
                     style="width: 250px; padding-left: 2.5rem; height: 38px; border-radius: 8px;">
             </div>
-            <a href="generate_mounting_po.php?booking_id=<?php echo $id; ?>"
-                style="background: #0d9488; color: white; padding: 0 1.25rem; border-radius: 8px; font-weight: 800; text-decoration: none; display: flex; align-items: center; gap: 0.5rem; height: 38px; font-size: 0.85rem; white-space: nowrap;">
-                <i class="fas fa-tools"></i> Generate Mounting PO
-            </a>
-            <?php if ((!$invoiceFinalized || $isAdmin) && canEdit('bookings')): ?>
+            <?php if ((!$isLocked || $isAdmin) && canEdit('bookings')): ?>
                 <button class="btn btn-secondary" onclick="openAddSiteModal()"
                     style="height: 38px; border-radius: 8px; background: #f1f5f9; color: #475569; border: 1px solid #e2e8f0;"><i
                         class="fas fa-plus-circle text-primary"></i> Add Sites</button>
@@ -434,7 +461,7 @@ $stmtCheckPO = $pdo->prepare("SELECT id, approval_status FROM purchase_orders WH
                                     <span
                                         style="font-size: 0.65rem; font-weight: 800; color: #94a3b8; text-transform: uppercase; display: block; margin-bottom: 2px;">Purchase
                                         Cost</span>
-                                    <?php if (($invoiceFinalized && !$isAdmin) || !canEdit('bookings')): ?>
+                                    <?php if (($isLocked && !$isAdmin) || !canEdit('bookings')): ?>
                                         <!-- Locked after Final Invoice or without edit permission -->
                                         <div style="display: inline-flex; align-items: center; gap: 0.4rem; background: #f1f5f9; border: 1px solid #cbd5e1; border-radius: 4px; padding: 3px 8px;"
                                             title="Locked">
@@ -481,7 +508,7 @@ $stmtCheckPO = $pdo->prepare("SELECT id, approval_status FROM purchase_orders WH
                         <?php endif; ?>
                     </td>
                     <td style="text-align: right; vertical-align: middle;">
-                        <?php if (($invoiceFinalized && !$isAdmin) || !canEdit('bookings')): ?>
+                        <?php if (($isLocked && !$isAdmin) || !canEdit('bookings')): ?>
                             <div style="display: inline-flex; align-items: center; gap: 0.4rem; background: #f1f5f9; border: 1px solid #cbd5e1; border-radius: 4px; padding: 3px 8px; justify-content: flex-end;"
                                 title="Locked">
                                 <i class="fas fa-lock" style="font-size: 0.6rem; color: #94a3b8;"></i>
@@ -727,78 +754,78 @@ $stmtCheckPO = $pdo->prepare("SELECT id, approval_status FROM purchase_orders WH
         </div>
 
         <div
-            style="display: grid; grid-template-columns: 2fr 1fr 1fr 1fr 1fr 1fr 1fr auto; gap: 0.5rem; margin-bottom: 1rem; align-items: flex-end;">
-            <div class="search-group">
+            style="display: flex; flex-wrap: wrap; gap: 0.5rem; margin-bottom: 1rem; align-items: flex-end; width: 100%;">
+            <div class="search-group" style="flex: 2 1 200px; min-width: 150px; margin-bottom: 0;">
                 <label
                     style="font-size: 0.55rem; font-weight: 900; color: #94a3b8; margin-bottom: 0.2rem; text-transform: uppercase;">Search
                     Site / Code / Area</label>
                 <input type="text" id="modal-search" class="p-input" placeholder="Search..."
-                    oninput="modalFetchSites(1)" style="height: 32px; font-size: 0.78rem; color: #1e293b !important; background: #fff; -webkit-text-fill-color: #1e293b;">
+                    oninput="modalFetchSites(1)" style="height: 32px; font-size: 0.78rem; color: #1e293b !important; background: #fff; -webkit-text-fill-color: #1e293b; padding: 0 10px; box-sizing: border-box;">
             </div>
-            <div class="search-group">
+            <div class="search-group" style="flex: 1 1 110px; min-width: 90px; margin-bottom: 0;">
                 <label
                     style="font-size: 0.55rem; font-weight: 900; color: #94a3b8; margin-bottom: 0.2rem; text-transform: uppercase;">Media</label>
                 <select id="modal-media" class="p-input" onchange="modalFetchSites(1)"
-                    style="height: 32px; font-size: 0.78rem; color: #1e293b !important; background: #fff; -webkit-text-fill-color: #1e293b;">
+                    style="height: 32px; font-size: 0.78rem; color: #1e293b !important; background: #fff; -webkit-text-fill-color: #1e293b; padding: 0 8px; box-sizing: border-box;">
                     <option value="" style="color:#1e293b;">All</option>
                     <?php foreach ($mediaTypes as $mt): ?>
                         <option value="<?php echo $mt; ?>"><?php echo $mt; ?></option> <?php endforeach; ?>
                 </select>
             </div>
-            <div class="search-group">
+            <div class="search-group" style="flex: 1 1 110px; min-width: 90px; margin-bottom: 0;">
                 <label
                     style="font-size: 0.55rem; font-weight: 900; color: #94a3b8; margin-bottom: 0.2rem; text-transform: uppercase;">State</label>
                 <select id="modal-state" class="p-input" onchange="modalFetchSites(1)"
-                    style="height: 32px; font-size: 0.78rem; color: #1e293b !important; background: #fff; -webkit-text-fill-color: #1e293b;">
+                    style="height: 32px; font-size: 0.78rem; color: #1e293b !important; background: #fff; -webkit-text-fill-color: #1e293b; padding: 0 8px; box-sizing: border-box;">
                     <option value="" style="color:#1e293b;">All</option>
                     <?php foreach ($states as $s): ?>
                         <option value="<?php echo $s; ?>"><?php echo $s; ?></option> <?php endforeach; ?>
                 </select>
             </div>
-            <div class="search-group">
+            <div class="search-group" style="flex: 1 1 110px; min-width: 90px; margin-bottom: 0;">
                 <label
                     style="font-size: 0.55rem; font-weight: 900; color: #94a3b8; margin-bottom: 0.2rem; text-transform: uppercase;">City</label>
                 <select id="modal-city" class="p-input" onchange="modalFetchSites(1)"
-                    style="height: 32px; font-size: 0.78rem; color: #1e293b !important; background: #fff; -webkit-text-fill-color: #1e293b;">
+                    style="height: 32px; font-size: 0.78rem; color: #1e293b !important; background: #fff; -webkit-text-fill-color: #1e293b; padding: 0 8px; box-sizing: border-box;">
                     <option value="" style="color:#1e293b;">All</option>
                     <?php foreach ($cities as $c): ?>
                         <option value="<?php echo $c; ?>"><?php echo $c; ?></option> <?php endforeach; ?>
                 </select>
             </div>
-            <div class="search-group">
+            <div class="search-group" style="flex: 1 1 110px; min-width: 90px; margin-bottom: 0;">
                 <label
                     style="font-size: 0.55rem; font-weight: 900; color: #94a3b8; margin-bottom: 0.2rem; text-transform: uppercase;">Location</label>
                 <select id="modal-location" class="p-input" onchange="modalFetchSites(1)"
-                    style="height: 32px; font-size: 0.78rem; color: #1e293b !important; background: #fff; -webkit-text-fill-color: #1e293b;">
+                    style="height: 32px; font-size: 0.78rem; color: #1e293b !important; background: #fff; -webkit-text-fill-color: #1e293b; padding: 0 8px; box-sizing: border-box;">
                     <option value="" style="color:#1e293b;">All</option>
                     <?php foreach ($locations as $loc): ?>
                         <option value="<?php echo htmlspecialchars($loc); ?>"><?php echo htmlspecialchars($loc); ?></option>
                     <?php endforeach; ?>
                 </select>
             </div>
-            <div class="search-group">
+            <div class="search-group" style="flex: 1 1 110px; min-width: 90px; margin-bottom: 0;">
                 <label
                     style="font-size: 0.55rem; font-weight: 900; color: #94a3b8; margin-bottom: 0.2rem; text-transform: uppercase;">Light</label>
                 <select id="modal-light" class="p-input" onchange="modalFetchSites(1)"
-                    style="height: 32px; font-size: 0.78rem; color: #1e293b !important; background: #fff; -webkit-text-fill-color: #1e293b;">
+                    style="height: 32px; font-size: 0.78rem; color: #1e293b !important; background: #fff; -webkit-text-fill-color: #1e293b; padding: 0 8px; box-sizing: border-box;">
                     <option value="" style="color:#1e293b;">All</option>
                     <?php foreach ($illuminations as $il): ?>
                         <option value="<?php echo $il; ?>"><?php echo $il; ?></option> <?php endforeach; ?>
                 </select>
             </div>
-            <div class="search-group">
+            <div class="search-group" style="flex: 1 1 110px; min-width: 90px; margin-bottom: 0;">
                 <label
                     style="font-size: 0.55rem; font-weight: 900; color: #94a3b8; margin-bottom: 0.2rem; text-transform: uppercase;">Vendor</label>
                 <select id="modal-vendor" class="p-input" onchange="modalFetchSites(1)"
-                    style="height: 32px; font-size: 0.78rem; color: #1e293b !important; background: #fff; -webkit-text-fill-color: #1e293b;">
+                    style="height: 32px; font-size: 0.78rem; color: #1e293b !important; background: #fff; -webkit-text-fill-color: #1e293b; padding: 0 8px; box-sizing: border-box;">
                     <option value="" style="color:#1e293b;">All</option>
                     <?php foreach ($vendors as $v): ?>
                         <option value="<?php echo $v['id']; ?>"><?php echo $v['name']; ?></option> <?php endforeach; ?>
                 </select>
             </div>
-            <div class="search-group" style="display: flex; align-items: flex-end;">
+            <div class="search-group" style="flex: 0 0 auto; margin-bottom: 0; display: flex; align-items: flex-end;">
                 <button class="btn btn-secondary" onclick="clearModalFilters()"
-                    style="height: 30px; font-size: 0.75rem; padding: 0 0.75rem; border-radius: 8px; background: #f1f5f9; color: #475569; border: 1px solid #e2e8f0;"><i
+                    style="height: 30px; font-size: 0.75rem; padding: 0 0.75rem; border-radius: 8px; background: #f1f5f9; color: #475569; border: 1px solid #e2e8f0; box-sizing: border-box;"><i
                         class="fas fa-times-circle"></i> Clear</button>
             </div>
         </div>
@@ -1234,6 +1261,7 @@ $stmtCheckPO = $pdo->prepare("SELECT id, approval_status FROM purchase_orders WH
             }
         });
     }
+
     function saveAndGeneratePO(booking_id, vendor_id) {
         Swal.fire({
             title: 'Save PO to Database?',

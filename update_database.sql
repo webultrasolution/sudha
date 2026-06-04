@@ -18,3 +18,18 @@ ADD COLUMN IF NOT EXISTS `mounting_date` DATE DEFAULT NULL AFTER `created_at`;
 ALTER TABLE `payments` CHANGE COLUMN `entity_id` `partner_id` INT(11);
 ALTER TABLE `payments` CHANGE COLUMN `reference_no` `transaction_id` VARCHAR(100);
 ALTER TABLE `payments` CHANGE COLUMN `po_id` `proposal_id` INT(11);
+
+-- 3. Fix 'approval_requests' table column 'entity_type' enum values
+ALTER TABLE `approval_requests` MODIFY COLUMN `entity_type` ENUM('proposal','purchase_order','booking','invoice','client_printing','payment') NOT NULL;
+UPDATE `approval_requests` SET `entity_type` = 'client_printing' WHERE `entity_type` = '' AND `entity_ref` LIKE 'CP%';
+UPDATE `approval_requests` SET `entity_type` = 'payment' WHERE `entity_type` = '' AND `entity_ref` LIKE 'Payment%';
+
+-- 4. Heal existing invoices with NULL GST values
+UPDATE `invoices` i 
+JOIN `bookings` b ON i.booking_id = b.id 
+SET i.cgst = IF(b.tax_type = 'cgst_sgst', b.tax_amount/2, 0), 
+    i.sgst = IF(b.tax_type = 'cgst_sgst', b.tax_amount/2, 0), 
+    i.igst = IF(b.tax_type = 'igst', b.tax_amount, 0) 
+WHERE i.cgst IS NULL AND i.sgst IS NULL AND i.igst IS NULL;
+
+

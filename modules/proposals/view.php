@@ -395,55 +395,55 @@ html, body { overflow-x: visible !important; }
             </div>
         </div>
         
-        <div style="display: grid; grid-template-columns: 2fr 1fr 1fr 1fr 1fr 1fr 1fr auto; gap: 0.5rem; margin-bottom: 1rem; align-items: flex-end;">
-            <div class="search-group">
+        <div style="display: flex; flex-wrap: wrap; gap: 0.5rem; margin-bottom: 1rem; align-items: flex-end; width: 100%;">
+            <div class="search-group" style="flex: 2 1 200px; min-width: 150px; margin-bottom: 0;">
                 <label style="font-size: 0.55rem; font-weight: 900; color: #94a3b8; margin-bottom: 0.2rem; text-transform: uppercase;">Search Site / Code / Area</label>
-                <input type="text" id="modal-search" class="p-input" placeholder="Search..." oninput="modalFetchSites(1)" style="height: 30px; font-size: 0.75rem;">
+                <input type="text" id="modal-search" class="p-input" placeholder="Search..." oninput="modalFetchSites(1)" style="height: 30px; font-size: 0.75rem; padding: 0 10px; box-sizing: border-box;">
             </div>
-            <div class="search-group">
+            <div class="search-group" style="flex: 1 1 110px; min-width: 90px; margin-bottom: 0;">
                 <label style="font-size: 0.55rem; font-weight: 900; color: #94a3b8; margin-bottom: 0.2rem; text-transform: uppercase;">Media</label>
-                <select id="modal-media" class="p-input" onchange="modalFetchSites(1)" style="height: 30px; font-size: 0.75rem;">
+                <select id="modal-media" class="p-input" onchange="modalFetchSites(1)" style="height: 30px; font-size: 0.75rem; padding: 0 8px; box-sizing: border-box;">
                     <option value="">All</option>
                     <?php foreach($mediaTypes as $mt): ?> <option value="<?php echo $mt; ?>"><?php echo $mt; ?></option> <?php endforeach; ?>
                 </select>
             </div>
-            <div class="search-group">
+            <div class="search-group" style="flex: 1 1 110px; min-width: 90px; margin-bottom: 0;">
                 <label style="font-size: 0.55rem; font-weight: 900; color: #94a3b8; margin-bottom: 0.2rem; text-transform: uppercase;">State</label>
-                <select id="modal-state" class="p-input" onchange="modalFetchSites(1)" style="height: 30px; font-size: 0.75rem;">
+                <select id="modal-state" class="p-input" onchange="modalFetchSites(1)" style="height: 30px; font-size: 0.75rem; padding: 0 8px; box-sizing: border-box;">
                     <option value="">All</option>
                     <?php foreach($states as $s): ?> <option value="<?php echo $s; ?>"><?php echo $s; ?></option> <?php endforeach; ?>
                 </select>
             </div>
-            <div class="search-group">
+            <div class="search-group" style="flex: 1 1 110px; min-width: 90px; margin-bottom: 0;">
                 <label style="font-size: 0.55rem; font-weight: 900; color: #94a3b8; margin-bottom: 0.2rem; text-transform: uppercase;">City</label>
-                <select id="modal-city" class="p-input" onchange="modalFetchSites(1)" style="height: 30px; font-size: 0.75rem;">
+                <select id="modal-city" class="p-input" onchange="modalFetchSites(1)" style="height: 30px; font-size: 0.75rem; padding: 0 8px; box-sizing: border-box;">
                     <option value="">All</option>
                     <?php foreach($cities as $c): ?> <option value="<?php echo $c; ?>"><?php echo $c; ?></option> <?php endforeach; ?>
                 </select>
             </div>
-            <div class="search-group">
+            <div class="search-group" style="flex: 1 1 110px; min-width: 90px; margin-bottom: 0;">
                 <label style="font-size: 0.55rem; font-weight: 900; color: #94a3b8; margin-bottom: 0.2rem; text-transform: uppercase;">Location</label>
-                <select id="modal-location" class="p-input" onchange="modalFetchSites(1)" style="height: 30px; font-size: 0.75rem;">
+                <select id="modal-location" class="p-input" onchange="modalFetchSites(1)" style="height: 30px; font-size: 0.75rem; padding: 0 8px; box-sizing: border-box;">
                     <option value="">All</option>
                     <?php foreach($locations as $loc): ?> <option value="<?php echo htmlspecialchars($loc); ?>"><?php echo htmlspecialchars($loc); ?></option> <?php endforeach; ?>
                 </select>
             </div>
-            <div class="search-group">
+            <div class="search-group" style="flex: 1 1 110px; min-width: 90px; margin-bottom: 0;">
                 <label style="font-size: 0.55rem; font-weight: 900; color: #94a3b8; margin-bottom: 0.2rem; text-transform: uppercase;">Light</label>
-                <select id="modal-light" class="p-input" onchange="modalFetchSites(1)" style="height: 30px; font-size: 0.75rem;">
+                <select id="modal-light" class="p-input" onchange="modalFetchSites(1)" style="height: 30px; font-size: 0.75rem; padding: 0 8px; box-sizing: border-box;">
                     <option value="">All</option>
                     <?php foreach($illuminations as $il): ?> <option value="<?php echo $il; ?>"><?php echo $il; ?></option> <?php endforeach; ?>
                 </select>
             </div>
-            <div class="search-group">
+            <div class="search-group" style="flex: 1 1 110px; min-width: 90px; margin-bottom: 0;">
                 <label style="font-size: 0.55rem; font-weight: 900; color: #94a3b8; margin-bottom: 0.2rem; text-transform: uppercase;">Vendor</label>
-                <select id="modal-vendor" class="p-input" onchange="modalFetchSites(1)" style="height: 30px; font-size: 0.75rem;">
+                <select id="modal-vendor" class="p-input" onchange="modalFetchSites(1)" style="height: 30px; font-size: 0.75rem; padding: 0 8px; box-sizing: border-box;">
                     <option value="">All</option>
                     <?php foreach($vendors as $v): ?> <option value="<?php echo $v['id']; ?>"><?php echo $v['name']; ?></option> <?php endforeach; ?>
                 </select>
             </div>
-            <div class="search-group" style="display: flex; align-items: flex-end;">
-                <button class="btn btn-secondary" onclick="clearModalFilters()" style="height: 30px; font-size: 0.75rem; padding: 0 0.75rem; border-radius: 8px; background: #f1f5f9; color: #475569; border: 1px solid #e2e8f0;"><i class="fas fa-times-circle"></i> Clear</button>
+            <div class="search-group" style="flex: 0 0 auto; margin-bottom: 0; display: flex; align-items: flex-end;">
+                <button class="btn btn-secondary" onclick="clearModalFilters()" style="height: 30px; font-size: 0.75rem; padding: 0 0.75rem; border-radius: 8px; background: #f1f5f9; color: #475569; border: 1px solid #e2e8f0; box-sizing: border-box;"><i class="fas fa-times-circle"></i> Clear</button>
             </div>
         </div>
 

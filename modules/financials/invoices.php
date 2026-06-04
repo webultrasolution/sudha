@@ -35,7 +35,9 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action']) && $_POST['
         $pdo->commit();
         echo json_encode(['success' => true]);
     } catch (Exception $e) {
-        $pdo->rollBack();
+        if ($pdo->inTransaction()) {
+            $pdo->rollBack();
+        }
         echo json_encode(['success' => false, 'message' => $e->getMessage()]);
     }
     exit;
@@ -52,20 +54,47 @@ requirePermission('financials', 'view');
 $limit = 10;
 $page = isset($_GET['page']) ? (int)$_GET['page'] : 1;
 $offset = ($page - 1) * $limit;
-$totalInvoices = $pdo->query("SELECT COUNT(*) FROM invoices")->fetchColumn();
+
+$clientFilter = isset($_GET['client_id']) ? intval($_GET['client_id']) : 0;
+$campaignFilter = trim($_GET['campaign_name'] ?? '');
+
+$where = 'WHERE 1=1';
+$params = [];
+if ($clientFilter) {
+    $where .= ' AND b.client_id = ?';
+    $params[] = $clientFilter;
+}
+if ($campaignFilter !== '') {
+    $where .= ' AND b.campaign_name LIKE ?';
+    $params[] = '%' . $campaignFilter . '%';
+}
+
+$totalInvoicesQuery = $pdo->prepare("
+    SELECT COUNT(*) 
+    FROM invoices i
+    JOIN bookings b ON i.booking_id = b.id
+    $where
+");
+$totalInvoicesQuery->execute($params);
+$totalInvoices = $totalInvoicesQuery->fetchColumn();
 $totalPages = ceil($totalInvoices / $limit);
 
 $invoices = $pdo->prepare("
-    SELECT i.*, b.id as booking_id, c.name as client_name 
+    SELECT i.*, b.id as booking_id, b.campaign_name, b.brand_name, c.name as client_name 
     FROM invoices i
     JOIN bookings b ON i.booking_id = b.id
     LEFT JOIN proposals p ON b.proposal_id = p.id
     JOIN partners c ON b.client_id = c.id
+    $where
     ORDER BY i.id DESC
     LIMIT ? OFFSET ?
 ");
-$invoices->execute([$limit, $offset]);
+$params[] = $limit;
+$params[] = $offset;
+$invoices->execute($params);
 $invoices = $invoices->fetchAll();
+
+$clients = $pdo->query("SELECT id, name FROM partners WHERE type = 'client' ORDER BY name ASC")->fetchAll();
 ?>
 
 <div class="card">
@@ -76,22 +105,42 @@ $invoices = $invoices->fetchAll();
         <?php endif; ?>
     </div>
 
+    <form method="get" action="invoices.php" style="display:flex; flex-wrap: wrap; gap:1rem; align-items:flex-end; margin-bottom:1.5rem;">
+        <div style="display:flex; flex-direction:column; gap:0.35rem;">
+            <label style="font-size:0.85rem; color:#475569; font-weight:600;">Client</label>
+            <select name="client_id" style="padding:0.75rem 0.95rem; border-radius:0.75rem; border:1px solid #d1d5db; min-width:220px;">
+                <option value="">All Clients</option>
+                <?php foreach ($clients as $client): ?>
+                    <option value="<?php echo $client['id']; ?>" <?php echo $clientFilter === intval($client['id']) ? 'selected' : ''; ?>><?php echo htmlspecialchars($client['name']); ?></option>
+                <?php endforeach; ?>
+            </select>
+        </div>
+        <div style="display:flex; flex-direction:column; gap:0.35rem; min-width:280px;">
+            <label style="font-size:0.85rem; color:#475569; font-weight:600;">Campaign Name</label>
+            <input type="text" name="campaign_name" value="<?php echo htmlspecialchars($campaignFilter); ?>" placeholder="Search campaign..." style="padding:0.75rem 0.95rem; border-radius:0.75rem; border:1px solid #d1d5db; min-width:280px;">
+        </div>
+        <div style="display:flex; gap:0.75rem;">
+            <button type="submit" class="btn btn-primary" style="padding:0.85rem 1.25rem;">Filter</button>
+            <a href="invoices.php" class="btn" style="background:#f8fafc; color:#475569; border:1px solid #cbd5e1; padding:0.85rem 1.25rem; text-decoration:none;">Reset</a>
+        </div>
+    </form>
+
     <table class="table">
         <thead>
             <tr>
-                <th style="width: 40px;">#</th>
-                <th>Invoice Details</th>
+                <th style="width: 120px;">Invoice #</th>
                 <th>Client / Booking</th>
+                <th>Campaign / Brand</th>
                 <th>Subtotal / Tax</th>
                 <th>Total Amount</th>
                 <th>Status</th>
-                <th style="text-align: right;">Actions</th>
+                <th style="text-align: right; width: 120px;">Actions</th>
             </tr>
         </thead>
         <tbody>
             <?php if (empty($invoices)): ?>
                 <tr>
-                    <td colspan="8" style="text-align: center; color: var(--secondary); padding: 2rem;">No invoices generated yet.</td>
+                    <td colspan="7" style="text-align: center; color: var(--secondary); padding: 2rem;">No invoices generated yet.</td>
                 </tr>
             <?php else: ?>
                 <?php 
@@ -99,12 +148,23 @@ $invoices = $invoices->fetchAll();
                 foreach ($invoices as $i): ?>
                 <tr>
                     <td>
-                        <div style="font-weight: 700; color: var(--primary);"><?php echo $i['invoice_number']; ?></div>
+                        <div style="font-weight: 700; color: var(--primary);">
+                            <?php echo $i['invoice_number']; ?>
+                            <?php if (($i['type'] ?? '') === 'ro'): ?>
+                                <span style="background: #e2e8f0; color: #475569; padding: 0.1rem 0.3rem; border-radius: 4px; font-size: 0.6rem; font-weight: 800; margin-left: 0.25rem;">RO</span>
+                            <?php endif; ?>
+                        </div>
                         <div style="font-size: 0.7rem; color: #94a3b8; font-weight: 600;"><?php echo date('d M Y', strtotime($i['created_at'] ?? date('Y-m-d'))); ?></div>
                     </td>
                     <td>
                         <div style="font-weight: 600; color: #334155;"><?php echo $i['client_name']; ?></div>
                         <div style="font-size: 0.7rem; color: #94a3b8;">Booking: #BK-<?php echo str_pad($i['booking_id'], 4, '0', STR_PAD_LEFT); ?></div>
+                    </td>
+                    <td>
+                        <div style="font-weight: 700; color: #1e293b;"><?php echo htmlspecialchars($i['campaign_name'] ?? ''); ?></div>
+                        <?php if (!empty($i['brand_name'])): ?>
+                            <div style="font-size: 0.7rem; color: #64748b; font-weight: 600; text-transform: uppercase;"><?php echo htmlspecialchars($i['brand_name']); ?></div>
+                        <?php endif; ?>
                     </td>
                     <td>
                         <div style="font-size: 0.85rem; color: #475569;">Sub: <?php echo formatCurrency($i['sub_total']); ?></div>
@@ -117,7 +177,7 @@ $invoices = $invoices->fetchAll();
                         </span>
                     </td>
                     <td style="text-align: right;">
-                        <a href="../operations/generate_invoice.php?booking_id=<?php echo $i['booking_id']; ?>" target="_blank" class="btn-icon" title="View & Print" style="color: #64748b;"><i class="fas fa-file-invoice"></i></a>
+                        <a href="../operations/<?php echo $i['type'] === 'ro' ? 'generate_ro_invoice.php' : 'generate_invoice.php'; ?>?booking_id=<?php echo $i['booking_id']; ?>" target="_blank" class="btn-icon" title="View & Print" style="color: #64748b;"><i class="fas fa-file-invoice"></i></a>
                         <button class="btn-icon" title="Email Invoice" style="color: var(--primary);"><i class="fas fa-paper-plane"></i></button>
                         <?php if (canDelete('financials')): ?>
                         <button class="btn-icon" title="Delete Invoice" onclick="deleteInvoice(<?php echo $i['id']; ?>)" style="color: #ef4444;"><i class="fas fa-trash"></i></button>
@@ -128,7 +188,7 @@ $invoices = $invoices->fetchAll();
             <?php endif; ?>
         </tbody>
     </table>
-    <?php echo renderPagination($page, $totalPages, 'invoices.php'); ?>
+    <?php echo renderPagination($page, $totalPages, 'invoices.php', 'page', ['client_id' => $clientFilter, 'campaign_name' => $campaignFilter]); ?>
 </div>
 
 <style>

@@ -97,18 +97,41 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 }
 
 $clients = $pdo->query("SELECT id, name FROM partners WHERE type = 'client' ORDER BY name ASC")->fetchAll();
-$sites   = $pdo->query("
-    SELECT s.id, s.name, s.site_code, s.width, s.height, s.city, s.state, s.type, s.light_type, s.owner_type, s.status, s.location,
-        s.hsn_code, s.mounting_hsn,
-        p.name as vendor_name,
-        (SELECT GROUP_CONCAT(filename) FROM site_images WHERE site_id = s.id) as all_images,
-        (SELECT filename FROM site_images WHERE site_id = s.id LIMIT 1) as thumbnail
-    FROM sites s LEFT JOIN partners p ON s.vendor_id = p.id
-    ORDER BY s.site_code ASC
-")->fetchAll();
+$vendors = $pdo->query("SELECT id, name FROM partners WHERE type = 'vendor' ORDER BY name ASC")->fetchAll();
+try {
+    $sites   = $pdo->query("
+        SELECT s.id, s.name, s.site_code, s.width, s.height, s.vendor_id, s.city, s.state, s.type, s.light_type, s.owner_type, s.status, s.location,
+            s.hsn_code, s.mounting_hsn,
+            p.name as vendor_name,
+            (SELECT GROUP_CONCAT(filename) FROM site_images WHERE site_id = s.id) as all_images,
+            (SELECT filename FROM site_images WHERE site_id = s.id LIMIT 1) as thumbnail
+        FROM sites s LEFT JOIN partners p ON s.vendor_id = p.id
+        ORDER BY s.site_code ASC
+    ")->fetchAll();
+} catch (PDOException $e) {
+    if (strpos($e->getMessage(), 'mounting_hsn') !== false) {
+        try {
+            $pdo->exec("ALTER TABLE sites ADD COLUMN mounting_hsn VARCHAR(50) DEFAULT NULL AFTER hsn_code");
+            $sites   = $pdo->query("
+                SELECT s.id, s.name, s.site_code, s.width, s.height, s.vendor_id, s.city, s.state, s.type, s.light_type, s.owner_type, s.status, s.location,
+                    s.hsn_code, s.mounting_hsn,
+                    p.name as vendor_name,
+                    (SELECT GROUP_CONCAT(filename) FROM site_images WHERE site_id = s.id) as all_images,
+                    (SELECT filename FROM site_images WHERE site_id = s.id LIMIT 1) as thumbnail
+                FROM sites s LEFT JOIN partners p ON s.vendor_id = p.id
+                ORDER BY s.site_code ASC
+            ")->fetchAll();
+        } catch (Exception $ex) {
+            throw $e;
+        }
+    } else {
+        throw $e;
+    }
+}
 
 $cities        = $pdo->query("SELECT DISTINCT city  FROM sites WHERE city IS NOT NULL AND city != '' ORDER BY city")->fetchAll(PDO::FETCH_COLUMN);
 $states        = $pdo->query("SELECT DISTINCT state FROM sites WHERE state IS NOT NULL AND state != '' ORDER BY state")->fetchAll(PDO::FETCH_COLUMN);
+$locations     = $pdo->query("SELECT DISTINCT location FROM sites WHERE location IS NOT NULL AND location != '' ORDER BY location")->fetchAll(PDO::FETCH_COLUMN);
 $mediaTypes    = $pdo->query("SELECT DISTINCT type  FROM sites WHERE type IS NOT NULL AND type != '' ORDER BY type")->fetchAll(PDO::FETCH_COLUMN);
 $illuminations = $pdo->query("SELECT DISTINCT light_type FROM sites WHERE light_type IS NOT NULL AND light_type != '' ORDER BY light_type")->fetchAll(PDO::FETCH_COLUMN);
 $sizes         = $pdo->query("SELECT DISTINCT CONCAT(width,'x',height) as size FROM sites WHERE width IS NOT NULL AND height IS NOT NULL ORDER BY width,height")->fetchAll(PDO::FETCH_COLUMN);
@@ -185,6 +208,15 @@ include_once __DIR__ . '/../../includes/header.php';
                         <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:0.5rem;flex-wrap:wrap;gap:1rem;">
                             <div style="display:flex;align-items:center;gap:2rem;">
                                 <span style="font-weight:800;color:#0d9488;font-size:0.65rem;text-transform:uppercase;letter-spacing:0.05em;display:flex;align-items:center;gap:6px;"><i class="fas fa-filter"></i> Filters</span>
+                                <!-- Ownership -->
+                                <div style="display:flex;align-items:center;gap:0.75rem;">
+                                    <label style="font-size:0.55rem;font-weight:800;color:#475569;margin:0;text-transform:uppercase;">Ownership:</label>
+                                    <div style="display:flex;gap:0.75rem;">
+                                        <label style="font-size:0.65rem;font-weight:600;display:flex;align-items:center;gap:4px;cursor:pointer;color:#1e293b;margin:0;"><input type="radio" name="ownership" value="all" checked onchange="filterSitesInModal()" style="width:12px;height:12px;accent-color:#0d9488;cursor:pointer;"> All</label>
+                                        <label style="font-size:0.65rem;font-weight:600;display:flex;align-items:center;gap:4px;cursor:pointer;color:#1e293b;margin:0;"><input type="radio" name="ownership" value="HA" onchange="filterSitesInModal()" style="width:12px;height:12px;accent-color:#0d9488;cursor:pointer;"> Self</label>
+                                        <label style="font-size:0.65rem;font-weight:600;display:flex;align-items:center;gap:4px;cursor:pointer;color:#1e293b;margin:0;"><input type="radio" name="ownership" value="TA" onchange="filterSitesInModal()" style="width:12px;height:12px;accent-color:#0d9488;cursor:pointer;"> Vendor</label>
+                                    </div>
+                                </div>
                                 <div style="display:flex;align-items:center;gap:0.75rem;">
                                     <label style="font-size:0.55rem;font-weight:800;color:#475569;margin:0;text-transform:uppercase;">Availability:</label>
                                     <div style="display:flex;gap:0.75rem;">
@@ -192,16 +224,27 @@ include_once __DIR__ . '/../../includes/header.php';
                                         <label style="font-size:0.65rem;font-weight:600;display:flex;align-items:center;gap:4px;cursor:pointer;color:#1e293b;margin:0;"><input type="radio" name="availability" value="all" onchange="filterSitesInModal()" style="accent-color:#0d9488;"> All</label>
                                     </div>
                                 </div>
+                                <!-- Vendor Dropdown -->
+                                <div id="vendor_filter_group" style="display:none;align-items:center;gap:0.75rem;">
+                                    <label style="font-size:0.55rem;font-weight:800;color:#475569;margin:0;text-transform:uppercase;">Vendor:</label>
+                                    <select id="filter_vendor" onchange="filterSitesInModal()" style="padding:2px 8px;font-size:0.7rem;border:1px solid #e2e8f0;border-radius:4px;background:#fff;font-weight:600;height:22px;">
+                                        <option value="">All Vendors</option>
+                                        <?php foreach ($vendors as $v): ?>
+                                            <option value="<?php echo $v['id']; ?>"><?php echo htmlspecialchars($v['name']); ?></option>
+                                        <?php endforeach; ?>
+                                    </select>
+                                </div>
                             </div>
                             <button type="button" onclick="resetFilters()" style="background:none;border:none;color:#ef4444;font-size:0.6rem;font-weight:800;cursor:pointer;display:flex;align-items:center;gap:4px;padding:0;text-transform:uppercase;"><i class="fas fa-undo"></i> Reset</button>
                         </div>
-                        <div style="display:grid;grid-template-columns:2fr 1fr 1fr 1fr 1fr 1fr;gap:0.5rem;align-items:flex-end;">
-                            <div style="position:relative;"><i class="fas fa-search" style="position:absolute;left:10px;top:50%;transform:translateY(-50%);font-size:0.7rem;color:#94a3b8;"></i><input type="text" id="siteSearch" placeholder="Search by name, code, city..." oninput="filterSitesInModal()" style="width:100%;padding:4px 10px 4px 28px;font-size:0.75rem;border:1px solid #e2e8f0;border-radius:6px;font-weight:600;background:#fff;height:30px;font-family:inherit;"></div>
-                            <select id="filter_media" onchange="filterSitesInModal()" style="width:100%;padding:4px 8px;font-size:0.75rem;border:1px solid #e2e8f0;border-radius:6px;font-weight:600;background:#fff;height:30px;font-family:inherit;"><option value="">All Media</option><?php foreach($mediaTypes as $mt): ?><option value="<?php echo htmlspecialchars($mt);?>"><?php echo htmlspecialchars($mt);?></option><?php endforeach;?></select>
-                            <select id="filter_state" onchange="filterSitesInModal()" style="width:100%;padding:4px 8px;font-size:0.75rem;border:1px solid #e2e8f0;border-radius:6px;font-weight:600;background:#fff;height:30px;font-family:inherit;"><option value="">All States</option><?php foreach($states as $st): ?><option value="<?php echo htmlspecialchars($st);?>"><?php echo htmlspecialchars($st);?></option><?php endforeach;?></select>
-                            <select id="filter_city" onchange="filterSitesInModal()" style="width:100%;padding:4px 8px;font-size:0.75rem;border:1px solid #e2e8f0;border-radius:6px;font-weight:600;background:#fff;height:30px;font-family:inherit;"><option value="">All Cities</option><?php foreach($cities as $ct): ?><option value="<?php echo htmlspecialchars($ct);?>"><?php echo htmlspecialchars($ct);?></option><?php endforeach;?></select>
-                            <select id="filter_light" onchange="filterSitesInModal()" style="width:100%;padding:4px 8px;font-size:0.75rem;border:1px solid #e2e8f0;border-radius:6px;font-weight:600;background:#fff;height:30px;font-family:inherit;"><option value="">All Lights</option><?php foreach($illuminations as $il): ?><option value="<?php echo htmlspecialchars($il);?>"><?php echo htmlspecialchars($il);?></option><?php endforeach;?></select>
-                            <select id="filter_size" onchange="filterSitesInModal()" style="width:100%;padding:4px 8px;font-size:0.75rem;border:1px solid #e2e8f0;border-radius:6px;font-weight:600;background:#fff;height:30px;font-family:inherit;"><option value="">All Sizes</option><?php foreach($sizes as $sz): ?><option value="<?php echo htmlspecialchars($sz);?>"><?php echo htmlspecialchars($sz);?></option><?php endforeach;?></select>
+                        <div style="display:flex;flex-wrap:wrap;gap:0.5rem;align-items:flex-end;width:100%;">
+                            <div style="flex:2 1 200px;min-width:150px;margin-bottom:0;position:relative;"><i class="fas fa-search" style="position:absolute;left:10px;top:50%;transform:translateY(-50%);font-size:0.7rem;color:#94a3b8;"></i><input type="text" id="siteSearch" placeholder="Search by name, code, city..." oninput="filterSitesInModal()" style="width:100%;padding:4px 10px 4px 28px;font-size:0.75rem;border:1px solid #e2e8f0;border-radius:6px;font-weight:600;background:#fff;height:30px;font-family:inherit;"></div>
+                            <div style="flex:1 1 110px;min-width:90px;margin-bottom:0;"><select id="filter_media" onchange="filterSitesInModal()" style="width:100%;padding:4px 8px;font-size:0.75rem;border:1px solid #e2e8f0;border-radius:6px;font-weight:600;background:#fff;height:30px;font-family:inherit;"><option value="">All Media</option><?php foreach($mediaTypes as $mt): ?><option value="<?php echo htmlspecialchars($mt);?>"><?php echo htmlspecialchars($mt);?></option><?php endforeach;?></select></div>
+                            <div style="flex:1 1 110px;min-width:90px;margin-bottom:0;"><select id="filter_state" onchange="filterSitesInModal()" style="width:100%;padding:4px 8px;font-size:0.75rem;border:1px solid #e2e8f0;border-radius:6px;font-weight:600;background:#fff;height:30px;font-family:inherit;"><option value="">All States</option><?php foreach($states as $st): ?><option value="<?php echo htmlspecialchars($st);?>"><?php echo htmlspecialchars($st);?></option><?php endforeach;?></select></div>
+                            <div style="flex:1 1 110px;min-width:90px;margin-bottom:0;"><select id="filter_city" onchange="filterSitesInModal()" style="width:100%;padding:4px 8px;font-size:0.75rem;border:1px solid #e2e8f0;border-radius:6px;font-weight:600;background:#fff;height:30px;font-family:inherit;"><option value="">All Cities</option><?php foreach($cities as $ct): ?><option value="<?php echo htmlspecialchars($ct);?>"><?php echo htmlspecialchars($ct);?></option><?php endforeach;?></select></div>
+                            <div style="flex:1 1 110px;min-width:90px;margin-bottom:0;"><select id="filter_location" onchange="filterSitesInModal()" style="width:100%;padding:4px 8px;font-size:0.75rem;border:1px solid #e2e8f0;border-radius:6px;font-weight:600;background:#fff;height:30px;font-family:inherit;"><option value="">All Locations</option><?php foreach($locations as $loc): ?><option value="<?php echo htmlspecialchars($loc);?>"><?php echo htmlspecialchars($loc);?></option><?php endforeach;?></select></div>
+                            <div style="flex:1 1 110px;min-width:90px;margin-bottom:0;"><select id="filter_light" onchange="filterSitesInModal()" style="width:100%;padding:4px 8px;font-size:0.75rem;border:1px solid #e2e8f0;border-radius:6px;font-weight:600;background:#fff;height:30px;font-family:inherit;"><option value="">All Lights</option><?php foreach($illuminations as $il): ?><option value="<?php echo htmlspecialchars($il);?>"><?php echo htmlspecialchars($il);?></option><?php endforeach;?></select></div>
+                            <div style="flex:1 1 110px;min-width:90px;margin-bottom:0;"><select id="filter_size" onchange="filterSitesInModal()" style="width:100%;padding:4px 8px;font-size:0.75rem;border:1px solid #e2e8f0;border-radius:6px;font-weight:600;background:#fff;height:30px;font-family:inherit;"><option value="">All Sizes</option><?php foreach($sizes as $sz): ?><option value="<?php echo htmlspecialchars($sz);?>"><?php echo htmlspecialchars($sz);?></option><?php endforeach;?></select></div>
                         </div>
                     </div>
 
@@ -385,6 +428,7 @@ function buildSiteTable() {
         tr.dataset.city=s.city||''; tr.dataset.state=s.state||''; tr.dataset.type=s.type||'';
         tr.dataset.illumination=s.light_type||''; tr.dataset.owner=s.owner_type||'';
         tr.dataset.status=s.status||''; tr.dataset.size=`${s.width}x${s.height}`;
+        tr.dataset.vendorId=s.vendor_id||'';
         tr.dataset.thumbnail=s.thumbnail||''; tr.dataset.images=allImgs;
         tr.dataset.location=s.location||''; tr.dataset.width=s.width||''; tr.dataset.height=s.height||'';
         tr.dataset.hsn=s.mounting_hsn||s.hsn_code||'';
@@ -408,30 +452,65 @@ function buildSiteTable() {
     filterSitesInModal(); calculateTotal(); updateBucketUI();
 }
 
-function filterSitesInModal(){
-    const q=document.getElementById('siteSearch').value.toLowerCase();
-    const avEl=document.querySelector('input[name="availability"]:checked');
-    const av=avEl?avEl.value:'all';
-    const media=document.getElementById('filter_media').value, state=document.getElementById('filter_state').value,
-          city=document.getElementById('filter_city').value, light=document.getElementById('filter_light').value,
-          size=document.getElementById('filter_size').value;
-    document.querySelectorAll('tr.site-row').forEach(row=>{
-        const iCode=(row.dataset.code||'').toLowerCase(), iName=(row.dataset.name||'').toLowerCase(),
-              iCity=(row.dataset.city||'').toLowerCase(), iState=(row.dataset.state||'').toLowerCase();
-        const ok=(!q||iCode.includes(q)||iName.includes(q)||iCity.includes(q)||iState.includes(q))&&
-            (av==='all'||(row.dataset.status||'').toLowerCase()==='available')&&
-            (!media||row.dataset.type===media)&&(!state||iState===state.toLowerCase())&&
-            (!city||iCity===city.toLowerCase())&&(!light||row.dataset.illumination===light)&&
-            (!size||row.dataset.size===size);
-        ok?row.classList.remove('search-hidden'):row.classList.add('search-hidden');
+function filterSitesInModal() {
+    const q            = document.getElementById('siteSearch').value.toLowerCase();
+    
+    const ownershipEl  = document.querySelector('input[name="ownership"]:checked');
+    const ownership    = ownershipEl ? ownershipEl.value : 'all';
+
+    const vendorGroup  = document.getElementById('vendor_filter_group');
+    if (vendorGroup) {
+        vendorGroup.style.display = (ownership === 'TA') ? 'flex' : 'none';
+        if (ownership !== 'TA') document.getElementById('filter_vendor').value = '';
+    }
+
+    const availEl      = document.querySelector('input[name="availability"]:checked');
+    const availability = availEl ? availEl.value : 'all';
+    
+    const media = document.getElementById('filter_media').value;
+    const state = document.getElementById('filter_state').value;
+    const city  = document.getElementById('filter_city').value;
+    const loc   = document.getElementById('filter_location').value;
+    const light = document.getElementById('filter_light').value;
+    const size  = document.getElementById('filter_size').value;
+    const vendorId = document.getElementById('filter_vendor') ? document.getElementById('filter_vendor').value : '';
+
+    document.querySelectorAll('tr.site-row').forEach(row => {
+        const iCode  = (row.dataset.code  || '').toLowerCase();
+        const iName  = (row.dataset.name  || '').toLowerCase();
+        const iCity  = (row.dataset.city  || '').toLowerCase();
+        const iState = (row.dataset.state || '').toLowerCase();
+        const iLoc   = (row.dataset.location || '').toLowerCase();
+        const itemVendor = row.dataset.vendorId || '';
+
+        const matchesSearch = !q || iCode.includes(q) || iName.includes(q) || iCity.includes(q) || iState.includes(q) || iLoc.includes(q);
+        const matchesOwnership = ownership === 'all' || row.dataset.owner === ownership;
+        const matchesAvailability = availability === 'all' || (row.dataset.status||'').toLowerCase() === 'available';
+        const matchesVendor = !vendorId || itemVendor == vendorId;
+        const matchesMedia = !media || row.dataset.type === media;
+        const matchesState = !state || iState === state.toLowerCase();
+        const matchesCity = !city || iCity === city.toLowerCase();
+        const matchesLocation = !loc || iLoc === loc.toLowerCase();
+        const matchesLight = !light || row.dataset.illumination === light;
+        const matchesSize = !size || row.dataset.size === size;
+
+        const ok = matchesSearch && matchesOwnership && matchesAvailability && matchesVendor && matchesMedia && matchesState && matchesCity && matchesLocation && matchesLight && matchesSize;
+        ok ? row.classList.remove('search-hidden') : row.classList.add('search-hidden');
     });
-    currentPage=1; renderPagination();
+    currentPage = 1; renderPagination();
 }
 
-function resetFilters(){
-    document.getElementById('siteSearch').value='';
-    const av=document.querySelector('input[name="availability"][value="available"]'); if(av) av.checked=true;
-    ['filter_media','filter_state','filter_city','filter_light','filter_size'].forEach(id=>{const e=document.getElementById(id);if(e)e.value='';});
+function resetFilters() {
+    document.getElementById('siteSearch').value = '';
+    const av = document.querySelector('input[name="availability"][value="available"]');
+    if (av) av.checked = true;
+    const ow = document.querySelector('input[name="ownership"][value="all"]');
+    if (ow) ow.checked = true;
+    ['filter_media','filter_state','filter_city','filter_location','filter_light','filter_size'].forEach(id => {
+        const el = document.getElementById(id); if (el) el.value = '';
+    });
+    const vf = document.getElementById('filter_vendor');
+    if (vf) vf.value = '';
     filterSitesInModal();
 }
 

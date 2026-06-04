@@ -16,6 +16,10 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     $po_date = clean($_POST['customer_po_date'] ?? '');
     $email_date = clean($_POST['email_date'] ?? '');
     $billing_gstin = clean($_POST['billing_gstin'] ?? '');
+    $invoice_type = clean($_POST['invoice_type'] ?? 'tax');
+    if (!in_array($invoice_type, ['tax', 'ro'])) {
+        $invoice_type = 'tax';
+    }
     
     if (!$booking_id) {
         echo json_encode(['success' => false, 'message' => 'Invalid Booking ID']);
@@ -54,8 +58,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     $stmt = $pdo->prepare($sql);
     if ($stmt->execute($params)) {
         // Automatically create record in 'invoices' table if it doesn't exist
-        $checkInvoice = $pdo->prepare("SELECT id, approval_status FROM invoices WHERE booking_id = ?");
-        $checkInvoice->execute([$booking_id]);
+        $checkInvoice = $pdo->prepare("SELECT id, approval_status FROM invoices WHERE booking_id = ? AND type = ?");
+        $checkInvoice->execute([$booking_id, $invoice_type]);
         $existing = $checkInvoice->fetch();
 
         if (session_status() === PHP_SESSION_NONE) session_start();
@@ -63,7 +67,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
         if (!$existing) {
             // Fetch booking totals for the invoice record
-            $stmtBooking = $pdo->prepare("SELECT total_amount, grand_total FROM bookings WHERE id = ?");
+            $stmtBooking = $pdo->prepare("SELECT total_amount, tax_amount, grand_total, tax_type FROM bookings WHERE id = ?");
             $stmtBooking->execute([$booking_id]);
             $bookingData = $stmtBooking->fetch();
             
@@ -102,8 +106,22 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             $custom_invoice_date = clean($_POST['custom_invoice_date'] ?? date('Y-m-d'));
             $approvalStatus = $isAdmin ? 'approved' : 'pending_approval';
             
-            $stmtInsert = $pdo->prepare("INSERT INTO invoices (invoice_number, booking_id, type, sub_total, total_amount, payment_status, approval_status, invoice_date) VALUES (?, ?, 'tax', ?, ?, 'unpaid', ?, ?)");
-            $stmtInsert->execute([$invNo, $booking_id, $bookingData['total_amount'], $bookingData['grand_total'], $approvalStatus, $custom_invoice_date]);
+            $tax_amount = floatval($bookingData['tax_amount'] ?? 0);
+            $tax_type = $bookingData['tax_type'] ?? 'igst';
+            
+            $cgst = 0;
+            $sgst = 0;
+            $igst = 0;
+            
+            if ($tax_type === 'cgst_sgst') {
+                $cgst = $tax_amount / 2;
+                $sgst = $tax_amount / 2;
+            } else {
+                $igst = $tax_amount;
+            }
+            
+            $stmtInsert = $pdo->prepare("INSERT INTO invoices (invoice_number, booking_id, type, sub_total, cgst, sgst, igst, total_amount, payment_status, approval_status, invoice_date) VALUES (?, ?, ?, ?, ?, ?, ?, ?, 'unpaid', ?, ?)");
+            $stmtInsert->execute([$invNo, $booking_id, $invoice_type, $bookingData['total_amount'], $cgst, $sgst, $igst, $bookingData['grand_total'], $approvalStatus, $custom_invoice_date]);
             
             $invoiceId = $pdo->lastInsertId();
             

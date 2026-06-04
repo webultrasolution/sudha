@@ -33,9 +33,13 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action'])) {
     } elseif ($_POST['action'] === 'delete_media_type') {
         $id = intval($_POST['id']);
         try {
-            $stmt = $pdo->prepare("DELETE FROM media_types WHERE id = ?");
-            $stmt->execute([$id]);
-            echo json_encode(['success' => true]);
+            include_once __DIR__ . '/../../includes/trash_helper.php';
+            $trashId = move_row_to_trash($pdo, 'media_types', 'id', $id, $_SESSION['user_id'] ?? null, 'Media type deleted via admin UI');
+            if ($trashId) {
+                echo json_encode(['success' => true]);
+            } else {
+                echo json_encode(['success' => false, 'message' => 'Failed to move media type to trash.']);
+            }
             exit;
         } catch (PDOException $e) {
             echo json_encode(['success' => false, 'message' => $e->getMessage()]);

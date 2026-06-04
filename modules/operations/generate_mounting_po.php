@@ -17,14 +17,34 @@ if (!$b) die("Booking not found.");
 $vendors = $pdo->query("SELECT id, name FROM partners WHERE type = 'vendor' ORDER BY name")->fetchAll();
 
 // Fetch Sites for this booking
-$stmtS = $pdo->prepare("
-    SELECT bi.*, COALESCE(bi.custom_site_name, s.name) as site_name, s.site_code, COALESCE(bi.custom_location, s.location) as location, s.city, s.width, s.height, s.type as media_type, s.hsn_code, s.vendor_gst
-    FROM booking_items bi
-    JOIN sites s ON bi.site_id = s.id
-    WHERE bi.booking_id = ?
-    ORDER BY s.site_code ASC
-");
-$stmtS->execute([$booking_id]);
+try {
+    $stmtS = $pdo->prepare("
+        SELECT bi.*, COALESCE(bi.custom_site_name, s.name) as site_name, s.site_code, COALESCE(bi.custom_location, s.location) as location, s.city, s.width, s.height, s.type as media_type, s.hsn_code, s.mounting_hsn, s.vendor_gst
+        FROM booking_items bi
+        JOIN sites s ON bi.site_id = s.id
+        WHERE bi.booking_id = ?
+        ORDER BY s.site_code ASC
+    ");
+    $stmtS->execute([$booking_id]);
+} catch (PDOException $e) {
+    if (strpos($e->getMessage(), 'mounting_hsn') !== false) {
+        try {
+            $pdo->exec("ALTER TABLE sites ADD COLUMN mounting_hsn VARCHAR(50) DEFAULT NULL AFTER hsn_code");
+            $stmtS = $pdo->prepare("
+                SELECT bi.*, COALESCE(bi.custom_site_name, s.name) as site_name, s.site_code, COALESCE(bi.custom_location, s.location) as location, s.city, s.width, s.height, s.type as media_type, s.hsn_code, s.mounting_hsn, s.vendor_gst
+                FROM booking_items bi
+                JOIN sites s ON bi.site_id = s.id
+                WHERE bi.booking_id = ?
+                ORDER BY s.site_code ASC
+            ");
+            $stmtS->execute([$booking_id]);
+        } catch (Exception $ex) {
+            throw $e;
+        }
+    } else {
+        throw $e;
+    }
+}
 $sites = $stmtS->fetchAll();
 
 // Check if we are in preview mode
@@ -431,7 +451,7 @@ if (empty($selected_rates)) die("No rates selected for this PO.");
                     <div style="font-weight: bold;"><?php echo $item['site_name']; ?></div>
                     <div style="font-size: 9px; color: #555;"><?php echo $item['site_code']; ?> • <?php echo $item['location'] ?? $item['city'] ?? ''; ?></div>
                 </td>
-                <td><?php echo $item['hsn_code'] ?: '998366'; ?></td>
+                <td><?php echo $item['mounting_hsn'] ?: $item['hsn_code'] ?: '998366'; ?></td>
                 <td><?php echo ($item['width'] && $item['height']) ? $item['width'] . "'x" . $item['height'] . "'" : '-'; ?></td>
                 <td><?php echo $sqft > 0 ? number_format($sqft) : '-'; ?></td>
                 <td style="font-size: 9px;"><?php echo $item['media_type']; ?></td>

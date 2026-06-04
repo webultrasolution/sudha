@@ -9,32 +9,66 @@ $po_number = isset($_GET['po_number']) ? clean($_GET['po_number']) : null;
 $rate_ids  = isset($_GET['rate_ids']) && is_array($_GET['rate_ids']) ? $_GET['rate_ids'] : [];
 $isFinal   = isset($_GET['final']) && $_GET['final'] == '1';
 
-// Fetch rows
-if ($po_number) {
-    $stmt = $pdo->prepare("
-        SELECT r.*, s.name as site_name, s.site_code, s.width, s.height, s.location, s.city, s.state,
-               s.hsn_code, s.mounting_hsn, c.name as client_name, c.city as client_city
-        FROM client_mounting_rates r
-        LEFT JOIN sites s ON r.site_id = s.id
-        JOIN partners c ON r.client_id = c.id
-        WHERE r.po_number = ? AND r.client_id = ?
-    ");
-    $stmt->execute([$po_number, $client_id]);
-} elseif (!empty($rate_ids)) {
-    $in   = str_repeat('?,', count($rate_ids) - 1) . '?';
-    $stmt = $pdo->prepare("
-        SELECT r.*, s.name as site_name, s.site_code, s.width, s.height, s.location, s.city, s.state,
-               s.hsn_code, s.mounting_hsn, c.name as client_name, c.city as client_city
-        FROM client_mounting_rates r
-        LEFT JOIN sites s ON r.site_id = s.id
-        JOIN partners c ON r.client_id = c.id
-        WHERE r.id IN ($in)
-    ");
-    $stmt->execute($rate_ids);
-} else {
-    die("Invalid request.");
+try {
+    if ($po_number) {
+        $stmt = $pdo->prepare("
+            SELECT r.*, s.name as site_name, s.site_code, s.width, s.height, s.location, s.city, s.state,
+                   s.hsn_code, s.mounting_hsn, c.name as client_name, c.city as client_city
+            FROM client_mounting_rates r
+            LEFT JOIN sites s ON r.site_id = s.id
+            JOIN partners c ON r.client_id = c.id
+            WHERE r.po_number = ? AND r.client_id = ?
+        ");
+        $stmt->execute([$po_number, $client_id]);
+    } elseif (!empty($rate_ids)) {
+        $in   = str_repeat('?,', count($rate_ids) - 1) . '?';
+        $stmt = $pdo->prepare("
+            SELECT r.*, s.name as site_name, s.site_code, s.width, s.height, s.location, s.city, s.state,
+                   s.hsn_code, s.mounting_hsn, c.name as client_name, c.city as client_city
+            FROM client_mounting_rates r
+            LEFT JOIN sites s ON r.site_id = s.id
+            JOIN partners c ON r.client_id = c.id
+            WHERE r.id IN ($in)
+        ");
+        $stmt->execute($rate_ids);
+    } else {
+        die("Invalid request.");
+    }
+    $rows = $stmt->fetchAll();
+} catch (PDOException $e) {
+    if (strpos($e->getMessage(), 'mounting_hsn') !== false) {
+        try {
+            $pdo->exec("ALTER TABLE sites ADD COLUMN mounting_hsn VARCHAR(50) DEFAULT NULL AFTER hsn_code");
+            if ($po_number) {
+                $stmt = $pdo->prepare("
+                    SELECT r.*, s.name as site_name, s.site_code, s.width, s.height, s.location, s.city, s.state,
+                           s.hsn_code, s.mounting_hsn, c.name as client_name, c.city as client_city
+                    FROM client_mounting_rates r
+                    LEFT JOIN sites s ON r.site_id = s.id
+                    JOIN partners c ON r.client_id = c.id
+                    WHERE r.po_number = ? AND r.client_id = ?
+                ");
+                $stmt->execute([$po_number, $client_id]);
+            } elseif (!empty($rate_ids)) {
+                $in   = str_repeat('?,', count($rate_ids) - 1) . '?';
+                $stmt = $pdo->prepare("
+                    SELECT r.*, s.name as site_name, s.site_code, s.width, s.height, s.location, s.city, s.state,
+                           s.hsn_code, s.mounting_hsn, c.name as client_name, c.city as client_city
+                    FROM client_mounting_rates r
+                    LEFT JOIN sites s ON r.site_id = s.id
+                    JOIN partners c ON r.client_id = c.id
+                    WHERE r.id IN ($in)
+                ");
+                $stmt->execute($rate_ids);
+            }
+            $rows = $stmt->fetchAll();
+        } catch (Exception $ex) {
+            throw $e;
+        }
+    } else {
+        throw $e;
+    }
 }
-$rows = $stmt->fetchAll();
 if (empty($rows)) die("No records found.");
 
 $first      = $rows[0];

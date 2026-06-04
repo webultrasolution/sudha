@@ -46,9 +46,14 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action'])) {
         requirePermission('vendors', 'delete');
         header('Content-Type: application/json');
         $id = intval($_POST['id']);
-        $stmt = $pdo->prepare("DELETE FROM partners WHERE id = ?");
-        $stmt->execute([$id]);
-        echo json_encode(['success' => true]); exit;
+        include_once __DIR__ . '/../../includes/trash_helper.php';
+        $trashId = move_row_to_trash($pdo, 'partners', 'id', $id, $_SESSION['user_id'] ?? null, 'Vendor deleted via UI');
+        if ($trashId) {
+            echo json_encode(['success' => true]);
+        } else {
+            echo json_encode(['success' => false, 'message' => 'Failed to move vendor to trash.']);
+        }
+        exit;
     }
 }
 

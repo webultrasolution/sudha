@@ -62,6 +62,7 @@ $sites = $pdo->query("
 // Fetch filter values
 $cities = $pdo->query("SELECT DISTINCT city FROM sites WHERE city IS NOT NULL AND city != '' ORDER BY city")->fetchAll(PDO::FETCH_COLUMN);
 $states = $pdo->query("SELECT DISTINCT state FROM sites WHERE state IS NOT NULL AND state != '' ORDER BY state")->fetchAll(PDO::FETCH_COLUMN);
+$locations = $pdo->query("SELECT DISTINCT location FROM sites WHERE location IS NOT NULL AND location != '' ORDER BY location")->fetchAll(PDO::FETCH_COLUMN);
 $mediaTypes = $pdo->query("SELECT DISTINCT type FROM sites WHERE type IS NOT NULL AND type != '' ORDER BY type")->fetchAll(PDO::FETCH_COLUMN);
 $illuminations = $pdo->query("SELECT DISTINCT light_type FROM sites WHERE light_type IS NOT NULL AND light_type != '' ORDER BY light_type")->fetchAll(PDO::FETCH_COLUMN);
 $sizes = $pdo->query("SELECT DISTINCT CONCAT(width, 'x', height) as size FROM sites WHERE width IS NOT NULL AND height IS NOT NULL AND width != '' AND height != '' ORDER BY width, height")->fetchAll(PDO::FETCH_COLUMN);
@@ -182,55 +183,63 @@ include_once __DIR__ . '/../../includes/header.php';
                                     </button>
                                 </div>
 
-                                <!-- Search & Dropdowns Grid -->
-                                <div style="display: grid; grid-template-columns: 2fr 1fr 1fr 1fr 1fr 1fr; gap: 0.5rem; align-items: flex-end;">
-                                    <div style="margin-bottom: 0;">
-                                        <div style="position: relative;">
-                                            <i class="fas fa-search" style="position: absolute; left: 10px; top: 50%; transform: translateY(-50%); font-size: 0.7rem; color: #94a3b8;"></i>
-                                            <input type="text" id="siteSearch" placeholder="Search by name, code, city..." oninput="filterSitesInModal()" style="width: 100%; padding: 4px 10px 4px 28px; font-size: 0.75rem; border: 1px solid #e2e8f0; border-radius: 6px; font-weight: 600; background: #fff; height: 30px; font-family: inherit;">
-                                        </div>
-                                    </div>
-                                    <div style="margin-bottom: 0;">
-                                        <select id="filter_media" onchange="filterSitesInModal()" style="width: 100%; padding: 4px 8px; font-size: 0.75rem; border: 1px solid #e2e8f0; border-radius: 6px; font-weight: 600; background: #fff; height: 30px; font-family: inherit;">
-                                            <option value="">All Media</option>
-                                            <?php foreach ($mediaTypes as $mt): ?>
-                                                <option value="<?php echo htmlspecialchars($mt); ?>"><?php echo htmlspecialchars($mt); ?></option>
-                                            <?php endforeach; ?>
-                                        </select>
-                                    </div>
-                                    <div style="margin-bottom: 0;">
-                                        <select id="filter_state" onchange="filterSitesInModal()" style="width: 100%; padding: 4px 8px; font-size: 0.75rem; border: 1px solid #e2e8f0; border-radius: 6px; font-weight: 600; background: #fff; height: 30px; font-family: inherit;">
-                                            <option value="">All States</option>
-                                            <?php foreach ($states as $st): ?>
-                                                <option value="<?php echo htmlspecialchars($st); ?>"><?php echo htmlspecialchars($st); ?></option>
-                                            <?php endforeach; ?>
-                                        </select>
-                                    </div>
-                                    <div style="margin-bottom: 0;">
-                                        <select id="filter_city" onchange="filterSitesInModal()" style="width: 100%; padding: 4px 8px; font-size: 0.75rem; border: 1px solid #e2e8f0; border-radius: 6px; font-weight: 600; background: #fff; height: 30px; font-family: inherit;">
-                                            <option value="">All Cities</option>
-                                            <?php foreach ($cities as $ct): ?>
-                                                <option value="<?php echo htmlspecialchars($ct); ?>"><?php echo htmlspecialchars($ct); ?></option>
-                                            <?php endforeach; ?>
-                                        </select>
-                                    </div>
-                                    <div style="margin-bottom: 0;">
-                                        <select id="filter_light" onchange="filterSitesInModal()" style="width: 100%; padding: 4px 8px; font-size: 0.75rem; border: 1px solid #e2e8f0; border-radius: 6px; font-weight: 600; background: #fff; height: 30px; font-family: inherit;">
-                                            <option value="">All Lights</option>
-                                            <?php foreach ($illuminations as $il): ?>
-                                                <option value="<?php echo htmlspecialchars($il); ?>"><?php echo htmlspecialchars($il); ?></option>
-                                            <?php endforeach; ?>
-                                        </select>
-                                    </div>
-                                    <div style="margin-bottom: 0;">
-                                        <select id="filter_size" onchange="filterSitesInModal()" style="width: 100%; padding: 4px 8px; font-size: 0.75rem; border: 1px solid #e2e8f0; border-radius: 6px; font-weight: 600; background: #fff; height: 30px; font-family: inherit;">
-                                            <option value="">All Sizes</option>
-                                            <?php foreach ($sizes as $sz): ?>
-                                                <option value="<?php echo htmlspecialchars($sz); ?>"><?php echo htmlspecialchars($sz); ?></option>
-                                            <?php endforeach; ?>
-                                        </select>
-                                    </div>
-                                </div>
+                                 <!-- Search & Dropdowns Grid -->
+                                 <div style="display: flex; flex-wrap: wrap; gap: 0.5rem; align-items: flex-end; width: 100%;">
+                                     <div style="flex: 2 1 200px; min-width: 150px; margin-bottom: 0;">
+                                         <div style="position: relative;">
+                                             <i class="fas fa-search" style="position: absolute; left: 10px; top: 50%; transform: translateY(-50%); font-size: 0.7rem; color: #94a3b8;"></i>
+                                             <input type="text" id="siteSearch" placeholder="Search by name, code, city..." oninput="filterSitesInModal()" style="width: 100%; padding: 4px 10px 4px 28px; font-size: 0.75rem; border: 1px solid #e2e8f0; border-radius: 6px; font-weight: 600; background: #fff; height: 30px; font-family: inherit;">
+                                         </div>
+                                     </div>
+                                     <div style="flex: 1 1 110px; min-width: 90px; margin-bottom: 0;">
+                                         <select id="filter_media" onchange="filterSitesInModal()" style="width: 100%; padding: 4px 8px; font-size: 0.75rem; border: 1px solid #e2e8f0; border-radius: 6px; font-weight: 600; background: #fff; height: 30px; font-family: inherit;">
+                                             <option value="">All Media</option>
+                                             <?php foreach ($mediaTypes as $mt): ?>
+                                                 <option value="<?php echo htmlspecialchars($mt); ?>"><?php echo htmlspecialchars($mt); ?></option>
+                                             <?php endforeach; ?>
+                                         </select>
+                                     </div>
+                                     <div style="flex: 1 1 110px; min-width: 90px; margin-bottom: 0;">
+                                         <select id="filter_state" onchange="filterSitesInModal()" style="width: 100%; padding: 4px 8px; font-size: 0.75rem; border: 1px solid #e2e8f0; border-radius: 6px; font-weight: 600; background: #fff; height: 30px; font-family: inherit;">
+                                             <option value="">All States</option>
+                                             <?php foreach ($states as $st): ?>
+                                                 <option value="<?php echo htmlspecialchars($st); ?>"><?php echo htmlspecialchars($st); ?></option>
+                                             <?php endforeach; ?>
+                                         </select>
+                                     </div>
+                                     <div style="flex: 1 1 110px; min-width: 90px; margin-bottom: 0;">
+                                         <select id="filter_city" onchange="filterSitesInModal()" style="width: 100%; padding: 4px 8px; font-size: 0.75rem; border: 1px solid #e2e8f0; border-radius: 6px; font-weight: 600; background: #fff; height: 30px; font-family: inherit;">
+                                             <option value="">All Cities</option>
+                                             <?php foreach ($cities as $ct): ?>
+                                                 <option value="<?php echo htmlspecialchars($ct); ?>"><?php echo htmlspecialchars($ct); ?></option>
+                                             <?php endforeach; ?>
+                                         </select>
+                                     </div>
+                                     <div style="flex: 1 1 110px; min-width: 90px; margin-bottom: 0;">
+                                         <select id="filter_location" onchange="filterSitesInModal()" style="width: 100%; padding: 4px 8px; font-size: 0.75rem; border: 1px solid #e2e8f0; border-radius: 6px; font-weight: 600; background: #fff; height: 30px; font-family: inherit;">
+                                             <option value="">All Locations</option>
+                                             <?php foreach ($locations as $loc): ?>
+                                                 <option value="<?php echo htmlspecialchars($loc); ?>"><?php echo htmlspecialchars($loc); ?></option>
+                                             <?php endforeach; ?>
+                                         </select>
+                                     </div>
+                                     <div style="flex: 1 1 110px; min-width: 90px; margin-bottom: 0;">
+                                         <select id="filter_light" onchange="filterSitesInModal()" style="width: 100%; padding: 4px 8px; font-size: 0.75rem; border: 1px solid #e2e8f0; border-radius: 6px; font-weight: 600; background: #fff; height: 30px; font-family: inherit;">
+                                             <option value="">All Lights</option>
+                                             <?php foreach ($illuminations as $il): ?>
+                                                 <option value="<?php echo htmlspecialchars($il); ?>"><?php echo htmlspecialchars($il); ?></option>
+                                             <?php endforeach; ?>
+                                         </select>
+                                     </div>
+                                     <div style="flex: 1 1 110px; min-width: 90px; margin-bottom: 0;">
+                                         <select id="filter_size" onchange="filterSitesInModal()" style="width: 100%; padding: 4px 8px; font-size: 0.75rem; border: 1px solid #e2e8f0; border-radius: 6px; font-weight: 600; background: #fff; height: 30px; font-family: inherit;">
+                                             <option value="">All Sizes</option>
+                                             <?php foreach ($sizes as $sz): ?>
+                                                 <option value="<?php echo htmlspecialchars($sz); ?>"><?php echo htmlspecialchars($sz); ?></option>
+                                             <?php endforeach; ?>
+                                         </select>
+                                     </div>
+                                 </div>
                             </div>
 
                             <!-- Select All + Count Header -->
@@ -631,6 +640,7 @@ function filterSitesInModal() {
     const media = document.getElementById('filter_media').value;
     const state = document.getElementById('filter_state').value;
     const city = document.getElementById('filter_city').value;
+    const loc = document.getElementById('filter_location').value;
     const light = document.getElementById('filter_light').value;
     const size = document.getElementById('filter_size').value;
     const vendorId = document.getElementById('filter_vendor') ? document.getElementById('filter_vendor').value : '';
@@ -640,6 +650,7 @@ function filterSitesInModal() {
         const itemName = (row.dataset.name || '').toLowerCase();
         const itemCity = (row.dataset.city || '').toLowerCase();
         const itemState = (row.dataset.state || '').toLowerCase();
+        const itemLoc = (row.dataset.location || '').toLowerCase();
         const itemType = row.dataset.type || '';
         const itemIllum = row.dataset.illumination || '';
         const itemOwner = row.dataset.owner || '';
@@ -647,17 +658,18 @@ function filterSitesInModal() {
         const itemSize = row.dataset.size || '';
         const itemVendor = row.dataset.vendorId || '';
 
-        const matchesSearch = !q || itemCode.includes(q) || itemName.includes(q) || itemCity.includes(q) || itemState.includes(q);
+        const matchesSearch = !q || itemCode.includes(q) || itemName.includes(q) || itemCity.includes(q) || itemState.includes(q) || itemLoc.includes(q);
         const matchesOwnership = ownership === 'all' || itemOwner === ownership;
         const matchesAvailability = availability === 'all' || (availability === 'available' && itemStatus.toLowerCase() === 'available');
         const matchesMedia = !media || itemType === media;
         const matchesState = !state || itemState.toLowerCase() === state.toLowerCase();
         const matchesCity = !city || itemCity.toLowerCase() === city.toLowerCase();
+        const matchesLocation = !loc || itemLoc.toLowerCase() === loc.toLowerCase();
         const matchesLight = !light || itemIllum === light;
         const matchesSize = !size || itemSize === size;
         const matchesVendor = !vendorId || itemVendor == vendorId;
 
-        if (matchesSearch && matchesOwnership && matchesVendor && matchesAvailability && matchesMedia && matchesState && matchesCity && matchesLight && matchesSize) {
+        if (matchesSearch && matchesOwnership && matchesVendor && matchesAvailability && matchesMedia && matchesState && matchesCity && matchesLocation && matchesLight && matchesSize) {
             row.classList.remove('search-hidden');
         } else {
             row.classList.add('search-hidden');
@@ -680,6 +692,7 @@ function resetFilters() {
     document.getElementById('filter_media').value = '';
     document.getElementById('filter_state').value = '';
     document.getElementById('filter_city').value = '';
+    document.getElementById('filter_location').value = '';
     document.getElementById('filter_light').value = '';
     document.getElementById('filter_size').value = '';
     if (document.getElementById('filter_vendor')) document.getElementById('filter_vendor').value = '';

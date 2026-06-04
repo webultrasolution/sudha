@@ -39,7 +39,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     }
 
     // Check Admin Status
-    $isAdmin = isset($_SESSION['role']) && $_SESSION['role'] === 'admin';
+    $isAdmin = isset($_SESSION['user_role']) && $_SESSION['user_role'] === 'admin';
     $userId = $_SESSION['user_id'] ?? 0;
     $setStatus = $isAdmin ? "is_final_invoice = 1, approval_status = 'approved'" : "approval_status = 'pending_approval'";
 

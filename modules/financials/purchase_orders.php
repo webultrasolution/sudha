@@ -3,6 +3,7 @@
 if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action']) && $_POST['action'] === 'delete') {
     include_once __DIR__ . '/../../config/db.php';
     include_once __DIR__ . '/../../includes/functions.php';
+    include_once __DIR__ . '/../../includes/trash_helper.php';
     checkAuth();
     requirePermission('financials', 'delete');
     header('Content-Type: application/json');
@@ -10,16 +11,32 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action']) && $_POST['
     try {
         $pdo->beginTransaction();
 
-        $pdo->prepare("DELETE FROM po_items WHERE po_id = ?")->execute([$id]);
-        $pdo->prepare("DELETE FROM po_attachments WHERE po_id = ?")->execute([$id]);
-        $pdo->prepare("DELETE FROM purchase_orders WHERE id = ?")->execute([$id]);
+        // Move po_items to trash
+        $itemStmt = $pdo->prepare("SELECT id FROM po_items WHERE po_id = ?");
+        $itemStmt->execute([$id]);
+        while ($item = $itemStmt->fetch(PDO::FETCH_ASSOC)) {
+            move_row_to_trash($pdo, 'po_items', 'id', $item['id'], $_SESSION['user_id'] ?? null, 'PO deleted - item moved to trash');
+        }
+
+        // Move po_attachments to trash
+        $attStmt = $pdo->prepare("SELECT id FROM po_attachments WHERE po_id = ?");
+        $attStmt->execute([$id]);
+        while ($att = $attStmt->fetch(PDO::FETCH_ASSOC)) {
+            move_row_to_trash($pdo, 'po_attachments', 'id', $att['id'], $_SESSION['user_id'] ?? null, 'PO deleted - attachment moved to trash');
+        }
+
+        // Move purchase order itself to trash
+        $trashId = move_row_to_trash($pdo, 'purchase_orders', 'id', $id, $_SESSION['user_id'] ?? null, 'Purchase order deleted via UI');
+        if (!$trashId) {
+            throw new Exception('Failed to move purchase order to trash');
+        }
 
         logActivity('deleted PO', 'financials', $id, "Purchase Order #$id was deleted.");
 
         $pdo->commit();
         echo json_encode(['success' => true]);
     } catch (Exception $e) {
-        $pdo->rollBack();
+        if ($pdo->inTransaction()) $pdo->rollBack();
         echo json_encode(['success' => false, 'message' => $e->getMessage()]);
     }
     exit;
@@ -34,6 +51,7 @@ requirePermission('financials', 'view');
 
 // Handle Filters
 $selectedVendorId = isset($_GET['vendor_id']) ? intval($_GET['vendor_id']) : 0;
+$campaignFilter = trim($_GET['campaign_name'] ?? '');
 
 $whereClauses = [];
 $params = [];
@@ -42,6 +60,10 @@ if ($selectedVendorId > 0) {
     $whereClauses[] = "po.vendor_id = ?";
     $params[] = $selectedVendorId;
 }
+if ($campaignFilter !== '') {
+    $whereClauses[] = "po.campaign_name LIKE ?";
+    $params[] = '%' . $campaignFilter . '%';
+}
 
 $whereSql = "";
 if (!empty($whereClauses)) {
@@ -49,7 +71,15 @@ if (!empty($whereClauses)) {
 }
 
 // Fetch filtered POs with attachments
-$stmt = $pdo->prepare("\n    SELECT po.*, po.campaign_name, v.name as vendor_name, u.username as creator,\n           (SELECT GROUP_CONCAT(filename SEPARATOR '||') FROM po_attachments WHERE po_id = po.id) as attachments\n    FROM purchase_orders po \n    JOIN partners v ON po.vendor_id = v.id \n    LEFT JOIN users u ON po.employee_id = u.id \n    $whereSql\n    ORDER BY po.id DESC\n");
+$stmt = $pdo->prepare("
+    SELECT po.*, po.campaign_name, v.name as vendor_name, u.username as creator,
+           (SELECT GROUP_CONCAT(filename SEPARATOR '||') FROM po_attachments WHERE po_id = po.id) as attachments
+    FROM purchase_orders po 
+    JOIN partners v ON po.vendor_id = v.id 
+    LEFT JOIN users u ON po.employee_id = u.id 
+    $whereSql
+    ORDER BY po.id DESC
+");
 $stmt->execute($params);
 $pos = $stmt->fetchAll();
 
@@ -75,12 +105,18 @@ $vendorsList = $pdo->query("SELECT id, name FROM partners WHERE type = 'vendor' 
                 <?php endforeach; ?>
             </select>
         </div>
+        <div style="flex: 1; min-width: 220px;">
+            <label
+                style="display: block; font-size: 0.65rem; font-weight: 800; color: #94a3b8; text-transform: uppercase; letter-spacing: 0.05em; margin-bottom: 0.5rem;">Campaign Name</label>
+            <input type="text" name="campaign_name" value="<?php echo htmlspecialchars($campaignFilter); ?>" placeholder="Search campaign..."
+                style="width: 100%; padding: 0.6rem 0.75rem; border: 1px solid #e2e8f0; border-radius: 10px; font-size: 0.85rem; font-weight: 600; background: white; outline: none; transition: border-color 0.2s;">
+        </div>
         <div style="display: flex; gap: 0.5rem;">
             <button type="submit" class="btn btn-primary"
                 style="height: 42px; padding: 0 1.5rem; font-weight: 800; font-size: 0.85rem; border-radius: 10px; display: inline-flex; align-items: center; gap: 6px; box-shadow: 0 4px 12px rgba(13,148,136,0.15);">
                 <i class="fas fa-filter"></i> Filter
             </button>
-            <?php if ($selectedVendorId > 0): ?>
+            <?php if ($selectedVendorId > 0 || $campaignFilter !== ''): ?>
                 <a href="purchase_orders.php" class="btn"
                     style="height: 42px; padding: 0 1.25rem; font-weight: 800; font-size: 0.85rem; border-radius: 10px; background: #e2e8f0; color: #475569; display: inline-flex; align-items: center; gap: 6px; text-decoration: none; border: none; justify-content: center;">
                     <i class="fas fa-times-circle"></i> Clear

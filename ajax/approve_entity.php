@@ -83,7 +83,11 @@ try {
         case 'client_printing':
             // In approvals.php we pass po_number as entityId string for client_printing
             $poNumber = $data['entity_id'] ?? '';
-            $stmt = $pdo->prepare("UPDATE client_printing_rates SET approval_status = ? WHERE po_number = ?");
+            if ($action === 'approve') {
+                $stmt = $pdo->prepare("UPDATE client_printing_rates SET approval_status = ?, is_final_invoice = 1 WHERE po_number = ?");
+            } else {
+                $stmt = $pdo->prepare("UPDATE client_printing_rates SET approval_status = ? WHERE po_number = ?");
+            }
             $stmt->execute([$newApprovalStatus, $poNumber]);
             $ref = $poNumber;
             // Get the actual first ID to update approval_requests

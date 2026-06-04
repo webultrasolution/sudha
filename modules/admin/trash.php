@@ -54,9 +54,17 @@ $items = $stmt->fetchAll();
     <?php if (empty($items)): ?>
         <div>No trashed items.</div>
     <?php else: ?>
-        <table class="crs-table" style="table-layout:fixed; width:100%;">
+        <table class="table">
             <thead>
-                <tr><th>ID</th><th>Table</th><th>Row ID</th><th>Deleted By</th><th>Deleted At</th><th>Reason</th><th>Action</th></tr>
+                <tr>
+                    <th style="width: 80px;">ID</th>
+                    <th style="width: 150px;">Table</th>
+                    <th style="width: 120px;">Row ID</th>
+                    <th style="width: 180px;">Deleted By</th>
+                    <th style="width: 180px;">Deleted At</th>
+                    <th>Reason</th>
+                    <th style="text-align: center; width: 160px;">Action</th>
+                </tr>
             </thead>
             <tbody>
             <?php foreach ($items as $it): ?>

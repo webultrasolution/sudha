@@ -102,9 +102,19 @@ try {
         // Generate a new Proforma Invoice using sequential numbering
         $invNum = generateSequentialReference($pdo, 'invoices', 'invoice_number', 'PI-', 5);
         
-        $cgst = $proposal['tax_amount'] / 2;
-        $sgst = $proposal['tax_amount'] / 2;
+        $tax_amount = floatval($proposal['tax_amount'] ?? 0);
+        $tax_type = $proposal['tax_type'] ?? 'igst';
+        
+        $cgst = 0;
+        $sgst = 0;
         $igst = 0;
+        
+        if ($tax_type === 'cgst_sgst') {
+            $cgst = $tax_amount / 2;
+            $sgst = $tax_amount / 2;
+        } else {
+            $igst = $tax_amount;
+        }
 
         $stmtInv = $pdo->prepare("
             INSERT INTO invoices (invoice_number, booking_id, type, sub_total, cgst, sgst, igst, total_amount, payment_status) 
