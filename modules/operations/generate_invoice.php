@@ -121,7 +121,7 @@ body {
     flex: 1.4;
 }
 .company-logo {
-    width: 58px;
+    width: 90px;
     height: auto;
     flex-shrink: 0;
 }
@@ -270,11 +270,12 @@ td {
             <?php if ($company_logo): ?>
             <img src="<?php echo BASE_URL; ?>assets/images/<?php echo htmlspecialchars($company_logo); ?>"
                  class="company-logo" onerror="this.style.display='none'">
-            <?php endif; ?>
+            <?php else: ?>
             <div class="company-name-block">
                 <div class="short-name"><?php echo htmlspecialchars($company_short); ?></div>
                 <div class="full-name"><?php echo htmlspecialchars($company_full_uc); ?></div>
             </div>
+            <?php endif; ?>
         </div>
         <div class="inv-header-center">
             <div class="inv-title">TAX INVOICE</div>
