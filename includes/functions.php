@@ -382,7 +382,8 @@ function resolveCompanyDetails($entity_id = null) {
         'logo'         => getSetting('company_logo',         ''),
         'letterhead'   => getSetting('company_letterhead',   ''),
         'signature'    => getSetting('company_signature',    'signature.png'),
-        'bank_details' => getSetting('company_bank_details', ''),
+        'bank_details'      => getSetting('company_bank_details', ''),
+        'terms_conditions'  => getSetting('company_terms_conditions', ''),
     ];
 
     $eid = $entity_id ?: ($_SESSION['active_entity_id'] ?? null);
@@ -392,13 +393,14 @@ function resolveCompanyDetails($entity_id = null) {
         $entity = $stmt->fetch();
         if ($entity) {
             $data['name'] = $entity['name'];
-            if (!empty($entity['gstin']))        $data['gstin']        = $entity['gstin'];
-            if (!empty($entity['pan']))          $data['pan']          = $entity['pan'];
-            if (!empty($entity['address']))      $data['address']      = $entity['address'];
-            if (!empty($entity['logo']))         $data['logo']         = $entity['logo'];
-            if (!empty($entity['letterhead']))   $data['letterhead']   = $entity['letterhead'];
-            if (!empty($entity['signature']))    $data['signature']    = $entity['signature'];
-            if (!empty($entity['bank_details'])) $data['bank_details'] = $entity['bank_details'];
+            if (!empty($entity['gstin']))             $data['gstin']            = $entity['gstin'];
+            if (!empty($entity['pan']))               $data['pan']              = $entity['pan'];
+            if (!empty($entity['address']))           $data['address']          = $entity['address'];
+            if (!empty($entity['logo']))              $data['logo']             = $entity['logo'];
+            if (!empty($entity['letterhead']))        $data['letterhead']       = $entity['letterhead'];
+            if (!empty($entity['signature']))         $data['signature']        = $entity['signature'];
+            if (!empty($entity['bank_details']))      $data['bank_details']     = $entity['bank_details'];
+            if (!empty($entity['terms_conditions']))  $data['terms_conditions'] = $entity['terms_conditions'];
         }
     }
 

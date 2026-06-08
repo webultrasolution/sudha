@@ -23,8 +23,9 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     $gstin = $_POST['gstin'];
     $pan = $_POST['pan'];
     $address = $_POST['address'];
-    $bank_details = $_POST['bank_details'];
-    
+    $bank_details      = $_POST['bank_details'];
+    $terms_conditions  = $_POST['terms_conditions'] ?? '';
+
     $uploadDir = __DIR__ . '/../../assets/images/';
     if (!is_dir($uploadDir)) mkdir($uploadDir, 0777, true);
     
@@ -54,12 +55,12 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
     try {
         if ($id > 0) {
-            $stmt = $pdo->prepare("UPDATE entities SET name=?, gstin=?, pan=?, address=?, bank_details=?, logo=?, letterhead=?, signature=? WHERE id=?");
-            $stmt->execute([$name, $gstin, $pan, $address, $bank_details, $logo, $letterhead, $signature, $id]);
+            $stmt = $pdo->prepare("UPDATE entities SET name=?, gstin=?, pan=?, address=?, bank_details=?, terms_conditions=?, logo=?, letterhead=?, signature=? WHERE id=?");
+            $stmt->execute([$name, $gstin, $pan, $address, $bank_details, $terms_conditions, $logo, $letterhead, $signature, $id]);
             $message = "Entity updated successfully!";
         } else {
-            $stmt = $pdo->prepare("INSERT INTO entities (name, gstin, pan, address, bank_details, logo, letterhead, signature) VALUES (?, ?, ?, ?, ?, ?, ?, ?)");
-            $stmt->execute([$name, $gstin, $pan, $address, $bank_details, $logo, $letterhead, $signature]);
+            $stmt = $pdo->prepare("INSERT INTO entities (name, gstin, pan, address, bank_details, terms_conditions, logo, letterhead, signature) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)");
+            $stmt->execute([$name, $gstin, $pan, $address, $bank_details, $terms_conditions, $logo, $letterhead, $signature]);
             $message = "New Entity added successfully!";
         }
     } catch (Exception $e) {
@@ -160,6 +161,10 @@ include_once __DIR__ . '/../../includes/header.php';
                     <label>Bank Details</label>
                     <textarea name="bank_details" id="entityBank" rows="3" placeholder="Bank Name&#10;A/C No: XXXX&#10;IFSC: XXXX"></textarea>
                 </div>
+                <div class="form-group" style="grid-column: span 2;">
+                    <label>Terms &amp; Conditions <span style="color:#94a3b8;font-weight:400;">(shown on invoices)</span></label>
+                    <textarea name="terms_conditions" id="entityTerms" rows="4" placeholder="1. Payment due within 30 days.&#10;2. Subject to local jurisdiction only."></textarea>
+                </div>
 
                 <!-- Logo -->
                 <div class="form-group">
@@ -236,7 +241,8 @@ function resetModal() {
     document.getElementById('entityGstin').value = '';
     document.getElementById('entityPan').value = '';
     document.getElementById('entityAddress').value = '';
-    document.getElementById('entityBank').value = '';
+    document.getElementById('entityBank').value  = '';
+    document.getElementById('entityTerms').value = '';
     document.getElementById('existingLogo').value = '';
     document.getElementById('existingLetterhead').value = '';
     document.getElementById('existingSignature').value = '';
@@ -263,6 +269,7 @@ function editEntity(entity) {
     document.getElementById('entityPan').value      = entity.pan || '';
     document.getElementById('entityAddress').value  = entity.address || '';
     document.getElementById('entityBank').value     = entity.bank_details || '';
+    document.getElementById('entityTerms').value    = entity.terms_conditions || '';
     document.getElementById('existingLogo').value        = entity.logo || '';
     document.getElementById('existingLetterhead').value  = entity.letterhead || '';
     document.getElementById('existingSignature').value   = entity.signature || '';

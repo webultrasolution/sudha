@@ -64,7 +64,8 @@ $company_phone        = $co['phone'];
 $company_email        = $co['email'];
 $company_logo         = $co['logo'];
 $company_signature    = $co['signature'];
-$company_bank_details = $co['bank_details'];
+$company_bank_details    = $co['bank_details'];
+$company_terms           = $co['terms_conditions'];
 
 // Derive short name (first 2 words) for large header text
 $name_words       = explode(' ', trim($company_name));
@@ -461,9 +462,13 @@ td {
         <!-- Terms & Conditions -->
         <div style="flex:1.4; padding:10px; border-right:1px solid #000; font-size:9.5px; line-height:1.6;">
             <div style="font-weight:bold; margin-bottom:4px;">Terms &amp; Conditions</div>
-            <div>E.&amp; O.E.</div>
-            <div>1. Interest @ 18% p.a. will be charged if the payment is not made with in the stipulated time.</div>
-            <div>2. Subject to &lsquo;Malda&rsquo; Jurisdiction only.</div>
+            <?php if (!empty($company_terms)): ?>
+                <?php echo nl2br(htmlspecialchars($company_terms)); ?>
+            <?php else: ?>
+                <div>E.&amp; O.E.</div>
+                <div>1. Interest @ 18% p.a. will be charged if the payment is not made with in the stipulated time.</div>
+                <div>2. Subject to &lsquo;Malda&rsquo; Jurisdiction only.</div>
+            <?php endif; ?>
         </div>
         <!-- Authorised Signatory -->
         <div style="flex:1; padding:10px; display:flex; flex-direction:column; justify-content:space-between; text-align:center; font-size:10px;">

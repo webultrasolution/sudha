@@ -6,6 +6,7 @@ $queries = [
     "ALTER TABLE entities ADD COLUMN IF NOT EXISTS letterhead VARCHAR(255) DEFAULT NULL AFTER logo",
     "ALTER TABLE entities ADD COLUMN IF NOT EXISTS signature VARCHAR(255) DEFAULT NULL AFTER letterhead",
     "ALTER TABLE entities ADD COLUMN IF NOT EXISTS bank_details TEXT DEFAULT NULL AFTER address",
+    "ALTER TABLE entities ADD COLUMN IF NOT EXISTS terms_conditions TEXT DEFAULT NULL AFTER bank_details",
 ];
 
 echo "<pre>Running entity column migrations...\n";
