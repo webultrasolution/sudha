@@ -55,6 +55,7 @@ $company_phone      = $co['phone'];
 $company_email      = $co['email'];
 $company_letterhead = $co['letterhead'];
 $company_signature  = $co['signature'];
+$company_msme       = $co['msme_number'];
 
 $po_number = "PPO/" . date('y') . "-" . date('y', strtotime('+1 year')) . "/" . str_pad($vendor_id, 3, '0', STR_PAD_LEFT) . "-" . date('dHi');
 $po_date = date('d-m-Y');
@@ -313,7 +314,8 @@ if (empty($rates)) die("No rates selected for this PO.");
         <div class="header-top" style="text-align: center;">
             <h2 style="margin: 0; text-transform: uppercase;"><?php echo $company_name; ?></h2>
             <p><?php echo $company_address; ?></p>
-            <p>Ph: <?php echo $company_phone; ?> Email: <?php echo $company_email; ?></p>
+            <p>Ph: <?php echo $company_phone; ?> | Email: <?php echo $company_email; ?></p>
+            <?php if ($company_msme): ?><p>MSME: <?php echo htmlspecialchars($company_msme); ?></p><?php endif; ?>
         </div>
     <?php endif; ?>
 

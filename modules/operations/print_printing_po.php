@@ -43,6 +43,7 @@ $company_address   = $co['address'];
 $company_phone     = $co['phone'];
 $company_email     = $co['email'];
 $company_signature = $co['signature'];
+$company_msme      = $co['msme_number'];
 ?>
 <!DOCTYPE html>
 <html lang="en">
@@ -93,6 +94,7 @@ $company_signature = $co['signature'];
             <div class="company-details">
                 <?php echo $company_address; ?><br>
                 Phone: <?php echo $company_phone; ?> | Email: <?php echo $company_email; ?>
+                <?php if ($company_msme): ?><br>MSME: <?php echo htmlspecialchars($company_msme); ?><?php endif; ?>
             </div>
         </div>
         <div style="width: 38%; text-align: right;">

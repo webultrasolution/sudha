@@ -384,6 +384,7 @@ function resolveCompanyDetails($entity_id = null) {
         'signature'    => getSetting('company_signature',    'signature.png'),
         'bank_details'      => getSetting('company_bank_details', ''),
         'terms_conditions'  => getSetting('company_terms_conditions', ''),
+        'msme_number'       => getSetting('company_msme_number', ''),
     ];
 
     $eid = $entity_id ?: ($_SESSION['active_entity_id'] ?? null);
@@ -401,6 +402,7 @@ function resolveCompanyDetails($entity_id = null) {
             if (!empty($entity['signature']))         $data['signature']        = $entity['signature'];
             if (!empty($entity['bank_details']))      $data['bank_details']     = $entity['bank_details'];
             if (!empty($entity['terms_conditions']))  $data['terms_conditions'] = $entity['terms_conditions'];
+            if (!empty($entity['msme_number']))       $data['msme_number']      = $entity['msme_number'];
         }
     }
 

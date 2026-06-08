@@ -88,6 +88,7 @@ $company_email      = $co['email'];
 $company_letterhead = $co['letterhead'];
 $company_signature  = $co['signature'];
 $company_logo       = $co['logo'];
+$company_msme       = $co['msme_number'];
 
 // Calculate totals
 $subTotal = 0;
@@ -166,6 +167,7 @@ $totalAmt = $subTotal + $cgst + $sgst + $igst;
             <p style="font-size:11px; opacity:0.85; margin-top:4px;"><?php echo htmlspecialchars($company_address); ?></p>
             <p style="font-size:11px; opacity:0.85;">📞 <?php echo $company_phone; ?> &nbsp;|&nbsp; ✉ <?php echo $company_email; ?></p>
             <p style="font-size:11px; opacity:0.85; margin-top:4px;">GSTIN: <strong><?php echo $company_gstin; ?></strong> &nbsp;|&nbsp; PAN: <?php echo $company_pan; ?></p>
+            <?php if ($company_msme): ?><p style="font-size:11px; opacity:0.85; margin-top:2px;">MSME: <?php echo htmlspecialchars($company_msme); ?></p><?php endif; ?>
         </div>
         <div class="inv-meta">
             <div class="inv-type"><?php echo $isFinalInv ? 'Final Tax Invoice' : 'Proforma Invoice'; ?> — Mounting</div>

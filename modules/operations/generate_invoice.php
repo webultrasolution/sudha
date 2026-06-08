@@ -66,6 +66,7 @@ $company_logo         = $co['logo'];
 $company_signature    = $co['signature'];
 $company_bank_details    = $co['bank_details'];
 $company_terms           = $co['terms_conditions'];
+$company_msme            = $co['msme_number'];
 
 // Derive short name (first 2 words) for large header text
 $name_words       = explode(' ', trim($company_name));
@@ -286,6 +287,7 @@ td {
         <?php echo nl2br(htmlspecialchars($company_address)); ?><br>
         Ph : <?php echo htmlspecialchars($company_phone); ?> &nbsp;&nbsp;
         Email : <?php echo htmlspecialchars($company_email); ?>
+        <?php if ($company_msme): ?> &nbsp;&nbsp; MSME : <?php echo htmlspecialchars($company_msme); ?><?php endif; ?>
     </div>
     <hr class="divider">
 

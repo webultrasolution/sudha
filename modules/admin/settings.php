@@ -114,6 +114,10 @@ include_once __DIR__ . '/../../includes/header.php';
                             <label>Official Email</label>
                             <input type="email" name="company_email" value="<?php echo htmlspecialchars($settings['company_email'] ?? ''); ?>">
                         </div>
+                        <div class="form-group">
+                            <label>MSME Number</label>
+                            <input type="text" name="company_msme_number" value="<?php echo htmlspecialchars($settings['company_msme_number'] ?? ''); ?>" placeholder="e.g. UDYAM-WB-00-0000000">
+                        </div>
                     </div>
                 </div>
 
