@@ -96,6 +96,7 @@ CREATE TABLE IF NOT EXISTS invoices (
     id INT AUTO_INCREMENT PRIMARY KEY,
     invoice_number VARCHAR(50) UNIQUE,
     booking_id INT NOT NULL,
+    entity_id INT NULL,
     type ENUM('tax', 'proforma', 'estimate') DEFAULT 'tax',
     sub_total DECIMAL(15, 2),
     cgst DECIMAL(15, 2),
@@ -104,7 +105,8 @@ CREATE TABLE IF NOT EXISTS invoices (
     total_amount DECIMAL(15, 2),
     payment_status ENUM('unpaid', 'partially_paid', 'paid') DEFAULT 'unpaid',
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-    FOREIGN KEY (booking_id) REFERENCES bookings(id)
+    FOREIGN KEY (booking_id) REFERENCES bookings(id),
+    FOREIGN KEY (entity_id) REFERENCES entities(id) ON DELETE SET NULL
 );
 
 CREATE TABLE IF NOT EXISTS payments (

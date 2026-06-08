@@ -34,14 +34,16 @@ $po_remark = $po['remarks'] ?? '';
 $po_number = $po['po_number'];
 $po_date = date('d-m-Y', strtotime($po['po_date']));
 
-// Company Settings
-$company_name = getSetting('company_name', 'Sudha Creative & Advertising');
-$company_gstin = getSetting('company_gstin', '19AHRPT4740Q1Z6');
-$company_pan = getSetting('company_pan', 'AHRPT4740Q');
-$company_address = getSetting('company_address', 'Deshbandhu Para, P.O - Jhaljhalia, Dist - Malda - 732102, West Bengal');
-$company_phone = getSetting('company_phone', '8158854313');
-$company_email = getSetting('company_email', 'sudhacreativemalda@gmail.com');
-$company_signature = getSetting('company_signature', 'signature.png');
+// Company Settings — uses active session entity
+$co                = resolveCompanyDetails();
+$company_name      = $co['name'];
+$company_gstin     = $co['gstin'];
+$company_pan       = $co['pan'];
+$company_address   = $co['address'];
+$company_phone     = $co['phone'];
+$company_email     = $co['email'];
+$company_signature = $co['signature'];
+$company_msme      = $co['msme_number'];
 ?>
 <!DOCTYPE html>
 <html lang="en">
@@ -92,6 +94,7 @@ $company_signature = getSetting('company_signature', 'signature.png');
             <div class="company-details">
                 <?php echo $company_address; ?><br>
                 Phone: <?php echo $company_phone; ?> | Email: <?php echo $company_email; ?>
+                <?php if ($company_msme): ?><br>MSME: <?php echo htmlspecialchars($company_msme); ?><?php endif; ?>
             </div>
         </div>
         <div style="width: 38%; text-align: right;">

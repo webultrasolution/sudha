@@ -365,6 +365,51 @@ function getActiveEntity() {
 }
 
 /**
+ * Resolve company/entity details for document generation.
+ * Priority: $entity_id → $_SESSION['active_entity_id'] → getSetting() defaults.
+ */
+function resolveCompanyDetails($entity_id = null) {
+    global $pdo;
+    if (session_status() === PHP_SESSION_NONE) session_start();
+
+    $data = [
+        'name'         => getSetting('company_name',         'Sudha Creative & Advertising'),
+        'gstin'        => getSetting('company_gstin',        '19AHRPT4740Q1Z6'),
+        'pan'          => getSetting('company_pan',          'AHRPT4740Q'),
+        'address'      => getSetting('company_address',      'Deshbandhu Para, P.O - Jhaljhalia, Dist - Malda - 732102, West Bengal'),
+        'phone'        => getSetting('company_phone',        '8158854313'),
+        'email'        => getSetting('company_email',        'sudhacreativemalda@gmail.com'),
+        'logo'         => getSetting('company_logo',         ''),
+        'letterhead'   => getSetting('company_letterhead',   ''),
+        'signature'    => getSetting('company_signature',    'signature.png'),
+        'bank_details'      => getSetting('company_bank_details', ''),
+        'terms_conditions'  => getSetting('company_terms_conditions', ''),
+        'msme_number'       => getSetting('company_msme_number', ''),
+    ];
+
+    $eid = $entity_id ?: ($_SESSION['active_entity_id'] ?? null);
+    if ($eid) {
+        $stmt = $pdo->prepare("SELECT * FROM entities WHERE id = ?");
+        $stmt->execute([$eid]);
+        $entity = $stmt->fetch();
+        if ($entity) {
+            $data['name'] = $entity['name'];
+            if (!empty($entity['gstin']))             $data['gstin']            = $entity['gstin'];
+            if (!empty($entity['pan']))               $data['pan']              = $entity['pan'];
+            if (!empty($entity['address']))           $data['address']          = $entity['address'];
+            if (!empty($entity['logo']))              $data['logo']             = $entity['logo'];
+            if (!empty($entity['letterhead']))        $data['letterhead']       = $entity['letterhead'];
+            if (!empty($entity['signature']))         $data['signature']        = $entity['signature'];
+            if (!empty($entity['bank_details']))      $data['bank_details']     = $entity['bank_details'];
+            if (!empty($entity['terms_conditions']))  $data['terms_conditions'] = $entity['terms_conditions'];
+            if (!empty($entity['msme_number']))       $data['msme_number']      = $entity['msme_number'];
+        }
+    }
+
+    return $data;
+}
+
+/**
  * Check if a partner / vendor has a valid GSTIN
  */
 function vendorHasGST($gstin) {

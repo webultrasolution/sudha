@@ -63,34 +63,17 @@ $stmtItems = $pdo->prepare("
 $stmtItems->execute([$booking_id]);
 $items = $stmtItems->fetchAll();
 
-// Company Settings
-$company_name = getSetting('company_name', 'Sudha Creative & Advertising');
-$company_gstin = getSetting('company_gstin', '19AHRPT4740Q1Z6');
-$company_pan = getSetting('company_pan', 'AHRPT4740Q');
-$company_address = getSetting('company_address', 'Deshbandhu Para, P.O - Jhaljhalia, Dist - Malda - 732102, West Bengal');
-$company_phone = getSetting('company_phone', '8158854313');
-$company_email = getSetting('company_email', 'sudhacreativemalda@gmail.com');
-$company_letterhead = getSetting('company_letterhead');
-$company_signature = getSetting('company_signature', 'signature.png');
-
-if (!empty($invoiceData['entity_id'])) {
-    $stmtEntity = $pdo->prepare("SELECT * FROM entities WHERE id = ?");
-    $stmtEntity->execute([$invoiceData['entity_id']]);
-    $entity = $stmtEntity->fetch();
-    if ($entity) {
-        $company_name = $entity['name'];
-        if (!empty($entity['gstin']))
-            $company_gstin = $entity['gstin'];
-        if (!empty($entity['pan']))
-            $company_pan = $entity['pan'];
-        if (!empty($entity['address']))
-            $company_address = $entity['address'];
-        if (!empty($entity['letterhead']))
-            $company_letterhead = $entity['letterhead'];
-        if (!empty($entity['signature']))
-            $company_signature = $entity['signature'];
-    }
-}
+// Company Settings — entity priority: invoice entity → active session entity → settings
+$co                 = resolveCompanyDetails($invoiceData['entity_id'] ?? null);
+$company_name       = $co['name'];
+$company_gstin      = $co['gstin'];
+$company_pan        = $co['pan'];
+$company_address    = $co['address'];
+$company_phone      = $co['phone'];
+$company_email      = $co['email'];
+$company_letterhead = $co['letterhead'];
+$company_signature  = $co['signature'];
+$company_msme       = $co['msme_number'];
 
 // Tax Calculation Logic
 $subtotal = $b['total_amount'];
@@ -290,7 +273,8 @@ $gst = calculateGST($subtotal, $isInterState);
             <div class="header-top" style="text-align: center;">
                 <h2 style="margin: 0; text-transform: uppercase;"><?php echo $company_name; ?></h2>
                 <p><?php echo $company_address; ?></p>
-                <p>Ph: <?php echo $company_phone; ?> Email: <?php echo $company_email; ?></p>
+                <p>Ph: <?php echo $company_phone; ?> | Email: <?php echo $company_email; ?></p>
+                <?php if ($company_msme): ?><p>MSME: <?php echo htmlspecialchars($company_msme); ?></p><?php endif; ?>
             </div>
         <?php endif; ?>
 

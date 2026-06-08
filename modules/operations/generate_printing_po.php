@@ -45,15 +45,17 @@ if ($preview) {
     }
 }
 
-// Company Settings
-$company_name = getSetting('company_name', 'Sudha Creative & Advertising');
-$company_gstin = getSetting('company_gstin', '19AHRPT4740Q1Z6');
-$company_pan = getSetting('company_pan', 'AHRPT4740Q');
-$company_address = getSetting('company_address', 'Deshbandhu Para, P.O - Jhaljhalia, Dist - Malda - 732102, West Bengal');
-$company_phone = getSetting('company_phone', '8158854313');
-$company_email = getSetting('company_email', 'sudhacreativemalda@gmail.com');
-$company_letterhead = getSetting('company_letterhead');
-$company_signature = getSetting('company_signature', 'signature.png');
+// Company Settings — uses active session entity
+$co                 = resolveCompanyDetails();
+$company_name       = $co['name'];
+$company_gstin      = $co['gstin'];
+$company_pan        = $co['pan'];
+$company_address    = $co['address'];
+$company_phone      = $co['phone'];
+$company_email      = $co['email'];
+$company_letterhead = $co['letterhead'];
+$company_signature  = $co['signature'];
+$company_msme       = $co['msme_number'];
 
 $po_number = "PPO/" . date('y') . "-" . date('y', strtotime('+1 year')) . "/" . str_pad($vendor_id, 3, '0', STR_PAD_LEFT) . "-" . date('dHi');
 $po_date = date('d-m-Y');
@@ -312,7 +314,8 @@ if (empty($rates)) die("No rates selected for this PO.");
         <div class="header-top" style="text-align: center;">
             <h2 style="margin: 0; text-transform: uppercase;"><?php echo $company_name; ?></h2>
             <p><?php echo $company_address; ?></p>
-            <p>Ph: <?php echo $company_phone; ?> Email: <?php echo $company_email; ?></p>
+            <p>Ph: <?php echo $company_phone; ?> | Email: <?php echo $company_email; ?></p>
+            <?php if ($company_msme): ?><p>MSME: <?php echo htmlspecialchars($company_msme); ?></p><?php endif; ?>
         </div>
     <?php endif; ?>
 

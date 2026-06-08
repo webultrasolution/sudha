@@ -1,0 +1,141 @@
+[25-May-2026 20:26:22 Europe/Berlin] PHP Warning:  Cannot modify header information - headers already sent by (output started at D:\xampp\htdocs\easy-outdoor-crm\includes\header.php:83) in D:\xampp\htdocs\easy-outdoor-crm\modules\financials\invoices.php on line 11
+[25-May-2026 20:26:30 Europe/Berlin] PHP Warning:  Cannot modify header information - headers already sent by (output started at D:\xampp\htdocs\easy-outdoor-crm\includes\header.php:83) in D:\xampp\htdocs\easy-outdoor-crm\modules\financials\invoices.php on line 11
+[25-May-2026 20:26:34 Europe/Berlin] PHP Warning:  Cannot modify header information - headers already sent by (output started at D:\xampp\htdocs\easy-outdoor-crm\includes\header.php:83) in D:\xampp\htdocs\easy-outdoor-crm\modules\financials\invoices.php on line 11
+[25-May-2026 20:26:40 Europe/Berlin] PHP Warning:  Cannot modify header information - headers already sent by (output started at D:\xampp\htdocs\easy-outdoor-crm\includes\header.php:83) in D:\xampp\htdocs\easy-outdoor-crm\modules\financials\invoices.php on line 11
+[26-May-2026 00:59:18 Asia/Kolkata] PHP Warning:  Undefined variable $company_signature in D:\xampp\htdocs\easy-outdoor-crm\modules\operations\generate_po.php on line 573
+[26-May-2026 01:03:08 Asia/Kolkata] PHP Warning:  Undefined variable $company_signature in D:\xampp\htdocs\easy-outdoor-crm\modules\operations\generate_po.php on line 573
+[26-May-2026 01:12:15 Asia/Kolkata] PHP Warning:  Undefined variable $company_signature in D:\xampp\htdocs\easy-outdoor-crm\modules\operations\generate_po.php on line 573
+[26-May-2026 01:25:53 Asia/Kolkata] PHP Warning:  Undefined variable $company_signature in D:\xampp\htdocs\easy-outdoor-crm\modules\operations\generate_po.php on line 573
+[26-May-2026 01:40:26 Asia/Kolkata] PHP Warning:  Undefined variable $company_signature in D:\xampp\htdocs\easy-outdoor-crm\modules\operations\generate_po.php on line 573
+[26-May-2026 01:52:19 Asia/Kolkata] PHP Warning:  Undefined variable $company_signature in D:\xampp\htdocs\easy-outdoor-crm\modules\operations\generate_po.php on line 573
+[26-May-2026 01:52:35 Asia/Kolkata] PHP Warning:  Undefined variable $company_signature in D:\xampp\htdocs\easy-outdoor-crm\modules\operations\generate_po.php on line 573
+[26-May-2026 01:52:45 Asia/Kolkata] PHP Warning:  Undefined variable $company_signature in D:\xampp\htdocs\easy-outdoor-crm\modules\operations\generate_po.php on line 573
+[26-May-2026 01:53:27 Asia/Kolkata] PHP Warning:  Undefined variable $company_signature in D:\xampp\htdocs\easy-outdoor-crm\modules\operations\generate_po.php on line 577
+[25-May-2026 22:32:04 Europe/Berlin] PHP Warning:  Undefined array key "rate_per_sqft" in D:\xampp\htdocs\easy-outdoor-crm\modules\partners\printing_rates.php on line 13
+[25-May-2026 22:37:57 Europe/Berlin] PHP Fatal error:  Uncaught PDOException: SQLSTATE[23000]: Integrity constraint violation: 1052 Column 'total_amount' in field list is ambiguous in D:\xampp\htdocs\easy-outdoor-crm\modules\financials\ledgers.php:54
+Stack trace:
+#0 D:\xampp\htdocs\easy-outdoor-crm\modules\financials\ledgers.php(54): PDO->prepare('\n              ...')
+#1 {main}
+  thrown in D:\xampp\htdocs\easy-outdoor-crm\modules\financials\ledgers.php on line 54
+[25-May-2026 22:38:48 Europe/Berlin] PHP Fatal error:  Uncaught PDOException: SQLSTATE[42S22]: Column not found: 1054 Unknown column 'client_id' in 'where clause' in D:\xampp\htdocs\easy-outdoor-crm\modules\financials\ledgers.php:54
+Stack trace:
+#0 D:\xampp\htdocs\easy-outdoor-crm\modules\financials\ledgers.php(54): PDO->prepare('\n              ...')
+#1 {main}
+  thrown in D:\xampp\htdocs\easy-outdoor-crm\modules\financials\ledgers.php on line 54
+[25-May-2026 22:39:22 Europe/Berlin] PHP Fatal error:  Uncaught PDOException: SQLSTATE[42S22]: Column not found: 1054 Unknown column 'client_id' in 'where clause' in D:\xampp\htdocs\easy-outdoor-crm\modules\financials\ledgers.php:54
+Stack trace:
+#0 D:\xampp\htdocs\easy-outdoor-crm\modules\financials\ledgers.php(54): PDO->prepare('\n              ...')
+#1 {main}
+  thrown in D:\xampp\htdocs\easy-outdoor-crm\modules\financials\ledgers.php on line 54
+[25-May-2026 23:09:51 Europe/Berlin] PHP Warning:  Undefined array key "created_at" in D:\xampp\htdocs\easy-outdoor-crm\modules\partners\client_printing_rates.php on line 139
+[25-May-2026 23:09:51 Europe/Berlin] PHP Deprecated:  strtotime(): Passing null to parameter #1 ($datetime) of type string is deprecated in D:\xampp\htdocs\easy-outdoor-crm\modules\partners\client_printing_rates.php on line 139
+[25-May-2026 23:09:51 Europe/Berlin] PHP Warning:  Undefined array key "created_at" in D:\xampp\htdocs\easy-outdoor-crm\modules\partners\client_printing_rates.php on line 139
+[25-May-2026 23:09:51 Europe/Berlin] PHP Deprecated:  strtotime(): Passing null to parameter #1 ($datetime) of type string is deprecated in D:\xampp\htdocs\easy-outdoor-crm\modules\partners\client_printing_rates.php on line 139
+[25-May-2026 23:09:51 Europe/Berlin] PHP Warning:  Undefined array key "created_at" in D:\xampp\htdocs\easy-outdoor-crm\modules\partners\client_printing_rates.php on line 139
+[25-May-2026 23:09:51 Europe/Berlin] PHP Deprecated:  strtotime(): Passing null to parameter #1 ($datetime) of type string is deprecated in D:\xampp\htdocs\easy-outdoor-crm\modules\partners\client_printing_rates.php on line 139
+[25-May-2026 23:10:55 Europe/Berlin] PHP Warning:  Undefined array key "created_at" in D:\xampp\htdocs\easy-outdoor-crm\modules\partners\client_printing_rates.php on line 139
+[25-May-2026 23:10:55 Europe/Berlin] PHP Deprecated:  strtotime(): Passing null to parameter #1 ($datetime) of type string is deprecated in D:\xampp\htdocs\easy-outdoor-crm\modules\partners\client_printing_rates.php on line 139
+[25-May-2026 23:10:55 Europe/Berlin] PHP Warning:  Undefined array key "created_at" in D:\xampp\htdocs\easy-outdoor-crm\modules\partners\client_printing_rates.php on line 139
+[25-May-2026 23:10:55 Europe/Berlin] PHP Deprecated:  strtotime(): Passing null to parameter #1 ($datetime) of type string is deprecated in D:\xampp\htdocs\easy-outdoor-crm\modules\partners\client_printing_rates.php on line 139
+[25-May-2026 23:10:55 Europe/Berlin] PHP Warning:  Undefined array key "created_at" in D:\xampp\htdocs\easy-outdoor-crm\modules\partners\client_printing_rates.php on line 139
+[25-May-2026 23:10:55 Europe/Berlin] PHP Deprecated:  strtotime(): Passing null to parameter #1 ($datetime) of type string is deprecated in D:\xampp\htdocs\easy-outdoor-crm\modules\partners\client_printing_rates.php on line 139
+[25-May-2026 23:10:59 Europe/Berlin] PHP Warning:  Undefined array key "created_at" in D:\xampp\htdocs\easy-outdoor-crm\modules\partners\client_printing_rates.php on line 139
+[25-May-2026 23:10:59 Europe/Berlin] PHP Deprecated:  strtotime(): Passing null to parameter #1 ($datetime) of type string is deprecated in D:\xampp\htdocs\easy-outdoor-crm\modules\partners\client_printing_rates.php on line 139
+[25-May-2026 23:10:59 Europe/Berlin] PHP Warning:  Undefined array key "created_at" in D:\xampp\htdocs\easy-outdoor-crm\modules\partners\client_printing_rates.php on line 139
+[25-May-2026 23:10:59 Europe/Berlin] PHP Deprecated:  strtotime(): Passing null to parameter #1 ($datetime) of type string is deprecated in D:\xampp\htdocs\easy-outdoor-crm\modules\partners\client_printing_rates.php on line 139
+[25-May-2026 23:10:59 Europe/Berlin] PHP Warning:  Undefined array key "created_at" in D:\xampp\htdocs\easy-outdoor-crm\modules\partners\client_printing_rates.php on line 139
+[25-May-2026 23:10:59 Europe/Berlin] PHP Deprecated:  strtotime(): Passing null to parameter #1 ($datetime) of type string is deprecated in D:\xampp\htdocs\easy-outdoor-crm\modules\partners\client_printing_rates.php on line 139
+[27-May-2026 23:17:37 Europe/Berlin] PHP Fatal error:  Uncaught PDOException: SQLSTATE[42S21]: Column already exists: 1060 Duplicate column name 'letterhead' in D:\xampp\htdocs\easy-outdoor-crm\modules\admin\temp_schema.php:3
+Stack trace:
+#0 D:\xampp\htdocs\easy-outdoor-crm\modules\admin\temp_schema.php(3): PDO->exec('ALTER TABLE ent...')
+#1 {main}
+  thrown in D:\xampp\htdocs\easy-outdoor-crm\modules\admin\temp_schema.php on line 3
+[28-May-2026 02:49:09 Asia/Kolkata] PHP Warning:  Undefined variable $company_signature in D:\xampp\htdocs\easy-outdoor-crm\modules\operations\generate_po.php on line 827
+[01-Jun-2026 17:16:40 Europe/Berlin] PHP Fatal error:  Uncaught PDOException: SQLSTATE[42S02]: Base table or view not found: 1146 Table 'easy_outdoor_crm.users' doesn't exist in D:\xampp\htdocs\easy-outdoor-crm\login.php:17
+Stack trace:
+#0 D:\xampp\htdocs\easy-outdoor-crm\login.php(17): PDO->prepare('SELECT * FROM u...')
+#1 {main}
+  thrown in D:\xampp\htdocs\easy-outdoor-crm\login.php on line 17
+[01-Jun-2026 17:18:43 Europe/Berlin] PHP Fatal error:  Uncaught PDOException: SQLSTATE[42S02]: Base table or view not found: 1146 Table 'easy_outdoor_crm.users' doesn't exist in D:\xampp\htdocs\easy-outdoor-crm\login.php:17
+Stack trace:
+#0 D:\xampp\htdocs\easy-outdoor-crm\login.php(17): PDO->prepare('SELECT * FROM u...')
+#1 {main}
+  thrown in D:\xampp\htdocs\easy-outdoor-crm\login.php on line 17
+[02-Jun-2026 20:57:02 Asia/Kolkata] PHP Deprecated:  htmlspecialchars(): Passing null to parameter #1 ($string) of type string is deprecated in D:\xampp\htdocs\easy-outdoor-crm\modules\operations\generate_mounting_po.php on line 85
+[02-Jun-2026 20:57:02 Asia/Kolkata] PHP Deprecated:  htmlspecialchars(): Passing null to parameter #1 ($string) of type string is deprecated in D:\xampp\htdocs\easy-outdoor-crm\modules\operations\generate_mounting_po.php on line 115
+[02-Jun-2026 20:59:32 Asia/Kolkata] PHP Deprecated:  htmlspecialchars(): Passing null to parameter #1 ($string) of type string is deprecated in D:\xampp\htdocs\easy-outdoor-crm\modules\operations\generate_mounting_po.php on line 85
+[02-Jun-2026 20:59:32 Asia/Kolkata] PHP Deprecated:  htmlspecialchars(): Passing null to parameter #1 ($string) of type string is deprecated in D:\xampp\htdocs\easy-outdoor-crm\modules\operations\generate_mounting_po.php on line 115
+[02-Jun-2026 20:59:48 Asia/Kolkata] PHP Deprecated:  htmlspecialchars(): Passing null to parameter #1 ($string) of type string is deprecated in D:\xampp\htdocs\easy-outdoor-crm\modules\operations\generate_mounting_po.php on line 85
+[02-Jun-2026 20:59:48 Asia/Kolkata] PHP Deprecated:  htmlspecialchars(): Passing null to parameter #1 ($string) of type string is deprecated in D:\xampp\htdocs\easy-outdoor-crm\modules\operations\generate_mounting_po.php on line 115
+[02-Jun-2026 20:59:48 Asia/Kolkata] PHP Deprecated:  htmlspecialchars(): Passing null to parameter #1 ($string) of type string is deprecated in D:\xampp\htdocs\easy-outdoor-crm\modules\operations\generate_mounting_po.php on line 85
+[02-Jun-2026 20:59:48 Asia/Kolkata] PHP Deprecated:  htmlspecialchars(): Passing null to parameter #1 ($string) of type string is deprecated in D:\xampp\htdocs\easy-outdoor-crm\modules\operations\generate_mounting_po.php on line 115
+[02-Jun-2026 21:01:55 Asia/Kolkata] PHP Deprecated:  htmlspecialchars(): Passing null to parameter #1 ($string) of type string is deprecated in D:\xampp\htdocs\easy-outdoor-crm\modules\operations\generate_mounting_po.php on line 85
+[02-Jun-2026 21:01:55 Asia/Kolkata] PHP Deprecated:  htmlspecialchars(): Passing null to parameter #1 ($string) of type string is deprecated in D:\xampp\htdocs\easy-outdoor-crm\modules\operations\generate_mounting_po.php on line 115
+[02-Jun-2026 21:05:01 Asia/Kolkata] PHP Deprecated:  htmlspecialchars(): Passing null to parameter #1 ($string) of type string is deprecated in D:\xampp\htdocs\easy-outdoor-crm\modules\operations\generate_mounting_po.php on line 85
+[02-Jun-2026 21:05:01 Asia/Kolkata] PHP Deprecated:  htmlspecialchars(): Passing null to parameter #1 ($string) of type string is deprecated in D:\xampp\htdocs\easy-outdoor-crm\modules\operations\generate_mounting_po.php on line 115
+[02-Jun-2026 17:45:55 Europe/Berlin] PHP Warning:  Undefined variable $vendors in D:\xampp\htdocs\easy-outdoor-crm\modules\operations\create_mounting_po.php on line 145
+[02-Jun-2026 17:45:55 Europe/Berlin] PHP Warning:  foreach() argument must be of type array|object, null given in D:\xampp\htdocs\easy-outdoor-crm\modules\operations\create_mounting_po.php on line 145
+[02-Jun-2026 17:45:55 Europe/Berlin] PHP Warning:  Undefined variable $vendors in D:\xampp\htdocs\easy-outdoor-crm\modules\operations\create_mounting_po.php on line 295
+[02-Jun-2026 17:46:15 Europe/Berlin] PHP Warning:  Undefined variable $vendors in D:\xampp\htdocs\easy-outdoor-crm\modules\operations\create_mounting_po.php on line 295
+[02-Jun-2026 18:39:12 Europe/Berlin] PHP Fatal error:  Uncaught PDOException: SQLSTATE[42000]: Syntax error or access violation: 1064 You have an error in your SQL syntax; check the manual that corresponds to your MariaDB server version for the right syntax to use near 'UNION ALL
+          
+          SELECT MIN(r.id) as id, 'invoice' as type, D...' at line 10 in D:\xampp\htdocs\easy-outdoor-crm\modules\financials\partner_ledger.php:39
+Stack trace:
+#0 D:\xampp\htdocs\easy-outdoor-crm\modules\financials\partner_ledger.php(39): PDO->prepare('\r\n          SEL...')
+#1 {main}
+  thrown in D:\xampp\htdocs\easy-outdoor-crm\modules\financials\partner_ledger.php on line 39
+[02-Jun-2026 18:39:16 Europe/Berlin] PHP Fatal error:  Uncaught PDOException: SQLSTATE[42000]: Syntax error or access violation: 1064 You have an error in your SQL syntax; check the manual that corresponds to your MariaDB server version for the right syntax to use near 'UNION ALL
+          
+          SELECT MIN(r.id) as id, 'invoice' as type, D...' at line 10 in D:\xampp\htdocs\easy-outdoor-crm\modules\financials\partner_ledger.php:39
+Stack trace:
+#0 D:\xampp\htdocs\easy-outdoor-crm\modules\financials\partner_ledger.php(39): PDO->prepare('\r\n          SEL...')
+#1 {main}
+  thrown in D:\xampp\htdocs\easy-outdoor-crm\modules\financials\partner_ledger.php on line 39
+[02-Jun-2026 18:39:40 Europe/Berlin] PHP Fatal error:  Uncaught PDOException: SQLSTATE[42000]: Syntax error or access violation: 1064 You have an error in your SQL syntax; check the manual that corresponds to your MariaDB server version for the right syntax to use near 'UNION ALL
+          
+          SELECT MIN(r.id) as id, 'invoice' as type, D...' at line 10 in D:\xampp\htdocs\easy-outdoor-crm\modules\financials\partner_ledger.php:39
+Stack trace:
+#0 D:\xampp\htdocs\easy-outdoor-crm\modules\financials\partner_ledger.php(39): PDO->prepare('\r\n          SEL...')
+#1 {main}
+  thrown in D:\xampp\htdocs\easy-outdoor-crm\modules\financials\partner_ledger.php on line 39
+[02-Jun-2026 18:39:47 Europe/Berlin] PHP Fatal error:  Uncaught PDOException: SQLSTATE[42000]: Syntax error or access violation: 1064 You have an error in your SQL syntax; check the manual that corresponds to your MariaDB server version for the right syntax to use near 'UNION ALL
+          
+          SELECT MIN(r.id) as id, 'invoice' as type, D...' at line 10 in D:\xampp\htdocs\easy-outdoor-crm\modules\financials\partner_ledger.php:39
+Stack trace:
+#0 D:\xampp\htdocs\easy-outdoor-crm\modules\financials\partner_ledger.php(39): PDO->prepare('\r\n          SEL...')
+#1 {main}
+  thrown in D:\xampp\htdocs\easy-outdoor-crm\modules\financials\partner_ledger.php on line 39
+[02-Jun-2026 19:46:30 Europe/Berlin] PHP Warning:  Undefined variable $tables in D:\xampp\htdocs\easy-outdoor-crm\modules\admin\trash.php on line 32
+[02-Jun-2026 19:46:30 Europe/Berlin] PHP Warning:  foreach() argument must be of type array|object, null given in D:\xampp\htdocs\easy-outdoor-crm\modules\admin\trash.php on line 32
+[02-Jun-2026 19:46:32 Europe/Berlin] PHP Warning:  Undefined variable $tables in D:\xampp\htdocs\easy-outdoor-crm\modules\admin\trash.php on line 32
+[02-Jun-2026 19:46:32 Europe/Berlin] PHP Warning:  foreach() argument must be of type array|object, null given in D:\xampp\htdocs\easy-outdoor-crm\modules\admin\trash.php on line 32
+[02-Jun-2026 19:50:09 Europe/Berlin] PHP Fatal error:  Uncaught PDOException: There is no active transaction in D:\xampp\htdocs\easy-outdoor-crm\modules\financials\invoices.php:38
+Stack trace:
+#0 D:\xampp\htdocs\easy-outdoor-crm\modules\financials\invoices.php(38): PDO->rollBack()
+#1 {main}
+  thrown in D:\xampp\htdocs\easy-outdoor-crm\modules\financials\invoices.php on line 38
+[02-Jun-2026 23:37:47 Asia/Kolkata] PHP Fatal error:  Uncaught PDOException: SQLSTATE[42S22]: Column not found: 1054 Unknown column 'e.letterhead' in 'field list' in D:\xampp\htdocs\easy-outdoor-crm\modules\operations\generate_po.php:17
+Stack trace:
+#0 D:\xampp\htdocs\easy-outdoor-crm\modules\operations\generate_po.php(17): PDO->prepare('\n        SELECT...')
+#1 {main}
+  thrown in D:\xampp\htdocs\easy-outdoor-crm\modules\operations\generate_po.php on line 17
+[02-Jun-2026 23:38:18 Asia/Kolkata] PHP Fatal error:  Uncaught PDOException: SQLSTATE[42S22]: Column not found: 1054 Unknown column 'e.letterhead' in 'field list' in D:\xampp\htdocs\easy-outdoor-crm\modules\operations\generate_po.php:17
+Stack trace:
+#0 D:\xampp\htdocs\easy-outdoor-crm\modules\operations\generate_po.php(17): PDO->prepare('\n        SELECT...')
+#1 {main}
+  thrown in D:\xampp\htdocs\easy-outdoor-crm\modules\operations\generate_po.php on line 17
+[02-Jun-2026 23:38:19 Asia/Kolkata] PHP Fatal error:  Uncaught PDOException: SQLSTATE[42S22]: Column not found: 1054 Unknown column 'e.letterhead' in 'field list' in D:\xampp\htdocs\easy-outdoor-crm\modules\operations\generate_po.php:17
+Stack trace:
+#0 D:\xampp\htdocs\easy-outdoor-crm\modules\operations\generate_po.php(17): PDO->prepare('\n        SELECT...')
+#1 {main}
+  thrown in D:\xampp\htdocs\easy-outdoor-crm\modules\operations\generate_po.php on line 17
+[08-Jun-2026 04:55:04 Europe/Berlin] PHP Fatal error:  Uncaught PDOException: SQLSTATE[42S22]: Column not found: 1054 Unknown column 'i.entity_id' in 'on clause' in D:\xampp\htdocs\test5\modules\financials\invoice_view.php:12
+Stack trace:
+#0 D:\xampp\htdocs\test5\modules\financials\invoice_view.php(12): PDO->prepare('\r\n    SELECT i....')
+#1 {main}
+  thrown in D:\xampp\htdocs\test5\modules\financials\invoice_view.php on line 12
+[08-Jun-2026 04:56:41 Europe/Berlin] PHP Fatal error:  Uncaught PDOException: SQLSTATE[42S22]: Column not found: 1054 Unknown column 'i.entity_id' in 'on clause' in D:\xampp\htdocs\test5\modules\financials\invoice_view.php:12
+Stack trace:
+#0 D:\xampp\htdocs\test5\modules\financials\invoice_view.php(12): PDO->prepare('\r\n    SELECT i....')
+#1 {main}
+  thrown in D:\xampp\htdocs\test5\modules\financials\invoice_view.php on line 12
