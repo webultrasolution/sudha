@@ -77,16 +77,17 @@ $invoiceDate = $first['invoice_date'] ?: $first['created_at'];
 $gstType    = $first['gst_type'] ?? 'igst';
 $isFinalInv = $first['is_final_invoice'] ?? 0;
 
-// Company settings
-$company_name      = getSetting('company_name',      'Sudha Creative & Advertising');
-$company_gstin     = getSetting('company_gstin',     '19AHRPT4740Q1Z6');
-$company_pan       = getSetting('company_pan',       'AHRPT4740Q');
-$company_address   = getSetting('company_address',   'Deshbandhu Para, P.O - Jhaljhalia, Dist - Malda - 732102, West Bengal');
-$company_phone     = getSetting('company_phone',     '8158854313');
-$company_email     = getSetting('company_email',     'sudhacreativemalda@gmail.com');
-$company_letterhead = getSetting('company_letterhead');
-$company_signature  = getSetting('company_signature', 'signature.png');
-$company_logo      = getSetting('company_logo');
+// Company settings — uses active session entity
+$co                 = resolveCompanyDetails();
+$company_name       = $co['name'];
+$company_gstin      = $co['gstin'];
+$company_pan        = $co['pan'];
+$company_address    = $co['address'];
+$company_phone      = $co['phone'];
+$company_email      = $co['email'];
+$company_letterhead = $co['letterhead'];
+$company_signature  = $co['signature'];
+$company_logo       = $co['logo'];
 
 // Calculate totals
 $subTotal = 0;

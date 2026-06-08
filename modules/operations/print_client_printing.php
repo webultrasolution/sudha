@@ -35,15 +35,16 @@ $po_number = $invoice['invoice_number'];
 $po_date = date('d-m-Y', strtotime($invoice['invoice_date']));
 $is_final = false; // Based on original code logic, client_printing was mainly PO or Tax Invoice based on a flag. We can assume standard printing invoice here.
 
-// Company Settings
-$company_name = getSetting('company_name', 'Sudha Creative & Advertising');
-$company_gstin = getSetting('company_gstin', '19AHRPT4740Q1Z6');
-$company_pan = getSetting('company_pan', 'AHRPT4740Q');
-$company_address = getSetting('company_address', 'Deshbandhu Para, P.O - Jhaljhalia, Dist - Malda - 732102, West Bengal');
-$company_phone = getSetting('company_phone', '8158854313');
-$company_email = getSetting('company_email', 'sudhacreativemalda@gmail.com');
-$company_letterhead = getSetting('company_letterhead');
-$company_signature = getSetting('company_signature', 'signature.png');
+// Company Settings — uses active session entity
+$co                 = resolveCompanyDetails();
+$company_name       = $co['name'];
+$company_gstin      = $co['gstin'];
+$company_pan        = $co['pan'];
+$company_address    = $co['address'];
+$company_phone      = $co['phone'];
+$company_email      = $co['email'];
+$company_letterhead = $co['letterhead'];
+$company_signature  = $co['signature'];
 ?>
 <!DOCTYPE html>
 <html lang="en">

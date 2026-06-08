@@ -56,7 +56,9 @@ $entities = $pdo->query("SELECT id, name FROM entities ORDER BY name ASC")->fetc
                 <select id="entity_id" class="form-control">
                     <option value="">-- Default Company Settings --</option>
                     <?php foreach ($entities as $e): ?>
-                        <option value="<?php echo $e['id']; ?>"><?php echo $e['name']; ?></option>
+                        <option value="<?php echo $e['id']; ?>" <?php echo (($_SESSION['active_entity_id'] ?? 0) == $e['id']) ? 'selected' : ''; ?>>
+                            <?php echo htmlspecialchars($e['name']); ?>
+                        </option>
                     <?php endforeach; ?>
                 </select>
             </div>

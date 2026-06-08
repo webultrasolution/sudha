@@ -133,13 +133,13 @@ include_once __DIR__ . '/../../includes/header.php';
             <button onclick="closeModal()" style="background: none; border: none; font-size: 1.5rem; cursor: pointer; color: #94a3b8;"><i class="fas fa-times"></i></button>
         </div>
         
-        <form method="POST" enctype="multipart/form-data">
+        <form method="POST" enctype="multipart/form-data" style="max-height:80vh; overflow-y:auto; padding-right:4px;">
             <input type="hidden" name="id" id="entityId">
             <input type="hidden" name="existing_logo" id="existingLogo">
             <input type="hidden" name="existing_letterhead" id="existingLetterhead">
             <input type="hidden" name="existing_signature" id="existingSignature">
-            
-            <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 1.5rem; margin-bottom: 1.5rem;">
+
+            <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 1.25rem; margin-bottom: 1.25rem;">
                 <div class="form-group" style="grid-column: span 2;">
                     <label>Content / Company Name</label>
                     <input type="text" name="name" id="entityName" required placeholder="e.g. Sudha Creative Mumbai">
@@ -158,25 +158,34 @@ include_once __DIR__ . '/../../includes/header.php';
                 </div>
                 <div class="form-group" style="grid-column: span 2;">
                     <label>Bank Details</label>
-                    <textarea name="bank_details" id="entityBank" rows="2" placeholder="Account No, IFSC, etc..."></textarea>
+                    <textarea name="bank_details" id="entityBank" rows="3" placeholder="Bank Name&#10;A/C No: XXXX&#10;IFSC: XXXX"></textarea>
                 </div>
+
+                <!-- Logo -->
                 <div class="form-group">
-                    <label>Brand Logo</label>
-                    <input type="file" name="logo" accept="image/*">
+                    <label>Brand Logo <span style="color:#94a3b8;font-weight:400;">(used in invoices)</span></label>
+                    <div id="logoPreviewBox" class="img-preview-box" style="display:none;">
+                        <img id="logoPreview" src="" alt="Logo">
+                        <span class="img-preview-label">Current Logo</span>
+                    </div>
+                    <input type="file" name="logo" accept="image/*" onchange="previewImg(this,'logoPreview','logoPreviewBox')">
                 </div>
+
+                <!-- Signature -->
                 <div class="form-group">
-                    <label>Full Letterhead</label>
-                    <input type="file" name="letterhead" accept="image/*,application/pdf">
+                    <label>Digital Signature <span style="color:#94a3b8;font-weight:400;">(invoice footer)</span></label>
+                    <div id="sigPreviewBox" class="img-preview-box" style="display:none;">
+                        <img id="sigPreview" src="" alt="Signature">
+                        <span class="img-preview-label">Current Signature</span>
+                    </div>
+                    <input type="file" name="signature" accept="image/*" onchange="previewImg(this,'sigPreview','sigPreviewBox')">
                 </div>
-                <div class="form-group" style="grid-column: span 2;">
-                    <label>Digital Signature</label>
-                    <input type="file" name="signature" accept="image/*">
-                </div>
+
             </div>
-            
-            <div style="display: flex; gap: 1rem; margin-top: 1rem;">
+
+            <div style="display: flex; gap: 1rem; margin-top: 0.5rem; position:sticky; bottom:0; background:white; padding-top:0.75rem;">
                 <button type="button" onclick="closeModal()" class="btn btn-secondary" style="flex: 1; padding: 0.75rem;">Cancel</button>
-                <button type="submit" class="btn btn-primary" style="flex: 2; padding: 0.75rem;">Save Content</button>
+                <button type="submit" class="btn btn-primary" style="flex: 2; padding: 0.75rem;">Save Entity</button>
             </div>
         </form>
     </div>
@@ -187,15 +196,41 @@ include_once __DIR__ . '/../../includes/header.php';
 .btn-icon { width: 35px; height: 35px; border-radius: 8px; border: none; background: white; color: #64748b; cursor: pointer; display: flex; align-items: center; justify-content: center; font-size: 0.9rem; transition: all 0.2s; }
 .btn-icon:hover { background: #eff6ff; color: #3b82f6; }
 .btn-icon.delete:hover { background: #fef2f2; color: #ef4444; }
-
 .form-group label { display: block; font-size: 0.75rem; font-weight: 800; color: #64748b; text-transform: uppercase; margin-bottom: 0.5rem; letter-spacing: 0.025em; }
-.form-group input, .form-group textarea { width: 100%; padding: 0.75rem; border: 1.5px solid #e2e8f0; border-radius: 12px; font-size: 0.95rem; font-family: inherit; transition: all 0.2s; }
+.form-group input, .form-group select, .form-group textarea { width: 100%; padding: 0.75rem; border: 1.5px solid #e2e8f0; border-radius: 12px; font-size: 0.95rem; font-family: inherit; transition: all 0.2s; box-sizing: border-box; }
 .form-group input:focus, .form-group textarea:focus { border-color: #3b82f6; outline: none; box-shadow: 0 0 0 4px rgba(59, 130, 246, 0.1); }
+.form-group input[type="file"] { padding: 0.5rem; background: #f8fafc; cursor: pointer; }
+.img-preview-box { position: relative; background: #f8fafc; border: 1.5px dashed #cbd5e1; border-radius: 10px; padding: 8px; text-align: center; margin-bottom: 8px; }
+.img-preview-box img { max-height: 60px; max-width: 100%; object-fit: contain; display: block; margin: 0 auto; }
+.img-preview-label { font-size: 0.65rem; color: #94a3b8; font-weight: 600; display: block; margin-top: 4px; }
 </style>
 
 <script>
-function openModal() {
-    document.getElementById('modalTitle').innerText = 'Add New Content';
+const BASE = '<?php echo BASE_URL; ?>assets/images/';
+
+function showPreview(imgId, boxId, filename) {
+    const box = document.getElementById(boxId);
+    const img = document.getElementById(imgId);
+    if (filename) {
+        img.src = BASE + filename;
+        box.style.display = 'block';
+    } else {
+        box.style.display = 'none';
+    }
+}
+
+function previewImg(input, imgId, boxId) {
+    if (input.files && input.files[0]) {
+        const reader = new FileReader();
+        reader.onload = e => {
+            document.getElementById(imgId).src = e.target.result;
+            document.getElementById(boxId).style.display = 'block';
+        };
+        reader.readAsDataURL(input.files[0]);
+    }
+}
+
+function resetModal() {
     document.getElementById('entityId').value = '';
     document.getElementById('entityName').value = '';
     document.getElementById('entityGstin').value = '';
@@ -205,6 +240,13 @@ function openModal() {
     document.getElementById('existingLogo').value = '';
     document.getElementById('existingLetterhead').value = '';
     document.getElementById('existingSignature').value = '';
+    showPreview('logoPreview', 'logoPreviewBox', null);
+    showPreview('sigPreview',  'sigPreviewBox',  null);
+}
+
+function openModal() {
+    resetModal();
+    document.getElementById('modalTitle').innerText = 'Add New Entity';
     document.getElementById('entityModal').style.display = 'flex';
 }
 
@@ -213,16 +255,19 @@ function closeModal() {
 }
 
 function editEntity(entity) {
-    document.getElementById('modalTitle').innerText = 'Edit Content';
-    document.getElementById('entityId').value = entity.id;
-    document.getElementById('entityName').value = entity.name;
-    document.getElementById('entityGstin').value = entity.gstin || '';
-    document.getElementById('entityPan').value = entity.pan || '';
-    document.getElementById('entityAddress').value = entity.address || '';
-    document.getElementById('entityBank').value = entity.bank_details || '';
-    document.getElementById('existingLogo').value = entity.logo || '';
-    document.getElementById('existingLetterhead').value = entity.letterhead || '';
-    document.getElementById('existingSignature').value = entity.signature || '';
+    resetModal();
+    document.getElementById('modalTitle').innerText = 'Edit Entity';
+    document.getElementById('entityId').value       = entity.id;
+    document.getElementById('entityName').value     = entity.name;
+    document.getElementById('entityGstin').value    = entity.gstin || '';
+    document.getElementById('entityPan').value      = entity.pan || '';
+    document.getElementById('entityAddress').value  = entity.address || '';
+    document.getElementById('entityBank').value     = entity.bank_details || '';
+    document.getElementById('existingLogo').value        = entity.logo || '';
+    document.getElementById('existingLetterhead').value  = entity.letterhead || '';
+    document.getElementById('existingSignature').value   = entity.signature || '';
+    showPreview('logoPreview', 'logoPreviewBox', entity.logo);
+    showPreview('sigPreview',  'sigPreviewBox',  entity.signature);
     document.getElementById('entityModal').style.display = 'flex';
 }
 </script>
