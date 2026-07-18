@@ -20,7 +20,8 @@ if (isset($_GET['action']) && $_GET['action'] === 'edit' && isset($_GET['id'])) 
             SELECT bi.*, COALESCE(bi.custom_site_name, s.name) as name, s.site_code,
                    COALESCE(bi.custom_location, s.location) as location,
                    s.city, s.width, s.height, s.light_type, s.hsn_code, s.type, s.owner_type,
-                   p.name as vendor_name, s.all_images
+                   p.name as vendor_name,
+                   (SELECT GROUP_CONCAT(filename) FROM site_images WHERE site_id = s.id) as all_images
             FROM booking_items bi
             JOIN sites s ON bi.site_id = s.id
             LEFT JOIN partners p ON s.vendor_id = p.id
