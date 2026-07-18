@@ -509,6 +509,11 @@ $stmtCheckPO = $pdo->prepare("SELECT id, approval_status FROM purchase_orders WH
                                             <span
                                                 style="font-weight: 800; color: #334155; font-size: 0.9rem;"><?php echo number_format(floatval($item['purchase_amount']), 2); ?></span>
                                         </div>
+                                    <?php elseif (floatval($item['amount']) <= 0): ?>
+                                        <!-- Disabled because selling cost is 0 -->
+                                        <input type="number" step="0.01" value="<?php echo floatval($item['purchase_amount'] ?? 0); ?>"
+                                            style="width: 100px; font-weight: 700; color: #94a3b8; font-size: 0.9rem; border: 1px solid #cbd5e1; border-radius: 4px; padding: 2px 5px; outline: none; background: #f8fafc; cursor: not-allowed;" disabled
+                                            title="Purchase Cost is not required when Space Rental is 0">
                                     <?php else: ?>
                                         <!-- Always editable before invoice -->
                                         <input type="number" step="0.01" value="<?php echo floatval($item['purchase_amount'] ?? 0); ?>"
@@ -531,7 +536,13 @@ $stmtCheckPO = $pdo->prepare("SELECT id, approval_status FROM purchase_orders WH
                                     </div>
                                 </div>
                             <?php else: ?>
-                                <?php if (canEdit('bookings')): ?>
+                                <?php if (floatval($item['amount']) <= 0): ?>
+                                    <!-- Blocked because selling cost is 0 -->
+                                    <button title="Purchase Cost is not required when Space Rental is 0"
+                                        style="background: #f8fafc; border: 1px dashed #cbd5e1; color: #cbd5e1; padding: 0.5rem; border-radius: 8px; font-size: 0.7rem; font-weight: 700; cursor: not-allowed; width: 100%; display: flex; align-items: center; justify-content: center; gap: 0.4rem;" disabled>
+                                        <i class="fas fa-ban"></i> SET PURCHASE COST
+                                    </button>
+                                <?php elseif (canEdit('bookings')): ?>
                                     <button onclick="promptSetCost(<?php echo $item['id']; ?>)"
                                         style="background: #f1f5f9; border: 1px dashed #cbd5e1; color: #64748b; padding: 0.5rem; border-radius: 8px; font-size: 0.7rem; font-weight: 700; cursor: pointer; width: 100%; display: flex; align-items: center; justify-content: center; gap: 0.4rem;">
                                         <i class="fas fa-plus-circle"></i> SET PURCHASE COST
