@@ -485,7 +485,7 @@ function checkAuth() {
         session_start();
     }
     if (!isset($_SESSION['user_id'])) {
-        header("Location: login.php");
+        header("Location: " . BASE_URL . "login.php");
         exit;
     }
     
@@ -508,7 +508,7 @@ function checkAuth() {
         session_destroy();
         
         // Redirect to login page
-        header("Location: login.php?error=inactive");
+        header("Location: " . BASE_URL . "login.php?error=inactive");
         exit;
     }
 }
