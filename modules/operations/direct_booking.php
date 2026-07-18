@@ -306,6 +306,15 @@ $all_media_types = $pdo->query("SELECT name FROM media_types ORDER BY name ASC")
                 <i class="fas fa-tools"></i> Mounting Service
             </button>
         </div>
+        <div id="bucket-rate-master-container" style="display: flex; align-items: center; justify-content: flex-end; padding: 0.5rem 1rem; background: #f8fafc; border-bottom: 1px solid #e2e8f0; gap: 0.5rem;">
+            <div style="display: flex; align-items: center; gap: 0.5rem; background: #fff; border: 1.5px solid var(--primary); border-radius: 20px; padding: 3px 12px; box-shadow: 0 2px 4px rgba(0,0,0,0.02);">
+                <span id="bucket-rate-master-label" style="font-size: 0.7rem; font-weight: 800; color: var(--primary); text-transform: uppercase;">Offer Rate:</span>
+                <input type="number" id="bucketRateMasterInput" placeholder="Rate" step="0.01" style="width: 90px; height: 26px; font-size: 0.75rem; font-weight: 800; border-radius: 6px; border: 1px solid #cbd5e1; padding: 0 0.4rem; color: var(--primary); outline: none; background: #f8fafc; text-align: right;">
+                <button type="button" onclick="applyBucketRateMaster()" style="background: var(--primary); border: none; color: white; padding: 4px 12px; border-radius: 12px; font-weight: 800; font-size: 0.65rem; cursor: pointer; transition: all 0.2s; display: flex; align-items: center; justify-content: center; height: 26px;">
+                    Apply to All
+                </button>
+            </div>
+        </div>
         <div id="bucket-list" style="flex: 1; overflow-y: auto; padding: 1rem;"></div>
         <div style="padding: 1rem; border-top: 1px solid #e2e8f0; background: #f8fafc;">
             <button onclick="closeBucket()" class="btn btn-primary" style="width: 100%; height: 45px; border-radius: 10px; font-weight: 800;">CONTINUE SELECTION</button>
@@ -848,7 +857,66 @@ function switchBucketTab(tab) {
     activeBucketTab = tab;
     document.querySelectorAll('.bucket-tab').forEach(b => b.classList.remove('active'));
     document.getElementById('btn-tab-' + tab).classList.add('active');
+    
+    const label = document.getElementById('bucket-rate-master-label');
+    const input = document.getElementById('bucketRateMasterInput');
+    if (label && input) {
+        if (tab === 'rental') {
+            label.innerText = 'Offer Rate:';
+            input.placeholder = 'Rate';
+        } else {
+            label.innerText = 'Rate / SQFT:';
+            input.placeholder = 'Rate';
+        }
+        input.value = '';
+    }
+    
     updateBucketUI();
+}
+
+function applyBucketRateMaster() {
+    const input = document.getElementById('bucketRateMasterInput');
+    if (!input) return;
+    const val = parseFloat(input.value);
+    if (isNaN(val) || val < 0) {
+        return Swal.fire('Error', 'Please enter a valid rate', 'error');
+    }
+    
+    selectedSites.forEach(s => {
+        if (activeBucketTab === 'rental') {
+            s.rate = val;
+        } else if (activeBucketTab === 'printing') {
+            s.printing_rate = val;
+            s.printing_total = val * s.sqft;
+        } else if (activeBucketTab === 'mounting') {
+            s.mounting_rate = val;
+            s.mounting_total = val * s.sqft;
+        }
+    });
+    
+    recalcAll();
+    updateBucketUI();
+    
+    // If it's space rental, update the main table inputs as well:
+    if (activeBucketTab === 'rental') {
+        selectedSites.forEach(s => {
+            const mainRow = document.getElementById('row-' + s.id);
+            if (mainRow) {
+                const totalCell = mainRow.querySelector('.total-cell');
+                if (totalCell) totalCell.innerText = '₹' + s.rate.toLocaleString();
+                const mainInput = mainRow.querySelector('.offer-rate-input');
+                if (mainInput) mainInput.value = s.rate;
+            }
+        });
+    }
+    
+    Swal.fire({
+        title: 'Success',
+        text: `Rate of ₹${val} applied to all selected assets.`,
+        icon: 'success',
+        timer: 1500,
+        showConfirmButton: false
+    });
 }
 
 function toggleSite(id, name, rate, code, location, vendor, thumbnail = '', city = '', card_rate = 0, size = '', type = '', light_type = '', owner_type = '', vendor_name = '', all_images = '') {
