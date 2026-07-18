@@ -783,6 +783,14 @@ function renderSites(sites) {
     });
 }
 
+let activeBucketTab = 'rental';
+function switchBucketTab(tab) {
+    activeBucketTab = tab;
+    document.querySelectorAll('.bucket-tab').forEach(b => b.classList.remove('active'));
+    document.getElementById('btn-tab-' + tab).classList.add('active');
+    updateBucketUI();
+}
+
 function toggleSite(id, name, rate, code, location, vendor, thumbnail = '', city = '', card_rate = 0, size = '', type = '', light_type = '', owner_type = '', vendor_name = '', all_images = '') {
     const idx = selectedSites.findIndex(s => s.id == id);
     if (idx === -1) {
@@ -792,11 +800,18 @@ function toggleSite(id, name, rate, code, location, vendor, thumbnail = '', city
         const pRate = bestRate ? parseFloat(bestRate.rate_per_sqft) : 0;
         const pTotal = pRate * sqft;
 
+        const mRate = 0;
+        const mType = 'Standard';
+        const mTotal = mRate * sqft;
+
         selectedSites.push({ 
             id, name, rate, code, location, vendor, thumbnail, city, card_rate, size, type, light_type, owner_type, vendor_name, all_images,
             printing_vendor_id: pVendor,
             printing_rate: pRate,
             printing_total: pTotal,
+            mounting_type: mType,
+            mounting_rate: mRate,
+            mounting_total: mTotal,
             sqft: sqft
         });
     } else {
@@ -826,6 +841,17 @@ function updatePrintingInfo(id, vendorId, rateVal) {
     }
 }
 
+function updateMountingInfo(id, typeVal, rateVal) {
+    const idx = selectedSites.findIndex(s => s.id == id);
+    if (idx !== -1) {
+        selectedSites[idx].mounting_type = typeVal;
+        selectedSites[idx].mounting_rate = parseFloat(rateVal) || 0;
+        selectedSites[idx].mounting_total = selectedSites[idx].mounting_rate * selectedSites[idx].sqft;
+        recalcAll();
+        updateBucketUI();
+    }
+}
+
 function updateBucketUI() {
     const list = document.getElementById('bucket-list');
     if (!list) return;
@@ -837,20 +863,50 @@ function updateBucketUI() {
         return;
     }
 
+    let headers = '';
+    if (activeBucketTab === 'rental') {
+        headers = `
+            <th style="width: 40px;">#</th>
+            <th style="width: 50px; text-align:center;">ACT</th>
+            <th style="width: 80px;">PREVIEW</th>
+            <th>CITY / CODE</th>
+            <th>ASSET DETAILS</th>
+            <th>SIZE</th>
+            <th>PRICING</th>
+            <th style="text-align:right; width: 120px;">OFFER RATE</th>
+            <th style="text-align:right; width: 100px;">TOTAL</th>
+        `;
+    } else if (activeBucketTab === 'printing') {
+        headers = `
+            <th style="width: 40px;">#</th>
+            <th style="width: 50px; text-align:center;">ACT</th>
+            <th style="width: 80px;">PREVIEW</th>
+            <th>CITY / CODE</th>
+            <th>ASSET DETAILS</th>
+            <th>SIZE / SQFT</th>
+            <th>PRINTING VENDOR</th>
+            <th style="text-align:right; width: 120px;">RATE / SQFT</th>
+            <th style="text-align:right; width: 100px;">TOTAL</th>
+        `;
+    } else if (activeBucketTab === 'mounting') {
+        headers = `
+            <th style="width: 40px;">#</th>
+            <th style="width: 50px; text-align:center;">ACT</th>
+            <th style="width: 80px;">PREVIEW</th>
+            <th>CITY / CODE</th>
+            <th>ASSET DETAILS</th>
+            <th>SIZE / SQFT</th>
+            <th>MOUNTING TYPE</th>
+            <th style="text-align:right; width: 120px;">RATE / SQFT</th>
+            <th style="text-align:right; width: 100px;">TOTAL</th>
+        `;
+    }
+
     let html = `
         <table class="crs-table selection-table" style="width: 100%; border-collapse: separate; border-spacing: 0 0.5rem;">
             <thead>
                 <tr style="border-bottom: 2px solid #f1f5f9;">
-                    <th style="width: 40px;">#</th>
-                    <th style="width: 50px; text-align:center;">ACT</th>
-                    <th style="width: 80px;">PREVIEW</th>
-                    <th>CITY / CODE</th>
-                    <th>ASSET DETAILS</th>
-                    <th>SIZE</th>
-                    <th>PRINTING</th>
-                    <th>PRICING</th>
-                    <th style="text-align:right;">OFFER RATE</th>
-                    <th style="text-align:right;">TOTAL</th>
+                    ${headers}
                 </tr>
             </thead>
             <tbody>
@@ -863,12 +919,68 @@ function updateBucketUI() {
         const imgList = (s.all_images || "").split(',').filter(img => img.trim() !== "");
         const imgCount = imgList.length;
 
-        // Printing Dropdown
-        let pOptions = '<option value="">Select Vendor</option>';
-        printingVendors.forEach(v => {
-            const selected = v.id == s.printing_vendor_id ? 'selected' : '';
-            pOptions += `<option value="${v.id}" ${selected}>${v.name}</option>`;
-        });
+        let cells = '';
+
+        if (activeBucketTab === 'rental') {
+            cells = `
+                <td>
+                    <div style="font-weight:800; color:#64748b; font-size:0.7rem;">CARD: ₹${cardRate.toLocaleString()}</div>
+                </td>
+                <td style="text-align:right;">
+                    <input type="number" class="p-input" value="${rate}" oninput="updateSitePrice(${s.id}, this.value)" style="width:100px; height:32px; text-align:right; font-weight:900; color:var(--primary); padding:0 0.5rem; border-radius:8px; border: 1px solid #e2e8f0;">
+                </td>
+                <td style="text-align:right; font-weight:900; color:var(--primary);">
+                    ₹${rate.toLocaleString()}
+                </td>
+            `;
+        } else if (activeBucketTab === 'printing') {
+            let pOptions = '<option value="">Select Vendor</option>';
+            printingVendors.forEach(v => {
+                const selected = v.id == s.printing_vendor_id ? 'selected' : '';
+                pOptions += `<option value="${v.id}" ${selected}>${v.name}</option>`;
+            });
+
+            cells = `
+                <td>
+                    <select onchange="updatePrintingInfo(${s.id}, this.value, document.getElementById('p_rate_${s.id}').value)" 
+                            style="width: 150px; font-size: 0.75rem; padding: 0.4rem; border-radius: 6px; border: 1px solid #e2e8f0;">
+                        ${pOptions}
+                    </select>
+                </td>
+                <td style="text-align:right;">
+                    <input type="number" id="p_rate_${s.id}" value="${s.printing_rate || 0}" 
+                           oninput="updatePrintingInfo(${s.id}, this.closest('tr').querySelector('select').value, this.value)"
+                           style="width:100px; height:32px; text-align:right; font-weight:900; color:var(--primary); padding:0 0.5rem; border-radius:8px; border: 1px solid #e2e8f0;">
+                </td>
+                <td style="text-align:right; font-weight:900; color:var(--primary);">
+                    ₹${(s.printing_total || 0).toLocaleString()}
+                </td>
+            `;
+        } else if (activeBucketTab === 'mounting') {
+            const mTypes = ['Standard', 'Premium', 'Non-Lit Flex', 'Back-Lit Flex', 'Vinyl'];
+            let mOptions = '';
+            mTypes.forEach(t => {
+                const selected = t === s.mounting_type ? 'selected' : '';
+                mOptions += `<option value="${t}" ${selected}>${t}</option>`;
+            });
+
+            cells = `
+                <td>
+                    <select onchange="updateMountingInfo(${s.id}, this.value, document.getElementById('m_rate_${s.id}').value)" 
+                            style="width: 150px; font-size: 0.75rem; padding: 0.4rem; border-radius: 6px; border: 1px solid #e2e8f0;">
+                        ${mOptions}
+                    </select>
+                </td>
+                <td style="text-align:right;">
+                    <input type="number" id="m_rate_${s.id}" value="${s.mounting_rate || 0}" 
+                           oninput="updateMountingInfo(${s.id}, this.closest('tr').querySelector('select').value, this.value)"
+                           style="width:100px; height:32px; text-align:right; font-weight:900; color:var(--primary); padding:0 0.5rem; border-radius:8px; border: 1px solid #e2e8f0;">
+                </td>
+                <td style="text-align:right; font-weight:900; color:var(--primary);">
+                    ₹${(s.mounting_total || 0).toLocaleString()}
+                </td>
+            `;
+        }
 
         html += `
             <tr class="site-row selected" style="background: white;">
@@ -900,28 +1012,7 @@ function updateBucketUI() {
                     <div style="font-weight:800; color:#1e293b; font-size:0.8rem; margin-bottom:1px;">${s.size}</div>
                     <div style="font-size:0.65rem; color:#94a3b8; font-weight:700;">${s.sqft.toLocaleString()} SQFT</div>
                 </td>
-                <td>
-                    <select onchange="updatePrintingInfo(${s.id}, this.value, document.getElementById('p_rate_${s.id}').value)" 
-                            style="width: 120px; font-size: 0.7rem; padding: 0.3rem; border-radius: 6px; border: 1px solid #e2e8f0; margin-bottom: 4px;">
-                        ${pOptions}
-                    </select>
-                    <div style="display: flex; align-items: center; gap: 0.3rem;">
-                        <span style="font-size: 0.6rem; color: #64748b;">Rate:</span>
-                        <input type="number" id="p_rate_${s.id}" value="${s.printing_rate}" 
-                               oninput="updatePrintingInfo(${s.id}, document.getElementById('p_rate_${s.id}').previousElementSibling.previousElementSibling ? document.getElementById('p_rate_${s.id}').previousElementSibling.previousElementSibling.value : '', this.value)"
-                               style="width: 60px; height: 24px; font-size: 0.7rem; border-radius: 4px; border: 1px solid #e2e8f0; padding: 0 0.3rem;">
-                    </div>
-                    <div style="font-size: 0.65rem; font-weight: 800; color: var(--primary); margin-top: 2px;">₹${(s.printing_total || 0).toLocaleString()}</div>
-                </td>
-                <td>
-                    <div style="font-weight:800; color:#64748b; font-size:0.7rem;">CARD: ₹${cardRate.toLocaleString()}</div>
-                </td>
-                <td style="text-align:right;">
-                    <input type="number" class="p-input" value="${rate}" oninput="updateSitePrice(${s.id}, this.value)" style="width:80px; height:32px; text-align:right; font-weight:900; color:var(--primary); padding:0 0.5rem; border-radius:8px; border: 1px solid #e2e8f0;">
-                </td>
-                <td style="text-align:right;">
-                    <div style="font-weight:900; color:var(--primary); font-size:0.95rem;">₹${rate.toLocaleString()}</div>
-                </td>
+                ${cells}
             </tr>
         `;
     });
@@ -941,7 +1032,6 @@ function updateSitePrice(id, val) {
         if (mainRow) {
             const totalCell = mainRow.querySelector('.total-cell');
             if (totalCell) totalCell.innerText = '₹' + rate.toLocaleString();
-            // Also update the checkbox's onclick argument if needed, but it's easier to just keep selectedSites as source of truth
         }
 
         recalcAll();
@@ -952,7 +1042,8 @@ function updateSitePrice(id, val) {
 function recalcAll() {
     const subtotalAssets = selectedSites.reduce((acc, s) => acc + s.rate, 0);
     const totalPrinting = selectedSites.reduce((acc, s) => acc + (s.printing_total || 0), 0);
-    const subtotal = subtotalAssets + totalPrinting;
+    const totalMounting = selectedSites.reduce((acc, s) => acc + (s.mounting_total || 0), 0);
+    const subtotal = subtotalAssets + totalPrinting + totalMounting;
     
     const taxType = document.getElementById('tax-type').value;
     const totalTax = subtotal * 0.18;
@@ -1053,6 +1144,14 @@ function saveDirectBooking() {
                 total: s.printing_total 
             }; 
             return acc; 
+        }, {}),
+        mounting_info: selectedSites.reduce((acc, s) => {
+            acc[s.id] = {
+                type: s.mounting_type,
+                rate: s.mounting_rate,
+                total: s.mounting_total
+            };
+            return acc;
         }, {})
     };
 

@@ -80,10 +80,59 @@ $name_words       = explode(' ', trim($company_name));
 $company_short    = strtoupper(implode(' ', array_slice($name_words, 0, 2)));
 $company_full_uc  = strtoupper($company_name);
 
+$invoiceLines = [];
+$sn = 1;
+foreach ($items as $item) {
+    $sDate = (!empty($item['start_date']) && $item['start_date'] != '0000-00-00') ? $item['start_date'] : $b['start_date'];
+    $eDate = (!empty($item['end_date'])   && $item['end_date']   != '0000-00-00') ? $item['end_date']   : $b['end_date'];
+    
+    $parts = [];
+    if (!empty(trim($item['city'])))       $parts[] = trim($item['city']);
+    if (!empty(trim($item['site_name'])))  $parts[] = trim($item['site_name']);
+    
+    $siteDetails = implode(', ', $parts) . " (" . $item['site_code'] . ")";
+    
+    // 1. Rental Line
+    if (floatval($item['amount']) > 0) {
+        $invoiceLines[] = [
+            'sn' => $sn++,
+            'desc' => "Space Rental - " . $siteDetails,
+            'hsn' => $item['hsn_code'] ?: '998366',
+            'size' => $item['width'] . "'&times;" . $item['height'] . "'",
+            'period' => date('d.m.Y', strtotime($sDate)) . " to " . date('d.m.Y', strtotime($eDate)),
+            'amount' => floatval($item['amount'])
+        ];
+    }
+    
+    // 2. Printing Line
+    if (floatval($item['printing_amount'] ?? 0) > 0) {
+        $invoiceLines[] = [
+            'sn' => $sn++,
+            'desc' => "Printing Service (" . ($item['media_type'] ?: 'Flex') . ") - " . $siteDetails,
+            'hsn' => '998912',
+            'size' => $item['width'] . "'&times;" . $item['height'] . "'",
+            'period' => 'One-time',
+            'amount' => floatval($item['printing_amount'])
+        ];
+    }
+    
+    // 3. Mounting Line
+    if (floatval($item['mounting_amount'] ?? 0) > 0) {
+        $invoiceLines[] = [
+            'sn' => $sn++,
+            'desc' => "Mounting / Installation Service (" . ($item['mounting_type'] ?: 'Standard') . ") - " . $siteDetails,
+            'hsn' => '998739',
+            'size' => $item['width'] . "'&times;" . $item['height'] . "'",
+            'period' => 'One-time',
+            'amount' => floatval($item['mounting_amount'])
+        ];
+    }
+}
+
 // Tax
 $subtotal = 0;
-foreach ($items as $item) {
-    $subtotal += floatval($item['amount']);
+foreach ($invoiceLines as $line) {
+    $subtotal += $line['amount'];
 }
 $isInterState = (strtolower(trim($b['client_state'] ?? '')) !== 'west bengal');
 $gst          = calculateGST($subtotal, $isInterState);
@@ -402,27 +451,19 @@ td:last-child {
             </tr>
         </thead>
         <tbody>
-            <?php foreach ($items as $idx => $item):
-                $sDate = (!empty($item['start_date']) && $item['start_date'] != '0000-00-00') ? $item['start_date'] : $b['start_date'];
-                $eDate = (!empty($item['end_date'])   && $item['end_date']   != '0000-00-00') ? $item['end_date']   : $b['end_date'];
-                $parts = [];
-                if (!empty(trim($item['city'])))       $parts[] = trim($item['city']);
-                if (!empty(trim($item['site_name'])))  $parts[] = trim($item['site_name']);
-                if (!empty(trim($item['media_type']))) $parts[] = trim($item['media_type']);
-            ?>
+            <?php foreach ($invoiceLines as $line): ?>
             <tr>
-                <td><?php echo $idx + 1; ?></td>
+                <td><?php echo $line['sn']; ?></td>
                 <td style="text-align:left; padding-left:10px;">
-                    <strong><?php echo htmlspecialchars(implode(', ', $parts)); ?></strong>
+                    <strong><?php echo htmlspecialchars($line['desc']); ?></strong>
                 </td>
-                <td><?php echo htmlspecialchars($item['hsn_code'] ?: '998366'); ?></td>
-                <td><?php echo $item['width']; ?>'&times;<?php echo $item['height']; ?>'</td>
+                <td><?php echo htmlspecialchars($line['hsn']); ?></td>
+                <td><?php echo $line['size']; ?></td>
                 <td style="font-size:9px; line-height:1.6;">
-                    <?php echo date('d.m.Y', strtotime($sDate)); ?> to<br>
-                    <?php echo date('d.m.Y', strtotime($eDate)); ?>
+                    <?php echo $line['period']; ?>
                 </td>
                 <td style="text-align:right; padding-right:10px; font-weight:bold;">
-                    <?php echo number_format($item['amount'], 2); ?>
+                    <?php echo number_format($line['amount'], 2); ?>
                 </td>
             </tr>
             <?php endforeach; ?>
@@ -460,9 +501,9 @@ td:last-child {
         <?php
         // Group items by HSN code
         $hsnGroups = [];
-        foreach ($items as $item) {
-            $hsn = $item['hsn_code'] ?: '998366';
-            $hsnGroups[$hsn] = ($hsnGroups[$hsn] ?? 0) + floatval($item['amount'] ?? 0);
+        foreach ($invoiceLines as $line) {
+            $hsn = $line['hsn'];
+            $hsnGroups[$hsn] = ($hsnGroups[$hsn] ?? 0) + $line['amount'];
         }
         ?>
         <table style="border:1px solid #000; margin-top: 10px;">

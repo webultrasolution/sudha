@@ -47,11 +47,12 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             $days = $d1->diff($d2)->days + 1;
         }
 
-        // 1. Group Sites by Vendor & Collect Printing Info
+        // 1. Group Sites by Vendor & Collect Printing / Mounting Info
         $vendorSites = [];
         $printingVendorItems = [];
         $overallSubtotal = 0;
         $overallPrinting = 0;
+        $overallMounting = 0;
         
         foreach ($data['site_ids'] as $sid) {
             // Fetch vendor_id for each site
@@ -83,11 +84,17 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                     $overallPrinting += $pTotal;
                 }
             }
+
+            // Handle Mounting Info
+            if (!empty($data['mounting_info'][$sid])) {
+                $mInfo = $data['mounting_info'][$sid];
+                $overallMounting += floatval($mInfo['total'] ?? 0);
+            }
         }
 
         // 3. Create Single Booking (Direct)
         $bookingNum = generateSequenceNumber($pdo, 'booking');
-        $bookingSubtotal = $overallSubtotal + $overallPrinting;
+        $bookingSubtotal = $overallSubtotal + $overallPrinting + $overallMounting;
         $overallTax = $bookingSubtotal * 0.18;
         $overallGrand = $bookingSubtotal + $overallTax;
 
@@ -113,7 +120,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
         // 4. Create Operational Tasks & Booking Items
         $stmtOps = $pdo->prepare("INSERT INTO operations (booking_id, site_id, status) VALUES (?, ?, 'pending')");
-        $stmtBI = $pdo->prepare("INSERT INTO booking_items (booking_id, site_id, purchase_rate, sale_rate, start_date, end_date, days, purchase_amount, amount, printing_vendor_id, printing_rate, printing_amount) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)");
+        $stmtBI = $pdo->prepare("INSERT INTO booking_items (booking_id, site_id, purchase_rate, sale_rate, start_date, end_date, days, purchase_amount, amount, printing_vendor_id, printing_rate, printing_amount, mounting_vendor_id, mounting_rate, mounting_amount) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)");
         
         foreach ($data['site_ids'] as $sid) {
             $stmtOps->execute([$bookingId, $sid]);
@@ -121,6 +128,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             $rate = floatval($data['rates'][$sid] ?? 0);
             $proratedRate = $rate * $days / 30;
             $pInfo = $data['printing_info'][$sid] ?? null;
+            $mInfo = $data['mounting_info'][$sid] ?? null;
 
             $stmtBI->execute([
                 $bookingId,
@@ -132,10 +140,51 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 $days,
                 $proratedRate, // purchase_amount
                 $proratedRate, // amount
-                $pInfo ? $pInfo['vendor_id'] : null,
-                $pInfo ? $pInfo['rate'] : 0,
-                $pInfo ? $pInfo['total'] : 0
+                ($pInfo && !empty($pInfo['vendor_id'])) ? intval($pInfo['vendor_id']) : null,
+                $pInfo ? floatval($pInfo['rate']) : 0,
+                $pInfo ? floatval($pInfo['total']) : 0,
+                null, // mounting_vendor_id
+                $mInfo ? floatval($mInfo['rate']) : 0,
+                $mInfo ? floatval($mInfo['total']) : 0
             ]);
+
+            // Replicate to client_printing_rates
+            if ($pInfo && floatval($pInfo['rate']) > 0) {
+                $stmtSite = $pdo->prepare("SELECT type FROM sites WHERE id = ?");
+                $stmtSite->execute([$sid]);
+                $siteType = $stmtSite->fetchColumn() ?: 'Flex';
+
+                $stmtCPR = $pdo->prepare("INSERT INTO client_printing_rates 
+                    (client_id, site_id, media_type, rate_per_sqft, po_number, campaign_name, brand_name, billing_gstin, is_final_invoice, approval_status) 
+                    VALUES (?, ?, ?, ?, ?, ?, ?, ?, 0, 'approved')");
+                $stmtCPR->execute([
+                    $client_id,
+                    $sid,
+                    $siteType,
+                    floatval($pInfo['rate']),
+                    $bookingNum,
+                    $campaign_name,
+                    $brand_name,
+                    $billing_gstin
+                ]);
+            }
+
+            // Replicate to client_mounting_rates
+            if ($mInfo && floatval($mInfo['rate']) > 0) {
+                $stmtCMR = $pdo->prepare("INSERT INTO client_mounting_rates 
+                    (client_id, site_id, mounting_type, rate_per_sqft, po_number, campaign_name, brand_name, billing_gstin, is_final_invoice, approval_status) 
+                    VALUES (?, ?, ?, ?, ?, ?, ?, ?, 0, 'approved')");
+                $stmtCMR->execute([
+                    $client_id,
+                    $sid,
+                    !empty($mInfo['type']) ? $mInfo['type'] : 'Standard',
+                    floatval($mInfo['rate']),
+                    $bookingNum,
+                    $campaign_name,
+                    $brand_name,
+                    $billing_gstin
+                ]);
+            }
         }
 
         logActivity('generated a direct booking', 'bookings', $bookingId, "Booking ID: $bookingId");

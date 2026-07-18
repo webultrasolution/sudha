@@ -19,10 +19,9 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     try {
         $pdo->beginTransaction();
 
-        $printCost = floatval($data['printCost'] ?? 0);
-        $mountCost = floatval($data['mountCost'] ?? 0);
-
         // 1. Calculate Totals
+        $printCost = 0;
+        $mountCost = 0;
         $displayCost = 0;
         $totalSQFT = 0;
         $haMarkup = 0;
@@ -34,9 +33,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             $displayCost += $sRate;
             $totalSQFT += floatval($site['sqft']);
             
-            // Add per-site printing cost to overall printCost if not already summed
-            $pTotal = floatval($site['printing_total'] ?? 0);
-            $printCost += $pTotal;
+            $printCost += floatval($site['printing_total'] ?? 0);
+            $mountCost += floatval($site['mounting_total'] ?? 0);
 
             $markupVal = $sRate - $pRate;
             if ($site['owner'] === 'HA') $haMarkup += $markupVal;
@@ -105,7 +103,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         logActivity('generated a new proposal', 'proposals', $proposalId, "Proposal Number: $propNum");
 
         // 3. Insert Items
-        $stmtItem = $pdo->prepare("INSERT INTO proposal_items (proposal_id, site_id, sale_rate, purchase_rate, margin_pct, amount, selected_image, printing_vendor_id, printing_rate, printing_amount) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)");
+        $stmtItem = $pdo->prepare("INSERT INTO proposal_items (proposal_id, site_id, sale_rate, purchase_rate, margin_pct, amount, selected_image, printing_vendor_id, printing_rate, printing_amount, mounting_vendor_id, mounting_rate, mounting_amount) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)");
         foreach ($data['selectedSites'] as $site) {
             $pRate = floatval($site['purchaseRate']);
             $sRate = floatval($site['saleRate']);
@@ -119,9 +117,12 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 $margin,
                 $sRate,
                 $site['thumbnail'] ?? null,
-                $site['printing_vendor_id'] ?? null,
+                !empty($site['printing_vendor_id']) ? intval($site['printing_vendor_id']) : null,
                 $site['printing_rate'] ?? 0,
-                $site['printing_total'] ?? 0
+                $site['printing_total'] ?? 0,
+                null, // mounting_vendor_id
+                $site['mounting_rate'] ?? 0,
+                $site['mounting_total'] ?? 0
             ]);
         }
 

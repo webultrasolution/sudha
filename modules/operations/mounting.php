@@ -200,7 +200,8 @@ $ratesStmt = $pdo->prepare("
         MAX(c.state) as client_state,
         MAX(c.gstin) as client_gstin,
         MAX(c.additional_gst) as additional_gst,
-        (SELECT remarks FROM approval_requests WHERE entity_type = 'client_mounting' AND entity_ref COLLATE utf8mb4_unicode_ci = r.po_number COLLATE utf8mb4_unicode_ci ORDER BY id DESC LIMIT 1) as rejection_reason
+        (SELECT remarks FROM approval_requests WHERE entity_type = 'client_mounting' AND entity_ref COLLATE utf8mb4_unicode_ci = r.po_number COLLATE utf8mb4_unicode_ci ORDER BY id DESC LIMIT 1) as rejection_reason,
+        (SELECT COUNT(*) FROM bookings WHERE booking_number = r.po_number) as is_unified
     FROM client_mounting_rates r
     JOIN partners c ON r.client_id = c.id
     LEFT JOIN sites s ON r.site_id = s.id
@@ -350,6 +351,11 @@ $clients = $pdo->query("SELECT id, name FROM partners WHERE type = 'client' ORDE
                                 <i class="fas fa-file-invoice"></i> Draft
                             </span>
                         <?php endif; ?>
+                        <?php if (!empty($r['is_unified'])): ?>
+                            <span style="background: #f3e8ff; color: #6b21a8; border: 1px solid #e9d5ff; padding: 0.15rem 0.5rem; border-radius: 50px; font-size: 0.6rem; font-weight: 800; display: inline-flex; align-items: center; gap: 4px; margin-top: 4px;">
+                                <i class="fas fa-link"></i> Unified Booking
+                            </span>
+                        <?php endif; ?>
                     </td>
                     <td style="white-space:nowrap;">
                         <?php
@@ -388,7 +394,7 @@ $clients = $pdo->query("SELECT id, name FROM partners WHERE type = 'client' ORDE
                         <a href="<?php echo $viewUrl; ?>" target="_blank" class="btn-icon" style="color:#0d9488;" title="View / Print Invoice"><i class="fas fa-eye"></i></a>
                         <?php endif; ?>
  
-                        <?php if (!$r['is_final_invoice'] && $r['approval_status'] !== 'pending_approval'): ?>
+                        <?php if (!$r['is_final_invoice'] && $r['approval_status'] !== 'pending_approval' && empty($r['is_unified'])): ?>
                         <button class="btn-icon" onclick="openFinalizePopup('<?php echo htmlspecialchars($r['po_number']??'',ENT_QUOTES); ?>',<?php echo $r['client_id']; ?>,'<?php echo implode(',',$ids); ?>', '<?php echo $defaultGstType; ?>')"
                                 style="color:#0f172a;" title="Generate Final Invoice">
                             <i class="fas fa-file-invoice-dollar"></i>
