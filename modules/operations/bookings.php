@@ -165,7 +165,10 @@ if ($campaignFilter !== '') {
 $bookings = $pdo->prepare("
     SELECT b.*, p.proposal_number, c.name as client_name,
            i.invoice_number, i.approval_status AS invoice_approval_status,
-           i.rejection_reason AS invoice_rejection_reason
+           i.rejection_reason AS invoice_rejection_reason,
+           (SELECT COALESCE(SUM(amount), 0) FROM booking_items WHERE booking_id = b.id) as space_cost,
+           (SELECT COALESCE(SUM(printing_amount), 0) FROM booking_items WHERE booking_id = b.id) as print_cost,
+           (SELECT COALESCE(SUM(mounting_amount), 0) FROM booking_items WHERE booking_id = b.id) as mount_cost
     FROM bookings b 
     LEFT JOIN proposals p ON b.proposal_id = p.id 
     LEFT JOIN partners c ON b.client_id = c.id 
@@ -269,7 +272,16 @@ $clients = $pdo->query("SELECT id, name FROM partners WHERE type = 'client' ORDE
                         ?>
                     </td>
                     <td style="font-size: 0.85rem; line-height: 1.4; white-space: nowrap; text-align: left; vertical-align: middle;">
-                        <div style="font-weight: 500; color: #64748b;">Base: <span style="font-weight: 700; color: #334155;"><?php echo formatCurrency($b['total_amount']); ?></span></div>
+                        <?php if (floatval($b['space_cost']) > 0): ?>
+                            <div style="font-size: 0.75rem; font-weight: 500; color: #64748b;">Rental: <span style="font-weight: 700; color: #475569;"><?php echo formatCurrency($b['space_cost']); ?></span></div>
+                        <?php endif; ?>
+                        <?php if (floatval($b['print_cost']) > 0): ?>
+                            <div style="font-size: 0.75rem; font-weight: 500; color: #64748b;">Print: <span style="font-weight: 700; color: #475569;"><?php echo formatCurrency($b['print_cost']); ?></span></div>
+                        <?php endif; ?>
+                        <?php if (floatval($b['mount_cost']) > 0): ?>
+                            <div style="font-size: 0.75rem; font-weight: 500; color: #64748b;">Mount: <span style="font-weight: 700; color: #475569;"><?php echo formatCurrency($b['mount_cost']); ?></span></div>
+                        <?php endif; ?>
+                        <div style="font-weight: 500; color: #64748b; border-top: 1px dashed #cbd5e1; margin-top: 2px; padding-top: 2px;">Base: <span style="font-weight: 700; color: #334155;"><?php echo formatCurrency($b['total_amount']); ?></span></div>
                         <div style="font-weight: 500; color: #64748b;">Tax: <span style="font-weight: 700; color: #334155;"><?php echo formatCurrency($b['tax_amount']); ?></span></div>
                         <div style="font-weight: 700; color: #059669; border-top: 1px dashed #cbd5e1; margin-top: 2px; padding-top: 2px;">Total: <span><?php echo formatCurrency($b['grand_total']); ?></span></div>
                     </td>
