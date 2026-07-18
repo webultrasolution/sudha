@@ -351,7 +351,7 @@ $printingRates = $pdo->query("SELECT * FROM vendor_printing_rates")->fetchAll(PD
 
                         <td style="padding: 0.6rem 1rem;">
                             <div style="font-size: 0.55rem; color: var(--primary); font-weight: 900; text-transform: uppercase; margin-bottom: 2px;">Offer Rate</div>
-                            <input type="number" class="p-input sale-rate-input" 
+                            <input type="number" step="any" class="p-input sale-rate-input" 
                                    value="0" 
                                    oninput="updateSitePrice('<?php echo $s['id']; ?>', this.value)"
                                    style="width: 80px; height: 24px; font-size: 0.75rem; font-weight: 800; border-radius: 5px; padding: 0 0.3rem;">
@@ -1238,7 +1238,7 @@ function updateBucketUI() {
                     <div style="font-weight: 800; color: #64748b; font-size: 0.7rem;">CARD: ₹${site.cardRate.toLocaleString()}</div>
                 </td>
                 <td style="padding: 0.6rem 1rem;">
-                    <input type="number" class="p-input bucket-rate-input" 
+                    <input type="number" step="any" class="p-input bucket-rate-input" 
                            value="${site.saleRate}" 
                            oninput="updateSitePrice('${site.id}', this.value)"
                            style="width: 100px; height: 32px; font-size: 0.8rem; font-weight: 800; border-radius: 8px; border: 1px solid #e2e8f0; padding: 0 0.4rem; color: #1e293b; text-align: right;">
@@ -1264,7 +1264,7 @@ function updateBucketUI() {
                     </select>
                 </td>
                 <td style="padding: 0.6rem 1rem; text-align: right;">
-                    <input type="number" id="p_rate_${site.id}" value="${site.printing_rate || 0}" 
+                    <input type="number" step="any" id="p_rate_${site.id}" value="${site.printing_rate || 0}" 
                            oninput="updatePrintingInfo('${site.id}', this.closest('tr').querySelector('select').value, this.value)"
                            style="width: 100px; height: 32px; font-size: 0.8rem; font-weight: 800; border-radius: 8px; border: 1px solid #e2e8f0; padding: 0 0.4rem; color: #1e293b; text-align: right;">
                 </td>
@@ -1288,7 +1288,7 @@ function updateBucketUI() {
                     </select>
                 </td>
                 <td style="padding: 0.6rem 1rem; text-align: right;">
-                    <input type="number" id="m_rate_${site.id}" value="${site.mounting_rate || 0}" 
+                    <input type="number" step="any" id="m_rate_${site.id}" value="${site.mounting_rate || 0}" 
                            oninput="updateMountingInfo('${site.id}', this.closest('tr').querySelector('select').value, this.value)"
                            style="width: 100px; height: 32px; font-size: 0.8rem; font-weight: 800; border-radius: 8px; border: 1px solid #e2e8f0; padding: 0 0.4rem; color: #1e293b; text-align: right;">
                 </td>

@@ -841,7 +841,7 @@ function renderSites(sites) {
             </td>
             <td style="padding:1rem; text-align:right;">
                 <div style="font-size:0.65rem; color:var(--primary); font-weight:800; margin-bottom:4px; text-transform:uppercase;">Offer Rate</div>
-                <input type="number" class="p-input offer-rate-input" value="${currentRate}" oninput="updateSitePrice(${s.id}, this.value)" style="width:100px; height:32px; text-align:right; font-weight:900; color:var(--primary); padding:0 0.5rem; border-radius:8px; border: 1px solid #e2e8f0;">
+                <input type="number" step="any" class="p-input offer-rate-input" value="${currentRate}" oninput="updateSitePrice(${s.id}, this.value)" style="width:100px; height:32px; text-align:right; font-weight:900; color:var(--primary); padding:0 0.5rem; border-radius:8px; border: 1px solid #e2e8f0;">
             </td>
             <td style="padding:1.5rem 1rem; text-align:right;">
                 <div style="font-size:0.65rem; color:#64748b; font-weight:800; margin-bottom:4px; text-transform:uppercase;">Total</div>
@@ -1055,7 +1055,7 @@ function updateBucketUI() {
                     <div style="font-weight:800; color:#64748b; font-size:0.7rem;">CARD: ₹${cardRate.toLocaleString()}</div>
                 </td>
                 <td style="text-align:right;">
-                    <input type="number" class="p-input" value="${rate}" oninput="updateSitePrice(${s.id}, this.value)" style="width:100px; height:32px; text-align:right; font-weight:900; color:var(--primary); padding:0 0.5rem; border-radius:8px; border: 1px solid #e2e8f0;">
+                    <input type="number" step="any" class="p-input" value="${rate}" oninput="updateSitePrice(${s.id}, this.value)" style="width:100px; height:32px; text-align:right; font-weight:900; color:var(--primary); padding:0 0.5rem; border-radius:8px; border: 1px solid #e2e8f0;">
                 </td>
                 <td style="text-align:right; font-weight:900; color:var(--primary);">
                     ₹${rate.toLocaleString()}
@@ -1076,7 +1076,7 @@ function updateBucketUI() {
                     </select>
                 </td>
                 <td style="text-align:right;">
-                    <input type="number" id="p_rate_${s.id}" value="${s.printing_rate || 0}" 
+                    <input type="number" step="any" id="p_rate_${s.id}" value="${s.printing_rate || 0}" 
                            oninput="updatePrintingInfo(${s.id}, this.closest('tr').querySelector('select').value, this.value)"
                            style="width:100px; height:32px; text-align:right; font-weight:900; color:var(--primary); padding:0 0.5rem; border-radius:8px; border: 1px solid #e2e8f0;">
                 </td>
@@ -1100,7 +1100,7 @@ function updateBucketUI() {
                     </select>
                 </td>
                 <td style="text-align:right;">
-                    <input type="number" id="m_rate_${s.id}" value="${s.mounting_rate || 0}" 
+                    <input type="number" step="any" id="m_rate_${s.id}" value="${s.mounting_rate || 0}" 
                            oninput="updateMountingInfo(${s.id}, this.closest('tr').querySelector('select').value, this.value)"
                            style="width:100px; height:32px; text-align:right; font-weight:900; color:var(--primary); padding:0 0.5rem; border-radius:8px; border: 1px solid #e2e8f0;">
                 </td>
