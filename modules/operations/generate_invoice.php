@@ -120,7 +120,7 @@ foreach ($items as $item) {
     if (floatval($item['mounting_amount'] ?? 0) > 0) {
         $invoiceLines[] = [
             'sn' => $sn++,
-            'desc' => "Mounting / Installation Service (" . ($item['mounting_type'] ?: 'Standard') . ") - " . $siteDetails,
+            'desc' => "Mounting / Installation Service (" . ($item['mounting_type'] ?? 'Standard') . ") - " . $siteDetails,
             'hsn' => '998739',
             'size' => $item['width'] . "'&times;" . $item['height'] . "'",
             'period' => 'One-time',
