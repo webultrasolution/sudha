@@ -350,9 +350,9 @@ $printingRates = $pdo->query("SELECT * FROM vendor_printing_rates")->fetchAll(PD
                         </td>
 
                         <td style="padding: 0.6rem 1rem;">
-                            <div style="font-size: 0.5rem; color: var(--primary); font-weight: 900; text-transform: uppercase; margin-bottom: 2px;">Offer Rate</div>
+                            <div style="font-size: 0.55rem; color: var(--primary); font-weight: 900; text-transform: uppercase; margin-bottom: 2px;">Offer Rate</div>
                             <input type="number" class="p-input sale-rate-input" 
-                                   value="<?php echo (float)$s['card_rate']; ?>" 
+                                   value="0" 
                                    oninput="updateSitePrice('<?php echo $s['id']; ?>', this.value)"
                                    style="width: 80px; height: 24px; font-size: 0.75rem; font-weight: 800; border-radius: 5px; padding: 0 0.3rem;">
                         </td>
@@ -1014,7 +1014,7 @@ function toggleSite(id) {
         const mTotal = mRate * sqft;
 
         selectedSites.push({ 
-            id, name, cardRate: rate, purchaseRate: prate, saleRate: rate, owner, sqft, city, state, type, illumination, thumbnail, allImages, width, height, vendorName, siteCode, area, location,
+            id, name, cardRate: rate, purchaseRate: prate, saleRate: 0, owner, sqft, city, state, type, illumination, thumbnail, allImages, width, height, vendorName, siteCode, area, location,
             printing_vendor_id: pVendor,
             printing_rate: pRate,
             printing_total: pTotal,

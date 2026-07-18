@@ -722,7 +722,7 @@ function renderSites(sites) {
     sites.forEach((s, i) => {
         const selectedSite = selectedSites.find(ss => ss.id == s.id);
         const isSelected = !!selectedSite;
-        const defaultRate = s.owner_type === 'HA' ? parseFloat(s.card_rate || 0) : parseFloat(s.purchase_rate || 0);
+        const defaultRate = 0;
         const currentRate = isSelected ? selectedSite.rate : defaultRate;
         
         const thumb = s.thumbnail ? imgBaseUrl + s.thumbnail : 'https://via.placeholder.com/150x95?text=No+Img';
@@ -805,7 +805,7 @@ function toggleSite(id, name, rate, code, location, vendor, thumbnail = '', city
         const mTotal = mRate * sqft;
 
         selectedSites.push({ 
-            id, name, rate, code, location, vendor, thumbnail, city, card_rate, size, type, light_type, owner_type, vendor_name, all_images,
+            id, name, rate: 0, code, location, vendor, thumbnail, city, card_rate, size, type, light_type, owner_type, vendor_name, all_images,
             printing_vendor_id: pVendor,
             printing_rate: pRate,
             printing_total: pTotal,
