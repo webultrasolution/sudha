@@ -133,8 +133,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             // Delete existing operations tasks
             $pdo->prepare("DELETE FROM operations WHERE booking_id = ?")->execute([$bookingId]);
             // Delete existing replicated printing/mounting rates
-            $pdo->prepare("DELETE FROM client_printing_rates WHERE po_number COLLATE utf8mb4_unicode_ci = ? COLLATE utf8mb4_unicode_ci")->execute([$bookingNum]);
-            $pdo->prepare("DELETE FROM client_mounting_rates WHERE po_number COLLATE utf8mb4_unicode_ci = ? COLLATE utf8mb4_unicode_ci")->execute([$bookingNum]);
+            $pdo->prepare("DELETE FROM client_printing_rates WHERE po_number = ?")->execute([$bookingNum]);
+            $pdo->prepare("DELETE FROM client_mounting_rates WHERE po_number = ?")->execute([$bookingNum]);
         } else {
             $bookingNum = generateSequenceNumber($pdo, 'booking');
             $stmtBooking = $pdo->prepare("
