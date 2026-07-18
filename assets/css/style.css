@@ -171,6 +171,24 @@ body {
     display: flex;
     flex-direction: column;
     gap: 0.5rem;
+    overflow-y: auto;
+    flex: 1;
+    padding-right: 2px;
+}
+
+/* Custom Scrollbar for Sidebar Menu */
+.nav-menu::-webkit-scrollbar {
+    width: 5px;
+}
+.nav-menu::-webkit-scrollbar-track {
+    background: transparent;
+}
+.nav-menu::-webkit-scrollbar-thumb {
+    background: rgba(13, 148, 136, 0.15);
+    border-radius: 10px;
+}
+.nav-menu::-webkit-scrollbar-thumb:hover {
+    background: rgba(13, 148, 136, 0.3);
 }
 
 .nav-link {
@@ -712,4 +730,37 @@ body {
     body.sidebar-collapsed .main-content {
         margin-left: var(--sidebar-collapsed-width);
     }
+}
+
+.inventory-tabs {
+    display: flex;
+    gap: 0.5rem;
+    margin-bottom: 1rem;
+    flex-wrap: wrap;
+}
+
+.tab {
+    padding: 0.625rem 1.25rem;
+    background: white;
+    border: 1px solid #e2e8f0;
+    border-radius: 8px;
+    text-decoration: none;
+    color: #64748b;
+    font-weight: 600;
+    font-size: 0.9rem;
+    cursor: pointer;
+    transition: all 0.2s ease;
+    outline: none;
+    font-family: inherit;
+}
+
+.tab:hover {
+    background: #f8fafc;
+    border-color: #cbd5e1;
+}
+
+.tab.active {
+    background: var(--primary);
+    color: white;
+    border-color: var(--primary);
 }

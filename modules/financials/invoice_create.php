@@ -8,7 +8,7 @@ requirePermission('financials', 'add');
 
 // Fetch Confirmed Bookings that don't have a final tax invoice yet
 $bookings = $pdo->query("
-    SELECT b.id, p.proposal_number, c.name as client_name, p.grand_total, p.total_amount, p.tax_amount
+    SELECT b.id, b.booking_number, p.proposal_number, c.name as client_name, p.grand_total, p.total_amount, p.tax_amount
     FROM bookings b
     JOIN proposals p ON b.proposal_id = p.id
     JOIN partners c ON p.client_id = c.id
@@ -32,7 +32,7 @@ $entities = $pdo->query("SELECT id, name FROM entities ORDER BY name ASC")->fetc
                             data-subtotal="<?php echo $b['total_amount']; ?>" 
                             data-tax="<?php echo $b['tax_amount']; ?>" 
                             data-total="<?php echo $b['grand_total']; ?>">
-                        #BK-<?php echo str_pad($b['id'], 4, '0', STR_PAD_LEFT); ?> | <?php echo $b['client_name']; ?> (<?php echo $b['proposal_number']; ?>)
+                        <?php echo htmlspecialchars(!empty($b['booking_number']) ? $b['booking_number'] : '#BK-' . str_pad($b['id'], 4, '0', STR_PAD_LEFT)); ?> | <?php echo $b['client_name']; ?> (<?php echo $b['proposal_number']; ?>)
                     </option>
                 <?php endforeach; ?>
             </select>
@@ -43,7 +43,7 @@ $entities = $pdo->query("SELECT id, name FROM entities ORDER BY name ASC")->fetc
                 <label>2. Invoice Type</label>
                 <select id="invoice_type" class="form-control">
                     <option value="tax">Tax Invoice (Final)</option>
-                    <option value="proforma">Proforma Invoice</option>
+                    <!-- <option value="proforma">Proforma Invoice</option> -->
                     <option value="estimate">Estimate / Quote</option>
                 </select>
             </div>
@@ -53,14 +53,23 @@ $entities = $pdo->query("SELECT id, name FROM entities ORDER BY name ASC")->fetc
             </div>
             <div class="form-group">
                 <label>4. Billing Entity</label>
-                <select id="entity_id" class="form-control">
-                    <option value="">-- Default Company Settings --</option>
-                    <?php foreach ($entities as $e): ?>
-                        <option value="<?php echo $e['id']; ?>" <?php echo (($_SESSION['active_entity_id'] ?? 0) == $e['id']) ? 'selected' : ''; ?>>
+                <select id="entity_id" class="form-control" onchange="updateEntityInvoiceInfo()">
+                    <option value="" data-last-invoice="<?php echo htmlspecialchars(getLastSequenceNumber($pdo, 'invoice')); ?>">-- Default Company Settings --</option>
+                    <?php foreach ($entities as $e): 
+                        $lastNo = getLastSequenceNumber($pdo, 'invoice', null, $e['id']);
+                    ?>
+                        <option value="<?php echo $e['id']; ?>" 
+                                data-last-invoice="<?php echo htmlspecialchars($lastNo); ?>"
+                                <?php echo (($_SESSION['active_entity_id'] ?? 0) == $e['id']) ? 'selected' : ''; ?>>
                             <?php echo htmlspecialchars($e['name']); ?>
                         </option>
                     <?php endforeach; ?>
                 </select>
+                <small id="entity-invoice-info" style="display:block; margin-top:0.4rem; color:var(--secondary); font-weight: 700;"></small>
+            </div>
+            <div class="form-group">
+                <label>5. Invoice Number</label>
+                <input type="text" id="invoice_number" class="form-control" placeholder="Type Invoice Number manually..." required>
             </div>
         </div>
 
@@ -92,6 +101,21 @@ $entities = $pdo->query("SELECT id, name FROM entities ORDER BY name ASC")->fetc
 </div>
 
 <script>
+function updateEntityInvoiceInfo() {
+    const select = document.getElementById('entity_id');
+    const option = select.options[select.selectedIndex];
+    const info = document.getElementById('entity-invoice-info');
+    if (option && option.dataset.lastInvoice) {
+        info.innerText = 'Last Invoice Number: ' + option.dataset.lastInvoice;
+    } else {
+        info.innerText = '';
+    }
+}
+
+document.addEventListener('DOMContentLoaded', () => {
+    updateEntityInvoiceInfo();
+});
+
 function updateDetails(select) {
     const option = select.options[select.selectedIndex];
     if (!option.value) {
@@ -112,15 +136,22 @@ function reset() {
 function saveInvoice() {
     const bookingId = document.getElementById('booking_id').value;
     const type = document.getElementById('invoice_type').value;
+    const invoiceNumber = document.getElementById('invoice_number').value;
     
     if (!bookingId) {
         alert('Please select a booking.');
         return;
     }
 
+    if (!invoiceNumber) {
+        alert('Invoice Number is mandatory.');
+        return;
+    }
+
     const data = {
         booking_id: bookingId,
         type: type,
+        invoice_number: invoiceNumber,
         date: document.getElementById('invoice_date').value,
         entity_id: document.getElementById('entity_id').value
     };

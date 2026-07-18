@@ -82,6 +82,8 @@ $company_email      = $co['email'];
 $company_letterhead = $co['letterhead'];
 $company_signature  = $co['signature'];
 $company_msme       = $co['msme_number'];
+$company_cin        = $co['cin'] ?? '';
+$company_tan        = $co['tan'] ?? '';
 
 $po_number = "MPO/" . date('y') . "-" . date('y', strtotime('+1 year')) . "/" . str_pad($vendor_id, 3, '0', STR_PAD_LEFT) . "-" . date('dHi');
 $po_date = date('d-m-Y');
@@ -306,39 +308,82 @@ if (empty($selected_rates)) die("No rates selected for this PO.");
     <meta charset="UTF-8">
     <title>Mounting PO - <?php echo htmlspecialchars($v['name']); ?></title>
     <style>
-        @page { size: A4; margin: 0; }
-        body { font-family: 'Arial', sans-serif; margin: 0; padding: 20px; color: #000; font-size: 11px; line-height: 1.3; }
-        .po-wrapper { border: 1px solid #000; max-width: 800px; margin: 0 auto; position: relative; }
+        @page {
+            size: A4;
+            margin: 8mm 10mm;
+            @bottom-right {
+                content: counter(page) "/" counter(pages);
+                font-family: Arial, sans-serif;
+                font-size: 9px;
+                color: #555;
+            }
+        }
+        .avoid-break {
+            page-break-inside: avoid;
+            break-inside: avoid;
+            margin-top: 20px;
+        }
+        body { font-family: 'Arial', sans-serif; margin: 0; padding: 20px; color: #000; font-size: 11px; line-height: 1.3; background: #f1f5f9; }
+        .po-wrapper {
+            border: 1px solid #d1d5db;
+            width: 210mm;
+            min-height: 297mm;
+            margin: 0 auto;
+            position: relative;
+            background: #fff;
+            padding: 12mm 14mm;
+            box-shadow: 0 4px 10px rgba(0,0,0,0.15);
+            box-sizing: border-box;
+            display: block;
+        }
 
         .header-top { border-bottom: 1px solid #000; padding: 5px 10px; }
         .header-top p { margin: 0; }
 
         .main-info { display: flex; border-bottom: 1px solid #000; }
-        .info-col { flex: 1; padding: 10px; }
+        .info-col { flex: 1; padding: 6px; }
         .info-col:first-child { border-right: 1px solid #000; }
 
         .info-row { display: flex; margin-bottom: 3px; }
-        .info-label { width: 90px; font-weight: normal; }
+        .info-label { width: 110px; font-weight: normal; }
         .info-sep { width: 15px; }
         .info-value { flex: 1; font-weight: normal; }
 
         .section-title { font-weight: bold; text-decoration: underline; margin-bottom: 5px; font-style: italic; }
         .table-title { background: #f0f0f0; border-bottom: 1px solid #000; text-align: center; font-weight: bold; padding: 4px; letter-spacing: 2px; text-transform: uppercase; }
 
-        table { width: 100%; border-collapse: collapse; }
-        th { border-bottom: 1px solid #000; border-right: 1px solid #000; padding: 6px; text-align: center; font-weight: bold; background: #fafafa; }
+        table { width: 100%; border-collapse: collapse; border: 1px solid #000; }
+        th { border-bottom: 1px solid #000; border-right: 1px solid #000; padding: 4px; text-align: center; font-weight: bold; background: #fafafa; }
         th:last-child { border-right: none; }
-        td { border-bottom: 1px solid #d0d0d0; border-right: 1px solid #000; padding: 8px 5px; vertical-align: top; text-align: center; }
+        td { border-bottom: 1px solid #000; border-right: 1px solid #000; padding: 4px 5px; vertical-align: top; text-align: center; }
         td:last-child { border-right: none; }
 
         .totals-row td { border-bottom: none; border-top: 1px solid #000; font-weight: bold; }
-        .footer { display: flex; border-top: 1px solid #000; }
-        .footer-left { flex: 2; padding: 10px; border-right: 1px solid #000; min-height: 120px; }
+        .footer { display: flex; border: 1px solid #000; }
+        .footer-left { flex: 2; padding: 10px; border-right: 1px solid #000; min-height: 80px; }
         .footer-right { flex: 1; padding: 10px; text-align: center; display: flex; flex-direction: column; justify-content: space-between; }
 
         .btn-print { position: fixed; bottom: 30px; right: 30px; background: #000; color: #fff; border: none; padding: 10px 20px; cursor: pointer; border-radius: 4px; font-weight: bold; }
         .btn-back { position: fixed; bottom: 30px; right: 180px; background: #6366f1; color: #fff; border: none; padding: 10px 20px; cursor: pointer; border-radius: 4px; font-weight: bold; text-decoration: none; font-size: 12px; }
-        @media print { .btn-print, .btn-back { display: none; } body { padding: 0; } .po-wrapper { border: none; width: 100%; } }
+        @media print {
+            .btn-print, .btn-back { display: none; }
+            body { padding: 0; background: #fff; }
+            .po-wrapper {
+                border: none;
+                width: 100%;
+                min-height: auto;
+                box-shadow: none;
+                padding: 0;
+                margin: 0;
+                display: block;
+            }
+            thead { display: table-header-group; }
+            tr { page-break-inside: avoid; break-inside: avoid; }
+            .avoid-break {
+                margin-top: 15px;
+                display: block;
+            }
+        }
     </style>
 </head>
 <body>
@@ -348,16 +393,27 @@ if (empty($selected_rates)) die("No rates selected for this PO.");
 
 <div class="po-wrapper">
     <!-- Header -->
-    <?php if ($company_letterhead): ?>
-        <img src="<?php echo BASE_URL; ?>assets/images/<?php echo $company_letterhead; ?>" style="width: 100%; height: auto; display: block; border-bottom: 1px solid #000;">
-    <?php else: ?>
-        <div class="header-top" style="text-align: center;">
-            <h2 style="margin: 0; text-transform: uppercase;"><?php echo $company_name; ?></h2>
-            <p><?php echo $company_address; ?></p>
-            <p>Ph: <?php echo $company_phone; ?> | Email: <?php echo $company_email; ?></p>
-            <?php if ($company_msme): ?><p>MSME: <?php echo htmlspecialchars($company_msme); ?></p><?php endif; ?>
+    <div style="display: flex; justify-content: space-between; align-items: flex-start; padding: 10px 10px 2px;">
+        <div style="flex: 1.4; text-align: left;">
+            <?php if ($company_letterhead): ?>
+                <img src="<?php echo BASE_URL; ?>assets/images/<?php echo $company_letterhead; ?>" style="max-height: 80px; width: auto; display: block; margin-bottom: 5px;">
+            <?php else: ?>
+                <h2 style="margin: 0; text-transform: uppercase; font-size: 18px; color: #8B1A1A;"><?php echo htmlspecialchars($company_name); ?></h2>
+            <?php endif; ?>
         </div>
-    <?php endif; ?>
+        <div style="flex: 1.2; text-align: center; padding-top: 15px;">
+            <div style="font-size: 15px; font-weight: bold; text-decoration: underline; letter-spacing: 1.5px; text-transform: uppercase;">MOUNTING PURCHASE ORDER</div>
+        </div>
+        <div style="flex: 0.8; text-align: right; font-style: italic; font-size: 10px; padding-top: 15px; color: #555;">
+            Original Copy
+        </div>
+    </div>
+    <div style="padding: 0 10px 10px; font-size: 10px; line-height: 1.4; color: #000; border-bottom: 1px solid #000; margin-bottom: 10px;">
+        <?php echo nl2br(htmlspecialchars($company_address)); ?><br>
+        Ph : <?php echo htmlspecialchars($company_phone); ?> &nbsp;|&nbsp; Email : <?php echo htmlspecialchars($company_email); ?>
+    </div>
+
+
 
     <!-- PO Info -->
     <div class="main-info">
@@ -412,7 +468,7 @@ if (empty($selected_rates)) die("No rates selected for this PO.");
                 <span class="info-value"><?php echo htmlspecialchars($po_remark); ?></span>
             </div>
             <?php endif; ?>
-            <div class="info-row" style="margin-top: 5px;">
+            <div class="info-row">
                 <span class="info-label">Buyer PAN</span>
                 <span class="info-sep">:</span>
                 <span class="info-value"><?php echo $company_pan; ?></span>
@@ -422,6 +478,20 @@ if (empty($selected_rates)) die("No rates selected for this PO.");
                 <span class="info-sep">:</span>
                 <span class="info-value"><?php echo $company_gstin; ?></span>
             </div>
+            <?php if (!empty($company_cin)): ?>
+            <div class="info-row">
+                <span class="info-label">Buyer CIN</span>
+                <span class="info-sep">:</span>
+                <span class="info-value"><?php echo htmlspecialchars($company_cin); ?></span>
+            </div>
+            <?php endif; ?>
+            <?php if (!empty($company_tan)): ?>
+            <div class="info-row">
+                <span class="info-label">Buyer TAN</span>
+                <span class="info-sep">:</span>
+                <span class="info-value"><?php echo htmlspecialchars($company_tan); ?></span>
+            </div>
+            <?php endif; ?>
         </div>
     </div>
 
@@ -464,7 +534,23 @@ if (empty($selected_rates)) die("No rates selected for this PO.");
             <?php endforeach; ?>
 
             <?php
-            $gst_amount = $net_total * 0.18;
+            $vendor_state = trim($v['state'] ?? '');
+            $vendor_gstin = trim($v['gstin'] ?? '');
+            $has_gst = !empty($vendor_gstin);
+            if (!$has_gst) {
+                $cgst_pct = 0;
+                $sgst_pct = 0;
+                $igst_pct = 0;
+            } else {
+                $is_interstate = (strcasecmp($vendor_state, 'West Bengal') !== 0 && substr($vendor_gstin, 0, 2) !== '19');
+                $cgst_pct = $is_interstate ? 0 : 9;
+                $sgst_pct = $is_interstate ? 0 : 9;
+                $igst_pct = $is_interstate ? 18 : 0;
+            }
+            $cgst_amount = round($net_total * ($cgst_pct / 100), 2);
+            $sgst_amount = round($net_total * ($sgst_pct / 100), 2);
+            $igst_amount = round($net_total * ($igst_pct / 100), 2);
+            $gst_amount = $cgst_amount + $sgst_amount + $igst_amount;
             $grand_total = $net_total + $gst_amount;
             ?>
 
@@ -473,8 +559,16 @@ if (empty($selected_rates)) die("No rates selected for this PO.");
                 <td style="text-align: right; padding-right: 10px;"><?php echo number_format($net_total, 2); ?></td>
             </tr>
             <tr class="totals-row">
-                <td colspan="7" style="text-align: right; padding-right: 10px;">GST (18%)</td>
-                <td style="text-align: right; padding-right: 10px;"><?php echo number_format($gst_amount, 2); ?></td>
+                <td colspan="7" style="text-align: right; padding-right: 10px;">CGST (<?php echo $cgst_pct; ?>%)</td>
+                <td style="text-align: right; padding-right: 10px;"><?php echo number_format($cgst_amount, 2); ?></td>
+            </tr>
+            <tr class="totals-row">
+                <td colspan="7" style="text-align: right; padding-right: 10px;">SGST (<?php echo $sgst_pct; ?>%)</td>
+                <td style="text-align: right; padding-right: 10px;"><?php echo number_format($sgst_amount, 2); ?></td>
+            </tr>
+            <tr class="totals-row">
+                <td colspan="7" style="text-align: right; padding-right: 10px;">IGST (<?php echo $igst_pct; ?>%)</td>
+                <td style="text-align: right; padding-right: 10px;"><?php echo number_format($igst_amount, 2); ?></td>
             </tr>
             <tr class="totals-row" style="background: #f9f9f9; border-top: 2px solid #000;">
                 <td colspan="7" style="text-align: right; padding-right: 10px; font-size: 12px; height: 30px; vertical-align: middle;">Gross Payable Amount</td>
@@ -483,32 +577,34 @@ if (empty($selected_rates)) die("No rates selected for this PO.");
         </tbody>
     </table>
 
-    <div style="padding: 10px; border-top: 1px solid #000;">
-        <strong>Amount in Words:</strong> <span style="text-transform: capitalize;"><?php echo amountInWords($grand_total); ?> Only</span>
-    </div>
+    <div class="avoid-break">
+        <div style="padding: 10px; border-top: 1px solid #000;">
+            <strong>Amount in Words:</strong> <span style="text-transform: capitalize;"><?php echo amountInWords($grand_total); ?> Only</span>
+        </div>
 
-    <div style="padding: 10px; border-top: 1px solid #000; font-size: 9px;">
-        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 5px;">
-            <div style="font-weight: bold; text-decoration: underline; font-size: 10px;">Terms & Conditions</div>
-            <div style="font-weight: bold; color: #cc0000; font-size: 11px;"><?php echo getSetting('po_important_note', 'Filing of GSTR-1 within time is mandatory for acceptance of Invoice.'); ?></div>
+        <div style="padding: 5px 10px; border-top: 1px solid #000; font-size: 8.5px; line-height: 1.25;">
+            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 5px;">
+                <div style="font-weight: bold; text-decoration: underline; font-size: 10px;">Terms & Conditions</div>
+                <div style="font-weight: bold; color: #cc0000; font-size: 11px;"><?php echo getSetting('po_important_note', 'Filing of GSTR-1 within time is mandatory for acceptance of Invoice.'); ?></div>
+            </div>
+            <div style="margin: 0; line-height: 1.2; white-space: pre-wrap;">
+                <?php echo nl2br(getSetting('po_terms', '')); ?>
+            </div>
         </div>
-        <div style="margin: 0; line-height: 1.2; white-space: pre-wrap;">
-            <?php echo nl2br(getSetting('po_terms', '')); ?>
-        </div>
-    </div>
 
-    <div class="footer">
-        <div class="footer-left">
-            <div style="font-weight: bold; text-decoration: underline; margin-bottom: 5px;">Payment Terms:</div>
-            <p style="margin: 2px 0;">- 100% after mounting completion with proofs</p>
-            <p style="margin: 2px 0;">- Cheque/NEFT in favor of: <strong><?php echo $v['name']; ?></strong></p>
-        </div>
-        <div class="footer-right">
-            <div>For <strong><?php echo $company_name; ?></strong></div>
-            <div style="margin-top: 30px;">
-                <img src="<?php echo BASE_URL; ?>assets/images/<?php echo $company_signature; ?>" style="height: 40px; display: block; margin: 0 auto;" onerror="this.style.display='none'">
-                <div style="border-top: 1px solid #000; width: 150px; margin: 5px auto 0;"></div>
-                <div style="font-weight: bold; margin-top: 2px;">Authorised Signatory</div>
+        <div class="footer">
+            <div class="footer-left">
+                <div style="font-weight: bold; text-decoration: underline; margin-bottom: 5px;">Payment Terms:</div>
+                <p style="margin: 2px 0;">- 100% after mounting completion with proofs</p>
+                <p style="margin: 2px 0;">- Cheque/NEFT in favor of: <strong><?php echo $v['name']; ?></strong></p>
+            </div>
+            <div class="footer-right">
+                <div>For <strong><?php echo $company_name; ?></strong></div>
+                <div style="margin-top: 15px;">
+                    <img src="<?php echo BASE_URL; ?>assets/images/<?php echo $company_signature; ?>" style="height: 40px; display: block; margin: 0 auto;" onerror="this.style.display='none'">
+                    <div style="border-top: 1px solid #000; width: 150px; margin: 5px auto 0;"></div>
+                    <div style="font-weight: bold; margin-top: 2px;">Authorised Signatory</div>
+                </div>
             </div>
         </div>
     </div>

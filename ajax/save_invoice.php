@@ -28,16 +28,41 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             throw new Exception("Booking details not found.");
         }
 
-        // Generate Invoice Number using sequential document numbering rather than random ids
-        $prefix = ($type === 'tax') ? 'INV-' : (($type === 'proforma') ? 'PI-' : 'EST-');
-        $invNum = generateSequentialReference($pdo, 'invoices', 'invoice_number', $prefix, 5);
+        // Read Invoice Number manually supplied by user
+        $invNum = clean($data['invoice_number'] ?? '');
+        if (empty($invNum)) {
+            if ($type === 'tax') {
+                throw new Exception("Invoice Number is mandatory.");
+            } else {
+                $prefix = ($type === 'proforma') ? 'PI-' : 'EST-';
+                $invNum = generateSequentialReference($pdo, 'invoices', 'invoice_number', $prefix, 4);
+            }
+        }
 
-        // Insert Invoice
-        $approvalStatus = $isAdmin ? 'approved' : 'pending_approval';
+        // Sync sequence registry for manual entry if it's tax invoice
+        if ($type === 'tax') {
+            syncSequenceNextValue($pdo, 'invoice', $invNum, $entityId);
+        }
+
+        // Check if the booking has any vendor sites
+        $stmtVendorSites = $pdo->prepare("
+            SELECT COUNT(*) 
+            FROM booking_items bi
+            JOIN sites s ON bi.site_id = s.id
+            WHERE bi.booking_id = ? AND s.owner_type = 'TA'
+        ");
+        $stmtVendorSites->execute([$bookingId]);
+        $hasVendorSites = ($stmtVendorSites->fetchColumn() > 0);
+
+        // Auto approve if admin, if it is NOT a final tax invoice (type === 'tax'), or if it has NO vendor sites
+        $needsApproval = (!$isAdmin && $type === 'tax' && $hasVendorSites);
+        $approvalStatus = $needsApproval ? 'pending_approval' : 'approved';
+
+        $invoice_date = !empty($data['date']) ? $data['date'] : date('Y-m-d');
 
         $stmtInv = $pdo->prepare("
-            INSERT INTO invoices (invoice_number, booking_id, entity_id, type, sub_total, cgst, sgst, igst, total_amount, payment_status, approval_status) 
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, 'unpaid', ?)
+            INSERT INTO invoices (invoice_number, booking_id, entity_id, invoice_date, type, sub_total, cgst, sgst, igst, total_amount, payment_status, approval_status) 
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'unpaid', ?)
         ");
         
         $tax_amount = floatval($fin['tax_amount'] ?? 0);
@@ -58,6 +83,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             $invNum,
             $bookingId,
             $entityId,
+            $invoice_date,
             $type,
             $fin['total_amount'],
             $cgst,
@@ -69,10 +95,34 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
         $invoiceId = $pdo->lastInsertId();
 
-        // Create approval request for non-admin
-        if (!$isAdmin) {
+        // Create approval request for non-admin invoice
+        if ($needsApproval) {
             $stmtAR = $pdo->prepare("INSERT INTO approval_requests (entity_type, entity_id, entity_ref, requested_by, status) VALUES ('invoice', ?, ?, ?, 'pending')");
             $stmtAR->execute([$invoiceId, $invNum, $_SESSION['user_id']]);
+        }
+
+        // If it is a final tax invoice with vendor sites, trigger vendor PO approvals
+        if ($type === 'tax' && $hasVendorSites) {
+            $poStmt = $pdo->prepare("SELECT id, po_number, approval_status FROM purchase_orders WHERE campaign_id = ?");
+            $poStmt->execute([$bookingId]);
+            $pos = $poStmt->fetchAll(PDO::FETCH_ASSOC);
+            
+            foreach ($pos as $po) {
+                if (in_array($po['approval_status'], ['draft', 'rejected'])) {
+                    $newStatus = $isAdmin ? 'approved' : 'pending';
+                    $newAppStatus = $isAdmin ? 'approved' : 'pending_approval';
+                    
+                    $upStmt = $pdo->prepare("UPDATE purchase_orders SET status = ?, approval_status = ? WHERE id = ?");
+                    $upStmt->execute([$newStatus, $newAppStatus, $po['id']]);
+                    
+                    if (!$isAdmin) {
+                        $pdo->prepare("DELETE FROM approval_requests WHERE entity_type = 'purchase_order' AND entity_id = ? AND status = 'pending'")
+                            ->execute([$po['id']]);
+                        $arStmt = $pdo->prepare("INSERT INTO approval_requests (entity_type, entity_id, entity_ref, requested_by, status) VALUES ('purchase_order', ?, ?, ?, 'pending')");
+                        $arStmt->execute([$po['id'], $po['po_number'], $_SESSION['user_id']]);
+                    }
+                }
+            }
         }
 
         echo json_encode([

@@ -76,7 +76,7 @@ include_once __DIR__ . '/../../includes/header.php';
     </a>
 </div>
 
-<div class="card" style="border-radius: 20px; box-shadow: 0 10px 30px rgba(0,0,0,0.05); padding: 0; overflow: hidden; background: #fff;">
+<div class="card" style="border-radius: 20px; box-shadow: 0 10px 30px rgba(0,0,0,0.05); padding: 0; overflow: visible; background: #fff;">
 
     <form method="POST" action="printing_rates.php" id="rateForm" style="display: flex; flex-direction: column; margin: 0;">
         <input type="hidden" name="action" value="<?php echo htmlspecialchars($action); ?>">
@@ -92,7 +92,7 @@ include_once __DIR__ . '/../../includes/header.php';
 
         <input type="hidden" name="rate_per_sqft" id="f_rate" value="0">
             <!-- Full-Width Horizontal Header Config Panel -->
-            <div style="background: #f8fafc; padding: 1rem 2.5rem; border-bottom: 1px solid #e2e8f0; display: grid; grid-template-columns: 1fr 1fr; gap: 2rem; align-items: start;">
+            <div style="background: #f8fafc; padding: 1rem 2.5rem; border-bottom: 1px solid #e2e8f0; display: grid; grid-template-columns: 1fr 1fr 1fr 1fr; gap: 1.5rem; align-items: start;">
                 <!-- Column 1: Select Vendor -->
                 <div class="form-group" style="margin: 0;">
                     <label style="font-weight: 800; color: #475569; font-size: 0.65rem; margin-bottom: 0.35rem; display: block; text-transform: uppercase; letter-spacing: 0.05em;">1. Select Vendor</label>
@@ -106,9 +106,21 @@ include_once __DIR__ . '/../../includes/header.php';
                     </select>
                 </div>
 
-                <!-- Column 2: Media Type Select Dropdown -->
+                <!-- Column 2: Campaign Name -->
                 <div class="form-group" style="margin: 0;">
-                    <label style="font-weight: 800; color: #475569; font-size: 0.65rem; margin-bottom: 0.35rem; display: block; text-transform: uppercase; letter-spacing: 0.05em;">2. Media Type</label>
+                    <label style="font-weight: 800; color: #475569; font-size: 0.65rem; margin-bottom: 0.35rem; display: block; text-transform: uppercase; letter-spacing: 0.05em;">2. Campaign Name</label>
+                    <input type="text" name="campaign_name" id="f_campaign" value="<?php echo $rateData ? htmlspecialchars($rateData['campaign_name'] ?? '') : ''; ?>" placeholder="e.g. Summer Special" style="background: #fff; border: 1.5px solid #e2e8f0; border-radius: 8px; padding: 0.5rem 0.75rem; width: 100%; font-weight: 600; font-size: 0.85rem; height: 38px; box-sizing: border-box;">
+                </div>
+
+                <!-- Column 3: Brand Name -->
+                <div class="form-group" style="margin: 0;">
+                    <label style="font-weight: 800; color: #475569; font-size: 0.65rem; margin-bottom: 0.35rem; display: block; text-transform: uppercase; letter-spacing: 0.05em;">3. Brand Name</label>
+                    <input type="text" name="brand_name" id="f_brand" value="<?php echo $rateData ? htmlspecialchars($rateData['brand_name'] ?? '') : ''; ?>" placeholder="e.g. Nike" style="background: #fff; border: 1.5px solid #e2e8f0; border-radius: 8px; padding: 0.5rem 0.75rem; width: 100%; font-weight: 600; font-size: 0.85rem; height: 38px; box-sizing: border-box;">
+                </div>
+
+                <!-- Column 4: Media Type Select Dropdown -->
+                <div class="form-group" style="margin: 0;">
+                    <label style="font-weight: 800; color: #475569; font-size: 0.65rem; margin-bottom: 0.35rem; display: block; text-transform: uppercase; letter-spacing: 0.05em;">4. Media Type</label>
                     <select name="media_type" id="f_media" style="background: #fff; border: 1.5px solid #e2e8f0; border-radius: 8px; padding: 0.5rem 0.75rem; width: 100%; font-weight: 600; font-size: 0.85rem; height: 38px;">
                         <option value="Flex" <?php echo (!$rateData || $rateData['media_type'] === 'Flex') ? 'selected' : ''; ?>>Flex</option>
                         <option value="Vinyl" <?php echo ($rateData && $rateData['media_type'] === 'Vinyl') ? 'selected' : ''; ?>>Vinyl</option>
@@ -243,10 +255,20 @@ include_once __DIR__ . '/../../includes/header.php';
                             </div>
 
                             <!-- Select All + Count Header -->
-                            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 0.75rem;">
-                                <label style="display: flex; align-items: center; cursor: pointer; font-size: 0.75rem; font-weight: 800; color: #0d9488; margin: 0; background: #fff; padding: 6px 12px; border-radius: 20px; border: 1.5px solid #0d9488; transition: all 0.2s;">
-                                    <input type="checkbox" id="selectAllSites" style="width: 16px; height: 16px; margin-right: 8px; accent-color: #0d9488; cursor: pointer;"> SELECT ALL (<span id="filtered_sites_count">0</span> matching)
-                                </label>
+                            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 0.75rem; flex-wrap: wrap; gap: 0.75rem;">
+                                <div style="display: flex; align-items: center; gap: 1rem; flex-wrap: wrap;">
+                                    <label style="display: flex; align-items: center; cursor: pointer; font-size: 0.75rem; font-weight: 800; color: #0d9488; margin: 0; background: #fff; padding: 6px 12px; border-radius: 20px; border: 1.5px solid #0d9488; transition: all 0.2s;">
+                                        <input type="checkbox" id="selectAllSites" style="width: 16px; height: 16px; margin-right: 8px; accent-color: #0d9488; cursor: pointer;"> SELECT ALL (<span id="filtered_sites_count">0</span> matching)
+                                    </label>
+                                    
+                                    <div style="display: flex; align-items: center; gap: 0.5rem; background: #fff; border: 1.5px solid #0d9488; border-radius: 20px; padding: 3px 8px 3px 12px; transition: all 0.2s; box-shadow: 0 2px 4px rgba(13, 148, 136, 0.05);">
+                                        <span style="font-size: 0.7rem; font-weight: 800; color: #0d9488; font-family: inherit;">Rate Master:</span>
+                                        <input type="number" id="rateMasterInput" placeholder="Rate" step="0.01" style="width: 80px; height: 24px; font-size: 0.75rem; font-weight: 800; border-radius: 6px; border: 1px solid #cbd5e1; padding: 0 0.4rem; color: #0d9488; outline: none; background: #f8fafc; text-align: right;">
+                                        <button type="button" onclick="applyRateMaster()" style="background: #0d9488; border: none; color: white; padding: 4px 10px; border-radius: 12px; font-weight: 800; font-size: 0.65rem; cursor: pointer; transition: all 0.2s; display: flex; align-items: center; gap: 4px; height: 24px;">
+                                            Apply to Selected
+                                        </button>
+                                    </div>
+                                </div>
                                 <?php if ($action !== 'edit'): ?>
                                 <button type="button" onclick="openBucket()" id="review-bucket-btn" style="background: #f0fdfa; border: 1.5px solid #0d9488; color: #0d9488; padding: 6px 14px; border-radius: 20px; font-weight: 800; display: flex; align-items: center; gap: 8px; cursor: pointer; font-size: 0.75rem;">
                                     <i class="fas fa-shopping-basket"></i>
@@ -761,6 +783,52 @@ document.getElementById('rateForm').addEventListener('submit', function(e) {
     }
 });
 
+function applyRateMaster() {
+    const rateVal = document.getElementById('rateMasterInput').value;
+    if (rateVal === '' || isNaN(parseFloat(rateVal))) {
+        Swal.fire({
+            title: 'Error',
+            text: 'Please enter a valid rate.',
+            icon: 'error',
+            confirmButtonColor: '#0d9488'
+        });
+        return;
+    }
+    const rate = parseFloat(rateVal);
+    const checked = document.querySelectorAll('.site-chk-input:checked');
+    if (checked.length === 0) {
+        Swal.fire({
+            title: 'Error',
+            text: 'No locations selected. Please select locations first.',
+            icon: 'error',
+            confirmButtonColor: '#0d9488'
+        });
+        return;
+    }
+    checked.forEach(chk => {
+        const row = chk.closest('tr.site-row');
+        if (row) {
+            const rateInput = row.querySelector('.site-rate-input');
+            if (rateInput) {
+                rateInput.value = rate;
+                rateInput.dataset.touched = 'true';
+                updateRowTotal(row);
+            }
+        }
+    });
+    calculateTotal();
+    updateBucketUI();
+    Swal.fire({
+        icon: 'success',
+        title: 'Rate Applied',
+        text: 'Applied ₹' + rate + ' to ' + checked.length + ' selected location(s).',
+        timer: 1500,
+        showConfirmButton: false,
+        toast: true,
+        position: 'top-end'
+    });
+}
+
 function openBucket() {
     document.getElementById('selection-bucket-panel').style.right = '0';
     document.getElementById('bucket-backdrop').style.display = 'block';
@@ -936,6 +1004,29 @@ document.addEventListener('DOMContentLoaded', () => {
     }
     calculateTotal();
     updateBucketUI();
+    
+    // Initialize Searchable Dropdowns
+    (function() {
+        function tryInit() {
+            if (typeof initSearchableSelect === 'function') {
+                initSearchableSelect('f_vendor', 'Choose Printing Partner...');
+                initSearchableSelect('filter_vendor', 'Search Vendor...');
+                console.log("Searchable selects initialized successfully on create_printing_po.php");
+            } else {
+                console.warn("initSearchableSelect function not available yet, retrying on window load...");
+                window.addEventListener('load', () => {
+                    if (typeof initSearchableSelect === 'function') {
+                        initSearchableSelect('f_vendor', 'Choose Printing Partner...');
+                        initSearchableSelect('filter_vendor', 'Search Vendor...');
+                        console.log("Searchable selects initialized successfully on window load");
+                    } else {
+                        console.error("initSearchableSelect function could not be loaded!");
+                    }
+                });
+            }
+        }
+        tryInit();
+    })();
 });
 </script>
 

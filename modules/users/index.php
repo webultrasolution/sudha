@@ -1,7 +1,7 @@
 <?php
 include_once __DIR__ . '/../../config/db.php';
 include_once __DIR__ . '/../../includes/functions.php';
-requireRole('admin');
+requirePermission('users', 'view');
 
 // Robust Migration: Ensure all columns exist
 try {
@@ -11,16 +11,26 @@ try {
     $columns = [
         "name" => "VARCHAR(100) NOT NULL AFTER id",
         "username" => "VARCHAR(50) NOT NULL UNIQUE AFTER name",
-        "password" => "VARCHAR(255) NOT NULL AFTER username",
+        "email" => "VARCHAR(150) NULL AFTER username",
+        "password" => "VARCHAR(255) NOT NULL AFTER email",
         "role" => "ENUM('admin', 'manager', 'sales', 'staff') DEFAULT 'staff' AFTER password",
         "status" => "ENUM('active', 'inactive') DEFAULT 'active' AFTER role",
         "created_at" => "TIMESTAMP DEFAULT CURRENT_TIMESTAMP AFTER status"
     ];
 
     foreach ($columns as $col => $definition) {
-        $check = $pdo->query("SHOW COLUMNS FROM users LIKE '$col'");
-        if (!$check->fetch()) {
+        $check = $pdo->query("SHOW COLUMNS FROM users LIKE '$col'")->fetch();
+        if (!$check) {
             $pdo->exec("ALTER TABLE users ADD $col $definition");
+        } else {
+            if ($col === 'role') {
+                $type = strtolower($check['Type']);
+                if (strpos($type, 'operations') !== false || strpos($type, 'accounts') !== false) {
+                    $pdo->exec("UPDATE users SET role = 'staff' WHERE role = 'operations' OR role = '' OR role IS NULL");
+                    $pdo->exec("UPDATE users SET role = 'manager' WHERE role = 'accounts'");
+                    $pdo->exec("ALTER TABLE users MODIFY COLUMN role ENUM('admin', 'manager', 'sales', 'staff') DEFAULT 'staff'");
+                }
+            }
         }
     }
 } catch (Exception $e) {
@@ -29,27 +39,66 @@ try {
 
 // Handle Form Submissions
 if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action'])) {
-    $name = clean($_POST['name']);
-    $username = clean($_POST['username']);
-    $role = clean($_POST['role']);
-    $status = clean($_POST['status'] ?? 'active');
-
-    if ($_POST['action'] === 'add') {
-        $password = password_hash($_POST['password'], PASSWORD_DEFAULT);
-        $stmt = $pdo->prepare("INSERT INTO users (name, username, password, role, status) VALUES (?, ?, ?, ?, ?)");
-        $stmt->execute([$name, $username, $password, $role, $status]);
-        header("Location: index.php?msg=added"); exit;
-    } elseif ($_POST['action'] === 'edit') {
-        $id = intval($_POST['id']);
-        if (!empty($_POST['password'])) {
-            $password = password_hash($_POST['password'], PASSWORD_DEFAULT);
-            $stmt = $pdo->prepare("UPDATE users SET name=?, username=?, password=?, role=?, status=? WHERE id=?");
-            $stmt->execute([$name, $username, $password, $role, $status, $id]);
-        } else {
-            $stmt = $pdo->prepare("UPDATE users SET name=?, username=?, role=?, status=? WHERE id=?");
-            $stmt->execute([$name, $username, $role, $status, $id]);
+    if ($_POST['action'] === 'add' || $_POST['action'] === 'edit') {
+        $name = clean($_POST['name']);
+        $username = clean($_POST['username']);
+        $role = clean($_POST['role']);
+        // Map deprecated or invalid role values to synchronized ENUM values
+        if ($role === 'operations') {
+            $role = 'staff';
+        } elseif ($role === 'accounts') {
+            $role = 'manager';
+        } elseif (!in_array($role, ['admin', 'manager', 'sales', 'staff'])) {
+            $role = 'staff';
         }
-        header("Location: index.php?msg=updated"); exit;
+        
+        $status = strtolower(clean($_POST['status'] ?? 'active'));
+        if (!in_array($status, ['active', 'inactive'])) {
+            $status = 'active';
+        }
+
+        if ($_POST['action'] === 'add') {
+            $password = password_hash($_POST['password'], PASSWORD_DEFAULT);
+            $email = !empty($_POST['email']) ? clean($_POST['email']) : null;
+            $stmt = $pdo->prepare("INSERT INTO users (name, username, email, password, role, status) VALUES (?, ?, ?, ?, ?, ?)");
+            $stmt->execute([$name, $username, $email, $password, $role, $status]);
+            header("Location: index.php?msg=added"); exit;
+        } elseif ($_POST['action'] === 'edit') {
+            $id = intval($_POST['id']);
+            $email = !empty($_POST['email']) ? clean($_POST['email']) : null;
+            if (!empty($_POST['password'])) {
+                $password = password_hash($_POST['password'], PASSWORD_DEFAULT);
+                $stmt = $pdo->prepare("UPDATE users SET name=?, username=?, email=?, password=?, role=?, status=? WHERE id=?");
+                $stmt->execute([$name, $username, $email, $password, $role, $status, $id]);
+            } else {
+                $stmt = $pdo->prepare("UPDATE users SET name=?, username=?, email=?, role=?, status=? WHERE id=?");
+                $stmt->execute([$name, $username, $email, $role, $status, $id]);
+            }
+            header("Location: index.php?msg=updated"); exit;
+        }
+    } elseif ($_POST['action'] === 'delete') {
+        header('Content-Type: application/json');
+        try {
+            $id = intval($_POST['id']);
+            
+            // Prevent deleting admin
+            $stmtCheck = $pdo->prepare("SELECT username FROM users WHERE id = ?");
+            $stmtCheck->execute([$id]);
+            $uname = $stmtCheck->fetchColumn();
+            
+            if ($uname === 'admin') {
+                echo json_encode(['success' => false, 'message' => 'Administrator account cannot be deleted.']);
+                exit;
+            }
+            
+            $stmt = $pdo->prepare("DELETE FROM users WHERE id = ?");
+            $stmt->execute([$id]);
+            echo json_encode(['success' => true]);
+            exit;
+        } catch (Exception $e) {
+            echo json_encode(['success' => false, 'message' => 'This user cannot be deleted because they are referenced in other records (such as bookings or activity logs). You can deactivate their account instead.']);
+            exit;
+        }
     }
 }
 
@@ -63,9 +112,11 @@ $users = $pdo->query("SELECT * FROM users ORDER BY name ASC")->fetchAll();
 <div class="card">
     <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1.5rem;">
         <h2 style="font-size: 1.25rem;">System Users & Roles</h2>
+        <?php if (canAdd('users')): ?>
         <button class="btn btn-primary" onclick="openUserModal()">
             <i class="fas fa-user-plus"></i> Add New User
         </button>
+        <?php endif; ?>
     </div>
 
     <table class="table">
@@ -83,6 +134,9 @@ $users = $pdo->query("SELECT * FROM users ORDER BY name ASC")->fetchAll();
             <tr>
                 <td>
                     <div style="font-weight: 700; color: var(--primary);"><?php echo $u['name']; ?></div>
+                    <?php if(!empty($u['email'])): ?>
+                        <div style="font-size: 0.8rem; color: #64748b; margin-top: 2px;"><i class="fas fa-envelope" style="opacity: 0.5; margin-right: 3px;"></i> <?php echo htmlspecialchars($u['email']); ?></div>
+                    <?php endif; ?>
                     <small style="color: #94a3b8;">Created: <?php echo date('d M Y', strtotime($u['created_at'])); ?></small>
                 </td>
                 <td><code style="background: #f1f5f9; padding: 2px 6px; border-radius: 4px;"><?php echo $u['username']; ?></code></td>
@@ -98,8 +152,10 @@ $users = $pdo->query("SELECT * FROM users ORDER BY name ASC")->fetchAll();
                     </span>
                 </td>
                 <td style="text-align: right;">
-                    <button class="btn-icon" onclick='editUser(<?php echo json_encode($u); ?>)' style="color: var(--primary);"><i class="fas fa-edit"></i></button>
-                    <?php if($u['username'] !== 'admin'): ?>
+                    <?php if (canEdit('users')): ?>
+                    <button class="btn-icon" onclick='editUser(<?php echo htmlspecialchars(json_encode($u), ENT_QUOTES, "UTF-8"); ?>)' style="color: var(--primary);"><i class="fas fa-edit"></i></button>
+                    <?php endif; ?>
+                    <?php if($u['username'] !== 'admin' && canDelete('users')): ?>
                         <button class="btn-icon" style="color: #ef4444;" onclick="deleteUser(<?php echo $u['id']; ?>)"><i class="fas fa-trash"></i></button>
                     <?php endif; ?>
                 </td>
@@ -122,6 +178,7 @@ $users = $pdo->query("SELECT * FROM users ORDER BY name ASC")->fetchAll();
             
             <div class="form-group"><label>Full Name</label><input type="text" name="name" id="f_name" required></div>
             <div class="form-group"><label>Username (Login ID)</label><input type="text" name="username" id="f_username" required></div>
+            <div class="form-group"><label>Email Address</label><input type="email" name="email" id="f_email"></div>
             <div class="form-group">
                 <label>Password <small id="pw_hint" style="display:none; color: #94a3b8;">(Leave blank to keep current)</small></label>
                 <input type="password" name="password" id="f_password">
@@ -175,12 +232,47 @@ function editUser(u) {
     document.getElementById('userId').value = u.id;
     document.getElementById('f_name').value = u.name;
     document.getElementById('f_username').value = u.username;
+    document.getElementById('f_email').value = u.email || '';
     document.getElementById('f_role').value = u.role;
     document.getElementById('f_status').value = u.status;
     document.getElementById('f_password').required = false;
     document.getElementById('pw_hint').style.display = 'inline';
     document.getElementById('modalTitle').innerText = 'Edit User Account';
     document.getElementById('userModal').style.display = 'block';
+}
+
+function deleteUser(id) {
+    Swal.fire({
+        title: 'Delete User?',
+        text: "Are you sure you want to delete this user account? This action cannot be undone.",
+        icon: 'warning',
+        showCancelButton: true,
+        confirmButtonColor: '#ef4444',
+        cancelButtonColor: '#475569',
+        confirmButtonText: 'Yes, delete it'
+    }).then((result) => {
+        if (result.isConfirmed) {
+            fetch('index.php', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+                body: `action=delete&id=${id}`
+            }).then(r => r.text().then(text => {
+                try {
+                    const res = JSON.parse(text);
+                    if (res.success) {
+                        Swal.fire('Deleted!', 'User account has been deleted.', 'success').then(() => location.reload());
+                    } else {
+                        Swal.fire('Error', res.message, 'error');
+                    }
+                } catch(e) {
+                    console.error("Server raw response:", text);
+                    Swal.fire('Error', 'Server response invalid: ' + text.substring(0, 200), 'error');
+                }
+            })).catch(err => {
+                Swal.fire('Error', 'Something went wrong: ' + err.message, 'error');
+            });
+        }
+    });
 }
 </script>
 

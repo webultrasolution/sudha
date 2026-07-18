@@ -17,8 +17,19 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     try {
         $pdo->beginTransaction();
 
+        $stmtProp = $pdo->prepare("SELECT start_date, end_date FROM proposals WHERE id = ?");
+        $stmtProp->execute([$propId]);
+        $proposal = $stmtProp->fetch();
+
+        $days = 30;
+        if ($proposal && !empty($proposal['start_date']) && !empty($proposal['end_date'])) {
+            $d1 = new DateTime($proposal['start_date']);
+            $d2 = new DateTime($proposal['end_date']);
+            $days = $d1->diff($d2)->days + 1;
+        }
+
         $stmtSite = $pdo->prepare("SELECT card_rate, purchase_rate FROM sites WHERE id = ?");
-        $stmtItem = $pdo->prepare("INSERT INTO proposal_items (proposal_id, site_id, sale_rate, purchase_rate, margin_pct, amount, days, selected_image) VALUES (?, ?, ?, ?, ?, ?, 30, ?)");
+        $stmtItem = $pdo->prepare("INSERT INTO proposal_items (proposal_id, site_id, sale_rate, purchase_rate, margin_pct, amount, days, selected_image) VALUES (?, ?, ?, ?, ?, ?, ?, ?)");
 
         foreach ($sitesData as $s) {
             $sid = intval($s['id']);
@@ -35,7 +46,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 $pRate = floatval($site['purchase_rate']);
                 $sRate = floatval($site['card_rate']); // Default to card rate
                 $margin = $pRate > 0 ? (($sRate - $pRate) / $pRate * 100) : 0;
-                $stmtItem->execute([$propId, $sid, $sRate, $pRate, $margin, $sRate, $img]);
+                $stmtItem->execute([$propId, $sid, $sRate, $pRate, $margin, $sRate, $days, $img]);
             }
         }
 

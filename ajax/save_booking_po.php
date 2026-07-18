@@ -100,9 +100,17 @@ try {
         $pdo->prepare("DELETE FROM po_items WHERE po_id = ?")->execute([$poId]);
         
         $poNum = $pdo->query("SELECT po_number FROM purchase_orders WHERE id = $poId")->fetchColumn();
+
+        // Create/Refresh approval request for non-admin on edit/re-save
+        if (!$isAdmin) {
+            $pdo->prepare("DELETE FROM approval_requests WHERE entity_type = 'purchase_order' AND entity_id = ? AND status = 'pending'")
+                ->execute([$poId]);
+            $stmtAR = $pdo->prepare("INSERT INTO approval_requests (entity_type, entity_id, entity_ref, requested_by, status) VALUES ('purchase_order', ?, ?, ?, 'pending')");
+            $stmtAR->execute([$poId, $poNum, $_SESSION['user_id'] ?? 0]);
+        }
     } else {
         // 5. Generate PO Number
-        $poNum = 'BPO-' . date('Ymd') . '-' . rand(100, 999);
+        $poNum = generateSequenceNumber($pdo, 'vendor_booking_po');
 
         // 6. Insert PO
         $stmtPO = $pdo->prepare("

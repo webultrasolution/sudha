@@ -54,15 +54,19 @@ try {
     $tax = $taxable * 0.18;
     $grand = $taxable + $tax;
 
-    $stmtUpdate = $pdo->prepare("UPDATE proposals SET total_amount = ?, tax_amount = ?, grand_total = ? WHERE id = ?");
-    $stmtUpdate->execute([$newSubtotal, $tax, $grand, $proposalId]);
-
-    // Revert proposal to pending_approval if non-admin deleted an item from an approved proposal
-    $isAdmin = ($_SESSION['user_role'] ?? '') === 'admin';
-    if (!$isAdmin) {
-        $propRef = $pdo->query("SELECT proposal_number FROM proposals WHERE id = $proposalId")->fetchColumn();
-        revertToPendingOnEdit($pdo, 'proposals', $proposalId, 'proposal', $propRef, $_SESSION['user_id'] ?? 0);
+    // Recalculate proposal start and end dates from its remaining items
+    $stmtMinMax = $pdo->prepare("SELECT MIN(start_date) as min_start, MAX(end_date) as max_end FROM proposal_items WHERE proposal_id = ?");
+    $stmtMinMax->execute([$proposalId]);
+    $minMax = $stmtMinMax->fetch();
+    $newStart = $minMax['min_start'] ?: null;
+    $newEnd = $minMax['max_end'] ?: null;
+    $newDays = null;
+    if (!empty($newStart) && !empty($newEnd)) {
+        $newDays = max(1, ceil((strtotime($newEnd) - strtotime($newStart)) / 86400) + 1);
     }
+
+    $stmtUpdate = $pdo->prepare("UPDATE proposals SET total_amount = ?, tax_amount = ?, grand_total = ?, start_date = ?, end_date = ?, total_days = ? WHERE id = ?");
+    $stmtUpdate->execute([$newSubtotal, $tax, $grand, $newStart, $newEnd, $newDays, $proposalId]);
 
     echo json_encode(['success' => true]);
 } catch (PDOException $e) {

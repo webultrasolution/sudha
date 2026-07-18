@@ -64,7 +64,12 @@ include_once __DIR__ . '/../../includes/header.php';
 $search = $_GET['search'] ?? '';
 $status_filter = $_GET['status'] ?? '';
 
-$query = "SELECT * FROM partners WHERE type = 'client'";
+$query = "SELECT *, 
+            (SELECT COUNT(*) FROM bookings b WHERE b.client_id = partners.id) as total_bookings,
+            (SELECT COALESCE(SUM(i.total_amount), 0) FROM invoices i JOIN bookings b ON i.booking_id = b.id WHERE b.client_id = partners.id AND i.approval_status = 'approved') as total_invoiced,
+            (SELECT COALESCE(SUM(p.amount), 0) FROM payments p WHERE p.partner_id = partners.id AND p.type = 'receivable' AND p.approval_status = 'approved') as total_paid
+          FROM partners 
+          WHERE type = 'client'";
 $params = [];
 
 if ($search) {
@@ -113,14 +118,12 @@ $indian_states = ["Andhra Pradesh", "Arunachal Pradesh", "Assam", "Bihar", "Chha
     <table class="table">
         <thead>
             <tr>
-            <tr>
                 <th>Client Details</th>
                 <th>Primary Contact</th>
                 <th>Tax Credentials</th>
                 <th>Location</th>
                 <th>Status</th>
                 <th style="text-align: right;">Actions</th>
-            </tr>
             </tr>
         </thead>
         <tbody>
@@ -131,6 +134,18 @@ $indian_states = ["Andhra Pradesh", "Arunachal Pradesh", "Assam", "Bihar", "Chha
                         <div style="font-weight: 700; color: var(--primary);"><?php echo $c['name']; ?></div>
                         <div style="font-size: 0.7rem; color: #64748b; font-weight: 700; margin-bottom: 2px;"><?php echo $c['business_type'] ?: 'N/A'; ?></div>
                         <div style="font-size: 0.7rem; color: #94a3b8; font-weight: 600;">ID: CL-<?php echo str_pad($c['id'], 4, '0', STR_PAD_LEFT); ?></div>
+                        <div style="margin-top: 5px; display: flex; gap: 8px; flex-wrap: wrap;">
+                            <span style="font-size: 0.65rem; background: #e0f2fe; color: #0369a1; padding: 2px 6px; border-radius: 4px; font-weight: 700;"><i class="fas fa-bullhorn"></i> <?php echo $c['total_bookings']; ?> Bookings</span>
+                            <?php 
+                            $outstanding = $c['total_invoiced'] - $c['total_paid'];
+                            if ($outstanding > 0): ?>
+                                <span style="font-size: 0.65rem; background: #fee2e2; color: #b91c1c; padding: 2px 6px; border-radius: 4px; font-weight: 700;"><i class="fas fa-exclamation-circle"></i> Bal: <?php echo formatCurrency($outstanding); ?></span>
+                            <?php elseif ($outstanding < 0): ?>
+                                <span style="font-size: 0.65rem; background: #ecfdf5; color: #047857; padding: 2px 6px; border-radius: 4px; font-weight: 700;"><i class="fas fa-arrow-down"></i> Adv: <?php echo formatCurrency(abs($outstanding)); ?></span>
+                            <?php else: ?>
+                                <span style="font-size: 0.65rem; background: #f1f5f9; color: #475569; padding: 2px 6px; border-radius: 4px; font-weight: 700;"><i class="fas fa-check-circle"></i> Clear</span>
+                            <?php endif; ?>
+                        </div>
                     </a>
                 </td>
                 <td>

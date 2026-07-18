@@ -75,24 +75,27 @@ try {
             $subtotal += $item['cost'];
         }
 
-        // Check if vendor has GSTIN in database
-        $stmtGst = $pdo->prepare("SELECT gstin FROM partners WHERE id = ?");
+        // Check if vendor has GSTIN and state in database
+        $stmtGst = $pdo->prepare("SELECT gstin, state FROM partners WHERE id = ?");
         $stmtGst->execute([$vid]);
-        $db_vendor_gst = trim($stmtGst->fetchColumn() ?: '');
+        $vendorRow = $stmtGst->fetch(PDO::FETCH_ASSOC);
+        $db_vendor_gst = trim($vendorRow['gstin'] ?? '');
+        $vendor_state = trim($vendorRow['state'] ?? '');
         $vendor_has_gst = vendorHasGST($db_vendor_gst);
 
         $cgst = 0; $sgst = 0; $igst = 0;
         if ($vendor_has_gst) {
-            if ($tax_type === 'cgst_sgst') {
+            $isVendorInterstate = (strcasecmp($vendor_state, 'West Bengal') !== 0 && substr($db_vendor_gst, 0, 2) !== '19');
+            if ($isVendorInterstate) {
+                $igst = $subtotal * 0.18;
+            } else {
                 $cgst = $subtotal * 0.09;
                 $sgst = $subtotal * 0.09;
-            } else {
-                $igst = $subtotal * 0.18;
             }
         }
         $grandTotal = $subtotal + $cgst + $sgst + $igst;
 
-        $poNum = 'PRT-' . date('Ymd') . '-' . rand(100, 999);
+        $poNum = generateSequenceNumber($pdo, 'vendor_printing_po');
 
         // Admin approves instantly; non-admin goes to queue
         $poStatus       = $isAdmin ? 'approved' : 'pending';

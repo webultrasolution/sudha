@@ -1,335 +1,546 @@
 <?php
-$activePage = 'dashboard';
-$pageTitle = 'Business Intelligence Dashboard';
-include_once __DIR__ . '/includes/header.php';
+session_start();
+require_once __DIR__ . '/config/db.php';
+require_once __DIR__ . '/includes/functions.php';
 
-// Check Dashboard Specific Permission
-if (!canView('dashboard')) {
-    echo "<div class='card' style='padding: 4rem 2rem; text-align: center; border-radius: 16px; margin: 3rem auto; max-width: 600px; box-shadow: 0 10px 30px rgba(0,0,0,0.05); border: none; background: white;'>
-        <div style='background: #fee2e2; color: #ef4444; width: 80px; height: 80px; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 2.5rem; margin: 0 auto 2rem;'>
-            <i class='fas fa-lock'></i>
-        </div>
-        <h2 style='color: #0f172a; font-weight: 800; font-size: 1.75rem; margin: 0 0 0.5rem 0;'>Dashboard Locked</h2>
-        <p style='color: #64748b; line-height: 1.6; margin: 0 0 2rem 0; font-size: 0.95rem;'>Your current user role does not have authorization to view the Business Intelligence Dashboard. Please use the sidebar to navigate to your assigned modules.</p>
-        <div style='display: flex; justify-content: center; gap: 1rem;'>
-            <a href='modules/inventory/sites.php' class='btn btn-secondary' style='font-weight: 700; border-radius: 8px; padding: 0.6rem 1.25rem; font-size: 0.85rem; text-decoration: none; display: inline-flex; align-items: center; gap: 6px;'><i class='fas fa-map-marked-alt'></i> View Sites</a>
-            <a href='modules/proposals/proposals.php' class='btn btn-primary' style='font-weight: 700; border-radius: 8px; padding: 0.6rem 1.25rem; font-size: 0.85rem; text-decoration: none; display: inline-flex; align-items: center; gap: 6px;'><i class='fas fa-file-contract'></i> Proposals</a>
-        </div>
-    </div>";
-    include_once __DIR__ . '/includes/footer.php';
-    exit;
+// Resolve company info
+$comp = resolveCompanyDetails();
+
+// Dynamic login context
+$isLoggedIn = isset($_SESSION['user_id']);
+$portalUrl = $isLoggedIn ? 'dashboard.php' : 'login.php';
+$portalText = $isLoggedIn ? 'Go to Dashboard' : 'CRM Login';
+
+// Create contact_leads table if it doesn't exist
+try {
+    $pdo->exec("CREATE TABLE IF NOT EXISTS contact_leads (
+        id INT AUTO_INCREMENT PRIMARY KEY,
+        name VARCHAR(255) NOT NULL,
+        email VARCHAR(255) NOT NULL,
+        phone VARCHAR(50),
+        subject VARCHAR(255),
+        message TEXT,
+        status VARCHAR(50) DEFAULT 'pending',
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+    ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;");
+} catch (Exception $e) {
+    // Fail silently in production or log error
+    error_log("Failed to create contact_leads table: " . $e->getMessage());
 }
 
-$canViewFinancials = canView('financials');
-$canViewInventory = canView('inventory');
-$canViewProposals = canView('proposals');
-$canViewBookings = canView('bookings');
+$successMsg = '';
+$errorMsg = '';
 
-$revenue = 0;
-$cost = 0;
-$profit = 0;
-$margin = 0;
-$chartLabels = '[]';
-$chartRevenue = '[]';
-$chartProfit = '[]';
+// Handle form submission
+if ($_SERVER['REQUEST_METHOD'] == 'POST' && isset($_POST['action']) && $_POST['action'] === 'submit_lead') {
+    $name = clean($_POST['name'] ?? '');
+    $email = clean($_POST['email'] ?? '');
+    $phone = clean($_POST['phone'] ?? '');
+    $subject = clean($_POST['subject'] ?? '');
+    $message = clean($_POST['message'] ?? '');
 
-if ($canViewFinancials) {
-    // Financial Data
-    $finStats = $pdo->query("
-        SELECT 
-            SUM(amount) as revenue,
-            SUM(purchase_rate * days) as cost,
-            SUM((sale_rate - purchase_rate) * days) as profit
-        FROM proposal_items 
-        JOIN proposals ON proposal_items.proposal_id = proposals.id
-        WHERE proposals.status != 'cancelled'
-    ")->fetch();
-
-    $revenue = $finStats['revenue'] ?: 0;
-    $cost = $finStats['cost'] ?: 0;
-    $profit = $finStats['profit'] ?: 0;
-    $margin = $revenue > 0 ? ($profit / $revenue) * 100 : 0;
-
-    // Monthly Data for Chart
-    $monthlyData = $pdo->query("
-        SELECT DATE_FORMAT(p.created_at, '%b %Y') as month, SUM(pi.amount) as rev, SUM((pi.sale_rate - pi.purchase_rate) * pi.days) as prof
-        FROM proposals p JOIN proposal_items pi ON p.id = pi.proposal_id
-        WHERE p.status != 'cancelled' GROUP BY month ORDER BY p.created_at ASC LIMIT 6
-    ")->fetchAll();
-
-    $chartLabels = json_encode(array_column($monthlyData, 'month'));
-    $chartRevenue = json_encode(array_column($monthlyData, 'rev'));
-    $chartProfit = json_encode(array_column($monthlyData, 'prof'));
-}
-
-$totalSites = 1;
-$bookedSites = 0;
-if ($canViewInventory) {
-    $totalSites = $pdo->query("SELECT COUNT(*) FROM sites")->fetchColumn() ?: 1;
-    $bookedSites = $pdo->query("SELECT COUNT(*) FROM sites WHERE status = 'booked'")->fetchColumn();
+    if (empty($name) || empty($email) || empty($message)) {
+        $errorMsg = 'Please fill in all required fields (Name, Email, and Message).';
+    } elseif (!filter_var($email, FILTER_VALIDATE_EMAIL)) {
+        $errorMsg = 'Please enter a valid email address.';
+    } else {
+        try {
+            $stmt = $pdo->prepare("INSERT INTO contact_leads (name, email, phone, subject, message) VALUES (?, ?, ?, ?, ?)");
+            $stmt->execute([$name, $email, $phone, $subject, $message]);
+            $successMsg = 'Thank you! Your message has been sent successfully. We will get back to you shortly.';
+        } catch (Exception $e) {
+            $errorMsg = 'Something went wrong. Please try again later.';
+            error_log("Database insertion failed for contact_lead: " . $e->getMessage());
+        }
+    }
 }
 ?>
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Suudha Creative & Advertising | Premium OOH & DOOH Media Agency</title>
+    
+    <!-- PWA manifest -->
+    <link rel="manifest" href="manifest.json">
+    <meta name="theme-color" content="#7b161c">
+    
+    <!-- CSS Styles -->
+    <link rel="stylesheet" href="assets/css/landing.css">
+    
+    <!-- FontAwesome for icons -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    
+    <!-- Google Fonts -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&family=Outfit:wght@400;600;700;800&display=swap" rel="stylesheet">
+</head>
+<body>
 
-<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <!-- Header / Navigation -->
+    <header class="landing-header" id="header">
+        <div class="nav-container">
+            <a href="#" class="brand-logo">
+                <img src="assets/images/sudha_logo.jpg" alt="Suudha Creative & Advertising Logo">
+            </a>
+            
+            <button class="menu-toggle" id="menuToggle" aria-label="Toggle Navigation">
+                <i class="fas fa-bars"></i>
+            </button>
+            
+            <ul class="nav-menu" id="navMenu">
+                <li><a href="#home" class="active">Home</a></li>
+                <li><a href="#about">About</a></li>
+                <li><a href="#offerings">Offerings</a></li>
+                <li><a href="#portfolio">Portfolio</a></li>
+                <li><a href="#presence">Presence</a></li>
+                <li><a href="#testimonials">Testimonials</a></li>
+                <li><a href="#contact">Contact</a></li>
+                <li><a href="<?php echo $portalUrl; ?>" class="nav-cta"><i class="fas fa-user-lock"></i> <?php echo $portalText; ?></a></li>
+            </ul>
+        </div>
+    </header>
 
-<div class="dashboard-container" style="padding: 10px;">
-    <!-- Row 1: Metrics -->
-    <div class="metrics-grid">
-        <?php if ($canViewFinancials): ?>
-        <div class="metric-card g-blue">
-            <div class="m-content">
-                <i class="fas fa-chart-line"></i>
-                <div class="m-data"><span>Revenue</span><h3><?php echo formatCurrency($revenue); ?></h3></div>
+    <!-- Hero Section -->
+    <section class="hero-section" id="home">
+        <div class="hero-container">
+            <div class="hero-content animate-slide">
+                <span class="hero-tag">Welcome to Suudha Creative</span>
+                <h1 class="hero-title">Elevate Your Brand with <span>Premium Out-Of-Home</span> Advertising</h1>
+                <p class="hero-desc">We connect brands with target audiences through high-impact outdoor media solutions, including state-of-the-art DOOH, airport branding, transit media, and traditional billboards.</p>
+                <div class="hero-actions">
+                    <a href="#portfolio" class="btn btn-primary">Explore Media Sites</a>
+                    <a href="#contact" class="btn btn-outline">Request a Proposal</a>
+                </div>
+            </div>
+            <div class="hero-visual animate-fade">
+                <div class="hero-visual-bg"></div>
+                <img src="assets/images/billboard_mockup_1.png" alt="OOH Advertising Billboard Mockup" class="hero-image">
             </div>
         </div>
-        <div class="metric-card g-orange">
-            <div class="m-content">
-                <i class="fas fa-shopping-cart"></i>
-                <div class="m-data"><span>Cost</span><h3><?php echo formatCurrency($cost); ?></h3></div>
-            </div>
-        </div>
-        <div class="metric-card g-green">
-            <div class="m-content">
-                <i class="fas fa-wallet"></i>
-                <div class="m-data"><span>Profit</span><h3><?php echo formatCurrency($profit); ?></h3></div>
-            </div>
-            <div class="m-mini-badge"><?php echo number_format($margin, 1); ?>%</div>
-        </div>
-        <?php endif; ?>
-        
-        <?php if ($canViewInventory): ?>
-        <div class="metric-card g-purple">
-            <div class="m-content">
-                <i class="fas fa-map-marker-alt"></i>
-                <div class="m-data"><span>Occupancy</span><h3><?php echo $bookedSites; ?> / <?php echo $totalSites; ?></h3></div>
-            </div>
-        </div>
-        <?php endif; ?>
-    </div>
+    </section>
 
-    <!-- Row 2: Charts -->
-    <div class="charts-row" style="<?php echo !$canViewFinancials ? 'grid-template-columns: 1fr;' : ''; ?>">
-        <?php if ($canViewFinancials): ?>
-        <div class="chart-box main-chart">
-            <div class="box-header"><h4>Revenue vs Profit Analytics</h4></div>
-            <div class="chart-wrapper"><canvas id="revenueChart"></canvas></div>
-        </div>
-        <?php endif; ?>
-        
-        <?php if ($canViewInventory): ?>
-        <div class="chart-box mini-chart">
-            <div class="box-header"><h4>Media Type Distribution</h4></div>
-            <div class="chart-wrapper"><canvas id="typeChart"></canvas></div>
-            <?php
-            $typeData = $pdo->query("SELECT type, COUNT(*) as count FROM sites GROUP BY type")->fetchAll();
-            $typeLabels = json_encode(array_column($typeData, 'type'));
-            $typeCounts = json_encode(array_column($typeData, 'count'));
-            ?>
-        </div>
-        <?php endif; ?>
-    </div>
-
-    <!-- Row 3: Tables & Details -->
-    <div class="details-row" style="<?php 
-        $cols = 0;
-        if ($canViewFinancials) $cols++;
-        if ($canViewInventory) $cols += 2; // Vendor sources & Inventory Status
-        echo "grid-template-columns: repeat($cols, 1fr);";
-    ?>">
-        <!-- Top Proposals -->
-        <?php if ($canViewFinancials): ?>
-        <div class="table-box">
-            <div class="box-header"><h4>Top Proposals</h4></div>
-            <table class="modern-table">
-                <thead><tr><th>Proposal</th><th>Revenue</th><th>Profit</th></tr></thead>
-                <tbody>
-                    <?php 
-                    $topP = $pdo->query("
-                        SELECT p.proposal_number, SUM(pi.amount) as rev, SUM((pi.sale_rate-pi.purchase_rate)*pi.days) as prof
-                        FROM proposals p JOIN proposal_items pi ON p.id=pi.proposal_id
-                        WHERE p.status != 'cancelled' GROUP BY p.id ORDER BY prof DESC LIMIT 5
-                    ")->fetchAll();
-                    foreach($topP as $tp): ?>
-                    <tr><td><strong><?php echo $tp['proposal_number']; ?></strong></td><td><?php echo formatCurrency($tp['rev']); ?></td><td style="color:#10b981; font-weight:800;">+<?php echo formatCurrency($tp['prof']); ?></td></tr>
-                    <?php endforeach; ?>
-                </tbody>
-            </table>
-        </div>
-        <?php endif; ?>
-
-        <!-- Vendor Progress -->
-        <?php if ($canViewInventory): ?>
-        <div class="table-box">
-            <div class="box-header"><h4>Vendor Sources</h4></div>
-            <div class="vendor-grid">
-                <?php
-                $topVendors = $pdo->query("
-                    SELECT p.name, COUNT(s.id) as site_count FROM partners p 
-                    JOIN sites s ON p.id = s.vendor_id WHERE p.type='vendor' 
-                    GROUP BY p.id ORDER BY site_count DESC LIMIT 4
-                ")->fetchAll();
-                foreach($topVendors as $v): ?>
-                <div class="v-item">
-                    <div style="display:flex; justify-content:space-between; margin-bottom:5px;">
-                        <span style="font-size:0.75rem; font-weight:700;"><?php echo $v['name']; ?></span>
-                        <span style="font-size:0.75rem; font-weight:800;"><?php echo $v['site_count']; ?></span>
+    <!-- Vision & About Section -->
+    <section class="section" id="about">
+        <div class="section-container">
+            <div class="vision-grid">
+                <div class="vision-image-box">
+                    <img src="assets/images/billboard_mockup_2.png" alt="DOOH Media Screen Showcase" class="vision-img">
+                    <div class="experience-badge">
+                        <h4>15+</h4>
+                        <p>Years of Media Excellence</p>
                     </div>
-                    <div class="v-bar"><div class="v-fill" style="width: <?php echo ($v['site_count']/$totalSites)*100; ?>%;"></div></div>
                 </div>
-                <?php endforeach; ?>
-            </div>
-        </div>
-
-        <!-- Status -->
-        <div class="table-box">
-            <div class="box-header"><h4>Inventory Status</h4></div>
-            <div class="chart-wrapper"><canvas id="statusChart"></canvas></div>
-        </div>
-        <?php endif; ?>
-    </div>
-
-    <!-- Row 4: Footer Polished Row -->
-    <div class="polished-footer" style="<?php 
-        $footCols = 1; // Quick Links is always visible
-        if ($canViewFinancials) $footCols++; // Top Clients
-        if (hasRole('admin')) $footCols++; // System Activity is admin only
-        echo "grid-template-columns: repeat($footCols, 1fr);";
-    ?>">
-        <?php if ($canViewFinancials): ?>
-        <div class="footer-card">
-            <h5><i class="fas fa-crown"></i> Top Clients</h5>
-            <div class="client-list">
-                <?php
-                $topClients = $pdo->query("
-                    SELECT p.name, SUM(pr.grand_total) as total_spend 
-                    FROM partners p JOIN proposals pr ON p.id = pr.client_id 
-                    WHERE p.type='client' AND pr.status='confirmed'
-                    GROUP BY p.id ORDER BY total_spend DESC LIMIT 3
-                ")->fetchAll();
-                foreach($topClients as $c): ?>
-                <div class="client-mini">
-                    <div class="c-icon"><?php echo substr($c['name'],0,1); ?></div>
-                    <div class="c-info"><strong><?php echo $c['name']; ?></strong><p><?php echo formatCurrency($c['total_spend']); ?></p></div>
+                <div class="vision-content">
+                    <span class="section-tag">About Our Company</span>
+                    <h3>Creating High Impact Campaigns Across Eastern India</h3>
+                    <p>Suudha Creative & Advertising (OPC) Private Limited is a leading media agency specialized in Out-of-Home (OOH) marketing, printing operations, and retail branding. Our mission is to provide businesses of all scales with the visibility they need to succeed in a highly competitive market.</p>
+                    <p>With deep regional expertise and prime site holdings across West Bengal, Bihar, and Jharkhand, we design, produce, print, and install advertisements that command attention and drive measurable brand recall.</p>
+                    
+                    <ul class="value-list">
+                        <li class="value-item">
+                            <div class="value-icon"><i class="fas fa-check"></i></div>
+                            <div class="value-text">
+                                <h5>Prime Media Locations</h5>
+                                <p>We offer media slots at high-traffic nodes, highways, airports, and major retail hubs.</p>
+                            </div>
+                        </li>
+                        <li class="value-item">
+                            <div class="value-icon"><i class="fas fa-check"></i></div>
+                            <div class="value-text">
+                                <h5>In-House Print Operations</h5>
+                                <p>End-to-end production control using top-tier printing machinery ensures maximum color fidelity and durability.</p>
+                            </div>
+                        </li>
+                        <li class="value-item">
+                            <div class="value-icon"><i class="fas fa-check"></i></div>
+                            <div class="value-text">
+                                <h5>Digital Innovation (DOOH)</h5>
+                                <p>Vibrant digital screens offering scheduled, high-frequency slots with smart scheduling analytics.</p>
+                            </div>
+                        </li>
+                    </ul>
                 </div>
-                <?php endforeach; ?>
             </div>
         </div>
-        <?php endif; ?>
+    </section>
+
+    <!-- Offerings Section -->
+    <section class="section section-bg" id="offerings">
+        <div class="section-container">
+            <div class="section-header">
+                <span class="section-tag">Our Services</span>
+                <h2 class="section-title">Comprehensive Advertising Solutions</h2>
+                <p class="section-desc">From strategy to installation, we handle all facets of outdoor media deployment to deliver a seamless brand campaign.</p>
+            </div>
+            
+            <div class="services-grid">
+                <div class="service-card">
+                    <div class="service-icon"><i class="fas fa-plane-departure"></i></div>
+                    <h4>Airport Advertising</h4>
+                    <p>Reach premium business and leisure travelers through high-dwell-time assets, lounge branding, baggage belt ads, and digital displays inside airport terminals.</p>
+                </div>
+                
+                <div class="service-card">
+                    <div class="service-icon"><i class="fas fa-tv"></i></div>
+                    <h4>Digital Out-of-Home (DOOH)</h4>
+                    <p>Dynamic digital displays that command high attention, allowing programmatic shifts, dayparting, and multi-creative syncs in urban marketplaces.</p>
+                </div>
+                
+                <div class="service-card">
+                    <div class="service-icon"><i class="fas fa-road"></i></div>
+                    <h4>Billboards & Unipoles</h4>
+                    <p>Classic high-impact traditional and back-lit billboards placed at critical traffic intersections, flyovers, and major state and national highways.</p>
+                </div>
+                
+                <div class="service-card">
+                    <div class="service-icon"><i class="fas fa-train"></i></div>
+                    <h4>Transit & Metro Media</h4>
+                    <p>Capture moving commuters with wrap-around branding on trains, buses, and metro platforms, ensuring continuous exposure.</p>
+                </div>
+                
+                <div class="service-card">
+                    <div class="service-icon"><i class="fas fa-print"></i></div>
+                    <h4>Creative Printing & Production</h4>
+                    <p>Flawless in-house print production of banners, vinyl sheets, flexes, and mounting structures utilizing strict quality testing protocols.</p>
+                </div>
+                
+                <div class="service-card">
+                    <div class="service-icon"><i class="fas fa-bullhorn"></i></div>
+                    <h4>Exhibition & Event Branding</h4>
+                    <p>Custom fabrication, exhibition stalls, kiosks, and venue branding solutions to provide an immersive experience during major corporate events.</p>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <!-- Portfolio Section -->
+    <section class="section" id="portfolio">
+        <div class="section-container">
+            <div class="section-header">
+                <span class="section-tag">Media Gallery</span>
+                <h2 class="section-title">Featured Media Deployments</h2>
+                <p class="section-desc">Take a look at some of our actual billboard installations and premium advertising placements.</p>
+            </div>
+            
+            <div class="portfolio-grid">
+                <div class="portfolio-card">
+                    <img src="assets/images/billboard_mockup_1.png" alt="Highway Unipole Billboard Placement">
+                    <div class="portfolio-overlay">
+                        <span class="portfolio-tag">Billboard</span>
+                        <h4>Premium National Highway Unipole</h4>
+                        <p>High-visibility outdoor structure capturing regional interstate traffic.</p>
+                    </div>
+                </div>
+                
+                <div class="portfolio-card">
+                    <img src="assets/images/billboard_mockup_2.png" alt="Urban DOOH Screen Installation">
+                    <div class="portfolio-overlay">
+                        <span class="portfolio-tag">DOOH</span>
+                        <h4>Urban Digital LED Screen</h4>
+                        <p>Lively, high-frequency digital screen located in the city center retail district.</p>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <!-- Presence / Reach Section -->
+    <section class="section section-bg" id="presence">
+        <div class="section-container">
+            <div class="presence-grid">
+                <div class="presence-info-box">
+                    <span class="section-tag">Our Coverage</span>
+                    <h3 class="section-title" style="font-size: 2.25rem;">Extensive Regional Footprint</h3>
+                    <p class="section-desc" style="margin-bottom: 2rem;">We boast an extensive network of advertising sites across key commercial zones in Eastern India, giving your brand maximum reach and regional impact.</p>
+                    
+                    <div class="presence-list">
+                        <div class="presence-item">
+                            <div class="presence-info">
+                                <h5>North Bengal & Siliguri</h5>
+                                <p>Gateways to Northeast India and international trade channels.</p>
+                            </div>
+                            <span class="presence-count">120+ Sites</span>
+                        </div>
+                        
+                        <div class="presence-item">
+                            <div class="presence-info">
+                                <h5>Malda & Central Bengal</h5>
+                                <p>Major commercial hubs and bypass expressways.</p>
+                            </div>
+                            <span class="presence-count">80+ Sites</span>
+                        </div>
+                        
+                        <div class="presence-item">
+                            <div class="presence-info">
+                                <h5>Kolkata & South Bengal</h5>
+                                <p>Corporate networks, metro grids, and high-street shopping zones.</p>
+                            </div>
+                            <span class="presence-count">150+ Sites</span>
+                        </div>
+                        
+                        <div class="presence-item">
+                            <div class="presence-info">
+                                <h5>Bihar & Jharkhand</h5>
+                                <p>Key railway junctions and high-traffic national highways.</p>
+                            </div>
+                            <span class="presence-count">95+ Sites</span>
+                        </div>
+                    </div>
+                </div>
+                
+                <div class="presence-map">
+                    <div style="background: rgba(123, 22, 28, 0.05); padding: 4rem 2rem; border-radius: 16px; border: 2px dashed rgba(123, 22, 28, 0.2);">
+                        <i class="fas fa-map-location-dot" style="font-size: 4rem; color: var(--primary); margin-bottom: 1.5rem;"></i>
+                        <h4 style="margin-bottom: 1rem;">OOH & DOOH Inventory Mapping</h4>
+                        <p style="color: var(--text-muted); font-size: 0.95rem; margin-bottom: 2rem;">Access interactive GIS map coordinates and real-time site availability reports inside our CRM workspace.</p>
+                        <a href="<?php echo $portalUrl; ?>" class="btn btn-primary" style="padding: 0.75rem 1.5rem; font-size: 0.9rem;"><i class="fas fa-search-location"></i> View Live Site Inventory</a>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <!-- Testimonials Section -->
+    <section class="section" id="testimonials">
+        <div class="section-container">
+            <div class="section-header">
+                <span class="section-tag">Client Feedback</span>
+                <h2 class="section-title">Trusted by Top Brands</h2>
+                <p class="section-desc">Read why businesses trust Suudha Creative to execute their high-impact marketing campaigns.</p>
+            </div>
+            
+            <div class="testimonials-slider">
+                <div class="testimonial-card">
+                    <div class="stars">
+                        <i class="fas fa-star"></i><i class="fas fa-star"></i><i class="fas fa-star"></i><i class="fas fa-star"></i><i class="fas fa-star"></i>
+                    </div>
+                    <p class="testimonial-text">"Suudha Creative helped us execute a complex, multi-city OOH campaign seamlessly. Their sites are in premium locations, and their in-house print quality is exceptional."</p>
+                    <div class="client-profile">
+                        <div class="client-name">
+                            <h5>Rajesh Sharma</h5>
+                            <p>Regional Marketing Head, Telecom Enterprise</p>
+                        </div>
+                    </div>
+                </div>
+                
+                <div class="testimonial-card">
+                    <div class="stars">
+                        <i class="fas fa-star"></i><i class="fas fa-star"></i><i class="fas fa-star"></i><i class="fas fa-star"></i><i class="fas fa-star"></i>
+                    </div>
+                    <p class="testimonial-text">"The digital billboard network (DOOH) provided by Suudha Creative delivered outstanding brand recall. The scheduling process was highly flexible and analytics were accurate."</p>
+                    <div class="client-profile">
+                        <div class="client-name">
+                            <h5>Ananya Sen</h5>
+                            <p>Brand Manager, Premium FMCG Group</p>
+                        </div>
+                    </div>
+                </div>
+                
+                <div class="testimonial-card">
+                    <div class="stars">
+                        <i class="fas fa-star"></i><i class="fas fa-star"></i><i class="fas fa-star"></i><i class="fas fa-star"></i><i class="fas fa-star"></i>
+                    </div>
+                    <p class="testimonial-text">"Outstanding client support! They managed our airport advertising rollout from creative design checks to installation with absolute professionalism. Highly recommended."</p>
+                    <div class="client-profile">
+                        <div class="client-name">
+                            <h5>Vikram Adhikari</h5>
+                            <p>Director, Real Estate Development Corp</p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <!-- Contact & Lead Form Section -->
+    <section class="section section-bg" id="contact">
+        <div class="section-container">
+            <div class="contact-grid">
+                <div class="contact-info-box">
+                    <div>
+                        <span class="section-tag">Get In Touch</span>
+                        <h2 class="section-title">Ready to Start Your Campaign?</h2>
+                        <p class="section-desc" style="margin-bottom: 2rem;">Contact our media planners today to draft a tailored media strategy for your brand's growth.</p>
+                    </div>
+                    
+                    <div class="contact-method">
+                        <div class="contact-icon"><i class="fas fa-map-marker-alt"></i></div>
+                        <div class="contact-text">
+                            <h5>Registered Address</h5>
+                            <p><?php echo htmlspecialchars($comp['address']); ?></p>
+                        </div>
+                    </div>
+                    
+                    <div class="contact-method">
+                        <div class="contact-icon"><i class="fas fa-phone-alt"></i></div>
+                        <div class="contact-text">
+                            <h5>Call Us</h5>
+                            <p><a href="tel:<?php echo htmlspecialchars($comp['phone']); ?>">+91 <?php echo htmlspecialchars($comp['phone']); ?></a></p>
+                            <p>Operational Hours: Mon - Sat (10:00 AM - 7:00 PM)</p>
+                        </div>
+                    </div>
+                    
+                    <div class="contact-method">
+                        <div class="contact-icon"><i class="fas fa-envelope"></i></div>
+                        <div class="contact-text">
+                            <h5>Email Inquiries</h5>
+                            <p><a href="mailto:<?php echo htmlspecialchars($comp['email']); ?>"><?php echo htmlspecialchars($comp['email']); ?></a></p>
+                        </div>
+                    </div>
+                    
+                    <div style="margin-top: 1rem; padding-top: 2rem; border-top: 1px solid var(--border-color); font-size: 0.85rem; color: var(--text-muted);">
+                        <?php if (!empty($comp['gstin'])): ?>
+                            <p><strong>GSTIN:</strong> <?php echo htmlspecialchars($comp['gstin']); ?></p>
+                        <?php endif; ?>
+                        <?php if (!empty($comp['pan'])): ?>
+                            <p><strong>PAN:</strong> <?php echo htmlspecialchars($comp['pan']); ?></p>
+                        <?php endif; ?>
+                        <?php if (!empty($comp['msme_number'])): ?>
+                            <p><strong>MSME Reg No:</strong> <?php echo htmlspecialchars($comp['msme_number']); ?></p>
+                        <?php endif; ?>
+                    </div>
+                </div>
+                
+                <div class="contact-form-box">
+                    <h4 style="font-size: 1.5rem; margin-bottom: 2rem;">Send Us a Message</h4>
+                    
+                    <form action="#contact" method="POST">
+                        <input type="hidden" name="action" value="submit_lead">
+                        
+                        <div class="form-group">
+                            <label class="form-label" for="name">Your Name *</label>
+                            <input type="text" name="name" id="name" class="form-control" placeholder="Enter full name" required>
+                        </div>
+                        
+                        <div class="form-group-row">
+                            <div class="form-group">
+                                <label class="form-label" for="email">Email Address *</label>
+                                <input type="email" name="email" id="email" class="form-control" placeholder="name@company.com" required>
+                            </div>
+                            <div class="form-group">
+                                <label class="form-label" for="phone">Phone Number</label>
+                                <input type="tel" name="phone" id="phone" class="form-control" placeholder="10-digit mobile number">
+                            </div>
+                        </div>
+                        
+                        <div class="form-group">
+                            <label class="form-label" for="subject">Subject</label>
+                            <input type="text" name="subject" id="subject" class="form-control" placeholder="E.g., Highway hoardings inquiry">
+                        </div>
+                        
+                        <div class="form-group">
+                            <label class="form-label" for="message">Message *</label>
+                            <textarea name="message" id="message" class="form-control" placeholder="Describe your advertising campaign details..." required></textarea>
+                        </div>
+                        
+                        <button type="submit" class="btn btn-primary submit-btn">
+                            <span>Send Message</span>
+                            <i class="fas fa-paper-plane"></i>
+                        </button>
+                    </form>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <!-- Footer Section -->
+    <footer class="landing-footer">
+        <div class="footer-container">
+            <div class="footer-about">
+                <img src="assets/images/sudha_logo.jpg" alt="Suudha Creative & Advertising Footer Logo">
+                <p>Suudha Creative & Advertising (OPC) Private Limited is Eastern India's premium OOH & DOOH network partner, helping brands build connections that last.</p>
+            </div>
+            <div class="footer-links">
+                <h5>Core Offerings</h5>
+                <ul>
+                    <li><a href="#offerings">Airport Branding</a></li>
+                    <li><a href="#offerings">Digital OOH (DOOH)</a></li>
+                    <li><a href="#offerings">Highway Billboards</a></li>
+                    <li><a href="#offerings">Transit Advertising</a></li>
+                    <li><a href="#offerings">Flex & Banner Printing</a></li>
+                </ul>
+            </div>
+            <div class="footer-links">
+                <h5>Quick Navigation</h5>
+                <ul>
+                    <li><a href="#home">Home</a></li>
+                    <li><a href="#about">About Us</a></li>
+                    <li><a href="#portfolio">Our Portfolio</a></li>
+                    <li><a href="#presence">Media Reach</a></li>
+                    <li><a href="<?php echo $portalUrl; ?>"><?php echo $portalText; ?></a></li>
+                </ul>
+            </div>
+        </div>
         
-        <?php if (hasRole('admin')): ?>
-        <div class="footer-card">
-            <h5><i class="fas fa-history"></i> System Activity</h5>
-            <div class="activity-list">
-                <?php
-                $activities = $pdo->query("SELECT a.*, u.username FROM activity_log a JOIN users u ON a.user_id = u.id ORDER BY a.id DESC LIMIT 3")->fetchAll();
-                foreach($activities as $a): ?>
-                <div class="a-mini"><strong><?php echo $a['username']; ?></strong> <?php echo $a['action']; ?><span><?php echo date('h:i A', strtotime($a['created_at'])); ?></span></div>
-                <?php endforeach; ?>
-            </div>
+        <div class="footer-bottom">
+            <p>&copy; <?php echo date('Y'); ?> Suudha Creative & Advertising (OPC) Private Limited. All Rights Reserved.</p>
+            <p>Designed with <i class="fas fa-heart" style="color: var(--primary);"></i> | <a href="<?php echo $portalUrl; ?>" style="color: var(--accent); text-decoration: none; font-weight: bold;"><?php echo $portalText; ?></a></p>
         </div>
-        <?php endif; ?>
+    </footer>
+
+    <!-- Form Notification Alerts -->
+    <?php if ($successMsg): ?>
+        <div class="toast-msg" id="toastAlert">
+            <i class="fas fa-circle-check" style="font-size: 1.5rem;"></i>
+            <span><?php echo htmlspecialchars($successMsg); ?></span>
+        </div>
+    <?php elseif ($errorMsg): ?>
+        <div class="toast-msg toast-msg-error" id="toastAlert">
+            <i class="fas fa-circle-exclamation" style="font-size: 1.5rem;"></i>
+            <span><?php echo htmlspecialchars($errorMsg); ?></span>
+        </div>
+    <?php endif; ?>
+
+    <!-- JS Logic -->
+    <script>
+        // Header styling on scroll
+        const header = document.getElementById('header');
+        window.addEventListener('scroll', () => {
+            if (window.scrollY > 50) {
+                header.classList.add('scrolled');
+            } else {
+                header.classList.remove('scrolled');
+            }
+        });
+
+        // Mobile menu toggle
+        const menuToggle = document.getElementById('menuToggle');
+        const navMenu = document.getElementById('navMenu');
         
-        <div class="footer-card dark-card">
-            <h5>Quick Links</h5>
-            <div class="quick-links">
-                <?php if (canAdd('proposals')): ?>
-                <a href="modules/proposals/create.php"><i class="fas fa-plus"></i> New Proposal</a>
-                <?php endif; ?>
-                <?php if (canAdd('bookings')): ?>
-                <a href="modules/operations/direct_booking.php"><i class="fas fa-plus-circle"></i> Direct Booking</a>
-                <?php endif; ?>
-                <?php if (canView('inventory')): ?>
-                <a href="modules/inventory/sites.php"><i class="fas fa-th"></i> Inventory</a>
-                <?php endif; ?>
-            </div>
-        </div>
-    </div>
-</div>
+        menuToggle.addEventListener('click', () => {
+            navMenu.classList.toggle('open');
+            const icon = menuToggle.querySelector('i');
+            if (navMenu.classList.contains('open')) {
+                icon.className = 'fas fa-times';
+            } else {
+                icon.className = 'fas fa-bars';
+            }
+        });
 
-<style>
-.metrics-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 1.25rem; margin-bottom: 1.5rem; }
-.metric-card { padding: 1.25rem; border-radius: 16px; color: white; position: relative; box-shadow: 0 4px 15px rgba(0,0,0,0.1); }
-.m-content { display: flex; align-items: center; gap: 1rem; }
-.m-content i { font-size: 1.5rem; background: rgba(255,255,255,0.2); width: 45px; height: 45px; display: flex; align-items: center; justify-content: center; border-radius: 10px; }
-.m-data span { font-size: 0.7rem; opacity: 0.8; text-transform: uppercase; font-weight: 700; }
-.m-data h3 { font-size: 1.3rem; font-weight: 800; margin: 0; }
-.m-mini-badge { position: absolute; top: 10px; right: 10px; background: #10b981; padding: 2px 6px; border-radius: 50px; font-size: 0.6rem; font-weight: 800; }
-.g-blue { background: linear-gradient(135deg, #3b82f6, #1d4ed8); }
-.g-orange { background: linear-gradient(135deg, #f97316, #ea580c); }
-.g-green { background: linear-gradient(135deg, #10b981, #059669); }
-.g-purple { background: linear-gradient(135deg, #8b5cf6, #6d28d9); }
+        // Close menu when clicking links
+        const navLinks = document.querySelectorAll('.nav-menu a');
+        navLinks.forEach(link => {
+            link.addEventListener('click', () => {
+                navMenu.classList.remove('open');
+                const icon = menuToggle.querySelector('i');
+                icon.className = 'fas fa-bars';
+            });
+        });
 
-.charts-row { display: grid; grid-template-columns: 2fr 1fr; gap: 1.5rem; margin-bottom: 1.5rem; }
-.chart-box { background: white; padding: 1.5rem; border-radius: 20px; box-shadow: 0 4px 6px -1px rgba(0,0,0,0.05); }
-.box-header h4 { font-size: 0.9rem; font-weight: 800; color: #1e293b; margin-bottom: 1.5rem; border-bottom: 1px solid #f1f5f9; padding-bottom: 0.75rem; }
-.chart-wrapper { position: relative; width: 100%; height: 220px; }
-
-.details-row { display: grid; grid-template-columns: 1fr 1fr 0.8fr; gap: 1.5rem; margin-bottom: 1.5rem; }
-.table-box { background: white; padding: 1.5rem; border-radius: 20px; }
-.modern-table { width: 100%; border-collapse: collapse; }
-.modern-table th { text-align: left; font-size: 0.65rem; color: #94a3b8; padding: 8px; text-transform: uppercase; }
-.modern-table td { padding: 10px 8px; font-size: 0.75rem; border-bottom: 1px solid #f8fafc; }
-
-.vendor-grid { display: flex; flex-direction: column; gap: 1rem; }
-.v-bar { width: 100%; height: 5px; background: #f1f5f9; border-radius: 10px; }
-.v-fill { height: 100%; background: #3b82f6; border-radius: 10px; }
-
-.polished-footer { display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: 1.5rem; background: #f1f5f9; padding: 1.5rem; border-radius: 24px; }
-.footer-card { background: white; padding: 1.25rem; border-radius: 18px; }
-.footer-card h5 { font-size: 0.8rem; font-weight: 800; margin-bottom: 1rem; color: #1e293b; }
-.client-mini { display: flex; align-items: center; gap: 0.75rem; margin-bottom: 0.75rem; }
-.c-icon { width: 32px; height: 32px; background: #eff6ff; color: #3b82f6; border-radius: 8px; display: flex; align-items: center; justify-content: center; font-weight: 800; font-size: 0.7rem; }
-.c-info strong { font-size: 0.75rem; display: block; color: #1e293b; }
-.c-info p { font-size: 0.65rem; color: #10b981; font-weight: 700; margin: 0; }
-.a-mini { font-size: 0.7rem; color: #475569; padding-bottom: 8px; border-bottom: 1px solid #f8fafc; margin-bottom: 8px; }
-.a-mini span { display: block; font-size: 0.6rem; color: #94a3b8; margin-top: 2px; }
-.dark-card { background: #0f172a; color: white; }
-.dark-card h5 { color: white; }
-.quick-links a { display: block; background: rgba(255,255,255,0.1); color: white; padding: 10px; border-radius: 10px; text-decoration: none; margin-bottom: 8px; font-size: 0.75rem; font-weight: 700; }
-</style>
-
-<script>
-// Line Chart
-if (document.getElementById('revenueChart')) {
-    new Chart(document.getElementById('revenueChart').getContext('2d'), {
-        type: 'line',
-        data: {
-            labels: <?php echo $chartLabels; ?>,
-            datasets: [{
-                label: 'Revenue', data: <?php echo $chartRevenue; ?>,
-                borderColor: '#3b82f6', backgroundColor: 'rgba(59, 130, 246, 0.1)', fill: true, tension: 0.4, borderWidth: 3
-            }, {
-                label: 'Profit', data: <?php echo $chartProfit; ?>,
-                borderColor: '#10b981', backgroundColor: 'transparent', fill: false, tension: 0.4, borderWidth: 3, borderDash: [5, 5]
-            }]
-        },
-        options: { maintainAspectRatio: false, plugins: { legend: { display: false } }, scales: { y: { beginAtZero: true, grid: { color: '#f1f5f9' }, ticks: { font: { size: 10 } } }, x: { grid: { display: false }, ticks: { font: { size: 10 } } } } }
-    });
-}
-
-// Doughnut
-if (document.getElementById('typeChart')) {
-    new Chart(document.getElementById('typeChart'), {
-        type: 'doughnut',
-        data: {
-            labels: <?php echo $typeLabels; ?>,
-            datasets: [{ data: <?php echo $typeCounts; ?>, backgroundColor: ['#3b82f6', '#10b981', '#f59e0b', '#ef4444', '#8b5cf6'], borderWidth: 0 }]
-        },
-        options: { maintainAspectRatio: false, cutout: '75%', plugins: { legend: { position: 'bottom', labels: { boxWidth: 10, font: { size: 10 } } } } }
-    });
-}
-
-// Pie
-if (document.getElementById('statusChart')) {
-    new Chart(document.getElementById('statusChart'), {
-        type: 'pie',
-        data: {
-            labels: ['Booked', 'Available'],
-            datasets: [{ data: [<?php echo $bookedSites; ?>, <?php echo ($totalSites-$bookedSites); ?>], backgroundColor: ['#ef4444', '#10b981'], borderWidth: 0 }]
-        },
-        options: { maintainAspectRatio: false, plugins: { legend: { position: 'bottom', labels: { boxWidth: 10, font: { size: 10 } } } } }
-    });
-}
-</script>
-
-<?php include_once __DIR__ . '/includes/footer.php'; ?>
+        // Auto-dismiss toast alerts after 5 seconds
+        const toastAlert = document.getElementById('toastAlert');
+        if (toastAlert) {
+            setTimeout(() => {
+                toastAlert.style.transition = 'opacity 0.5s ease-out';
+                toastAlert.style.opacity = '0';
+                setTimeout(() => {
+                    toastAlert.remove();
+                }, 500);
+            }, 5000);
+        }
+    </script>
+</body>
+</html>

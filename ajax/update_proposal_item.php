@@ -95,15 +95,17 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         $base = $newTotal - ($newTotal * ($p['discounting_pct'] / 100));
         $newGrand = $base + $tax + $p['printing_cost'] + $p['mounting_cost'];
         
-        $pdo->prepare("UPDATE proposals SET total_amount = ?, tax_amount = ?, grand_total = ? WHERE id = ?")
-            ->execute([$newTotal, $tax, $newGrand, $propId]);
-
-        // Revert proposal to pending_approval if non-admin edited an approved proposal
-        $isAdmin = ($_SESSION['user_role'] ?? '') === 'admin';
-        if (!$isAdmin) {
-            $propRef = $pdo->query("SELECT proposal_number FROM proposals WHERE id = $propId")->fetchColumn();
-            revertToPendingOnEdit($pdo, 'proposals', $propId, 'proposal', $propRef, $_SESSION['user_id'] ?? 0);
+        // Recalculate proposal start and end dates from its items
+        $minMax = $pdo->query("SELECT MIN(start_date) as min_start, MAX(end_date) as max_end FROM proposal_items WHERE proposal_id = $propId")->fetch();
+        $newStart = $minMax['min_start'] ?: null;
+        $newEnd = $minMax['max_end'] ?: null;
+        $newDays = null;
+        if (!empty($newStart) && !empty($newEnd)) {
+            $newDays = max(1, ceil((strtotime($newEnd) - strtotime($newStart)) / 86400) + 1);
         }
+        
+        $pdo->prepare("UPDATE proposals SET total_amount = ?, tax_amount = ?, grand_total = ?, start_date = ?, end_date = ?, total_days = ? WHERE id = ?")
+            ->execute([$newTotal, $tax, $newGrand, $newStart, $newEnd, $newDays, $propId]);
             
         echo json_encode(['success' => true]);
     } else {

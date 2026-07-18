@@ -4,11 +4,7 @@ $pageTitle = 'Create New Proposal';
 $hideSidebar = true;
 include_once __DIR__ . '/../../includes/header.php';
 
-if (!hasRole(['admin', 'sales'])) {
-    echo "<div class='card'>Access Denied. You do not have permission to create proposals.</div>";
-    include_once __DIR__ . '/../../includes/footer.php';
-    exit;
-}
+requirePermission('proposals', 'add');
 
 // Fetch Data
 $clients = $pdo->query("SELECT id, name, city, contact_person FROM partners WHERE type = 'client' ORDER BY name ASC")->fetchAll();
@@ -136,6 +132,16 @@ $printingRates = $pdo->query("SELECT * FROM vendor_printing_rates")->fetchAll(PD
 
     <!-- STEP 2: Media Selection & Search -->
     <div id="step-2" style="display: none;">
+        <!-- Category Filter Tabs -->
+        <div class="inventory-tabs" id="proposal-create-tabs" style="margin-top: 1rem; margin-bottom: 1.5rem;">
+            <button type="button" class="tab active" onclick="selectProposalMediaTab('all', this)">All</button>
+            <?php foreach ($mediaTypes as $mtype): ?>
+                <button type="button" class="tab" onclick="selectProposalMediaTab('<?php echo htmlspecialchars($mtype); ?>', this)">
+                    <?php echo htmlspecialchars($mtype); ?>
+                </button>
+            <?php endforeach; ?>
+        </div>
+
         <div class="p-panel" style="margin-bottom: 1rem; padding: 0.75rem;">
             <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 0.75rem; border-bottom: 1px solid #f1f5f9; padding-bottom: 0.5rem;">
                 <div style="display: flex; align-items: center; gap: 1rem;">
@@ -634,6 +640,42 @@ $printingRates = $pdo->query("SELECT * FROM vendor_printing_rates")->fetchAll(PD
 let selectedSites = [];
 let currentPage = 1;
 let pageSize = 6;
+
+let selectedMediaTab = 'all';
+function selectProposalMediaTab(mtype, btn) {
+    selectedMediaTab = mtype;
+    
+    // Update active class on tabs
+    const tabs = document.querySelectorAll('#proposal-create-tabs .tab');
+    tabs.forEach(t => t.classList.remove('active'));
+    btn.classList.add('active');
+    
+    // Sync the media_type select
+    const select = document.getElementById('media_type');
+    if (select) {
+        select.value = mtype === 'all' ? '' : mtype;
+    }
+    
+    currentPage = 1;
+    filterSites();
+}
+
+document.addEventListener('DOMContentLoaded', () => {
+    const select = document.getElementById('media_type');
+    if (select) {
+        select.addEventListener('change', function() {
+            const val = this.value || 'all';
+            const tabs = document.querySelectorAll('#proposal-create-tabs .tab');
+            tabs.forEach(t => {
+                const onclickAttr = t.getAttribute('onclick');
+                if (onclickAttr && (onclickAttr.includes(`'${val}'`) || (val === 'all' && onclickAttr.includes("'all'")))) {
+                    tabs.forEach(x => x.classList.remove('active'));
+                    t.classList.add('active');
+                }
+            });
+        });
+    }
+});
 const baseUrl = "<?php echo BASE_URL; ?>";
 const imgBaseUrl = "<?php echo BASE_URL; ?>uploads/sites/";
 const printingVendors = <?php echo json_encode($printingVendors); ?>;
@@ -899,6 +941,11 @@ function submitQuickClient() {
             opt.text = name;
             opt.selected = true;
             select.add(opt);
+            
+            if (select.refreshSearchable) {
+                select.refreshSearchable();
+            }
+            handleClientChange();
             closeClientModal();
             Swal.fire('Success', 'Client created and selected!', 'success');
         } else {
@@ -1229,6 +1276,13 @@ function clearFilters() {
     document.querySelector('input[name="availability"][value="available"]').checked = true;
     document.getElementById('vendor-filter-group').style.display = 'none';
 
+    // Reset tabs
+    const tabs = document.querySelectorAll('#proposal-create-tabs .tab');
+    tabs.forEach(t => t.classList.remove('active'));
+    const allTab = Array.from(tabs).find(t => t.getAttribute('onclick') && t.getAttribute('onclick').includes("'all'"));
+    if (allTab) allTab.classList.add('active');
+    selectedProposalMediaTab = 'all';
+
     filterSites();
 }
 
@@ -1306,6 +1360,30 @@ function filterSites() {
 document.addEventListener('DOMContentLoaded', () => {
     renderPagination();
 });
+
+(function() {
+    function tryInit() {
+        if (typeof initSearchableSelect === 'function') {
+            initSearchableSelect('client_id', 'Search Company / Client...');
+            console.log("Searchable selects initialized successfully on create.php (proposals)");
+        } else {
+            console.warn("initSearchableSelect function not available yet, retrying on window load...");
+            window.addEventListener('load', () => {
+                if (typeof initSearchableSelect === 'function') {
+                    initSearchableSelect('client_id', 'Search Company / Client...');
+                    console.log("Searchable selects initialized successfully on window load");
+                } else {
+                    console.error("initSearchableSelect function could not be loaded!");
+                }
+            });
+        }
+    }
+    if (document.readyState === 'loading') {
+        document.addEventListener('DOMContentLoaded', tryInit);
+    } else {
+        tryInit();
+    }
+})();
 
 function saveProposal() {
     const clientId = document.getElementById('client_id').value;
@@ -1527,6 +1605,7 @@ document.addEventListener('keydown', function(e) {
         if(e.key === 'Escape') closeLightbox();
     }
 });
+
 </script>
 
 <!-- Simple Lightbox HTML -->

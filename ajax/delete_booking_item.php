@@ -57,13 +57,6 @@ try {
     $stmtUpdate = $pdo->prepare("UPDATE bookings SET total_amount = ?, tax_amount = ?, grand_total = ? WHERE id = ?");
     $stmtUpdate->execute([$newSubtotal, $tax, $grand, $bookingId]);
 
-    // Revert booking to pending_approval if non-admin deleted an item from an approved booking
-    $isAdmin = ($_SESSION['user_role'] ?? '') === 'admin';
-    if (!$isAdmin) {
-        $bookRef = $pdo->query("SELECT campaign_name FROM bookings WHERE id = $bookingId")->fetchColumn();
-        revertToPendingOnEdit($pdo, 'bookings', $bookingId, 'booking', "Booking: $bookRef", $_SESSION['user_id'] ?? 0);
-    }
-
     $pdo->commit();
     echo json_encode(['success' => true]);
 } catch (Exception $e) {

@@ -25,7 +25,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action']) && $_POST['
         $pdo->commit();
         echo json_encode(['success' => true]);
     } catch (Exception $e) {
-        $pdo->rollBack();
+        if ($pdo->inTransaction()) $pdo->rollBack();
         echo json_encode(['success' => false, 'message' => $e->getMessage()]);
     }
     exit;
@@ -44,6 +44,13 @@ $campaignFilter = trim($_GET['campaign_name'] ?? '');
 
 $where = 'WHERE 1=1';
 $params = [];
+
+$activeEntityId = $_SESSION['active_entity_id'] ?? null;
+if ($activeEntityId) {
+    $where .= ' AND p.entity_id = ?';
+    $params[] = $activeEntityId;
+}
+
 if ($clientFilter) {
     $where .= ' AND p.client_id = ?';
     $params[] = $clientFilter;
@@ -142,15 +149,20 @@ $clients = $pdo->query("SELECT id, name FROM partners WHERE type = 'client' ORDE
                         <div style="font-size: 0.7rem; color: #64748b; font-weight: 600;">Account: <?php echo $p['creator']; ?></div>
                     </td>
                     <td>
-                        <div style="font-weight: 700; color: #475569; font-size: 0.85rem;"><?php echo date('d M', strtotime($p['start_date'])); ?> - <?php echo date('d M', strtotime($p['end_date'])); ?></div>
-                        <div style="font-size: 0.7rem; color: #94a3b8; font-weight: 600;"><?php echo date('Y', strtotime($p['end_date'])); ?> • <?php 
-                            $diff = date_diff(date_create($p['start_date']), date_create($p['end_date']));
-                            echo $diff->format("%a days");
-                        ?></div>
+                        <?php if (!empty($p['start_date']) && $p['start_date'] !== '0000-00-00' && !empty($p['end_date']) && $p['end_date'] !== '0000-00-00'): ?>
+                            <div style="font-weight: 700; color: #475569; font-size: 0.85rem;"><?php echo date('d M', strtotime($p['start_date'])); ?> - <?php echo date('d M', strtotime($p['end_date'])); ?></div>
+                            <div style="font-size: 0.7rem; color: #94a3b8; font-weight: 600;"><?php echo date('Y', strtotime($p['end_date'])); ?> • <?php 
+                                $diff = date_diff(date_create($p['start_date']), date_create($p['end_date']));
+                                echo $diff->format("%a days");
+                            ?></div>
+                        <?php else: ?>
+                            <div style="font-weight: 700; color: #94a3b8; font-size: 0.85rem;">N/A</div>
+                        <?php endif; ?>
                     </td>
-                    <td>
-                        <div style="font-weight: 800; color: #0f172a; font-size: 0.95rem;">₹<?php echo number_format($p['grand_total'], 2); ?></div>
-                        <div style="font-size: 0.65rem; color: #94a3b8; font-weight: 700;">Base: ₹<?php echo number_format($p['total_amount'], 2); ?></div>
+                    <td style="font-size: 0.85rem; line-height: 1.4; white-space: nowrap; text-align: left; vertical-align: middle;">
+                        <div style="font-weight: 500; color: #64748b;">Base: <span style="font-weight: 700; color: #334155;"><?php echo formatCurrency($p['total_amount']); ?></span></div>
+                        <div style="font-weight: 500; color: #64748b;">Tax: <span style="font-weight: 700; color: #334155;"><?php echo formatCurrency($p['tax_amount']); ?></span></div>
+                        <div style="font-weight: 700; color: #059669; border-top: 1px dashed #cbd5e1; margin-top: 2px; padding-top: 2px;">Total: <span><?php echo formatCurrency($p['grand_total']); ?></span></div>
                     </td>
                     <td>
                         <?php 
@@ -185,7 +197,7 @@ $clients = $pdo->query("SELECT id, name FROM partners WHERE type = 'client' ORDE
                                     <a href="export_pdf.php?id=<?php echo $p['id']; ?>" target="_blank"><i class="fas fa-file-pdf" style="color: #ef4444;"></i> Visual Media Plan (PDF)</a>
                                     <a href="export_excel.php?id=<?php echo $p['id']; ?>"><i class="fas fa-file-excel" style="color: #10b981;"></i> Excel Rate Sheet</a>
                                     <a href="export_ppt.php?id=<?php echo $p['id']; ?>" target="_blank"><i class="fas fa-file-powerpoint" style="color: #f97316;"></i> PPT Deck / Presentation</a>
-                                    <a href="javascript:void(0)" onclick="generateProforma(<?php echo $p['id']; ?>)"><i class="fas fa-file-invoice" style="color: #6366f1;"></i> Proforma Invoice (PI)</a>
+                                    <!-- <a href="javascript:void(0)" onclick="generateProforma(<?php echo $p['id']; ?>)"><i class="fas fa-file-invoice" style="color: #6366f1;"></i> Proforma Invoice (PI)</a> -->
                                     <div style="height: 1px; background: #f1f5f9; margin: 0.25rem 0;"></div>
                                     <div style="font-size: 0.6rem; font-weight: 800; color: #94a3b8; padding: 0.5rem 0.8rem; text-transform: uppercase; letter-spacing: 0.05em;">Visuals</div>
                                     <a href="export_ppt.php?id=<?php echo $p['id']; ?>&mode=view" target="_blank"><i class="fas fa-desktop" style="color: #6366f1;"></i> View Presentation</a>
@@ -295,6 +307,7 @@ function copyPublicLink(url) {
     });
 }
 
+/*
 function generateProforma(proposalId) {
     Swal.fire({
         title: 'Generating Proforma Invoice',
@@ -329,6 +342,7 @@ function generateProforma(proposalId) {
             Swal.fire('Error', 'An error occurred during communication with the server.', 'error');
         });
 }
+*/
 </script>
 
 <?php include_once __DIR__ . '/../../includes/footer.php'; ?>

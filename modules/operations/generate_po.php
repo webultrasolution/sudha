@@ -204,22 +204,29 @@ $ref_date = $b['po_date'] ?? $b['start_date'] ?? date('Y-m-d');
 $po_number = "PO/" . date('y', strtotime($ref_date)) . "-" . date('y', strtotime($ref_date . ' +1 year')) . "/" . $po_ref;
 $po_date = date('d-M-Y', strtotime($ref_date));
 
-// Company Settings
-$company_name = getSetting('company_name', 'Sudha Creative & Advertising');
-$company_gstin = getSetting('company_gstin', '19AHRPT4740Q1Z6');
-$company_pan = getSetting('company_pan', 'AHRPT4740Q');
-$company_address = getSetting('company_address', 'Deshbandhu Para, P.O - Jhaljhalia, Dist - Malda - 732102, West Bengal');
-$company_phone = getSetting('company_phone', '8158854313');
-$company_email = getSetting('company_email', 'sudhacreativemalda@gmail.com');
+// Setup Company / Entity Details
+$co = resolveCompanyDetails($b['entity_id'] ?? null);
+$company_name = $co['name'];
+$company_gstin = $co['gstin'];
+$company_pan = $co['pan'];
+$company_address = $co['address'];
+$company_phone = $co['phone'];
+$company_email = $co['email'];
+$company_logo = $co['logo'];
+$company_signature = $co['signature'];
+$company_bank_details = $co['bank_details'];
+$company_terms = $co['terms_conditions'];
+$company_msme = $co['msme_number'];
+$company_cin = $co['cin'] ?? '';
+$company_tan = $co['tan'] ?? '';
+
 $po_type = $po_type ?? 'RENTAL';
 $approval_badge = ($b['approval_status'] ?? '') === 'approved' ? '' : '<div style="position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%) rotate(-45deg); font-size: 8rem; color: rgba(239, 68, 68, 0.1); font-weight: 900; z-index: 0; pointer-events: none; border: 10px solid rgba(239, 68, 68, 0.1); padding: 2rem; border-radius: 20px;">DRAFT / PENDING</div>';
 
-// Setup Company / Entity Details
-$has_entity = !empty($b['entity_id']);
-$header_logo = $has_entity && !empty($b['entity_letterhead']) ? $b['entity_letterhead'] : ($has_entity && !empty($b['entity_logo']) ? $b['entity_logo'] : getSetting('company_letterhead'));
-$header_name = $has_entity ? $b['entity_name'] : getSetting('company_name', 'Sudha Creative & Advertising');
-$header_addr = $has_entity ? $b['entity_address'] : getSetting('company_address');
-$po_signature = $has_entity && !empty($b['entity_signature']) ? $b['entity_signature'] : getSetting('company_signature', 'signature.png');
+$header_logo = !empty($co['letterhead']) ? $co['letterhead'] : (!empty($co['logo']) ? $co['logo'] : '');
+$header_name = $company_name;
+$header_addr = $company_address;
+$po_signature = $company_signature;
 
 // Dynamic Category of Service Calculation
 $serviceCategory = 'Display on Billboards / Billboards';
@@ -291,7 +298,18 @@ function getStateName($gstin)
     <style>
         @page {
             size: A4;
-            margin: 0;
+            margin: 8mm 10mm;
+            @bottom-right {
+                content: counter(page) "/" counter(pages);
+                font-family: Arial, sans-serif;
+                font-size: 9px;
+                color: #555;
+            }
+        }
+        .avoid-break {
+            page-break-inside: avoid;
+            break-inside: avoid;
+            margin-top: 20px;
         }
 
         body {
@@ -301,13 +319,20 @@ function getStateName($gstin)
             color: #000;
             font-size: 11px;
             line-height: 1.3;
+            background: #f1f5f9;
         }
 
         .po-wrapper {
-            border: 1px solid #000;
-            max-width: 800px;
+            border: 1px solid #d1d5db;
+            width: 210mm;
+            min-height: 297mm;
             margin: 0 auto;
             position: relative;
+            background: #fff;
+            padding: 12mm 14mm;
+            box-shadow: 0 4px 10px rgba(0,0,0,0.15);
+            box-sizing: border-box;
+            display: block;
         }
 
         .header-top {
@@ -339,7 +364,7 @@ function getStateName($gstin)
         }
 
         .info-label {
-            width: 90px;
+            width: 110px;
             font-weight: normal;
         }
 
@@ -372,12 +397,13 @@ function getStateName($gstin)
         table {
             width: 100%;
             border-collapse: collapse;
+            border: 1px solid #000;
         }
 
         th {
             border-bottom: 1px solid #000;
             border-right: 1px solid #000;
-            padding: 6px;
+            padding: 4px;
             text-align: center;
             font-weight: bold;
             background: #fafafa;
@@ -388,9 +414,9 @@ function getStateName($gstin)
         }
 
         td {
-            border-bottom: 1px solid #d0d0d0;
+            border-bottom: 1px solid #000;
             border-right: 1px solid #000;
-            padding: 8px 5px;
+            padding: 5px 5px;
             vertical-align: top;
             text-align: center;
         }
@@ -407,7 +433,7 @@ function getStateName($gstin)
 
         .footer {
             display: flex;
-            border-top: 1px solid #000;
+            border: 1px solid #000;
         }
 
         .footer-left {
@@ -446,12 +472,33 @@ function getStateName($gstin)
 
             body {
                 padding: 0;
+                background: #fff;
             }
 
             .po-wrapper {
                 border: none;
                 width: 100%;
+                min-height: auto;
+                box-shadow: none;
+                padding: 0;
+                margin: 0;
+                display: block;
             }
+            thead { display: table-header-group; }
+            tr { page-break-inside: avoid; break-inside: avoid; }
+            .avoid-break {
+                margin-top: 15px;
+                display: block;
+            }
+        }
+        .print-hide {
+            display: none !important;
+        }
+        .screen-only {
+            display: none !important;
+        }
+        .print-only {
+            display: table-cell !important;
         }
     </style>
 </head>
@@ -462,22 +509,35 @@ function getStateName($gstin)
 
     <div class="po-wrapper">
         <!-- Header / Letterhead -->
-        <?php if ($header_logo): ?>
-            <img src="<?php echo BASE_URL; ?>assets/images/<?php echo $header_logo; ?>"
-                style="width: 100%; height: auto; display: block; border-bottom: 1px solid #000;">
-        <?php else: ?>
-            <div style="text-align: center; padding: 1rem; border-bottom: 1px solid #000; background: #f8fafc;">
-                <h2 style="margin: 0; text-transform: uppercase;"><?php echo htmlspecialchars($header_name); ?></h2>
-                <p style="margin: 0; font-size: 0.8rem;"><?php echo htmlspecialchars($header_addr); ?></p>
+        <div style="display: flex; justify-content: space-between; align-items: flex-start; padding: 10px 10px 2px;">
+            <div style="flex: 1.4; text-align: left;">
+                <?php if (!empty($co['letterhead'])): ?>
+                    <img src="<?php echo BASE_URL; ?>assets/images/<?php echo $co['letterhead']; ?>"
+                        style="max-height: 110px; width: auto; display: block; margin-bottom: 5px;">
+                <?php else: ?>
+                    <h2 style="margin: 0; text-transform: uppercase; font-size: 18px; color: #8B1A1A;"><?php echo htmlspecialchars($company_name); ?></h2>
+                <?php endif; ?>
             </div>
-        <?php endif; ?>
+            <div style="flex: 1.2; text-align: center; padding-top: 15px;">
+                <div style="font-size: 16px; font-weight: bold; text-decoration: underline; letter-spacing: 1.5px; text-transform: uppercase;">PURCHASE ORDER</div>
+            </div>
+            <div style="flex: 0.8; text-align: right; font-style: italic; font-size: 10px; padding-top: 15px; color: #555;">
+                Original Copy
+            </div>
+        </div>
+        <div style="padding: 0 10px 10px; font-size: 10px; line-height: 1.4; color: #000; border-bottom: 1px solid #000; margin-bottom: 10px;">
+            <?php echo nl2br(htmlspecialchars($company_address)); ?><br>
+            Ph : <?php echo htmlspecialchars($company_phone); ?> &nbsp;&nbsp; Email : <?php echo htmlspecialchars($company_email); ?>
+        </div>
+
+
 
         <!-- PO Info -->
         <table
             style="width: 100%; border: 1px solid #000; border-collapse: collapse; margin-bottom: 15px; font-size: 10px;">
             <tr>
                 <td
-                    style="width: 50%; border-right: 1px solid #000; padding: 8px 10px; text-align: left; vertical-align: top; line-height: 1.45;">
+                    style="width: 50%; border-right: 1px solid #000; padding: 4px 6px; text-align: left; vertical-align: top; line-height: 1.25;">
                     <div style="display: flex; margin-bottom: 2px;"><span
                             style="width: 150px; font-weight: bold;">Category of Service</span><span
                             style="width: 10px;">:</span><span
@@ -544,7 +604,7 @@ function getStateName($gstin)
                     </div>
                 </td>
 
-                <td style="width: 50%; padding: 8px 10px; text-align: left; vertical-align: top; line-height: 1.45;">
+                <td style="width: 50%; padding: 4px 6px; text-align: left; vertical-align: top; line-height: 1.25;">
                     <div style="display: flex; margin-bottom: 2px;"><span
                             style="width: 150px; font-weight: bold;">Buyer's Name</span><span
                             style="width: 10px;">:</span><span
@@ -573,6 +633,18 @@ function getStateName($gstin)
                             MSME Registration</span><span style="width: 10px;">:</span><span
                             style="flex: 1; font-weight: bold; text-transform: uppercase;"><?php echo (strlen($buyerGstin) >= 15) ? 'REGISTERED' : 'UNREGISTERED'; ?></span>
                     </div>
+                    <?php if (!empty($company_cin)): ?>
+                    <div style="display: flex; margin-bottom: 2px;"><span style="width: 150px; font-weight: bold;">Buyer
+                            CIN No.</span><span style="width: 10px;">:</span><span
+                            style="flex: 1; font-weight: bold; text-transform: uppercase;"><?php echo htmlspecialchars($company_cin); ?></span>
+                    </div>
+                    <?php endif; ?>
+                    <?php if (!empty($company_tan)): ?>
+                    <div style="display: flex; margin-bottom: 2px;"><span style="width: 150px; font-weight: bold;">Buyer
+                            TAN No.</span><span style="width: 10px;">:</span><span
+                            style="flex: 1; font-weight: bold; text-transform: uppercase;"><?php echo htmlspecialchars($company_tan); ?></span>
+                    </div>
+                    <?php endif; ?>
                     <div style="display: flex; margin-bottom: 2px;"><span style="width: 150px; font-weight: bold;">Buyer
                             State Code</span><span style="width: 10px;">:</span><span
                             style="flex: 1; font-weight: bold;"><?php echo htmlspecialchars($buyerStateCode); ?></span>
@@ -597,9 +669,9 @@ function getStateName($gstin)
                     <th rowspan="2" style="width: 50px;">Size (W)</th>
                     <th rowspan="2" style="width: 50px;">Size (H)</th>
                     <th rowspan="2" style="width: 60px;">Lit /<br>Non Lit</th>
-                    <th rowspan="2" style="width: 90px;">Display<br>Charges Per<br>Month</th>
+                    <th rowspan="2" style="width: 90px;" class="print-hide">Display<br>Charges Per<br>Month</th>
                     <th colspan="2" style="width: 150px; border-bottom: 1px solid #000;">Charged Period</th>
-                    <th rowspan="2" style="width: 70px;">Period</th>
+                    <th rowspan="2" style="width: 70px;" class="print-hide">Period</th>
                     <th rowspan="2" style="width: 95px;">Amount</th>
                 </tr>
                 <tr>
@@ -668,21 +740,24 @@ function getStateName($gstin)
                         <td><?php echo htmlspecialchars($item['width']); ?></td>
                         <td><?php echo htmlspecialchars($item['height']); ?></td>
                         <td><?php echo $litLabel; ?></td>
-                        <td style="text-align: right; padding-right: 5px;"><?php echo number_format($monthlyCharges, 2); ?>
+                        <td style="text-align: right; padding-right: 5px;" class="print-hide"><?php echo number_format($monthlyCharges, 2); ?>
                         </td>
                         <td><?php echo date('d-m-Y', strtotime($sDate)); ?></td>
                         <td><?php echo date('d-m-Y', strtotime($eDate)); ?></td>
-                        <td><?php echo $periodStr; ?></td>
+                        <td class="print-hide"><?php echo $periodStr; ?></td>
                         <td style="text-align: right; padding-right: 5px; font-weight: bold;">
                             <?php echo number_format($item['purchase_amount'], 2); ?></td>
                     </tr>
                 <?php endforeach; ?>
 
                 <?php
-                $cgst_amount = 0;
-                $sgst_amount = 0;
-                $igst_amount = 0;
-                $gst_label = 'GST (18%)';
+                $supplierGstin = trim($vendor_gst_filter ?: $v['gstin'] ?: '');
+                $isVendorInterState = true;
+                if (!empty($v['state']) && strtolower(trim($v['state'])) === 'west bengal') {
+                    $isVendorInterState = false;
+                } elseif (!empty($supplierGstin) && substr($supplierGstin, 0, 2) === '19') {
+                    $isVendorInterState = false;
+                }
 
                 if ($mode === 'saved_po') {
                     $cgst_amount = floatval($b['cgst_amount'] ?? 0);
@@ -690,43 +765,54 @@ function getStateName($gstin)
                     $igst_amount = floatval($b['igst_amount'] ?? 0);
                     $grand_total = floatval($b['total_amount'] ?? 0);
 
-                    if ($cgst_amount > 0 || $sgst_amount > 0) {
-                        $gst_label = 'CGST + SGST (9%+9%)';
-                        $gst_amount = $cgst_amount + $sgst_amount;
-                    } elseif ($igst_amount > 0) {
-                        $gst_label = 'IGST (18%)';
-                        $gst_amount = $igst_amount;
-                    } else {
-                        $gst_label = 'GST (0%)';
-                        $gst_amount = 0;
-                    }
+                    $cgst_rate = ($cgst_amount > 0) ? 9 : 0;
+                    $sgst_rate = ($sgst_amount > 0) ? 9 : 0;
+                    $igst_rate = ($igst_amount > 0) ? 18 : 0;
                 } else {
-                    $vendor_has_gst = vendorHasGST($v['gstin'] ?? '');
+                    $vendor_has_gst = vendorHasGST($supplierGstin);
                     if ($vendor_has_gst) {
-                        $gst_label = 'IGST (18%)';
-                        $gst_amount = $net_total * 0.18;
+                        if ($isVendorInterState) {
+                            $cgst_rate = 0; $sgst_rate = 0; $igst_rate = 18;
+                            $cgst_amount = 0; $sgst_amount = 0; $igst_amount = $net_total * 0.18;
+                        } else {
+                            $cgst_rate = 9; $sgst_rate = 9; $igst_rate = 0;
+                            $cgst_amount = $net_total * 0.09; $sgst_amount = $net_total * 0.09; $igst_amount = 0;
+                        }
                     } else {
-                        $gst_label = 'GST (0%)';
-                        $gst_amount = 0;
+                        $cgst_rate = 0; $sgst_rate = 0; $igst_rate = 0;
+                        $cgst_amount = 0; $sgst_amount = 0; $igst_amount = 0;
                     }
-                    $grand_total = $net_total + $gst_amount;
+                    $grand_total = $net_total + $cgst_amount + $sgst_amount + $igst_amount;
                 }
                 ?>
 
                 <tr class="totals-row">
-                    <td colspan="11" style="text-align: right; padding-right: 10px;">Taxable Amount (Total Cost)</td>
+                    <td colspan="11" style="text-align: right; padding-right: 10px;" class="screen-only">Taxable Amount (Total Cost)</td>
+                    <td colspan="9" style="text-align: right; padding-right: 10px;" class="print-only">Taxable Amount (Total Cost)</td>
                     <td style="text-align: right; padding-right: 10px; font-weight: bold;">
                         <?php echo number_format($net_total, 2); ?></td>
                 </tr>
                 <tr class="totals-row">
-                    <td colspan="11" style="text-align: right; padding-right: 10px;"><?php echo $gst_label; ?></td>
+                    <td colspan="11" style="text-align: right; padding-right: 10px;" class="screen-only">CGST (<?php echo $cgst_rate; ?>%)</td>
+                    <td colspan="9" style="text-align: right; padding-right: 10px;" class="print-only">CGST (<?php echo $cgst_rate; ?>%)</td>
                     <td style="text-align: right; padding-right: 10px; font-weight: bold;">
-                        <?php echo number_format($gst_amount, 2); ?></td>
+                        <?php echo number_format($cgst_amount, 2); ?></td>
+                </tr>
+                <tr class="totals-row">
+                    <td colspan="11" style="text-align: right; padding-right: 10px;" class="screen-only">SGST (<?php echo $sgst_rate; ?>%)</td>
+                    <td colspan="9" style="text-align: right; padding-right: 10px;" class="print-only">SGST (<?php echo $sgst_rate; ?>%)</td>
+                    <td style="text-align: right; padding-right: 10px; font-weight: bold;">
+                        <?php echo number_format($sgst_amount, 2); ?></td>
+                </tr>
+                <tr class="totals-row">
+                    <td colspan="11" style="text-align: right; padding-right: 10px;" class="screen-only">IGST (<?php echo $igst_rate; ?>%)</td>
+                    <td colspan="9" style="text-align: right; padding-right: 10px;" class="print-only">IGST (<?php echo $igst_rate; ?>%)</td>
+                    <td style="text-align: right; padding-right: 10px; font-weight: bold;">
+                        <?php echo number_format($igst_amount, 2); ?></td>
                 </tr>
                 <tr class="totals-row" style="background: #f9f9f9; border-top: 2px solid #000;">
-                    <td colspan="11"
-                        style="text-align: right; padding-right: 10px; font-size: 12px; height: 30px; vertical-align: middle;">
-                        Gross Payable Amount</td>
+                    <td colspan="11" style="text-align: right; padding-right: 10px; font-size: 12px; height: 30px; vertical-align: middle;" class="screen-only">Gross Payable Amount</td>
+                    <td colspan="9" style="text-align: right; padding-right: 10px; font-size: 12px; height: 30px; vertical-align: middle;" class="print-only">Gross Payable Amount</td>
                     <td
                         style="text-align: right; padding-right: 10px; font-size: 12px; vertical-align: middle; font-weight: bold;">
                         <?php echo number_format($grand_total, 2); ?></td>
@@ -734,113 +820,110 @@ function getStateName($gstin)
             </tbody>
         </table>
 
-        <!-- Amount in Words -->
-        <table style="width: 100%; border-collapse: collapse; border-top: 1px solid #000;">
-            <tr>
-                <td
-                    style="text-align: left; padding: 6px 10px; font-size: 10px; border-bottom: none; border-right: none;">
-                    <strong>Amount In Words</strong><br>
-                    <span
-                        style="font-weight: bold; text-transform: capitalize;"><?php echo amountInWords($grand_total); ?></span>
-                </td>
-                <td
-                    style="text-align: right; width: 80px; vertical-align: bottom; padding: 6px 10px; font-size: 9px; font-weight: bold; border-bottom: none; border-right: none;">
-                    E. & O.E.
-                </td>
-            </tr>
-        </table>
+        <div class="avoid-break">
+            <!-- Amount in Words -->
+            <table style="width: 100%; border-collapse: collapse; border-top: 1px solid #000;">
+                <tr>
+                    <td
+                        style="text-align: left; padding: 6px 10px; font-size: 10px; border-bottom: none; border-right: none;">
+                        <strong>Amount In Words</strong><br>
+                        <span
+                            style="font-weight: bold; text-transform: capitalize;"><?php echo amountInWords($grand_total); ?></span>
+                    </td>
+                    <td
+                        style="text-align: right; width: 80px; vertical-align: bottom; padding: 6px 10px; font-size: 9px; font-weight: bold; border-bottom: none; border-right: none;">
+                        E. & O.E.
+                    </td>
+                </tr>
+            </table>
 
-        <div style="padding: 10px; border-top: 1px solid #000; font-size: 9px;">
-            <div style="display: flex; align-items: center; margin-bottom: 8px;">
-                <div style="font-weight: bold; text-decoration: underline; font-size: 10.5px; margin-right: 15px;">Terms
-                    & Conditions</div>
-                <?php
-                $poNote = getSetting('po_important_note', '');
-                if (empty(trim($poNote))) {
-                    $poNote = 'Filing of GSTR-1 within time is mandatory for acceptance of Invoice.';
-                }
-                ?>
-                <div style="font-weight: bold; color: #ff0000; font-size: 10.5px; flex: 1; text-align: center;">
-                    <?php echo htmlspecialchars($poNote); ?></div>
-            </div>
-            <div style="margin: 0; line-height: 1.45; color: #000;">
-                <?php
-                $defaultTerms = "1. Flex mounting will be Free of Cost
-2. Kindly take proper care while mounting the vinyl & make sure there should be no wrinkles seen on the above Billboard. In case of execution being not proper resulting in poor quality of Flex/Vinyl mounting the same should be remounted free of cost within 24 hours. Penalty of display charges will be deducted on prorata basis for every day delayed.
-3. In case of non illumination of Lit sites display charge will be deducted on prorata basis for everyday of non illuminous.
-4. The media should be maintained by the contractor in good condition throughout the contract period.
-5. We reserve the right to discontinue or cancel the booking midway of display period.
-6. We reserve the right to accept or reject the quality of the job executed.
-7. Please arrange to send four sets of High Resolution Photographs (Two Long view & Two Close view) together with display report.
-8. The contract period will start from the date of display.
-9. For the print jobs the printer will have to give free replacement of print for any prints found fading or not as per given specification immediately.
-10. Any deviation from the specification given above will not be payable.
-11. All Bills should carry our purchase order copy.
-12. Required 2 Nos Bill For Payment Processing.
-13. Raise Your Bill In favor Of: [company_name], [company_address]
-14. GSTIN Number : [company_gstin]
-15. State Code : [buyerStateCode]
-16. State Name : [buyerStateName]
-17. Place of supply : [buyerStateName]";
+            <div style="padding: 5px 10px; border-top: 1px solid #000; font-size: 8.5px; line-height: 1.2;">
+                <div style="display: flex; align-items: center; margin-bottom: 8px;">
+                    <div style="font-weight: bold; text-decoration: underline; font-size: 10.5px; margin-right: 15px;">Terms
+                        & Conditions</div>
+                    <?php
+                    $poNote = getSetting('po_important_note', '');
+                    if (empty(trim($poNote))) {
+                        $poNote = 'Filing of GSTR-1 within time is mandatory for acceptance of Invoice.';
+                    }
+                    ?>
+                    <div style="font-weight: bold; color: #ff0000; font-size: 10.5px; flex: 1; text-align: center;">
+                        <?php echo htmlspecialchars($poNote); ?></div>
+                </div>
+                <div style="margin: 0; line-height: 1.25; color: #000;">
+                    <?php
+                    $defaultTerms = "1. Mounting: Flex mounting is free. Vinyl must be wrinkle-free; improper execution requires free remounting within 24h, else pro-rata penalty applies.
+2. Maintenance: Lit sites must remain illuminated (or pro-rata deduction). Media must be kept in good condition.
+3. Rights: We reserve the right to cancel bookings midway or reject execution quality.
+4. Proofs: Send 4 high-res photos (2 long, 2 close) immediately upon display. Contract starts from display date.
+5. Printing: Printer must replace fading or incorrect prints immediately. Deviations from specs are not payable.
+6. Billing: Submit 2 copies of the bill with a copy of this PO.
+7. Billing Details: Raise bills in favor of: [company_name], [company_address]
+8. GSTIN Number : [company_gstin]
+9. State Code : [buyerStateCode]
+10. State Name : [buyerStateName]
+11. Place of supply : [buyerStateName]";
 
-                $termsText = getSetting('po_terms', $defaultTerms);
-                if (empty(trim($termsText))) {
-                    $termsText = $defaultTerms;
-                }
-                $termsText = str_replace(
-                    ['[company_name]', '[company_address]', '[company_gstin]', '[buyerStateCode]', '[buyerStateName]'],
-                    [$company_name, $company_address, $company_gstin, $buyerStateCode, getStateName($company_gstin)],
-                    $termsText
-                );
+                    $termsText = getSetting('po_terms', $defaultTerms);
+                    if (empty(trim($termsText))) {
+                        $termsText = $defaultTerms;
+                    }
+                    $termsText = str_replace(
+                        ['[company_name]', '[company_address]', '[company_gstin]', '[buyerStateCode]', '[buyerStateName]'],
+                        [$company_name, $company_address, $company_gstin, $buyerStateCode, getStateName($company_gstin)],
+                        $termsText
+                    );
 
-                // Auto-append GST compliance lines if they are not present in the saved setting
-                if (strpos($termsText, 'GSTIN Number') === false) {
-                    $termsText .= "\n14. GSTIN Number : " . $company_gstin;
-                }
-                if (strpos($termsText, 'State Code') === false) {
-                    $termsText .= "\n15. State Code : " . $buyerStateCode;
-                }
-                if (strpos($termsText, 'State Name') === false) {
-                    $termsText .= "\n16. State Name : " . strtoupper(getStateName($company_gstin));
-                }
-                if (strpos($termsText, 'Place of supply') === false) {
-                    $termsText .= "\n17. Place of supply : " . strtoupper(getStateName($company_gstin));
-                }
+                    // Auto-append GST compliance lines if they are not present in the saved setting
+                    if (strpos($termsText, 'GSTIN Number') === false) {
+                        $termsText .= "\n14. GSTIN Number : " . $company_gstin;
+                    }
+                    if (strpos($termsText, 'State Code') === false) {
+                        $termsText .= "\n15. State Code : " . $buyerStateCode;
+                    }
+                    if (strpos($termsText, 'State Name') === false) {
+                        $termsText .= "\n16. State Name : " . strtoupper(getStateName($company_gstin));
+                    }
+                    if (strpos($termsText, 'Place of supply') === false) {
+                        $termsText .= "\n17. Place of supply : " . strtoupper(getStateName($company_gstin));
+                    }
 
-                // Dynamic parser override: Ensures any hardcoded/saved states in settings are dynamically updated in uppercase to match the top block!
-                $topPOS = strtoupper(getStateName($company_gstin));
-                $termsText = preg_replace('/State Code\s*:\s*[^\r\n]+/i', 'State Code : ' . $buyerStateCode, $termsText);
-                $termsText = preg_replace('/State Name\s*:\s*[^\r\n]+/i', 'State Name : ' . $topPOS, $termsText);
-                $termsText = preg_replace('/Place of supply\s*:\s*[^\r\n]+/i', 'Place of supply : ' . $topPOS, $termsText);
-                $termsText = preg_replace('/GSTIN Number\s*:\s*[^\r\n]+/i', 'GSTIN Number : ' . $company_gstin, $termsText);
+                    // Dynamic parser override: Ensures any hardcoded/saved states in settings are dynamically updated in uppercase to match the top block!
+                    $topPOS = strtoupper(getStateName($company_gstin));
+                    $termsText = preg_replace('/State Code\s*:\s*[^\r\n]+/i', 'State Code : ' . $buyerStateCode, $termsText);
+                    $termsText = preg_replace('/State Name\s*:\s*[^\r\n]+/i', 'State Name : ' . $topPOS, $termsText);
+                    $termsText = preg_replace('/Place of supply\s*:\s*[^\r\n]+/i', 'Place of supply : ' . $topPOS, $termsText);
+                    $termsText = preg_replace('/GSTIN Number\s*:\s*[^\r\n]+/i', 'GSTIN Number : ' . $company_gstin, $termsText);
 
-                echo nl2br(htmlspecialchars($termsText));
-                ?>
-            </div>
-        </div>
-
-        <!-- Signature Footer -->
-        <div style="border-top: 1px solid #000; display: flex; min-height: 125px; font-size: 10px;">
-            <div
-                style="flex: 1; border-right: 1px solid #000; padding: 8px 10px; display: flex; flex-direction: column; justify-content: space-between; align-items: flex-start;">
-                <div>For <strong><?php echo $header_name; ?></strong></div>
-                <div style="margin-top: 30px;">
-                    <img src="<?php echo BASE_URL; ?>assets/images/<?php echo $po_signature; ?>"
-                        style="height: 40px; display: block; margin: 0 auto;" onerror="this.style.display='none'">
-                    <div style="border-top: 1px solid #000; width: 150px; margin: 5px auto 0;"></div>
-                    <div style="font-weight: bold; margin-top: 2px;">Authorised Signatory</div>
+                    echo nl2br(htmlspecialchars($termsText));
+                    ?>
                 </div>
             </div>
-            <div
-                style="flex: 1; padding: 8px 10px; display: flex; flex-direction: column; justify-content: space-between; align-items: flex-start;">
-                <div style="font-weight: bold;">Received & Accepted by <span
-                        style="text-transform: uppercase;"><?php echo htmlspecialchars($v['name'] ?? ''); ?></span>
+
+            <!-- Signature Footer -->
+            <div style="border-top: 1px solid #000; display: flex; min-height: 90px; font-size: 9.5px;">
+                <div
+                    style="flex: 1; border-right: 1px solid #000; padding: 8px 10px; display: flex; flex-direction: column; justify-content: space-between; align-items: flex-start;">
+                    <div>For <strong><?php echo $header_name; ?></strong></div>
+                    <div style="margin-top: 15px;">
+                        <img src="<?php echo BASE_URL; ?>assets/images/<?php echo htmlspecialchars($po_signature); ?>"
+                            style="height: 45px; display: block; margin: 0 auto;" onerror="this.style.display='none'">
+                        <div style="border-top: 1px solid #000; width: 150px; margin: 5px auto 0;"></div>
+                        <div style="font-weight: bold; margin-top: 2px;">Authorised Signatory</div>
+                    </div>
                 </div>
-                <div style="height: 70px;"></div>
-                <div style="font-weight: bold; align-self: flex-end; padding-right: 20px;">Authorised Signatory</div>
+                <div
+                    style="flex: 1; padding: 8px 10px; display: flex; flex-direction: column; justify-content: space-between; align-items: flex-start;">
+                    <div style="font-weight: bold;">Received & Accepted by <span
+                             style="text-transform: uppercase;"><?php echo htmlspecialchars($v['name'] ?? ''); ?></span>
+                    </div>
+                    <div style="height: 35px;"></div>
+                    <div style="font-weight: bold; align-self: flex-end; padding-right: 20px;">Authorised Signatory</div>
+                </div>
             </div>
         </div>
     </div>
+
 
     <div style="max-width: 800px; margin: 10px auto; text-align: center; font-size: 9px; color: #888;">
         This is a computer generated Purchase Order and does not require physical signature.

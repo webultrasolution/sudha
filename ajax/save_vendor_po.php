@@ -27,8 +27,8 @@ try {
 
     $vendor_id = intval($data['vendor_id']);
     $campaign_name = $data['campaign_name'] ?? 'Vendor PO';
-    $start_date = $data['start_date'] ?? date('Y-m-d');
-    $end_date = $data['end_date'] ?? date('Y-m-d', strtotime('+1 month'));
+    $start_date = !empty($data['start_date']) ? $data['start_date'] : null;
+    $end_date = !empty($data['end_date']) ? $data['end_date'] : null;
     $tax_type = $data['tax_type'] ?? 'igst';
     $remarks = $data['remarks'] ?? '';
     $vendor_gst = $data['vendor_gst'] ?? '';
@@ -39,21 +39,22 @@ try {
         $subtotal += floatval($site['rate']);
     }
 
-    // Check if vendor has GSTIN in database
-    $stmtGst = $pdo->prepare("SELECT gstin FROM partners WHERE id = ?");
+    // Check if vendor has GSTIN and state in database
+    $stmtGst = $pdo->prepare("SELECT gstin, state FROM partners WHERE id = ?");
     $stmtGst->execute([$vendor_id]);
-    $db_vendor_gst = trim($stmtGst->fetchColumn() ?: '');
+    $vendorRow = $stmtGst->fetch(PDO::FETCH_ASSOC);
+    $db_vendor_gst = trim($vendorRow['gstin'] ?? '');
+    $vendor_state = trim($vendorRow['state'] ?? '');
     $vendor_has_gst = vendorHasGST($db_vendor_gst);
 
-    $cgst = 0;
-    $sgst = 0;
-    $igst = 0;
+    $cgst = 0; $sgst = 0; $igst = 0;
     if ($vendor_has_gst) {
-        if ($tax_type === 'cgst_sgst') {
+        $isVendorInterstate = (strcasecmp($vendor_state, 'West Bengal') !== 0 && substr($db_vendor_gst, 0, 2) !== '19');
+        if ($isVendorInterstate) {
+            $igst = $subtotal * 0.18;
+        } else {
             $cgst = $subtotal * 0.09;
             $sgst = $subtotal * 0.09;
-        } elseif ($tax_type === 'igst') {
-            $igst = $subtotal * 0.18;
         }
     }
     $grand_total = $subtotal + $cgst + $sgst + $igst;
@@ -100,9 +101,12 @@ try {
     ");
 
     // Calculate days
-    $d1 = new DateTime($start_date);
-    $d2 = new DateTime($end_date);
-    $days = $d1->diff($d2)->days + 1;
+    $days = 30;
+    if (!empty($start_date) && !empty($end_date)) {
+        $d1 = new DateTime($start_date);
+        $d2 = new DateTime($end_date);
+        $days = $d1->diff($d2)->days + 1;
+    }
 
     foreach ($data['sites'] as $site) {
         $rate = floatval($site['rate']);

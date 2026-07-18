@@ -51,6 +51,19 @@ if (empty($items)) {
 $first = $items[0];
 $po_num_display = $first['po_number'] ? $first['po_number'] : 'Draft-' . $first['id'];
 
+// Block view if not approved and user is not admin
+$isAdmin = ($_SESSION['user_role'] ?? '') === 'admin';
+if (!$isAdmin && $first['po_number']) {
+    $stmtStatus = $pdo->prepare("SELECT approval_status FROM purchase_orders WHERE po_number = ?");
+    $stmtStatus->execute([$first['po_number']]);
+    $apprStatus = $stmtStatus->fetchColumn();
+    if ($apprStatus !== 'approved') {
+        echo "<div class='card'><h3 style='color:red;'>Access Denied</h3><p>This Printing PO is awaiting admin approval and cannot be viewed yet.</p></div>";
+        include_once __DIR__ . '/../../includes/footer.php';
+        exit;
+    }
+}
+
 // Total Amount
 $totalAmount = 0;
 foreach ($items as &$item) {
@@ -75,6 +88,13 @@ foreach ($items as &$item) {
     $totalAmount += $amt;
 }
 unset($item);
+
+$po_status = 'draft';
+if ($po_number) {
+    $stmtPO = $pdo->prepare("SELECT approval_status FROM purchase_orders WHERE po_number = ?");
+    $stmtPO->execute([$po_number]);
+    $po_status = $stmtPO->fetchColumn() ?: 'approved';
+}
 ?>
 
 <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 2rem;">
@@ -85,6 +105,23 @@ unset($item);
             <span style="background: #f1f5f9; color: #475569; padding: 0.25rem 0.75rem; border-radius: 8px; font-size: 0.75rem; font-weight: 700;">
                 Vendor Printing PO
             </span>
+            <?php if ($po_status === 'pending_approval'): ?>
+                <span style="background: #fff7ed; color: #c2410c; padding: 0.25rem 0.75rem; border-radius: 50px; font-size: 0.75rem; font-weight: 800; text-transform: uppercase;">Awaiting Approval</span>
+            <?php elseif ($po_status === 'approved'): ?>
+                <span style="background: #f0fdf4; color: #15803d; padding: 0.25rem 0.75rem; border-radius: 50px; font-size: 0.75rem; font-weight: 800; text-transform: uppercase;">Approved</span>
+            <?php elseif ($po_status === 'rejected'): ?>
+                <span style="background: #fef2f2; color: #b91c1c; padding: 0.25rem 0.75rem; border-radius: 50px; font-size: 0.75rem; font-weight: 800; text-transform: uppercase;">Rejected</span>
+            <?php endif; ?>
+            <?php 
+            $camp_brand = [];
+            if (!empty($first['campaign_name'])) $camp_brand[] = trim($first['campaign_name']);
+            if (!empty($first['brand_name'])) $camp_brand[] = trim($first['brand_name']);
+            $display_camp_brand = implode(' / ', $camp_brand);
+            if (!empty($display_camp_brand)): ?>
+                <span style="background: #eff6ff; color: #2563eb; padding: 0.25rem 0.75rem; border-radius: 8px; font-size: 0.75rem; font-weight: 700; display: inline-flex; align-items: center; gap: 4px;">
+                    <i class="fas fa-bullhorn" style="font-size: 0.65rem;"></i> <?php echo htmlspecialchars($display_camp_brand); ?>
+                </span>
+            <?php endif; ?>
         </div>
         <p style="color: #64748b; margin: 0; font-size: 0.9rem;">
             Created on <?php echo date('d M Y, h:i A', strtotime($first['created_at'])); ?> by System

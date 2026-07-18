@@ -61,40 +61,100 @@ $activePage = 'vendors';
 $pageTitle = 'Vendor Management';
 include_once __DIR__ . '/../../includes/header.php';
 
-// Search Logic
+// Search and Filter Logic
 $search = $_GET['search'] ?? '';
-$query = "
-    SELECT v.*, (SELECT COUNT(*) FROM sites WHERE vendor_id = v.id) as site_count 
-    FROM partners v 
-    WHERE type = 'vendor' 
-";
+$cityFilter = $_GET['city'] ?? '';
+$stateFilter = $_GET['state'] ?? '';
+$businessTypeFilter = $_GET['business_type'] ?? '';
+
+$where = "WHERE type = 'vendor'";
 $params = [];
+
 if ($search) {
-    $query .= " AND (name LIKE ? OR contact_person LIKE ? OR city LIKE ?)";
-    $params = ["%$search%", "%$search%", "%$search%"];
+    $where .= " AND (name LIKE ? OR contact_person LIKE ? OR city LIKE ? OR phone LIKE ?)";
+    $params[] = "%$search%";
+    $params[] = "%$search%";
+    $params[] = "%$search%";
+    $params[] = "%$search%";
 }
-$query .= " ORDER BY name ASC";
+if ($cityFilter) {
+    $where .= " AND city = ?";
+    $params[] = $cityFilter;
+}
+if ($stateFilter) {
+    $where .= " AND state = ?";
+    $params[] = $stateFilter;
+}
+if ($businessTypeFilter) {
+    $where .= " AND business_type = ?";
+    $params[] = $businessTypeFilter;
+}
+
+$query = "
+    SELECT v.*, 
+           (SELECT COUNT(*) FROM sites WHERE vendor_id = v.id) as site_count,
+           COALESCE((SELECT SUM(amount) FROM payments WHERE partner_id = v.id AND type = 'payable'), 0) as total_paid,
+           COALESCE((SELECT SUM(COALESCE(NULLIF(total_amount, 0), po_amount + COALESCE(cgst_amount,0) + COALESCE(sgst_amount,0) + COALESCE(igst_amount,0))) FROM purchase_orders WHERE vendor_id = v.id), 0) as total_po
+    FROM partners v 
+    $where 
+    ORDER BY name ASC
+";
 $stmt = $pdo->prepare($query);
 $stmt->execute($params);
 $vendors = $stmt->fetchAll();
+
+$cities = $pdo->query("SELECT DISTINCT city FROM partners WHERE type = 'vendor' AND city != '' ORDER BY city")->fetchAll(PDO::FETCH_COLUMN);
+$states = $pdo->query("SELECT DISTINCT state FROM partners WHERE type = 'vendor' AND state != '' ORDER BY state")->fetchAll(PDO::FETCH_COLUMN);
+$business_types = $pdo->query("SELECT DISTINCT business_type FROM partners WHERE type = 'vendor' AND business_type != '' ORDER BY business_type")->fetchAll(PDO::FETCH_COLUMN);
 
 $indian_states = ["Andhra Pradesh", "Arunachal Pradesh", "Assam", "Bihar", "Chhattisgarh", "Goa", "Gujarat", "Haryana", "Himachal Pradesh", "Jharkhand", "Karnataka", "Kerala", "Madhya Pradesh", "Maharashtra", "Manipur", "Meghalaya", "Mizoram", "Nagaland", "Odisha", "Punjab", "Rajasthan", "Sikkim", "Tamil Nadu", "Telangana", "Tripura", "Uttar Pradesh", "Uttarakhand", "West Bengal", "Delhi"];
 ?>
 
 <div class="card">
-    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1.5rem;">
-        <h2 style="font-size: 1.25rem;">Manage Vendors</h2>
-        <div style="display: flex; gap: 1rem;">
-            <form method="GET" style="display: flex; gap: 0.5rem;">
-                <input type="text" name="search" value="<?php echo htmlspecialchars($search); ?>" placeholder="Search vendor..." style="padding: 0.5rem; border: 1px solid #ddd; border-radius: 6px;">
-                <button type="submit" class="btn" style="padding: 0.5rem 1rem;"><i class="fas fa-search"></i></button>
-            </form>
-            <?php if (canAdd('vendors')): ?>
-            <button class="btn btn-primary" onclick="openModal()">
-                <i class="fas fa-plus"></i> Create Vendor
-            </button>
-            <?php endif; ?>
-        </div>
+    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1.5rem; border-bottom: 1px solid #f1f5f9; padding-bottom: 1rem;">
+        <h2 style="font-size: 1.25rem; font-weight: 800; color: #0f172a;">Manage Vendors</h2>
+        <?php if (canAdd('vendors')): ?>
+        <button class="btn btn-primary" onclick="openModal()">
+            <i class="fas fa-plus"></i> Create Vendor
+        </button>
+        <?php endif; ?>
+    </div>
+
+    <!-- Filters Section -->
+    <div style="background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 12px; padding: 1rem; margin-bottom: 1.5rem;">
+        <form method="GET" style="display: grid; grid-template-columns: 2fr 1.2fr 1.2fr 1.2fr auto; gap: 0.75rem; align-items: center;">
+            <div style="position: relative;">
+                <input type="text" name="search" value="<?php echo htmlspecialchars($search); ?>" placeholder="Search vendor name, contact, phone..." style="width: 100%; padding: 0.55rem; border: 1px solid #cbd5e1; border-radius: 8px; font-size: 0.85rem;">
+            </div>
+            
+            <select name="business_type" style="width: 100%; padding: 0.55rem; border: 1px solid #cbd5e1; border-radius: 8px; font-size: 0.85rem; font-weight: 600; color: #0f172a;" onchange="this.form.submit()">
+                <option value="">All Business Types</option>
+                <?php foreach ($business_types as $bt): ?>
+                    <option value="<?php echo htmlspecialchars($bt); ?>" <?php echo $businessTypeFilter === $bt ? 'selected' : ''; ?>><?php echo htmlspecialchars($bt); ?></option>
+                <?php endforeach; ?>
+            </select>
+
+            <select name="state" style="width: 100%; padding: 0.55rem; border: 1px solid #cbd5e1; border-radius: 8px; font-size: 0.85rem; font-weight: 600; color: #0f172a;" onchange="this.form.submit()">
+                <option value="">All States</option>
+                <?php foreach ($states as $st): ?>
+                    <option value="<?php echo htmlspecialchars($st); ?>" <?php echo $stateFilter === $st ? 'selected' : ''; ?>><?php echo htmlspecialchars($st); ?></option>
+                <?php endforeach; ?>
+            </select>
+
+            <select name="city" style="width: 100%; padding: 0.55rem; border: 1px solid #cbd5e1; border-radius: 8px; font-size: 0.85rem; font-weight: 600; color: #0f172a;" onchange="this.form.submit()">
+                <option value="">All Cities</option>
+                <?php foreach ($cities as $ct): ?>
+                    <option value="<?php echo htmlspecialchars($ct); ?>" <?php echo $cityFilter === $ct ? 'selected' : ''; ?>><?php echo htmlspecialchars($ct); ?></option>
+                <?php endforeach; ?>
+            </select>
+
+            <div style="display: flex; gap: 0.5rem; min-width: 90px;">
+                <button type="submit" class="btn btn-primary" style="padding: 0.55rem 0.85rem; display: flex; align-items: center; justify-content: center;"><i class="fas fa-filter"></i></button>
+                <?php if ($search || $cityFilter || $stateFilter || $businessTypeFilter): ?>
+                    <a href="vendors.php" class="btn" style="background: #f1f5f9; color: #475569; border: 1px solid #cbd5e1; padding: 0.55rem 0.85rem; display: flex; align-items: center; justify-content: center; text-decoration: none;" title="Reset filters"><i class="fas fa-undo"></i></a>
+                <?php endif; ?>
+            </div>
+        </form>
     </div>
 
     <table class="table">
@@ -112,11 +172,24 @@ $indian_states = ["Andhra Pradesh", "Arunachal Pradesh", "Assam", "Bihar", "Chha
             <?php foreach ($vendors as $v): ?>
             <tr>
                 <td>
-                    <a href="vendor_view.php?id=<?php echo $v['id']; ?>" style="text-decoration: none; color: inherit;">
+                    <a href="vendor_view.php?id=<?php echo $v['id']; ?>" style="text-decoration: none; color: inherit; display: inline-block;">
                         <strong><?php echo $v['name']; ?></strong>
-                        <div style="font-size: 0.7rem; color: #64748b; font-weight: 700; margin-top: 2px;"><?php echo $v['business_type'] ?: 'N/A'; ?></div>
-                        <i class="fas fa-external-link-alt" style="font-size: 0.7rem; color: var(--primary); margin-left: 0.3rem;"></i>
+                        <div style="font-size: 0.7rem; color: #64748b; font-weight: 700; margin-top: 2px;">
+                            <?php echo $v['business_type'] ?: 'N/A'; ?>
+                            <i class="fas fa-external-link-alt" style="font-size: 0.65rem; color: var(--primary); margin-left: 0.3rem;"></i>
+                        </div>
                     </a>
+                    
+                    <div style="margin-top: 6px; display: flex; gap: 6px; flex-wrap: wrap; align-items: center;">
+                        <span style="font-size: 0.65rem; background: #e0f2fe; color: #0369a1; border: 1px solid #bae6fd; padding: 2px 6px; border-radius: 4px; font-weight: 700;">POs: <?php echo formatCurrency($v['total_po']); ?></span>
+                        <?php 
+                        $due = $v['total_po'] - $v['total_paid'];
+                        if ($due > 0.01): ?>
+                            <span style="font-size: 0.65rem; background: #fef2f2; color: #991b1b; border: 1px solid #fecaca; padding: 2px 6px; border-radius: 4px; font-weight: 700;">Bal: <?php echo formatCurrency($due); ?></span>
+                        <?php else: ?>
+                            <span style="font-size: 0.65rem; background: #f0fdf4; color: #166534; border: 1px solid #bbf7d0; padding: 2px 6px; border-radius: 4px; font-weight: 700;">Paid</span>
+                        <?php endif; ?>
+                    </div>
                 </td>
                 <td>
                     <div><?php echo $v['contact_person']; ?></div>

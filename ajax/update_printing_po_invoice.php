@@ -17,6 +17,10 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     if ($po_number && $no && $date) {
         $stmt = $pdo->prepare("UPDATE vendor_printing_rates SET vendor_invoice_no = ?, vendor_invoice_date = ? WHERE po_number = ?");
         $stmt->execute([$no, $date, $po_number]);
+        
+        $stmtPO = $pdo->prepare("UPDATE purchase_orders SET vendor_invoice_no = ?, vendor_invoice_date = ? WHERE po_number = ?");
+        $stmtPO->execute([$no, $date, $po_number]);
+        
         echo json_encode(['success' => true]);
     } else {
         echo json_encode(['success' => false, 'message' => 'Missing fields or invalid PO number']);

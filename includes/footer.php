@@ -1,5 +1,5 @@
     </div><!-- End Main Content -->
-    <script src="<?php echo BASE_URL; ?>assets/js/main.js"></script>
+    <script src="<?php echo BASE_URL; ?>assets/js/main.js?v=1.0.7"></script>
     <script>
     // Global Bootstrap-like Validation Logic
     (function() {

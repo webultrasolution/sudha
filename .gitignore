@@ -1,0 +1,22 @@
+# Logs
+*.log
+php_error.log
+pay_debug.log
+
+# Uploads and temporary assets
+uploads/
+assets/images/entity_*
+assets/images/lh_*
+assets/images/logo_*
+assets/images/sig_*
+
+# Scratch directory (temp scripts and backups)
+scratch/
+scratch_*.php
+remote_*.php
+*.zip
+*.tar
+*.gz
+inspect_*.php
+check_*.php
+temp_*.php

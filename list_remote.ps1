@@ -2,10 +2,10 @@ Add-Type -Path 'C:\Users\Lenovo\AppData\Local\Temp\winscp\WinSCPnet.dll'
 
 $sessionOptions = New-Object WinSCP.SessionOptions -Property @{
     Protocol = [WinSCP.Protocol]::Sftp
-    HostName = '145.79.209.12'
-    PortNumber = 65002
-    UserName = 'u511039083'
-    Password = 'M2Noida@278'
+    HostName = 'sudhacreative.com'
+    PortNumber = 22
+    UserName = 'root'
+    Password = 'M2Noida@847226'
     GiveUpSecurityAndAcceptAnySshHostKey = $true
 }
 
@@ -17,15 +17,14 @@ try {
     $session.Open($sessionOptions)
     Write-Host "Connected!" -ForegroundColor Green
 
-    $remotePath = "/home/u511039083/domains/webultrasolution.io/public_html/sudha/"
+    $remotePath = "/home/sudhacreative/public_html/"
     
-    # List all files in root
-    Write-Host "`n=== ROOT FILES ON SERVER ===" -ForegroundColor Cyan
-    $dir = $session.ListDirectory($remotePath)
-    foreach ($file in $dir.Files | Sort-Object Name) {
-        $size = if ($file.IsDirectory) { "[DIR]" } else { "$([math]::Round($file.Length/1KB,1)) KB" }
-        Write-Host ("  " + $file.Name + " -- " + $size)
+    Write-Host "Searching recursively for inspect_prod_invoices2.php under $remotePath..." -ForegroundColor Cyan
+    $files = $session.EnumerateRemoteFiles($remotePath, "*inspect_prod_invoices2.php", [WinSCP.EnumerationOptions]::AllDirectories)
+    foreach ($file in $files) {
+        Write-Host "Found: $($file.FullName) - Size: $($file.Length) bytes" -ForegroundColor Green
     }
+    Write-Host "Search completed." -ForegroundColor Cyan
 
 } catch {
     Write-Host ("Error: " + $_.Exception.Message) -ForegroundColor Red

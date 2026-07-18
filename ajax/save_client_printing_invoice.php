@@ -76,15 +76,62 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             }
         }
 
-        $cgst = 0; $sgst = 0; $igst = $net_total * 0.18; // Defaulting to IGST 18%
+        $billing_gstin = trim($_POST['billing_gstin'] ?? '');
+        $client_state = '';
+        if ($client_id) {
+            $stmtC = $pdo->prepare("SELECT gstin, state, additional_gst FROM partners WHERE id = ?");
+            $stmtC->execute([$client_id]);
+            $partner = $stmtC->fetch();
+            if ($partner) {
+                if (!empty($billing_gstin) && $partner['gstin'] !== $billing_gstin) {
+                    $found = false;
+                    if (!empty($partner['additional_gst'])) {
+                        $extra = json_decode($partner['additional_gst'], true);
+                        if (is_array($extra)) {
+                            foreach ($extra as $item) {
+                                if (isset($item['gstin']) && $item['gstin'] === $billing_gstin) {
+                                    $client_state = trim($item['state'] ?? '');
+                                    $found = true;
+                                    break;
+                                }
+                            }
+                        }
+                    }
+                    if (!$found) {
+                        $client_state = trim($partner['state'] ?? '');
+                    }
+                } else {
+                    $client_state = trim($partner['state'] ?? '');
+                }
+            }
+        }
+
+        $isClientInterstate = true;
+        if (!empty($client_state)) {
+            $isClientInterstate = (strcasecmp($client_state, 'West Bengal') !== 0);
+        }
+        if (!empty($billing_gstin)) {
+            $isClientInterstate = (strcasecmp($client_state, 'West Bengal') !== 0 && substr($billing_gstin, 0, 2) !== '19');
+        }
+
+        $cgst = 0; $sgst = 0; $igst = 0;
+        if ($isClientInterstate) {
+            $igst = $net_total * 0.18;
+        } else {
+            $cgst = $net_total * 0.09;
+            $sgst = $net_total * 0.09;
+        }
         $grandTotal = $net_total + $cgst + $sgst + $igst;
 
-        $invoiceNum = "CP/" . date('y') . "-" . date('y', strtotime('+1 year')) . "/" . str_pad($client_id, 3, '0', STR_PAD_LEFT) . "-" . date('dHi');
+        $prefix = 'SCRP/' . getFinancialYear() . '/';
+        $invoiceNum = generateSequentialReference($pdo, 'invoices', 'invoice_number', $prefix, 4);
         
-        // 2. Insert into invoices
+        $approvalStatus = $isAdmin ? 'approved' : 'pending_approval';
+
+        // 2. Insert into invoices (using entity_id, remarks, billing_gstin, approval_status)
         $stmtInv = $pdo->prepare("
-            INSERT INTO invoices (booking_id, client_id, invoice_number, invoice_date, sub_total, cgst, sgst, igst, total_amount, status, type, remarks) 
-            VALUES (0, ?, ?, CURDATE(), ?, ?, ?, ?, ?, 'Billed', 'printing', ?)
+            INSERT INTO invoices (booking_id, entity_id, invoice_number, invoice_date, sub_total, cgst, sgst, igst, total_amount, payment_status, approval_status, type, remarks, billing_gstin) 
+            VALUES (0, ?, ?, CURDATE(), ?, ?, ?, ?, ?, 'unpaid', ?, 'printing', ?, ?)
         ");
         $stmtInv->execute([
             $client_id, 
@@ -94,7 +141,9 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             $sgst, 
             $igst, 
             $grandTotal,
-            $remarks
+            $approvalStatus,
+            $remarks,
+            $billing_gstin
         ]);
         $invoiceId = $pdo->lastInsertId();
 

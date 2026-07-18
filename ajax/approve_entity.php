@@ -30,12 +30,14 @@ $adminId    = $_SESSION['user_id'];
 
 if (!$entityId && $entityType === 'client_printing') {
     // Note: for client printing, entityId is passed as po_number string in the payload from approvals.php, so we handle it below
-} elseif (!$entityId && $entityType !== 'client_printing') {
+} elseif (!$entityId && $entityType === 'client_mounting') {
+    // Note: for client mounting, entityId is passed as po_number string in the payload from approvals.php, so we handle it below
+} elseif (!$entityId && $entityType !== 'client_printing' && $entityType !== 'client_mounting') {
     echo json_encode(['success' => false, 'message' => 'Invalid parameters.']);
     exit;
 }
 
-if (!in_array($action, ['approve', 'reject']) || !in_array($entityType, ['proposal', 'purchase_order', 'booking', 'invoice', 'client_printing', 'payment'])) {
+if (!in_array($action, ['approve', 'reject']) || !in_array($entityType, ['proposal', 'purchase_order', 'booking', 'invoice', 'client_printing', 'client_mounting', 'payment'])) {
     echo json_encode(['success' => false, 'message' => 'Invalid parameters.']);
     exit;
 }
@@ -95,29 +97,31 @@ try {
             $entityId = $rateId; 
             break;
 
+        case 'client_mounting':
+            // In approvals.php we pass po_number as entityId string for client_mounting
+            $poNumber = $data['entity_id'] ?? '';
+            if ($action === 'approve') {
+                $stmt = $pdo->prepare("UPDATE client_mounting_rates SET approval_status = ?, is_final_invoice = 1 WHERE po_number = ?");
+            } else {
+                $stmt = $pdo->prepare("UPDATE client_mounting_rates SET approval_status = ? WHERE po_number = ?");
+            }
+            $stmt->execute([$newApprovalStatus, $poNumber]);
+            $ref = $poNumber;
+            // Get the actual first ID to update approval_requests
+            $rateId = $pdo->query("SELECT id FROM client_mounting_rates WHERE po_number = '$poNumber' LIMIT 1")->fetchColumn();
+            $entityId = $rateId; 
+            break;
+
         case 'payment':
-            $stmt = $pdo->prepare("UPDATE payments SET approval_status = ?, approved_by = ?, approved_at = NOW() WHERE id = ?");
-            $stmt->execute([$newApprovalStatus, $adminId, $entityId]);
+            $stmt = $pdo->prepare("UPDATE payments SET approval_status = ?, approved_by = ?, approved_at = NOW(), rejection_reason = ? WHERE id = ?");
+            $stmt->execute([$newApprovalStatus, $adminId, $reason ?: null, $entityId]);
             
-            // If approved and linked to invoice, recalculate invoice payment status
-            if ($newApprovalStatus === 'approved') {
-                $payStmt = $pdo->prepare("SELECT invoice_id FROM payments WHERE id = ?");
-                $payStmt->execute([$entityId]);
-                $invId = $payStmt->fetchColumn();
-                
-                if ($invId) {
-                    $paidStmt = $pdo->prepare("SELECT SUM(amount) FROM payments WHERE invoice_id = ? AND approval_status = 'approved'");
-                    $paidStmt->execute([$invId]);
-                    $totalPaid = floatval($paidStmt->fetchColumn());
-
-                    $invStmt = $pdo->prepare("SELECT total_amount FROM invoices WHERE id = ?");
-                    $invStmt->execute([$invId]);
-                    $invTotal = floatval($invStmt->fetchColumn());
-
-                    $status = ($totalPaid >= $invTotal) ? 'paid' : (($totalPaid > 0) ? 'partially_paid' : 'unpaid');
-                    $upd = $pdo->prepare("UPDATE invoices SET payment_status = ? WHERE id = ?");
-                    $upd->execute([$status, $invId]);
-                }
+            // Recalculate invoice / PO payment status
+            $payStmt = $pdo->prepare("SELECT invoice_id, proposal_id FROM payments WHERE id = ?");
+            $payStmt->execute([$entityId]);
+            $pay = $payStmt->fetch(PDO::FETCH_ASSOC);
+            if ($pay) {
+                updateDocumentPaymentStatus($pdo, $pay['invoice_id'], $pay['proposal_id']);
             }
             $ref = "Payment #$entityId";
             break;

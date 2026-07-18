@@ -50,6 +50,9 @@ function calculateGST($subtotal, $isInterState = false) {
  * @param int    $userId     The user making the change
  */
 function revertToPendingOnEdit($pdo, $table, $entityId, $entityType, $entityRef, $userId) {
+    if ($table === 'bookings' || $entityType === 'booking') {
+        return;
+    }
     // Only revert if it was previously approved (not already pending/rejected)
     $cur = $pdo->prepare("SELECT approval_status FROM $table WHERE id = ?");
     $cur->execute([$entityId]);
@@ -78,6 +81,28 @@ function formatCurrency($amount) {
     }
     return '₹' . number_format($amount, 2);
 }
+/**
+ * Get the current Indian Financial Year (e.g. "26-27" for June 2026)
+ */
+function getFinancialYear($date = null, $systemOnly = false) {
+    if ($date === null && !$systemOnly) {
+        if (session_status() === PHP_SESSION_NONE) session_start();
+        if (!empty($_SESSION['active_financial_year'])) {
+            return $_SESSION['active_financial_year'];
+        }
+    }
+    $timestamp = $date ? strtotime($date) : time();
+    $month = intval(date('m', $timestamp));
+    $year = intval(date('y', $timestamp));
+    if ($month >= 4) {
+        $startYear = $year;
+        $endYear = $year + 1;
+    } else {
+        $startYear = $year - 1;
+        $endYear = $year;
+    }
+    return sprintf("%02d-%02d", $startYear, $endYear);
+}
 
 /**
  * Generate a prefixed sequential reference using the next available table ID.
@@ -88,6 +113,269 @@ function generateSequentialReference($pdo, $table, $column, $prefix, $padding = 
     $stmt->execute();
     $nextId = intval($stmt->fetchColumn()) + 1;
     return $prefix . str_pad($nextId, $padding, '0', STR_PAD_LEFT);
+}
+
+/**
+ * Generate a sequence number based on a configuration stored in `document_sequences` table.
+ * Resolves the `{FY}` placeholder with the current financial year and increments `next_value` atomically.
+ */
+function generateSequenceNumber($pdo, $moduleKey, $date = null, $entityId = null) {
+    if ($moduleKey === 'invoice') {
+        if ($entityId === null) {
+            if (session_status() === PHP_SESSION_NONE) session_start();
+            $entityId = $_SESSION['active_entity_id'] ?? null;
+            if (!$entityId) {
+                $stmt = $pdo->query("SELECT id FROM entities LIMIT 1");
+                $entityId = $stmt->fetchColumn();
+            }
+        }
+        $moduleKey = "invoice_" . $entityId;
+    }
+
+    $fy = getFinancialYear($date);
+    
+    // 1. Fetch sequence settings for this specific financial year
+    $stmt = $pdo->prepare("SELECT * FROM `document_sequences` WHERE `module_key` = ? AND `financial_year` = ? FOR UPDATE");
+    $stmt->execute([$moduleKey, $fy]);
+    $seq = $stmt->fetch();
+    
+    if (!$seq) {
+        // If not found, look up the template / any existing row for this module to copy settings
+        $stmtTemplate = $pdo->prepare("SELECT prefix, padding FROM `document_sequences` WHERE `module_key` = ? LIMIT 1");
+        $stmtTemplate->execute([$moduleKey]);
+        $template = $stmtTemplate->fetch();
+        
+        $prefix = $template ? $template['prefix'] : '';
+        $padding = $template ? intval($template['padding']) : 4;
+        
+        if (empty($prefix)) {
+            $defaults = [
+                'proposal' => ['prefix' => 'PR/{FY}/', 'padding' => 4],
+                'booking' => ['prefix' => 'BK/{FY}/', 'padding' => 4],
+                'vendor_printing_po' => ['prefix' => 'PPO/{FY}/', 'padding' => 4],
+                'client_printing_po' => ['prefix' => 'SCRP/{FY}/', 'padding' => 4],
+                'client_mounting_invoice' => ['prefix' => 'SCRM/{FY}/', 'padding' => 4],
+                'vendor_booking_po' => ['prefix' => 'BPO/{FY}/', 'padding' => 4],
+                'invoice' => ['prefix' => 'SCR/{FY}/', 'padding' => 4],
+                'invoice_1' => ['prefix' => 'SCA/{FY}/', 'padding' => 3],
+                'invoice_2' => ['prefix' => 'SCR/{FY}/', 'padding' => 3]
+            ];
+            $def = $defaults[$moduleKey] ?? ['prefix' => 'DOC/{FY}/', 'padding' => 4];
+            if ($moduleKey !== 'invoice_1' && $moduleKey !== 'invoice_2' && strpos($moduleKey, 'invoice_') === 0) {
+                $def = ['prefix' => 'SCR/{FY}/', 'padding' => 3];
+            }
+            $prefix = $def['prefix'];
+            $padding = $def['padding'];
+        }
+        
+        $nextValue = 1;
+        if ($moduleKey === 'invoice_1') {
+            $nextValue = 24;
+        } elseif ($moduleKey === 'invoice_2') {
+            $nextValue = 34;
+        }
+        
+        // Insert new sequence entry for this new financial year starting at $nextValue
+        $stmtIns = $pdo->prepare("INSERT INTO `document_sequences` (`module_key`, `financial_year`, `prefix`, `next_value`, `padding`) VALUES (?, ?, ?, ?, ?)");
+        $stmtIns->execute([$moduleKey, $fy, $prefix, $nextValue, $padding]);
+        
+        // Refetch
+        $stmt->execute([$moduleKey, $fy]);
+        $seq = $stmt->fetch();
+    }
+    
+    $nextValue = intval($seq['next_value']);
+    $prefixTemplate = $seq['prefix'];
+    $padding = intval($seq['padding']);
+    
+    $resolvedPrefix = str_replace('{FY}', $fy, $prefixTemplate);
+    $formattedNumber = $resolvedPrefix . str_pad($nextValue, $padding, '0', STR_PAD_LEFT);
+    
+    $stmtUpd = $pdo->prepare("UPDATE `document_sequences` SET `next_value` = `next_value` + 1 WHERE `module_key` = ? AND `financial_year` = ?");
+    $stmtUpd->execute([$moduleKey, $fy]);
+    
+    return $formattedNumber;
+}
+
+/**
+ * Get next sequence number without incrementing the database value.
+ * Useful for pre-filling input fields in forms.
+ */
+function getPreviewSequenceNumber($pdo, $moduleKey, $date = null, $entityId = null) {
+    if ($moduleKey === 'invoice') {
+        if ($entityId === null) {
+            if (session_status() === PHP_SESSION_NONE) session_start();
+            $entityId = $_SESSION['active_entity_id'] ?? null;
+            if (!$entityId) {
+                $stmt = $pdo->query("SELECT id FROM entities LIMIT 1");
+                $entityId = $stmt->fetchColumn();
+            }
+        }
+        $moduleKey = "invoice_" . $entityId;
+    }
+
+    $fy = getFinancialYear($date);
+    $stmt = $pdo->prepare("SELECT * FROM `document_sequences` WHERE `module_key` = ? AND `financial_year` = ?");
+    $stmt->execute([$moduleKey, $fy]);
+    $seq = $stmt->fetch();
+    
+    if (!$seq) {
+        // Find any existing entry to preview
+        $stmtTemplate = $pdo->prepare("SELECT prefix, padding FROM `document_sequences` WHERE `module_key` = ? LIMIT 1");
+        $stmtTemplate->execute([$moduleKey]);
+        $template = $stmtTemplate->fetch();
+        
+        $prefixTemplate = $template ? $template['prefix'] : '';
+        $padding = $template ? intval($template['padding']) : 4;
+        
+        if (empty($prefixTemplate)) {
+            $defaults = [
+                'proposal' => ['prefix' => 'PR/{FY}/', 'padding' => 4],
+                'booking' => ['prefix' => 'BK/{FY}/', 'padding' => 4],
+                'vendor_printing_po' => ['prefix' => 'PPO/{FY}/', 'padding' => 4],
+                'client_printing_po' => ['prefix' => 'SCRP/{FY}/', 'padding' => 4],
+                'client_mounting_invoice' => ['prefix' => 'SCRM/{FY}/', 'padding' => 4],
+                'vendor_booking_po' => ['prefix' => 'BPO/{FY}/', 'padding' => 4],
+                'invoice' => ['prefix' => 'SCR/{FY}/', 'padding' => 4],
+                'invoice_1' => ['prefix' => 'SCA/{FY}/', 'padding' => 3],
+                'invoice_2' => ['prefix' => 'SCR/{FY}/', 'padding' => 3]
+            ];
+            $def = $defaults[$moduleKey] ?? ['prefix' => 'DOC/{FY}/', 'padding' => 4];
+            if ($moduleKey !== 'invoice_1' && $moduleKey !== 'invoice_2' && strpos($moduleKey, 'invoice_') === 0) {
+                $def = ['prefix' => 'SCR/{FY}/', 'padding' => 3];
+            }
+            $prefixTemplate = $def['prefix'];
+            $padding = $def['padding'];
+        }
+        
+        $nextValue = 1;
+        if ($moduleKey === 'invoice_1') {
+            $nextValue = 24;
+        } elseif ($moduleKey === 'invoice_2') {
+            $nextValue = 34;
+        }
+    } else {
+        $nextValue = intval($seq['next_value']);
+        $prefixTemplate = $seq['prefix'];
+        $padding = intval($seq['padding']);
+    }
+    
+    $resolvedPrefix = str_replace('{FY}', $fy, $prefixTemplate);
+    return $resolvedPrefix . str_pad($nextValue, $padding, '0', STR_PAD_LEFT);
+}
+
+/**
+ * Get last generated sequence number without altering database.
+ */
+function getLastSequenceNumber($pdo, $moduleKey, $date = null, $entityId = null) {
+    if ($moduleKey === 'invoice') {
+        if ($entityId === null) {
+            if (session_status() === PHP_SESSION_NONE) session_start();
+            $entityId = $_SESSION['active_entity_id'] ?? null;
+            if (!$entityId) {
+                $stmt = $pdo->query("SELECT id FROM entities LIMIT 1");
+                $entityId = $stmt->fetchColumn();
+            }
+        }
+        $moduleKey = "invoice_" . $entityId;
+    }
+
+    $fy = getFinancialYear($date);
+    $stmt = $pdo->prepare("SELECT * FROM `document_sequences` WHERE `module_key` = ? AND `financial_year` = ?");
+    $stmt->execute([$moduleKey, $fy]);
+    $seq = $stmt->fetch();
+    
+    if (!$seq) {
+        $defaults = [
+            'proposal' => ['prefix' => 'PR/{FY}/', 'padding' => 4, 'start' => 1],
+            'booking' => ['prefix' => 'BK/{FY}/', 'padding' => 4, 'start' => 1],
+            'vendor_printing_po' => ['prefix' => 'PPO/{FY}/', 'padding' => 4, 'start' => 1],
+            'client_printing_po' => ['prefix' => 'SCRP/{FY}/', 'padding' => 4, 'start' => 1],
+            'client_mounting_invoice' => ['prefix' => 'SCRM/{FY}/', 'padding' => 4, 'start' => 1],
+            'vendor_booking_po' => ['prefix' => 'BPO/{FY}/', 'padding' => 4, 'start' => 1],
+            'invoice' => ['prefix' => 'SCR/{FY}/', 'padding' => 4, 'start' => 1],
+            'invoice_1' => ['prefix' => 'SCA/{FY}/', 'padding' => 3, 'start' => 24],
+            'invoice_2' => ['prefix' => 'SCR/{FY}/', 'padding' => 3, 'start' => 34]
+        ];
+        $def = $defaults[$moduleKey] ?? ['prefix' => 'DOC/{FY}/', 'padding' => 4, 'start' => 1];
+        if ($moduleKey !== 'invoice_1' && $moduleKey !== 'invoice_2' && strpos($moduleKey, 'invoice_') === 0) {
+            $def = ['prefix' => 'SCR/{FY}/', 'padding' => 3, 'start' => 1];
+        }
+        $lastValue = $def['start'] - 1;
+        $prefixTemplate = $def['prefix'];
+        $padding = $def['padding'];
+    } else {
+        $lastValue = intval($seq['next_value']) - 1;
+        $prefixTemplate = $seq['prefix'];
+        $padding = intval($seq['padding']);
+    }
+    
+    if ($lastValue <= 0) {
+        return "None";
+    }
+    
+    $resolvedPrefix = str_replace('{FY}', $fy, $prefixTemplate);
+    return $resolvedPrefix . str_pad($lastValue, $padding, '0', STR_PAD_LEFT);
+}
+
+/**
+ * Parse manual custom document reference and update sequences in database.
+ */
+function syncSequenceNextValue($pdo, $moduleKey, $customValue, $entityId = null) {
+    if ($moduleKey === 'invoice') {
+        if ($entityId === null) {
+            if (session_status() === PHP_SESSION_NONE) session_start();
+            $entityId = $_SESSION['active_entity_id'] ?? null;
+        }
+        $moduleKey = "invoice_" . $entityId;
+    }
+    
+    $fy = getFinancialYear();
+    
+    // Extract trailing numbers (e.g. SCA/26-27/024 -> 24)
+    if (preg_match('/(\d+)$/', trim($customValue), $matches)) {
+        $numVal = intval($matches[1]);
+        $nextVal = $numVal + 1;
+        
+        $stmt = $pdo->prepare("SELECT id, next_value FROM `document_sequences` WHERE `module_key` = ? AND `financial_year` = ?");
+        $stmt->execute([$moduleKey, $fy]);
+        $seq = $stmt->fetch();
+        
+        if ($seq) {
+            if ($nextVal > intval($seq['next_value'])) {
+                $stmtUp = $pdo->prepare("UPDATE `document_sequences` SET `next_value` = ? WHERE `id` = ?");
+                $stmtUp->execute([$nextVal, $seq['id']]);
+            }
+        } else {
+            $defaults = [
+                'invoice_1' => ['prefix' => 'SCA/{FY}/', 'padding' => 3],
+                'invoice_2' => ['prefix' => 'SCR/{FY}/', 'padding' => 3]
+            ];
+            $def = $defaults[$moduleKey] ?? ['prefix' => 'SCR/{FY}/', 'padding' => 3];
+            $stmtIns = $pdo->prepare("INSERT INTO `document_sequences` (`module_key`, `financial_year`, `prefix`, `next_value`, `padding`) VALUES (?, ?, ?, ?, ?)");
+            $stmtIns->execute([$moduleKey, $fy, $def['prefix'], $nextVal, $def['padding']]);
+        }
+    }
+}
+
+/**
+ * Increment sequence next_value.
+ */
+function incrementSequenceValue($pdo, $moduleKey, $entityId = null) {
+    if ($moduleKey === 'invoice') {
+        if ($entityId === null) {
+            if (session_status() === PHP_SESSION_NONE) session_start();
+            $entityId = $_SESSION['active_entity_id'] ?? null;
+            if (!$entityId) {
+                $stmt = $pdo->query("SELECT id FROM entities LIMIT 1");
+                $entityId = $stmt->fetchColumn();
+            }
+        }
+        $moduleKey = "invoice_" . $entityId;
+    }
+    $fy = getFinancialYear();
+    $stmt = $pdo->prepare("UPDATE `document_sequences` SET `next_value` = `next_value` + 1 WHERE `module_key` = ? AND `financial_year` = ?");
+    $stmt->execute([$moduleKey, $fy]);
 }
 
 /**
@@ -141,7 +429,7 @@ function requireRole($roles) {
         echo "<div style='padding: 50px; text-align: center; font-family: sans-serif;'>
                 <h1 style='color: #ef4444;'>Access Denied</h1>
                 <p>Aapke paas is page ko dekhne ki permission nahi hai.</p>
-                <a href='" . BASE_URL . "index.php' style='color: var(--primary);'>Dashboard par wapas jayein</a>
+                <a href='" . BASE_URL . "dashboard.php' style='color: var(--primary);'>Dashboard par wapas jayein</a>
               </div>";
         exit;
     }
@@ -168,7 +456,7 @@ function requirePermission($module, $action = 'view') {
                     <i class='fas fa-shield-alt' style='font-size: 3.5rem; color: #ef4444; margin-bottom: 20px;'></i>
                     <h1 style='color: #0f172a; margin: 0 0 10px 0; font-size: 1.6rem; font-weight: 800; font-family: Outfit, sans-serif;'>Access Denied</h1>
                     <p style='color: #64748b; margin-bottom: 30px; font-size: 0.95rem; font-family: Outfit, sans-serif;'>Aapke paas is page ko dekhne ya action perform karne ki permission nahi hai.</p>
-                    <a href='" . BASE_URL . "index.php' style='display: inline-block; padding: 12px 24px; background: #1cada9; color: white; text-decoration: none; border-radius: 8px; font-weight: 700; font-family: Outfit, sans-serif; transition: background 0.2s;'>Dashboard par wapas jayein</a>
+                    <a href='" . BASE_URL . "dashboard.php' style='display: inline-block; padding: 12px 24px; background: #1cada9; color: white; text-decoration: none; border-radius: 8px; font-weight: 700; font-family: Outfit, sans-serif; transition: background 0.2s;'>Dashboard par wapas jayein</a>
                 </div>
               </div>";
         exit;
@@ -200,14 +488,104 @@ function checkAuth() {
         header("Location: login.php");
         exit;
     }
+    
+    // Check if user is active in DB
+    global $pdo;
+    $stmt = $pdo->prepare("SELECT status FROM users WHERE id = ?");
+    $stmt->execute([$_SESSION['user_id']]);
+    $status = $stmt->fetchColumn();
+    
+    if ($status === 'inactive') {
+        // Destroy session
+        $_SESSION = [];
+        if (ini_get("session.use_cookies")) {
+            $params = session_get_cookie_params();
+            setcookie(session_name(), '', time() - 42000,
+                $params["path"], $params["domain"],
+                $params["secure"], $params["httponly"]
+            );
+        }
+        session_destroy();
+        
+        // Redirect to login page
+        header("Location: login.php?error=inactive");
+        exit;
+    }
 }
 
-/**
- * Send System Email (SMTP Placeholder)
- */
 function sendSystemEmail($to, $subject, $message) {
-    // In a real production environment, you would use PHPMailer or a similar library.
-    // For now, we simulate the queuing logic.
+    $smtp_host = defined('SMTP_HOST') ? SMTP_HOST : '194.238.17.209';
+    $smtp_port = defined('SMTP_PORT') ? SMTP_PORT : 25;
+    $smtp_user = defined('SMTP_USER') ? SMTP_USER : 'info@sudhacreative.com';
+    $smtp_pass = defined('SMTP_PASS') ? SMTP_PASS : 'M2Noida@278';
+
+    $context = stream_context_create([
+        'ssl' => [
+            'verify_peer' => false,
+            'verify_peer_name' => false,
+            'allow_self_signed' => true
+        ]
+    ]);
+
+    $connection = @stream_socket_client("tcp://$smtp_host:$smtp_port", $errno, $errstr, 15, STREAM_CLIENT_CONNECT, $context);
+    if (!$connection) {
+        error_log("SMTP connection failed: $errstr ($errno)");
+        return false;
+    }
+
+    $response = fgets($connection, 515);
+
+    fwrite($connection, "EHLO " . ($_SERVER['HTTP_HOST'] ?? 'localhost') . "\r\n");
+    $response = fgets($connection, 515);
+    while (substr($response, 3, 1) == "-") { $response = fgets($connection, 515); }
+
+    fwrite($connection, "STARTTLS\r\n");
+    $response = fgets($connection, 515);
+
+    if (strpos($response, '220') !== false) {
+        $crypto_res = @stream_socket_enable_crypto($connection, true, STREAM_CRYPTO_METHOD_TLS_CLIENT);
+        if ($crypto_res) {
+            fwrite($connection, "EHLO " . ($_SERVER['HTTP_HOST'] ?? 'localhost') . "\r\n");
+            $response = fgets($connection, 515);
+            while (substr($response, 3, 1) == "-") { $response = fgets($connection, 515); }
+        }
+    }
+
+    fwrite($connection, "AUTH LOGIN\r\n");
+    $response = fgets($connection, 515);
+
+    fwrite($connection, base64_encode($smtp_user) . "\r\n");
+    $response = fgets($connection, 515);
+
+    fwrite($connection, base64_encode($smtp_pass) . "\r\n");
+    $response = fgets($connection, 515);
+
+    if (strpos($response, '235') === false) {
+        error_log("SMTP Auth Failed: " . $response);
+        fclose($connection);
+        return false;
+    }
+
+    fwrite($connection, "MAIL FROM: <$smtp_user>\r\n");
+    $response = fgets($connection, 515);
+
+    fwrite($connection, "RCPT TO: <$to>\r\n");
+    $response = fgets($connection, 515);
+
+    fwrite($connection, "DATA\r\n");
+    $response = fgets($connection, 515);
+
+    $headers = "MIME-Version: 1.0\r\n";
+    $headers .= "Content-type: text/html; charset=utf-8\r\n";
+    $headers .= "To: $to\r\n";
+    $headers .= "From: <$smtp_user>\r\n";
+    $headers .= "Subject: $subject\r\n";
+
+    fwrite($connection, "$headers\r\n$message\r\n.\r\n");
+    $response = fgets($connection, 515);
+
+    fwrite($connection, "QUIT\r\n");
+    fclose($connection);
     return true;
 }
 
@@ -341,10 +719,46 @@ function getActiveEntity() {
     // Handle switching
     if (isset($_GET['set_entity'])) {
         $_SESSION['active_entity_id'] = (int)$_GET['set_entity'];
-        // Remove the parameter and redirect
+        // Remove only set_entity parameter and redirect
+        $queryParams = $_GET;
+        unset($queryParams['set_entity']);
+        $queryString = http_build_query($queryParams);
         $clean_url = strtok($_SERVER['REQUEST_URI'], '?');
+        if (!empty($queryString)) {
+            $clean_url .= '?' . $queryString;
+        }
         header("Location: " . $clean_url);
         exit;
+    }
+
+    // Handle switching financial year
+    if (isset($_GET['set_fy'])) {
+        $_SESSION['active_financial_year'] = $_GET['set_fy'];
+        // Remove only set_fy parameter and redirect
+        $queryParams = $_GET;
+        unset($queryParams['set_fy']);
+        $queryString = http_build_query($queryParams);
+        $clean_url = strtok($_SERVER['REQUEST_URI'], '?');
+        if (!empty($queryString)) {
+            $clean_url .= '?' . $queryString;
+        }
+        header("Location: " . $clean_url);
+        exit;
+    }
+
+    if (!isset($_SESSION['active_financial_year'])) {
+        // Default to the current system financial year
+        $timestamp = time();
+        $month = intval(date('m', $timestamp));
+        $year = intval(date('y', $timestamp));
+        if ($month >= 4) {
+            $startYear = $year;
+            $endYear = $year + 1;
+        } else {
+            $startYear = $year - 1;
+            $endYear = $year;
+        }
+        $_SESSION['active_financial_year'] = sprintf("%02d-%02d", $startYear, $endYear);
     }
 
     if (!isset($_SESSION['active_entity_id'])) {
@@ -383,8 +797,11 @@ function resolveCompanyDetails($entity_id = null) {
         'letterhead'   => getSetting('company_letterhead',   ''),
         'signature'    => getSetting('company_signature',    'signature.png'),
         'bank_details'      => getSetting('company_bank_details', ''),
-        'terms_conditions'  => getSetting('company_terms_conditions', ''),
+        'terms_conditions'  => getSetting('po_terms', ''),
+        'invoice_terms'     => getSetting('invoice_terms', ''),
         'msme_number'       => getSetting('company_msme_number', ''),
+        'cin'               => getSetting('company_cin',          ''),
+        'tan'               => getSetting('company_tan',          ''),
     ];
 
     $eid = $entity_id ?: ($_SESSION['active_entity_id'] ?? null);
@@ -393,16 +810,24 @@ function resolveCompanyDetails($entity_id = null) {
         $stmt->execute([$eid]);
         $entity = $stmt->fetch();
         if ($entity) {
-            $data['name'] = $entity['name'];
-            if (!empty($entity['gstin']))             $data['gstin']            = $entity['gstin'];
-            if (!empty($entity['pan']))               $data['pan']              = $entity['pan'];
-            if (!empty($entity['address']))           $data['address']          = $entity['address'];
-            if (!empty($entity['logo']))              $data['logo']             = $entity['logo'];
-            if (!empty($entity['letterhead']))        $data['letterhead']       = $entity['letterhead'];
-            if (!empty($entity['signature']))         $data['signature']        = $entity['signature'];
-            if (!empty($entity['bank_details']))      $data['bank_details']     = $entity['bank_details'];
-            if (!empty($entity['terms_conditions']))  $data['terms_conditions'] = $entity['terms_conditions'];
-            if (!empty($entity['msme_number']))       $data['msme_number']      = $entity['msme_number'];
+            $data['name']             = $entity['name'];
+            $data['gstin']            = !empty($entity['gstin']) ? $entity['gstin'] : '';
+            $data['pan']              = !empty($entity['pan']) ? $entity['pan'] : '';
+            $data['address']          = !empty($entity['address']) ? $entity['address'] : '';
+            $data['logo']             = !empty($entity['logo']) ? $entity['logo'] : '';
+            $data['letterhead']       = !empty($entity['letterhead']) ? $entity['letterhead'] : '';
+            $data['signature']        = !empty($entity['signature']) ? $entity['signature'] : '';
+            $data['bank_details']     = !empty($entity['bank_details']) ? $entity['bank_details'] : '';
+            $data['terms_conditions'] = !empty($entity['terms_conditions']) ? $entity['terms_conditions'] : '';
+            $data['invoice_terms']    = !empty($entity['invoice_terms']) ? $entity['invoice_terms'] : '';
+            $data['msme_number']      = !empty($entity['msme_number']) ? $entity['msme_number'] : '';
+            $data['cin']              = (isset($entity['cin']) && !empty($entity['cin'])) ? $entity['cin'] : '';
+            $data['tan']              = (isset($entity['tan']) && !empty($entity['tan'])) ? $entity['tan'] : '';
+
+            // Fallback for letterhead to logo if letterhead is empty
+            if (empty($data['letterhead']) && !empty($data['logo'])) {
+                $data['letterhead'] = $data['logo'];
+            }
         }
     }
 
@@ -423,5 +848,44 @@ function vendorHasGST($gstin) {
         return false;
     }
     return true;
+}
+
+/**
+ * Recalculate and update the payment status of invoices or purchase orders.
+ */
+function updateDocumentPaymentStatus($pdo, $invoiceId, $poId) {
+    if ($invoiceId) {
+        $paidStmt = $pdo->prepare("SELECT SUM(amount) FROM payments WHERE invoice_id = ? AND approval_status = 'approved'");
+        $paidStmt->execute([$invoiceId]);
+        $totalPaid = floatval($paidStmt->fetchColumn());
+
+        $invStmt = $pdo->prepare("SELECT total_amount FROM invoices WHERE id = ?");
+        $invStmt->execute([$invoiceId]);
+        $invTotal = floatval($invStmt->fetchColumn());
+
+        $status = ($totalPaid >= $invTotal) ? 'paid' : (($totalPaid > 0) ? 'partially_paid' : 'unpaid');
+        $upd = $pdo->prepare("UPDATE invoices SET payment_status = ? WHERE id = ?");
+        $upd->execute([$status, $invoiceId]);
+    }
+
+    if ($poId) {
+        $paidStmt = $pdo->prepare("SELECT SUM(amount) FROM payments WHERE proposal_id = ? AND approval_status = 'approved'");
+        $paidStmt->execute([$poId]);
+        $totalPaid = floatval($paidStmt->fetchColumn());
+
+        $poStmt = $pdo->prepare("SELECT total_amount, approval_status FROM purchase_orders WHERE id = ?");
+        $poStmt->execute([$poId]);
+        $po = $poStmt->fetch();
+        if ($po) {
+            $poTotal = floatval($po['total_amount']);
+            if ($po['approval_status'] === 'approved') {
+                $status = ($totalPaid >= $poTotal) ? 'paid' : 'approved';
+            } else {
+                $status = ($po['approval_status'] === 'pending_approval') ? 'pending' : 'cancelled';
+            }
+            $upd = $pdo->prepare("UPDATE purchase_orders SET status = ? WHERE id = ?");
+            $upd->execute([$status, $poId]);
+        }
+    }
 }
 ?>

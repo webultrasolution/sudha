@@ -33,6 +33,12 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action'])) {
 
         if ($_POST['action'] === 'add_site') {
             requirePermission('inventory', 'add');
+            $checkStmt = $pdo->prepare("SELECT id FROM sites WHERE site_code = ?");
+            $checkStmt->execute([$code]);
+            if ($checkStmt->fetch()) {
+                header("Location: sites.php?error=" . urlencode("Asset code '$code' already exists. Duplicate asset codes are not allowed."));
+                exit;
+            }
             try {
                 $stmt = $pdo->prepare("INSERT INTO sites (site_code, name, location, area, city, district, latitude, longitude, type, width, height, facing, light_type, hsn_code, mounting_hsn, vendor_gst, grade, owner_type, vendor_id, card_rate, purchase_rate, available_from) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)");
                 $stmt->execute([$code, $name, $location, $area, $city, $district, $latitude, $longitude, $type, $width, $height, $facing, $light_type, $hsn_code, $mounting_hsn, $vendor_gst, $grade, $owner_type, $vendor_id, $card_rate, $purchase_rate, $available_from]);
@@ -62,6 +68,12 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action'])) {
         } else {
             requirePermission('inventory', 'edit');
             $id = intval($_POST['id']);
+            $checkStmt = $pdo->prepare("SELECT id FROM sites WHERE site_code = ? AND id != ?");
+            $checkStmt->execute([$code, $id]);
+            if ($checkStmt->fetch()) {
+                header("Location: sites.php?error=" . urlencode("Asset code '$code' already exists on another asset."));
+                exit;
+            }
             try {
                 $stmt = $pdo->prepare("UPDATE sites SET site_code=?, name=?, location=?, area=?, city=?, district=?, latitude=?, longitude=?, type=?, width=?, height=?, facing=?, light_type=?, hsn_code=?, mounting_hsn=?, vendor_gst=?, grade=?, owner_type=?, vendor_id=?, card_rate=?, purchase_rate=?, available_from=? WHERE id=?");
                 $stmt->execute([$code, $name, $location, $area, $city, $district, $latitude, $longitude, $type, $width, $height, $facing, $light_type, $hsn_code, $mounting_hsn, $vendor_gst, $grade, $owner_type, $vendor_id, $card_rate, $purchase_rate, $available_from, $id]);
@@ -191,15 +203,20 @@ $all_media_types = $pdo->query("SELECT name FROM media_types ORDER BY name ASC")
 
 // Counts for Tabs
 $counts = [
-    'all' => $pdo->query("SELECT COUNT(*) FROM sites")->fetchColumn(),
-    'Billboard' => $pdo->query("SELECT COUNT(*) FROM sites WHERE type='Billboard'")->fetchColumn(),
-    'Unipole' => $pdo->query("SELECT COUNT(*) FROM sites WHERE type='Unipole'")->fetchColumn(),
-    'Gantry' => $pdo->query("SELECT COUNT(*) FROM sites WHERE type='Gantry'")->fetchColumn(),
-    'BQS' => $pdo->query("SELECT COUNT(*) FROM sites WHERE type='BQS'")->fetchColumn()
+    'all' => $pdo->query("SELECT COUNT(*) FROM sites")->fetchColumn()
 ];
+foreach ($all_media_types as $mtype) {
+    $stmtCount = $pdo->prepare("SELECT COUNT(*) FROM sites WHERE type = ?");
+    $stmtCount->execute([$mtype]);
+    $counts[$mtype] = $stmtCount->fetchColumn();
+}
 
 // Fetch Sites
-$stmt = $pdo->prepare("SELECT s.*, p.name as vendor_name FROM sites s LEFT JOIN partners p ON s.vendor_id = p.id $where ORDER BY s.id DESC");
+$stmt = $pdo->prepare("SELECT s.*, p.name as vendor_name,
+    (SELECT b.campaign_name FROM booking_items bi JOIN bookings b ON bi.booking_id = b.id WHERE bi.site_id = s.id AND CURDATE() BETWEEN b.start_date AND b.end_date LIMIT 1) as current_campaign,
+    (SELECT c.name FROM booking_items bi JOIN bookings b ON bi.booking_id = b.id JOIN partners c ON b.client_id = c.id WHERE bi.site_id = s.id AND CURDATE() BETWEEN b.start_date AND b.end_date LIMIT 1) as current_client,
+    (SELECT b.end_date FROM booking_items bi JOIN bookings b ON bi.booking_id = b.id WHERE bi.site_id = s.id AND CURDATE() BETWEEN b.start_date AND b.end_date LIMIT 1) as current_end_date
+FROM sites s LEFT JOIN partners p ON s.vendor_id = p.id $where ORDER BY s.id DESC");
 $stmt->execute($params);
 $sites = $stmt->fetchAll();
 
@@ -209,14 +226,11 @@ $vendors = $pdo->query("SELECT id, name FROM partners WHERE type = 'vendor' ORDE
 <div class="inventory-tabs">
     <a href="?media=all" class="tab <?php echo $mediaFilter == 'all' ? 'active' : ''; ?>">All
         (<?php echo $counts['all']; ?>)</a>
-    <a href="?media=Billboard" class="tab <?php echo $mediaFilter == 'Billboard' ? 'active' : ''; ?>">Billboard
-        (<?php echo $counts['Billboard']; ?>)</a>
-    <a href="?media=Unipole" class="tab <?php echo $mediaFilter == 'Unipole' ? 'active' : ''; ?>">Unipole
-        (<?php echo $counts['Unipole']; ?>)</a>
-    <a href="?media=Gantry" class="tab <?php echo $mediaFilter == 'Gantry' ? 'active' : ''; ?>">Gantry
-        (<?php echo $counts['Gantry']; ?>)</a>
-    <a href="?media=BQS" class="tab <?php echo $mediaFilter == 'BQS' ? 'active' : ''; ?>">BQS
-        (<?php echo $counts['BQS']; ?>)</a>
+    <?php foreach ($all_media_types as $mtype): ?>
+        <a href="?media=<?php echo urlencode($mtype); ?>" class="tab <?php echo $mediaFilter == $mtype ? 'active' : ''; ?>">
+            <?php echo htmlspecialchars($mtype); ?> (<?php echo $counts[$mtype] ?? 0; ?>)
+        </a>
+    <?php endforeach; ?>
 </div>
 
 <div class="card">
@@ -425,6 +439,12 @@ $vendors = $pdo->query("SELECT id, name FROM partners WHERE type = 'vendor' ORDE
                                         echo " - " . htmlspecialchars($s['vendor_name']); ?>
                                 </span>
                             </div>
+                            <?php if (!empty($s['current_campaign'])): ?>
+                                <div style="margin-top: 6px; font-size: 0.7rem; background: #fffbeb; border: 1px solid #fef3c7; color: #b45309; padding: 4px 8px; border-radius: 6px; font-weight: 700; display: inline-block;">
+                                    <i class="fas fa-business-time"></i> Occupied by: <strong><?php echo htmlspecialchars($s['current_client']); ?></strong>
+                                    <br><span style="font-weight: 600; color: #d97706;">(Campaign: <?php echo htmlspecialchars($s['current_campaign']); ?>)</span>
+                                </div>
+                            <?php endif; ?>
                         </td>
                         <td data-label="Size">
                             <div style="font-weight: 700; color: #475569;">
@@ -439,11 +459,20 @@ $vendors = $pdo->query("SELECT id, name FROM partners WHERE type = 'vendor' ORDE
                                 <?php echo formatCurrency($s['purchase_rate']); ?></div>
                         </td>
                         <td data-label="Availability">
-                            <div style="font-weight: 600; color: #475569; font-size: 0.8rem;">
-                                <?php echo date('d M Y', strtotime($s['available_from'])); ?></div>
+                            <?php if (!empty($s['current_campaign'])): ?>
+                                <div style="font-weight: 700; color: #c2410c; font-size: 0.8rem;">
+                                    Till <?php echo date('d M Y', strtotime($s['current_end_date'])); ?></div>
+                            <?php else: ?>
+                                <div style="font-weight: 600; color: #475569; font-size: 0.8rem;">
+                                    <?php echo date('d M Y', strtotime($s['available_from'])); ?></div>
+                            <?php endif; ?>
                         </td>
-                        <td data-label="Status"><span
-                                class="status-pill <?php echo $s['status']; ?>"><?php echo ucfirst($s['status']); ?></span>
+                        <td data-label="Status">
+                            <?php if (!empty($s['current_campaign'])): ?>
+                                <span class="status-pill occupied" style="background: #ffedd5; color: #c2410c; font-weight: 700; border-radius: 9999px; padding: 0.25rem 0.625rem; font-size: 0.7rem;">Occupied</span>
+                            <?php else: ?>
+                                <span class="status-pill <?php echo $s['status']; ?>"><?php echo ucfirst($s['status']); ?></span>
+                            <?php endif; ?>
                         </td>
                         <td data-label="Actions" style="text-align: right; white-space: nowrap;">
                             <a href="site_financials.php?id=<?php echo $s['id']; ?>" class="btn-icon"
@@ -586,10 +615,10 @@ $vendors = $pdo->query("SELECT id, name FROM partners WHERE type = 'vendor' ORDE
                 </div>
                 <div class="form-group" id="vendor_select" style="display: none;">
                     <label>Vendor</label>
-                    <select name="vendor_id" id="f_vendor">
+                    <select name="vendor_id" id="f_vendor" onchange="autoGenerateSiteCode()">
                         <option value="">Select Vendor</option>
                         <?php foreach ($vendors as $v): ?>
-                            <option value="<?php echo $v['id']; ?>"><?php echo $v['name']; ?></option>
+                            <option value="<?php echo $v['id']; ?>"><?php echo htmlspecialchars($v['name']); ?></option>
                         <?php endforeach; ?>
                     </select>
                 </div>
@@ -1007,14 +1036,41 @@ $vendors = $pdo->query("SELECT id, name FROM partners WHERE type = 'vendor' ORDE
         }
     });
 
+    function autoGenerateSiteCode() {
+        const action = document.getElementById('formAction').value;
+        if (action !== 'add_site') {
+            return;
+        }
+        const ownerType = document.getElementById('owner_toggle').value;
+        const vendorId = document.getElementById('f_vendor').value;
+        
+        if (ownerType === 'TA' && !vendorId) {
+            document.getElementById('f_code').value = '';
+            return;
+        }
+        
+        fetch(`../../ajax/get_next_site_code.php?owner_type=${ownerType}&vendor_id=${vendorId}`)
+            .then(r => r.json())
+            .then(res => {
+                if (res.success) {
+                    document.getElementById('f_code').value = res.site_code;
+                }
+            })
+            .catch(err => console.error('Error fetching next site code:', err));
+    }
+
     function openModal() {
         const form = document.getElementById('siteForm');
         form.reset();
+        document.getElementById('formAction').value = 'add_site';
+        document.getElementById('modalTitle').innerText = 'Add New Advertising Asset';
         form.classList.remove('was-validated');
         document.getElementById('preview-container').innerHTML = '';
         document.getElementById('existing-images').innerHTML = '';
         pendingFiles = []; // Reset pending files
         document.getElementById('file-input').value = '';
+        toggleVendor();
+        autoGenerateSiteCode();
         document.getElementById('siteModal').style.display = 'block';
     }
     function closeModal() { document.getElementById('siteModal').style.display = 'none'; }
@@ -1038,6 +1094,7 @@ $vendors = $pdo->query("SELECT id, name FROM partners WHERE type = 'vendor' ORDE
             vendorInput.value = '';
             document.getElementById('f_vendor_gst').value = '';
         }
+        autoGenerateSiteCode();
     }
 
     function viewPhotos(siteId, lightType) {
@@ -1181,6 +1238,7 @@ $vendors = $pdo->query("SELECT id, name FROM partners WHERE type = 'vendor' ORDE
         if (form) form.classList.remove('was-validated');
 
         document.getElementById('formAction').value = 'edit_site';
+        document.getElementById('modalTitle').innerText = 'Edit Advertising Asset';
         document.getElementById('siteId').value = site.id;
         document.getElementById('f_type').value = site.type;
         document.getElementById('f_code').value = site.site_code;

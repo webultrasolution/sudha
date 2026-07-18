@@ -8,11 +8,8 @@ if (session_status() === PHP_SESSION_NONE) {
 
 header('Content-Type: application/json');
 
-// Enforce permissions for financials/proposals
-if (!canAdd('financials') && !canAdd('proposals')) {
-    echo json_encode(['success' => false, 'message' => 'Unauthorized action.']);
-    exit;
-}
+echo json_encode(['success' => false, 'message' => 'Proforma Invoice generation has been disabled.']);
+exit;
 
 $proposalId = isset($_GET['proposal_id']) ? intval($_GET['proposal_id']) : 0;
 
@@ -43,14 +40,25 @@ try {
         $stmtUpdate = $pdo->prepare("UPDATE proposals SET status = 'confirmed' WHERE id = ?");
         $stmtUpdate->execute([$proposalId]);
 
+        $bookingNum = generateSequenceNumber($pdo, 'booking');
+
+        $entityId = $proposal['entity_id'] ?? $_SESSION['active_entity_id'] ?? null;
+        if (!$entityId) {
+            $stmtEntity = $pdo->query("SELECT id FROM entities LIMIT 1");
+            $entityId = $stmtEntity->fetchColumn() ?: null;
+        }
+
         $stmtBooking = $pdo->prepare("
-            INSERT INTO bookings (proposal_id, client_id, billing_gstin, start_date, end_date, total_amount, tax_amount, grand_total, status) 
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?, 'active')
+            INSERT INTO bookings (proposal_id, booking_number, client_id, entity_id, billing_gstin, tax_type, start_date, end_date, total_amount, tax_amount, grand_total, status) 
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'active')
         ");
         $stmtBooking->execute([
             $proposalId,
+            $bookingNum,
             $proposal['client_id'],
+            $entityId,
             $proposal['billing_gstin'],
+            $proposal['tax_type'],
             $proposal['start_date'],
             $proposal['end_date'],
             $proposal['total_amount'],

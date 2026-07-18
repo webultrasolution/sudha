@@ -50,32 +50,39 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         $pricePerSqft = $totalSQFT > 0 ? $displayCost / $totalSQFT : 0;
 
         // Generate Proposal Number
-        $propNum = 'PR-' . date('Ymd') . '-' . rand(1000, 9999);
+        $propNum = generateSequenceNumber($pdo, 'proposal');
 
         // 2. Insert Proposal
         // Admin sends directly; non-admin goes to pending_approval queue
-        $proposalStatus   = $isAdmin ? 'sent' : 'draft';
-        $approvalStatus   = $isAdmin ? 'approved' : 'pending_approval';
+        $proposalStatus   = 'sent';
+        $approvalStatus   = 'approved';
+
+        $entityId = $_SESSION['active_entity_id'] ?? null;
+        if (!$entityId) {
+            $stmtEntity = $pdo->query("SELECT id FROM entities LIMIT 1");
+            $entityId = $stmtEntity->fetchColumn() ?: null;
+        }
 
         $stmt = $pdo->prepare("INSERT INTO proposals 
-            (proposal_number, campaign_name, media_type, inventory_type, light_type, client_id, billing_gstin, tax_type, contact_person, start_date, end_date, total_days, remark,
+            (proposal_number, campaign_name, media_type, inventory_type, light_type, client_id, entity_id, billing_gstin, tax_type, contact_person, start_date, end_date, total_days, remark,
              printing_cost, mounting_cost, 
              ha_markup_amount, ta_markup_amount, total_sqft, price_per_sqft, display_cost, 
              total_amount, tax_amount, grand_total, status, approval_status, created_by) 
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)");
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)");
             
         $stmt->execute([
             $propNum,
             $data['campaignName'] ?? '',
-            $data['mediaType'] ?? '',
+            !empty($data['mediaType']) ? intval($data['mediaType']) : null,
             $data['inventoryType'] ?? '',
             $data['lightType'] ?? '',
             $data['clientId'],
+            $entityId,
             $data['selectedGstin'] ?? null,
             $data['taxType'] ?? 'igst',
             $data['contactPerson'] ?? '',
-            $data['startDate'],
-            $data['endDate'],
+            !empty($data['startDate']) ? $data['startDate'] : null,
+            !empty($data['endDate']) ? $data['endDate'] : null,
             $data['totalDays'] ?: null,
             $data['remark'] ?? '',
             $printCost,
@@ -94,12 +101,6 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         ]);
         
         $proposalId = $pdo->lastInsertId();
-
-        // Create approval request for non-admin
-        if (!$isAdmin) {
-            $stmtAR = $pdo->prepare("INSERT INTO approval_requests (entity_type, entity_id, entity_ref, requested_by, status) VALUES ('proposal', ?, ?, ?, 'pending')");
-            $stmtAR->execute([$proposalId, $propNum, $_SESSION['user_id']]);
-        }
         
         logActivity('generated a new proposal', 'proposals', $proposalId, "Proposal Number: $propNum");
 
@@ -129,9 +130,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             'success'         => true,
             'proposal_id'     => $proposalId,
             'approval_status' => $approvalStatus,
-            'message'         => $isAdmin
-                ? "Proposal $propNum created and sent."
-                : "Proposal $propNum submitted for admin approval."
+            'message'         => "Proposal $propNum created and sent."
         ]);
 
     } catch (Exception $e) {

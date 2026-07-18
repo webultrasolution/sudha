@@ -51,6 +51,14 @@ if (empty($items)) {
 $first = $items[0];
 $po_num_display = $first['po_number'] ? $first['po_number'] : 'Draft-' . $first['id'];
 
+// Block view if not approved and user is not admin
+$isAdmin = ($_SESSION['user_role'] ?? '') === 'admin';
+if (!$isAdmin && $first['approval_status'] !== 'approved') {
+    echo "<div class='card'><h3 style='color:red;'>Access Denied</h3><p>This Client Printing Invoice is awaiting admin approval and cannot be viewed yet.</p></div>";
+    include_once __DIR__ . '/../../includes/footer.php';
+    exit;
+}
+
 // Total Amount
 $totalAmount = 0;
 foreach ($items as &$item) {
@@ -85,12 +93,22 @@ unset($item);
             <span style="background: #f1f5f9; color: #475569; padding: 0.25rem 0.75rem; border-radius: 8px; font-size: 0.75rem; font-weight: 700;">
                 Client Printing Invoice
             </span>
+            <?php 
+            $camp_brand = [];
+            if (!empty($first['campaign_name'])) $camp_brand[] = trim($first['campaign_name']);
+            if (!empty($first['brand_name'])) $camp_brand[] = trim($first['brand_name']);
+            $display_camp_brand = implode(' / ', $camp_brand);
+            if (!empty($display_camp_brand)): ?>
+                <span style="background: #eff6ff; color: #2563eb; padding: 0.25rem 0.75rem; border-radius: 8px; font-size: 0.75rem; font-weight: 700; display: inline-flex; align-items: center; gap: 4px;">
+                    <i class="fas fa-bullhorn" style="font-size: 0.65rem;"></i> <?php echo htmlspecialchars($display_camp_brand); ?>
+                </span>
+            <?php endif; ?>
             <?php if ($first['approval_status'] === 'pending_approval'): ?>
                 <span style="background: #fff7ed; color: #c2410c; padding: 0.25rem 0.75rem; border-radius: 50px; font-size: 0.75rem; font-weight: 800; text-transform: uppercase;">Awaiting Approval</span>
             <?php elseif ($first['is_final_invoice']): ?>
                 <span style="background: #f0fdf4; color: #15803d; padding: 0.25rem 0.75rem; border-radius: 50px; font-size: 0.75rem; font-weight: 800; text-transform: uppercase;">Final Invoice</span>
             <?php else: ?>
-                <span style="background: #e0f2fe; color: #0369a1; padding: 0.25rem 0.75rem; border-radius: 50px; font-size: 0.75rem; font-weight: 800; text-transform: uppercase;">Proforma</span>
+                <span style="background: #e0f2fe; color: #0369a1; padding: 0.25rem 0.75rem; border-radius: 50px; font-size: 0.75rem; font-weight: 800; text-transform: uppercase;">Draft</span>
             <?php endif; ?>
         </div>
         <p style="color: #64748b; margin: 0; font-size: 0.9rem;">

@@ -56,19 +56,34 @@ $poAttachments = $attachments->fetchAll();
     <div class="card" id="po-print-area" style="padding: 0; border: 1px solid #000; overflow: hidden; border-radius: 0;">
         <!-- Header / Letterhead -->
         <?php 
-        $has_entity = !empty($poData['entity_id']);
-        $header_logo = $has_entity && !empty($poData['entity_letterhead']) ? $poData['entity_letterhead'] : ($has_entity && !empty($poData['entity_logo']) ? $poData['entity_logo'] : getSetting('company_letterhead'));
-        $header_name = $has_entity ? $poData['entity_name'] : getSetting('company_name');
-        $header_addr = $has_entity ? $poData['entity_address'] : getSetting('company_address');
-        
-        if ($header_logo): ?>
-            <img src="<?php echo BASE_URL; ?>assets/images/<?php echo $header_logo; ?>" style="width: 100%; height: auto; display: block; border-bottom: 1px solid #000;">
-        <?php else: ?>
-            <div style="text-align: center; padding: 1rem; border-bottom: 1px solid #000; background: #f8fafc;">
-                <h2 style="margin: 0; text-transform: uppercase;"><?php echo htmlspecialchars($header_name); ?></h2>
-                <p style="margin: 0; font-size: 0.8rem;"><?php echo htmlspecialchars($header_addr); ?></p>
+        $co_details = resolveCompanyDetails($poData['entity_id'] ?? null);
+        $header_logo = !empty($co_details['letterhead']) ? $co_details['letterhead'] : (!empty($co_details['logo']) ? $co_details['logo'] : '');
+        $header_name = $co_details['name'];
+        $company_address = $co_details['address'];
+        $company_phone = $co_details['phone'];
+        $company_email = $co_details['email'];
+        ?>
+        <div style="display: flex; justify-content: space-between; align-items: flex-start; padding: 10px 10px 2px;">
+            <div style="flex: 1.4; text-align: left;">
+                <?php if ($header_logo): ?>
+                    <img src="<?php echo BASE_URL; ?>assets/images/<?php echo $header_logo; ?>" style="max-height: 80px; width: auto; display: block; margin-bottom: 5px;">
+                <?php else: ?>
+                    <h2 style="margin: 0; text-transform: uppercase; font-size: 18px; color: #8B1A1A;"><?php echo htmlspecialchars($header_name); ?></h2>
+                <?php endif; ?>
             </div>
-        <?php endif; ?>
+            <div style="flex: 1.2; text-align: center; padding-top: 15px;">
+                <div style="font-size: 16px; font-weight: bold; text-decoration: underline; letter-spacing: 1.5px; text-transform: uppercase;">PURCHASE ORDER</div>
+            </div>
+            <div style="flex: 0.8; text-align: right; font-style: italic; font-size: 10px; padding-top: 15px; color: #555;">
+                Original Copy
+            </div>
+        </div>
+        <div style="padding: 0 10px 10px; font-size: 10px; line-height: 1.4; color: #000; border-bottom: 1px solid #000; margin-bottom: 10px;">
+            <?php echo nl2br(htmlspecialchars($company_address)); ?><br>
+            Ph : <?php echo htmlspecialchars($company_phone); ?> &nbsp;|&nbsp; Email : <?php echo htmlspecialchars($company_email); ?>
+        </div>
+
+
 
         <div style="padding: 1.5rem;">
             <!-- Info Grid -->
@@ -125,7 +140,11 @@ $poAttachments = $attachments->fetchAll();
                             <div style="font-size: 0.75rem; color: #64748b;"><?php echo $item['location']; ?></div>
                         </td>
                         <td style="border-right: 1px solid #e2e8f0; font-size: 0.8rem;">
-                            <?php echo date('d/m/y', strtotime($item['start_date'])); ?> - <?php echo date('d/m/y', strtotime($item['end_date'])); ?>
+                            <?php 
+                            $sD = (!empty($item['start_date']) && $item['start_date'] !== '0000-00-00') ? date('d/m/y', strtotime($item['start_date'])) : 'N/A';
+                            $eD = (!empty($item['end_date']) && $item['end_date'] !== '0000-00-00') ? date('d/m/y', strtotime($item['end_date'])) : 'N/A';
+                            echo "$sD - $eD";
+                            ?>
                         </td>
                         <td style="border-right: 1px solid #e2e8f0; font-weight: 600;"><?php echo formatCurrency($item['monthly_rate']); ?></td>
                         <td style="text-align: right; font-weight: 700; color: #000;"><?php echo formatCurrency($item['cost']); ?></td>
@@ -165,7 +184,7 @@ $poAttachments = $attachments->fetchAll();
             </table>
 
             <?php if(!empty($poData['remarks'])): ?>
-                <div style="margin-top: 1.5rem; padding: 1rem; background: #fffbeb; border: 1px dashed #f59e0b; border-radius: 8px;">
+                <div class="avoid-break" style="margin-top: 1.5rem; padding: 1rem; background: #fffbeb; border: 1px dashed #f59e0b; border-radius: 8px;">
                     <div style="font-weight: 800; font-size: 0.75rem; text-transform: uppercase; color: #92400e; margin-bottom: 0.5rem;">Remarks / Special Instructions</div>
                     <div style="font-style: italic; color: #000;"><?php echo nl2br(htmlspecialchars($poData['remarks'])); ?></div>
                 </div>
@@ -235,12 +254,29 @@ $poAttachments = $attachments->fetchAll();
 .status-badge.draft { background: #f1f5f9; color: #475569; }
 .p-input { width: 100%; padding: 0.5rem; border: 1px solid #cbd5e1; border-radius: 6px; font-family: inherit; margin-top: 0.25rem; font-size: 0.85rem; }
 
+@page {
+    size: A4;
+    margin: 12mm 14mm;
+    @bottom-right {
+        content: counter(page) "/" counter(pages);
+        font-family: Arial, sans-serif;
+        font-size: 9px;
+        color: #555;
+    }
+}
+.avoid-break {
+    page-break-inside: avoid;
+    break-inside: avoid;
+}
+
 @media print {
     .sidebar, .header, .btn-primary, .no-print { display: none !important; }
     .main-content { margin: 0; padding: 0; width: 100% !important; }
-    .card { border: none; box-shadow: none; }
+    .card { border: none !important; box-shadow: none !important; }
     body { background: white; }
-    #po-print-area { width: 100% !important; margin: 0 !important; }
+    #po-print-area { width: 100% !important; margin: 0 !important; border: none !important; }
+    thead { display: table-header-group; }
+    tr { page-break-inside: avoid; break-inside: avoid; }
 }
 </style>
 

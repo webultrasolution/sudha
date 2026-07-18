@@ -115,7 +115,7 @@ if ($export === 'csv') {
                 'INV-' . str_pad($inv['booking_id'], 4, '0', STR_PAD_LEFT),
                 'Revenue',
                 $inv['client_name'],
-                'Period: ' . date('d/m/y', strtotime($inv['start_date'])) . ' - ' . date('d/m/y', strtotime($inv['end_date'])),
+                'Period: ' . ((!empty($inv['start_date']) && $inv['start_date'] !== '0000-00-00') ? date('d/m/y', strtotime($inv['start_date'])) : 'N/A') . ' - ' . ((!empty($inv['end_date']) && $inv['end_date'] !== '0000-00-00') ? date('d/m/y', strtotime($inv['end_date'])) : 'N/A'),
                 number_format($inv['amount'], 2),
                 ''
             ]
@@ -130,7 +130,7 @@ if ($export === 'csv') {
                 $po['po_number'],
                 'Expense',
                 $po['vendor_name'],
-                'Asset Booking: ' . date('d/m/y', strtotime($po['start_date'])) . ' - ' . date('d/m/y', strtotime($po['end_date'])),
+                'Asset Booking: ' . ((!empty($po['start_date']) && $po['start_date'] !== '0000-00-00') ? date('d/m/y', strtotime($po['start_date'])) : 'N/A') . ' - ' . ((!empty($po['end_date']) && $po['end_date'] !== '0000-00-00') ? date('d/m/y', strtotime($po['end_date'])) : 'N/A'),
                 '',
                 number_format($po['cost'], 2)
             ]
@@ -274,7 +274,11 @@ include_once __DIR__ . '/../../includes/header.php';
                                     </td>
                                     <td style="padding: 0.65rem 0.75rem; border-top: 1px solid #f1f5f9; border-bottom: 1px solid #f1f5f9;">
                                         <div style="font-size: 0.75rem; font-weight: 600; color: #334155; line-height: 1.2; margin-bottom: 2px;"><?php echo htmlspecialchars($inv['client_name']); ?></div>
-                                        <div style="font-size: 0.65rem; color: #64748b;"><i class="far fa-calendar-alt"></i> <?php echo date('d/m/y', strtotime($inv['start_date'])); ?> - <?php echo date('d/m/y', strtotime($inv['end_date'])); ?></div>
+                                        <div style="font-size: 0.65rem; color: #64748b;"><i class="far fa-calendar-alt"></i> <?php 
+                                            $sD = (!empty($inv['start_date']) && $inv['start_date'] !== '0000-00-00') ? date('d/m/y', strtotime($inv['start_date'])) : 'N/A';
+                                            $eD = (!empty($inv['end_date']) && $inv['end_date'] !== '0000-00-00') ? date('d/m/y', strtotime($inv['end_date'])) : 'N/A';
+                                            echo "$sD - $eD";
+                                        ?></div>
                                     </td>
                                     <td style="padding: 0.65rem 0.75rem; text-align: right; border-top-right-radius: 6px; border-bottom-right-radius: 6px; border: 1px solid #f1f5f9; border-left: none;">
                                         <div style="font-weight: 800; color: #10b981; font-size: 0.85rem;">₹<?php echo number_format($inv['amount'], 2); ?></div>
@@ -318,7 +322,11 @@ include_once __DIR__ . '/../../includes/header.php';
                                     <td style="padding: 0.65rem 0.75rem; border-top: 1px solid #fff1f2; border-bottom: 1px solid #fff1f2;">
                                         <div style="font-size: 0.75rem; font-weight: 600; color: #334155; line-height: 1.2; margin-bottom: 2px;"><?php echo htmlspecialchars($po['vendor_name']); ?></div>
                                         <div style="font-size: 0.6rem; color: #ef4444; font-weight: 700; text-transform: uppercase; margin-bottom: 2px;">Asset Booking</div>
-                                        <div style="font-size: 0.65rem; color: #64748b;"><i class="far fa-calendar-alt"></i> <?php echo date('d/m/y', strtotime($po['start_date'])); ?> - <?php echo date('d/m/y', strtotime($po['end_date'])); ?></div>
+                                        <div style="font-size: 0.65rem; color: #64748b;"><i class="far fa-calendar-alt"></i> <?php 
+                                            $sD = (!empty($po['start_date']) && $po['start_date'] !== '0000-00-00') ? date('d/m/y', strtotime($po['start_date'])) : 'N/A';
+                                            $eD = (!empty($po['end_date']) && $po['end_date'] !== '0000-00-00') ? date('d/m/y', strtotime($po['end_date'])) : 'N/A';
+                                            echo "$sD - $eD";
+                                        ?></div>
                                     </td>
                                     <td style="padding: 0.65rem 0.75rem; text-align: right; border-top-right-radius: 6px; border-bottom-right-radius: 6px; border: 1px solid #fff1f2; border-left: none;">
                                         <div style="font-weight: 800; color: #ef4444; font-size: 0.85rem;">₹<?php echo number_format($po['cost'], 2); ?></div>

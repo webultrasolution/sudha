@@ -16,106 +16,92 @@ $illuminations = $pdo->query("SELECT DISTINCT light_type FROM sites WHERE light_
 $sizes = $pdo->query("SELECT DISTINCT CONCAT(width, 'x', height) as size FROM sites WHERE width IS NOT NULL AND height IS NOT NULL AND width != '' AND height != '' ORDER BY width, height")->fetchAll(PDO::FETCH_COLUMN);
 $printingVendors = $pdo->query("SELECT id, name FROM partners WHERE type = 'vendor' ORDER BY name ASC")->fetchAll();
 $printingRates = $pdo->query("SELECT * FROM vendor_printing_rates")->fetchAll(PDO::FETCH_ASSOC);
+$all_media_types = $pdo->query("SELECT name FROM media_types ORDER BY name ASC")->fetchAll(PDO::FETCH_COLUMN);
 ?>
 
 <div class="proposal-full-wrapper">
-    <!-- Wizard Progress Tracker -->
-    <div style="display: flex; justify-content: center; align-items: center; margin-bottom: 1.5rem; background: white; padding: 0.6rem; border-radius: 12px; box-shadow: 0 2px 10px rgba(0,0,0,0.03); max-width: 400px; margin-left: auto; margin-right: auto;">
-        <div style="display: flex; align-items: center; gap: 1rem;">
-            <div id="step-tab-1" style="display: flex; flex-direction: column; align-items: center; gap: 0.2rem;">
-                <div class="step-circle" style="width: 24px; height: 24px; background: #059669; color: white; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 0.7rem; border: 2px solid white; box-shadow: 0 0 0 2px #059669;"><i class="fas fa-check"></i></div>
-                <span class="step-label" style="font-size: 0.55rem; font-weight: 800; color: #059669; text-transform: uppercase;">Details</span>
+    <!-- Campaign Details Panel (Always Visible) -->
+    <div class="p-panel" style="max-width: 100%; margin-bottom: 1.5rem;">
+        <div class="p-header">Campaign Details & Duration</div>
+        
+        <div class="form-grid" style="grid-template-columns: 1fr 1fr 1fr; margin-bottom: 1rem;">
+            <div class="form-group">
+                <label>Campaign Name <span style="color:red;">*</span></label>
+                <input type="text" id="campaign_name" class="p-input" placeholder="e.g. Summer Sale 2024" style="height: 38px;" required>
             </div>
-            <div style="width: 30px; height: 2px; background: #e2e8f0; position: relative; margin-top: -12px;">
-                <div id="wizard-progress-line" style="position: absolute; left: 0; top: 0; height: 100%; width: 0%; background: #059669; transition: width 0.4s;"></div>
+            <div class="form-group">
+                <label style="display: flex; justify-content: space-between; align-items: center;">
+                    <span>Company / Client <span style="color:red;">*</span></span>
+                    <button type="button" class="btn-text" onclick="openClientModal()" style="font-size: 0.7rem; color: var(--primary); background: none; border: none; cursor: pointer; padding: 0;">
+                        <i class="fas fa-plus-circle"></i> New
+                    </button>
+                </label>
+                <select id="client_id" class="p-input" style="height: 38px;" onchange="handleClientChange()" required>
+                    <option value="">-- Choose Client --</option>
+                    <?php foreach ($clients as $c): ?>
+                        <option value="<?php echo $c['id']; ?>" data-contact="<?php echo htmlspecialchars($c['contact_person'] ?? ''); ?>">
+                            <?php echo $c['name']; ?> <?php echo $c['city'] ? "({$c['city']})" : ""; ?>
+                        </option>
+                    <?php endforeach; ?>
+                </select>
             </div>
-            <div id="step-tab-2" style="display: flex; flex-direction: column; align-items: center; gap: 0.2rem;">
-                <div class="step-circle" style="width: 24px; height: 24px; background: #fff; color: #94a3b8; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 0.7rem; font-weight: 800; border: 2px solid white; box-shadow: 0 0 0 2px #e2e8f0;">2</div>
-                <span class="step-label" style="font-size: 0.55rem; font-weight: 800; color: #94a3b8; text-transform: uppercase;">Assets</span>
-            </div>
-        </div>
-    </div>
-
-    <!-- STEP 1 -->
-    <div id="step-1">
-        <div class="p-panel" style="max-width: 1100px; margin: 0 auto 1.5rem auto;">
-            <div class="p-header">Campaign Details & Duration</div>
-            
-            <div class="form-grid" style="grid-template-columns: 1fr 1fr 1fr; margin-bottom: 1rem;">
-                <div class="form-group">
-                    <label>Campaign Name <span style="color:red;">*</span></label>
-                    <input type="text" id="campaign_name" class="p-input" placeholder="e.g. Summer Sale 2024" style="height: 38px;" required>
-                </div>
-                <div class="form-group">
-                    <label style="display: flex; justify-content: space-between; align-items: center;">
-                        <span>Company / Client <span style="color:red;">*</span></span>
-                        <button type="button" class="btn-text" onclick="openClientModal()" style="font-size: 0.7rem; color: var(--primary); background: none; border: none; cursor: pointer; padding: 0;">
-                            <i class="fas fa-plus-circle"></i> New
-                        </button>
+            <!-- GST Selection for Group Companies -->
+            <div id="gst_selection_container" style="display: none; grid-column: span 3; margin-top: 0.5rem; background: #f0fdfa; padding: 1rem; border-radius: 12px; border: 1px solid #ccfbf1; box-shadow: inset 0 2px 4px rgba(0,0,0,0.05); margin-bottom: 1rem;">
+                <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 0.75rem;">
+                    <label style="color: var(--primary); font-weight: 800; font-size: 0.7rem; margin-bottom: 0; display: block; text-transform: uppercase;">
+                        <i class="fas fa-id-card"></i> Billing GSTIN / State Selection
                     </label>
-                    <select id="client_id" class="p-input" style="height: 38px;" onchange="handleClientChange()" required>
-                        <option value="">-- Choose Client --</option>
-                        <?php foreach ($clients as $c): ?>
-                            <option value="<?php echo $c['id']; ?>" data-contact="<?php echo htmlspecialchars($c['contact_person'] ?? ''); ?>">
-                                <?php echo $c['name']; ?> <?php echo $c['city'] ? "({$c['city']})" : ""; ?>
-                            </option>
-                        <?php endforeach; ?>
+                    <span id="gst_count_badge" style="background: var(--primary); color: white; font-size: 0.65rem; padding: 2px 8px; border-radius: 50px; font-weight: 700;"></span>
+                </div>
+                <div style="display: flex; gap: 1rem;">
+                    <select id="selected_gstin" class="p-input" style="flex: 1; height: 38px; border-color: #5eead4; background: white;" onchange="handleGstSelectionChange()">
+                        <!-- Dynamic Options -->
                     </select>
-                </div>
-                <!-- GST Selection for Group Companies -->
-                <div id="gst_selection_container" style="display: none; grid-column: span 3; margin-top: 0.5rem; background: #f0fdfa; padding: 1rem; border-radius: 12px; border: 1px solid #ccfbf1; box-shadow: inset 0 2px 4px rgba(0,0,0,0.05); margin-bottom: 1rem;">
-                    <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 0.75rem;">
-                        <label style="color: var(--primary); font-weight: 800; font-size: 0.7rem; margin-bottom: 0; display: block; text-transform: uppercase;">
-                            <i class="fas fa-id-card"></i> Billing GSTIN / State Selection
-                        </label>
-                        <span id="gst_count_badge" style="background: var(--primary); color: white; font-size: 0.65rem; padding: 2px 8px; border-radius: 50px; font-weight: 700;"></span>
-                    </div>
-                    <div style="display: flex; gap: 1rem;">
-                        <select id="selected_gstin" class="p-input" style="flex: 1; height: 38px; border-color: #5eead4; background: white;" onchange="handleGstSelectionChange()">
-                            <!-- Dynamic Options -->
-                        </select>
-                        <div id="gst_details_preview" style="flex: 2; background: white; border: 1px solid #ccfbf1; border-radius: 6px; padding: 0.5rem; font-size: 0.75rem; color: #0f766e; display: flex; align-items: center; gap: 0.5rem;">
-                            <i class="fas fa-map-marker-alt"></i>
-                            <span id="gst_preview_text">Select a GSTIN to see location details</span>
-                        </div>
+                    <div id="gst_details_preview" style="flex: 2; background: white; border: 1px solid #ccfbf1; border-radius: 6px; padding: 0.5rem; font-size: 0.75rem; color: #0f766e; display: flex; align-items: center; gap: 0.5rem;">
+                        <i class="fas fa-map-marker-alt"></i>
+                        <span id="gst_preview_text">Select a GSTIN to see location details</span>
                     </div>
                 </div>
-                <div class="form-group">
-                    <label>Contact Person</label>
-                    <input type="text" id="contact_person" class="p-input" placeholder="Full Name" style="height: 38px;">
-                </div>
             </div>
-
-            <div class="form-grid" style="grid-template-columns: 1fr 1fr 1fr;">
-                <div class="form-group">
-                    <label>From Date <span style="color:red;">*</span></label>
-                    <input type="date" id="start_date" class="p-input" style="height: 38px;" value="<?php echo date('Y-m-d'); ?>" onchange="calculateEndDate()" required>
-                </div>
-                <div class="form-group">
-                    <label>To Date <span style="color:red;">*</span></label>
-                    <input type="date" id="end_date" class="p-input" style="height: 38px;" value="<?php echo date('Y-m-d', strtotime('+1 month')); ?>" onchange="calculateTotalDays()" required>
-                </div>
-                <div class="form-group">
-                    <label>Total Days</label>
-                    <input type="number" id="total_days" class="p-input" placeholder="Days" style="height: 38px;" oninput="calculateEndDate()">
-                </div>
-            </div>
-            
-            <div class="form-group" style="margin-top: 1.5rem;">
-                <label>Internal Remarks</label>
-                <textarea id="remark" class="p-input" rows="2" placeholder="Notes for this booking..."></textarea>
+            <div class="form-group">
+                <label>Contact Person</label>
+                <input type="text" id="contact_person" class="p-input" placeholder="Full Name" style="height: 38px;">
             </div>
         </div>
 
-        <div style="display: flex; justify-content: flex-end; margin: 2rem auto; max-width: 1100px;">
-            <button class="btn btn-primary" onclick="goToStep2()" style="width: 250px; height: 48px; border-radius: 12px; font-weight: 800; font-size: 0.95rem;">
-                Next Step: Select Assets <i class="fas fa-arrow-right" style="margin-left: 0.75rem;"></i>
-            </button>
+        <div class="form-grid" style="grid-template-columns: 1fr 1fr 1fr;">
+            <div class="form-group">
+                <label>From Date <span style="color:red;">*</span></label>
+                <input type="date" id="start_date" class="p-input" style="height: 38px;" value="<?php echo date('Y-m-d'); ?>" onchange="calculateEndDate()" required>
+            </div>
+            <div class="form-group">
+                <label>To Date <span style="color:red;">*</span></label>
+                <input type="date" id="end_date" class="p-input" style="height: 38px;" value="<?php echo date('Y-m-d', strtotime('+1 month')); ?>" onchange="calculateTotalDays()" required>
+            </div>
+            <div class="form-group">
+                <label>Total Days</label>
+                <input type="number" id="total_days" class="p-input" placeholder="Days" style="height: 38px;" oninput="calculateEndDate()">
+            </div>
+        </div>
+        
+        <div class="form-group" style="margin-top: 1.5rem;">
+            <label>Internal Remarks</label>
+            <textarea id="remark" class="p-input" rows="2" placeholder="Notes for this booking..."></textarea>
         </div>
     </div>
 
-    <!-- STEP 2 -->
-    <div id="step-2" style="display: none;">
+    <!-- Assets Selection Section (Always Visible) -->
+    <div id="assets-selection-section">
+        <!-- Category Filter Tabs -->
+        <div class="inventory-tabs" id="direct-booking-tabs" style="margin-top: 1rem; margin-bottom: 1.5rem;">
+            <button type="button" class="tab active" onclick="selectMediaTab('all', this)">All</button>
+            <?php foreach ($all_media_types as $mtype): ?>
+                <button type="button" class="tab" onclick="selectMediaTab('<?php echo htmlspecialchars($mtype); ?>', this)">
+                    <?php echo htmlspecialchars($mtype); ?>
+                </button>
+            <?php endforeach; ?>
+        </div>
+
         <div class="p-panel" style="margin-bottom: 1rem; padding: 1.5rem;">
             <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 1.5rem; border-bottom: 1px solid #f1f5f9; padding-bottom: 1rem;">
                 <div style="display: flex; align-items: center; gap: 1rem;">
@@ -205,9 +191,14 @@ $printingRates = $pdo->query("SELECT * FROM vendor_printing_rates")->fetchAll(PD
         <div class="p-panel" id="asset-plan-panel" style="margin-bottom: 2rem;">
             <div class="p-header" style="display: flex; justify-content: space-between; align-items: center;">
                 <span>Select Assets</span>
-                <button onclick="openBucket()" style="background: #ecfdf5; color: #059669; border: 1px solid #d1fae5; padding: 0.4rem 1rem; border-radius: 8px; font-weight: 800; font-size: 0.8rem; cursor: pointer;">
-                    Selected: <span id="selected-count">0</span>
-                </button>
+                <div style="display: flex; gap: 0.5rem; align-items: center;">
+                    <button type="button" onclick="openSiteModal()" class="btn btn-primary" style="height: 32px; padding: 0 1rem; font-size: 0.75rem; border-radius: 8px; display: inline-flex; align-items: center; gap: 0.25rem;">
+                        <i class="fas fa-plus"></i> Add New Site
+                    </button>
+                    <button onclick="openBucket()" style="background: #ecfdf5; color: #059669; border: 1px solid #d1fae5; padding: 0.4rem 1rem; border-radius: 8px; font-weight: 800; font-size: 0.8rem; cursor: pointer;">
+                        Selected: <span id="selected-count">0</span>
+                    </button>
+                </div>
             </div>
 
             <div style="min-height: 400px; position: relative;">
@@ -307,6 +298,126 @@ $printingRates = $pdo->query("SELECT * FROM vendor_printing_rates")->fetchAll(PD
 .site-row.selected { background: #f0fdfa !important; }
 .pg-btn { min-width: 32px; height: 32px; border: 1px solid #e2e8f0; background: white; border-radius: 8px; cursor: pointer; font-weight: 700; font-size: 0.75rem; }
 .pg-btn.active { background: var(--primary); color: white; border-color: var(--primary); }
+
+/* Quick Add Site Modal CSS */
+#quickSiteModal.modal {
+    display: none;
+    position: fixed;
+    z-index: 5500;
+    left: 0;
+    top: 0;
+    width: 100%;
+    height: 100%;
+    background: rgba(0, 0, 0, 0.5);
+    overflow-y: auto;
+}
+
+.swal2-container {
+    z-index: 99999 !important;
+}
+
+#quickSiteModal .modal-content {
+    background: white;
+    margin: 3% auto;
+    padding: 2rem;
+    border-radius: 12px;
+}
+
+#quickSiteModal .close {
+    cursor: pointer;
+    float: right;
+    font-size: 1.5rem;
+}
+
+#quickSiteModal .form-group label {
+    display: block;
+    margin-bottom: 0.3rem;
+    font-size: 0.85rem;
+    font-weight: 600;
+    color: #475569;
+    text-transform: none;
+}
+
+#quickSiteModal .form-group input,
+#quickSiteModal .form-group select {
+    width: 100%;
+    padding: 0.6rem;
+    border: 1px solid #ddd;
+    border-radius: 6px;
+    font-weight: normal;
+}
+
+#quickSiteModal .drop-zone {
+    border: 2px dashed #cbd5e1;
+    border-radius: 12px;
+    padding: 2rem;
+    text-align: center;
+    background: #f8fafc;
+    cursor: pointer;
+    transition: all 0.3s;
+    position: relative;
+}
+
+#quickSiteModal .drop-zone:hover,
+#quickSiteModal .drop-zone.dragover {
+    border-color: var(--primary);
+    background: rgba(13, 148, 136, 0.05);
+}
+
+#quickSiteModal .drop-zone-content p {
+    font-size: 0.9rem;
+    font-weight: 600;
+    color: #475569;
+    margin: 0.5rem 0;
+}
+
+#quickSiteModal .drop-zone-content p span {
+    color: var(--primary);
+    text-decoration: underline;
+}
+
+#quickSiteModal .drop-zone-content small {
+    color: #94a3b8;
+    font-size: 0.75rem;
+}
+
+#quickSiteModal .preview-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(80px, 1fr));
+    gap: 0.75rem;
+    margin-top: 1rem;
+}
+
+#quickSiteModal .preview-item {
+    position: relative;
+    aspect-ratio: 1;
+    border-radius: 8px;
+    overflow: hidden;
+    border: 1px solid #e2e8f0;
+}
+
+#quickSiteModal .preview-item img {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+}
+
+#quickSiteModal .remove-preview {
+    position: absolute;
+    top: 4px;
+    right: 4px;
+    background: rgba(239, 68, 68, 0.9);
+    color: white;
+    width: 20px;
+    height: 20px;
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 0.7rem;
+    cursor: pointer;
+    border: none;
+}
 </style>
 
 <script>
@@ -314,6 +425,41 @@ let selectedSites = [];
 let currentPage = 1;
 let totalSites = 0;
 const pageSize = 6;
+
+let selectedMediaTab = 'all';
+function selectMediaTab(mtype, btn) {
+    selectedMediaTab = mtype;
+    
+    // Update active class on tabs
+    const tabs = document.querySelectorAll('#direct-booking-tabs .tab');
+    tabs.forEach(t => t.classList.remove('active'));
+    btn.classList.add('active');
+    
+    // Sync the media_type select
+    const select = document.getElementById('media_type');
+    if (select) {
+        select.value = mtype === 'all' ? '' : mtype;
+    }
+    
+    fetchSites(1);
+}
+
+document.addEventListener('DOMContentLoaded', () => {
+    const select = document.getElementById('media_type');
+    if (select) {
+        select.addEventListener('change', function() {
+            const val = this.value || 'all';
+            const tabs = document.querySelectorAll('#direct-booking-tabs .tab');
+            tabs.forEach(t => {
+                const onclickAttr = t.getAttribute('onclick');
+                if (onclickAttr && (onclickAttr.includes(`'${val}'`) || (val === 'all' && onclickAttr.includes("'all'")))) {
+                    tabs.forEach(x => x.classList.remove('active'));
+                    t.classList.add('active');
+                }
+            });
+        });
+    }
+});
 const baseUrl = "<?php echo BASE_URL; ?>";
 const imgBaseUrl = "../../uploads/sites/";
 const printingVendors = <?php echo json_encode($printingVendors); ?>;
@@ -488,6 +634,67 @@ function fetchSites(page = 1) {
             renderPagination(res.total);
         }
     });
+}
+
+function renderPagination(total) {
+    const totalPages = Math.ceil(total / pageSize);
+    const container = document.getElementById('pg-numbers');
+    const info = document.getElementById('pg-info');
+    container.innerHTML = '';
+
+    if (total === 0) {
+        info.innerText = 'Showing 0 to 0 of 0 sites';
+        return;
+    }
+
+    const start = (currentPage - 1) * pageSize + 1;
+    const end = Math.min(currentPage * pageSize, total);
+    info.innerText = `Showing ${start} to ${end} of ${total} sites`;
+
+    if (totalPages <= 1) return;
+
+    // Previous Button
+    const prevBtn = document.createElement('button');
+    prevBtn.innerHTML = '<i class="fas fa-chevron-left"></i>';
+    prevBtn.className = 'btn btn-secondary';
+    prevBtn.style.padding = '0.3rem 0.6rem';
+    prevBtn.style.margin = '0 2px';
+    prevBtn.disabled = currentPage === 1;
+    if (!prevBtn.disabled) {
+        prevBtn.onclick = () => fetchSites(currentPage - 1);
+    }
+    container.appendChild(prevBtn);
+
+    // Page Numbers (max 5)
+    let pStart = Math.max(1, currentPage - 2);
+    let pEnd = Math.min(totalPages, pStart + 4);
+    if (pEnd - pStart < 4) {
+        pStart = Math.max(1, pEnd - 4);
+    }
+
+    for (let i = pStart; i <= pEnd; i++) {
+        const btn = document.createElement('button');
+        btn.innerText = i;
+        btn.className = i === currentPage ? 'btn btn-primary' : 'btn btn-secondary';
+        btn.style.padding = '0.3rem 0.6rem';
+        btn.style.margin = '0 2px';
+        if (i !== currentPage) {
+            btn.onclick = () => fetchSites(i);
+        }
+        container.appendChild(btn);
+    }
+
+    // Next Button
+    const nextBtn = document.createElement('button');
+    nextBtn.innerHTML = '<i class="fas fa-chevron-right"></i>';
+    nextBtn.className = 'btn btn-secondary';
+    nextBtn.style.padding = '0.3rem 0.6rem';
+    nextBtn.style.margin = '0 2px';
+    nextBtn.disabled = currentPage === totalPages;
+    if (!nextBtn.disabled) {
+        nextBtn.onclick = () => fetchSites(currentPage + 1);
+    }
+    container.appendChild(nextBtn);
 }
 
 function renderSites(sites) {
@@ -789,14 +996,29 @@ function submitQuickClient() {
             opt.dataset.contact = contact;
             opt.selected = true;
             select.add(opt);
+            
+            if (select.refreshSearchable) {
+                select.refreshSearchable();
+            }
+
             document.getElementById('contact_person').value = contact;
             closeClientModal();
+            handleClientChange();
         }
     });
 }
 
 function saveDirectBooking() {
+    const clientVal = document.getElementById('client_id').value;
+    const campaignVal = document.getElementById('campaign_name').value.trim();
+    const startVal = document.getElementById('start_date').value;
+    const endVal = document.getElementById('end_date').value;
+
+    if (!clientVal) return Swal.fire('Error', 'Please select a Client', 'error');
+    if (!campaignVal) return Swal.fire('Error', 'Please enter Campaign Name', 'error');
+    if (!startVal || !endVal) return Swal.fire('Error', 'Please select Booking Dates', 'error');
     if (selectedSites.length === 0) return Swal.fire('Error', 'Select at least one site', 'error');
+
     const btn = document.getElementById('submitBtn');
     btn.disabled = true; btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> SAVING...';
 
@@ -836,8 +1058,7 @@ function saveDirectBooking() {
         }
     }).then(res => {
         if (res.success) {
-            let msg = res.po_id ? 'Purchase Order submitted for approval!' : 'Booking generated!';
-            if (res.approval_status === 'approved') msg = 'Purchase Order generated successfully!';
+            let msg = res.message || 'Booking generated successfully!';
             
             Swal.fire('Success', msg, 'success').then(() => window.location.href = 'bookings.php');
             if(res.po_id && res.approval_status !== 'pending_approval') {
@@ -936,6 +1157,7 @@ function setPrimaryImage(e) {
 
 function nextSlide(e) { if(e) e.stopPropagation(); currentImgIndex = (currentImgIndex + 1) % currentImages.length; updateSliderImage(); }
 function prevSlide(e) { if(e) e.stopPropagation(); currentImgIndex = (currentImgIndex - 1 + currentImages.length) % currentImages.length; updateSliderImage(); }
+
 function closeLightbox() { const lb = document.getElementById('simple-lightbox'); if(lb) lb.style.display = 'none'; }
 
 document.addEventListener('keydown', function(e) {
@@ -946,6 +1168,276 @@ document.addEventListener('keydown', function(e) {
         if(e.key === 'Escape') closeLightbox();
     }
 });
+
+// Quick Add Site Modal JavaScript Handlers
+let quickPendingFiles = [];
+
+function openSiteModal() {
+    const form = document.getElementById('quickSiteForm');
+    if (form) {
+        form.reset();
+        form.classList.remove('was-validated');
+    }
+    const previewContainer = document.getElementById('quick-preview-container');
+    if (previewContainer) {
+        previewContainer.innerHTML = '';
+    }
+    quickPendingFiles = [];
+    const fileInput = document.getElementById('quick-file-input');
+    if (fileInput) {
+        fileInput.value = '';
+    }
+    const modal = document.getElementById('quickSiteModal');
+    if (modal) {
+        modal.style.display = 'block';
+    }
+    const availInput = document.getElementById('q_avail');
+    if (availInput) {
+        availInput.value = new Date().toISOString().split('T')[0];
+    }
+    toggleQuickVendor();
+}
+
+function closeSiteModal() {
+    const modal = document.getElementById('quickSiteModal');
+    if (modal) {
+        modal.style.display = 'none';
+    }
+}
+
+function toggleQuickVendor() {
+    const type = document.getElementById('q_owner_toggle').value;
+    const vendorSelect = document.getElementById('q_vendor_select');
+    const vendorInput = document.getElementById('q_vendor');
+    const gstGroup = document.getElementById('q_vendor_gst_group');
+
+    if (type === 'TA') {
+        vendorSelect.style.display = 'block';
+        gstGroup.style.display = 'block';
+        vendorInput.required = true;
+    } else {
+        vendorSelect.style.display = 'none';
+        gstGroup.style.display = 'none';
+        vendorInput.required = false;
+        vendorInput.value = '';
+        document.getElementById('q_vendor_gst').value = '';
+    }
+    autoGenerateQuickSiteCode();
+}
+
+function autoGenerateQuickSiteCode() {
+    const ownerType = document.getElementById('q_owner_toggle').value;
+    const vendorId = document.getElementById('q_vendor').value;
+    if (ownerType === 'TA' && !vendorId) {
+        document.getElementById('q_code').value = '';
+        return;
+    }
+    
+    fetch(`../../ajax/get_next_site_code.php?owner_type=${ownerType}&vendor_id=${vendorId}`)
+        .then(r => r.json())
+        .then(res => {
+            if (res.success) {
+                document.getElementById('q_code').value = res.site_code;
+            }
+        })
+        .catch(err => console.error('Error fetching next site code:', err));
+}
+
+function handleQuickFiles(files) {
+    const container = document.getElementById('quick-preview-container');
+    const fileArray = Array.from(files);
+
+    fileArray.forEach((file) => {
+        if (!file.type.startsWith('image/')) return;
+
+        quickPendingFiles.push(file);
+        const currentIdx = quickPendingFiles.length - 1;
+
+        const reader = new FileReader();
+        reader.onload = (e) => {
+            const div = document.createElement('div');
+            div.className = 'preview-item';
+            div.id = 'quick-pending-img-' + currentIdx;
+            div.innerHTML = `
+                <img src="${e.target.result}" style="cursor:zoom-in;">
+                <button type="button" class="remove-preview" onclick="removeQuickPendingFile(${currentIdx})">×</button>
+            `;
+            container.appendChild(div);
+        };
+        reader.readAsDataURL(file);
+    });
+    updateQuickFileInput();
+}
+
+function removeQuickPendingFile(index) {
+    quickPendingFiles[index] = null;
+    const item = document.getElementById('quick-pending-img-' + index);
+    if (item) item.remove();
+    updateQuickFileInput();
+}
+
+function updateQuickFileInput() {
+    const dt = new DataTransfer();
+    quickPendingFiles.forEach(file => {
+        if (file) dt.items.add(file);
+    });
+    const fileInput = document.getElementById('quick-file-input');
+    if (fileInput) fileInput.files = dt.files;
+}
+
+// Attach event handlers for drag & drop when document is loaded
+document.addEventListener('DOMContentLoaded', () => {
+    const quickDropZone = document.getElementById('quick-drop-zone');
+    if (quickDropZone) {
+        ['dragenter', 'dragover', 'dragleave', 'drop'].forEach(eventName => {
+            quickDropZone.addEventListener(eventName, (e) => {
+                e.preventDefault();
+                e.stopPropagation();
+            }, false);
+        });
+
+        ['dragenter', 'dragover'].forEach(eventName => {
+            quickDropZone.addEventListener(eventName, () => quickDropZone.classList.add('dragover'), false);
+        });
+
+        ['dragleave', 'drop'].forEach(eventName => {
+            quickDropZone.addEventListener(eventName, () => quickDropZone.classList.remove('dragover'), false);
+        });
+
+        quickDropZone.addEventListener('drop', (e) => {
+            const dt = e.dataTransfer;
+            const files = dt.files;
+            handleQuickFiles(files);
+        }, false);
+    }
+
+    const quickForm = document.getElementById('quickSiteForm');
+    if (quickForm) {
+        quickForm.addEventListener('submit', function(e) {
+            e.preventDefault();
+
+            if (this.dataset.submitting === 'true') {
+                return;
+            }
+
+            if (!this.checkValidity()) {
+                this.classList.add('was-validated');
+                return;
+            }
+
+            this.dataset.submitting = 'true';
+
+            const submitBtn = this.querySelector('button[type="submit"]');
+            if (submitBtn) {
+                submitBtn.disabled = true;
+                const originalText = submitBtn.innerHTML;
+                submitBtn.dataset.originalText = originalText;
+                submitBtn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Saving...';
+            }
+
+            Swal.fire({
+                title: 'Saving...',
+                text: 'Adding new advertising asset',
+                allowOutsideClick: false,
+                didOpen: () => {
+                    Swal.showLoading();
+                }
+            });
+
+            const formData = new FormData(this);
+
+            fetch('../../ajax/quick_save_site.php', {
+                method: 'POST',
+                body: formData
+            })
+            .then(r => r.json())
+            .then(res => {
+                // Reset submitting flag
+                quickForm.removeAttribute('data-submitting');
+
+                if (res.success) {
+                    Swal.fire('Success', res.message || 'Site added successfully!', 'success').then(() => {
+                        if (submitBtn) {
+                            submitBtn.disabled = false;
+                            submitBtn.innerHTML = submitBtn.dataset.originalText;
+                        }
+                        closeSiteModal();
+                        
+                        // Select the newly added site
+                        toggleSite(
+                            res.id,
+                            res.name,
+                            parseFloat(res.rate),
+                            res.site_code,
+                            res.location,
+                            res.vendor_id,
+                            res.thumbnail,
+                            res.city,
+                            parseFloat(res.card_rate),
+                            res.size,
+                            res.type,
+                            res.light_type,
+                            res.owner_type,
+                            res.vendor_name,
+                            res.all_images
+                        );
+
+                        // Reload list to show it at the top
+                        fetchSites(1);
+                    });
+                } else {
+                    Swal.fire('Error', res.message || 'Failed to save site.', 'error');
+                    if (submitBtn) {
+                        submitBtn.disabled = false;
+                        submitBtn.innerHTML = submitBtn.dataset.originalText;
+                    }
+                }
+            })
+            .catch(err => {
+                console.error(err);
+                // Reset submitting flag
+                quickForm.removeAttribute('data-submitting');
+
+                Swal.fire('Error', 'An unexpected error occurred.', 'error');
+                if (submitBtn) {
+                    submitBtn.disabled = false;
+                    submitBtn.innerHTML = submitBtn.dataset.originalText;
+                }
+            });
+        });
+    }
+});
+
+// Calculate total days on page load
+calculateTotalDays();
+fetchSites(1);
+
+// Initialize Searchable Dropdowns
+(function() {
+    function tryInit() {
+        if (typeof initSearchableSelect === 'function') {
+            initSearchableSelect('client_id', 'Search Company / Client...');
+            initSearchableSelect('filter-vendor', 'Search Vendor...');
+            console.log("Searchable selects initialized successfully on direct_booking.php");
+        } else {
+            console.warn("initSearchableSelect function not available yet, retrying on window load...");
+            window.addEventListener('load', () => {
+                if (typeof initSearchableSelect === 'function') {
+                    initSearchableSelect('client_id', 'Search Company / Client...');
+                    initSearchableSelect('filter-vendor', 'Search Vendor...');
+                    console.log("Searchable selects initialized successfully on window load");
+                } else {
+                    console.error("initSearchableSelect function could not be loaded!");
+                }
+            });
+        }
+    }
+    if (document.readyState === 'loading') {
+        document.addEventListener('DOMContentLoaded', tryInit);
+    } else {
+        tryInit();
+    }
+})();
 </script>
 
 <!-- Simple Lightbox HTML -->
@@ -975,6 +1467,153 @@ document.addEventListener('keydown', function(e) {
 
         <!-- Close Button -->
         <div onclick="closeLightbox()" style="position: absolute; top: -60px; right: -60px; color: white; font-size: 2.5rem; cursor: pointer; opacity: 0.6; transition: opacity 0.2s;" onmouseover="this.style.opacity=1" onmouseout="this.style.opacity=0.6">&times;</div>
+    </div>
+</div>
+
+<!-- Quick Add New Site Modal -->
+<div id="quickSiteModal" class="modal">
+    <div class="modal-content" style="max-width: 850px; border-radius: 16px; box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 10px 10px -5px rgba(0, 0, 0, 0.04);">
+        <div class="modal-header" style="display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid #e2e8f0; padding-bottom: 1rem; margin-bottom: 1.5rem;">
+            <h2 id="quickModalTitle" style="margin: 0; color: var(--primary); font-weight: 800; font-size: 1.25rem; text-transform: uppercase; letter-spacing: 0.05em;">Add New Advertising Asset</h2>
+            <span class="close" onclick="closeSiteModal()" style="font-size: 1.75rem; font-weight: bold; cursor: pointer; color: #94a3b8; line-height: 1;">&times;</span>
+        </div>
+        <form method="POST" id="quickSiteForm" enctype="multipart/form-data">
+            <input type="hidden" name="action" value="add_site">
+            <div style="display: grid; grid-template-columns: repeat(3, 1fr); gap: 1.25rem;">
+                <div class="form-group">
+                    <label>City <span style="color:red;">*</span></label>
+                    <input type="text" name="city" id="q_city" required>
+                </div>
+                <div class="form-group">
+                    <label>District</label>
+                    <input type="text" name="district" id="q_district">
+                </div>
+                <div class="form-group">
+                    <label>Media ID / Code <span style="color:red;">*</span></label>
+                    <input type="text" name="site_code" id="q_code" required>
+                </div>
+
+                <div class="form-group">
+                    <label>Media Type <span style="color:red;">*</span></label>
+                    <select name="type" id="q_type" required>
+                        <option value="">Select Type</option>
+                        <?php foreach ($all_media_types as $mt): ?>
+                            <option value="<?php echo htmlspecialchars($mt); ?>"><?php echo htmlspecialchars($mt); ?></option>
+                        <?php endforeach; ?>
+                    </select>
+                </div>
+                <div class="form-group">
+                    <label>Inventory Type <span style="color:red;">*</span></label>
+                    <select name="owner_type" id="q_owner_toggle" onchange="toggleQuickVendor()" required>
+                        <option value="HA">Home Asset (HA)</option>
+                        <option value="TA">Vendor Asset (TA)</option>
+                    </select>
+                </div>
+                <div class="form-group">
+                    <label>Grade <span style="color:red;">*</span></label>
+                    <select name="grade" id="q_grade" required>
+                        <option value="A">Grade A</option>
+                        <option value="B">Grade B</option>
+                        <option value="C">Grade C</option>
+                    </select>
+                </div>
+
+                <div class="form-group" style="grid-column: span 2;">
+                    <label>Site Location <span style="color:red;">*</span></label>
+                    <input type="text" name="name" id="q_name" placeholder="e.g. Near Station Main Road" required>
+                </div>
+                <div class="form-group">
+                    <label>Facing <span style="color:red;">*</span></label>
+                    <input type="text" name="facing" id="q_facing" required>
+                </div>
+
+                <div class="form-group" style="grid-column: span 2;">
+                    <label>Location Landmark <span style="color:red;">*</span></label>
+                    <input type="text" name="location" id="q_location" required>
+                </div>
+                <div class="form-group">
+                    <label>Area</label>
+                    <input type="text" name="area" id="q_area">
+                </div>
+
+                <div class="form-group">
+                    <label>Width (ft) <span style="color:red;">*</span></label>
+                    <input type="number" step="0.1" name="width" id="qw_input" required min="1">
+                </div>
+                <div class="form-group">
+                    <label>Height (ft) <span style="color:red;">*</span></label>
+                    <input type="number" step="0.1" name="height" id="qh_input" required min="1">
+                </div>
+                <div class="form-group">
+                    <label>Light Type <span style="color:red;">*</span></label>
+                    <select name="light_type" id="q_light" required>
+                        <option value="NL">Non-Lit (NL)</option>
+                        <option value="BL">Back-Lit (BL)</option>
+                        <option value="FL">Front-Lit (FL)</option>
+                    </select>
+                </div>
+                <div class="form-group" id="q_vendor_gst_group" style="display: none;">
+                    <label>Vendor Branch GST (for Groups)</label>
+                    <input type="text" name="vendor_gst" id="q_vendor_gst" placeholder="Branch GSTIN">
+                </div>
+                <div class="form-group">
+                    <label>HSN / SAC Code (Space Rental)</label>
+                    <input type="text" name="hsn_code" id="q_hsn" value="998366" placeholder="e.g. 998366">
+                </div>
+
+                <div class="form-group">
+                    <label>Mounting HSN Code</label>
+                    <input type="text" name="mounting_hsn" id="q_mounting_hsn" placeholder="e.g. 995479">
+                </div>
+
+                <div class="form-group">
+                    <label>Monthly Card Rate (₹) <span style="color:red;">*</span></label>
+                    <input type="number" step="1" name="card_rate" id="q_card" required min="0">
+                </div>
+                <div class="form-group">
+                    <label>Cost to Company (₹) <span style="color:red;">*</span></label>
+                    <input type="number" step="1" name="purchase_rate" id="q_purchase" required min="0">
+                </div>
+                <div class="form-group">
+                    <label>Available From <span style="color:red;">*</span></label>
+                    <input type="date" name="available_from" id="q_avail" value="<?php echo date('Y-m-d'); ?>" required>
+                </div>
+
+                <div class="form-group">
+                    <label>Latitude</label>
+                    <input type="number" step="0.00000001" name="latitude" id="q_lat" placeholder="e.g. 19.0760">
+                </div>
+                <div class="form-group">
+                    <label>Longitude</label>
+                    <input type="number" step="0.00000001" name="longitude" id="q_lng" placeholder="e.g. 72.8777">
+                </div>
+                <div class="form-group" id="q_vendor_select" style="display: none;">
+                    <label>Vendor <span style="color:red;">*</span></label>
+                    <select name="vendor_id" id="q_vendor" onchange="autoGenerateQuickSiteCode()">
+                        <option value="">Select Vendor</option>
+                        <?php foreach ($vendors as $v): ?>
+                            <option value="<?php echo $v['id']; ?>"><?php echo htmlspecialchars($v['name']); ?></option>
+                        <?php endforeach; ?>
+                    </select>
+                </div>
+                <div class="form-group" style="grid-column: span 3;">
+                    <label><i class="fas fa-images"></i> Site Photos (Multi-upload)</label>
+                    <div id="quick-drop-zone" class="drop-zone" onclick="document.getElementById('quick-file-input').click()">
+                        <div class="drop-zone-content">
+                            <i class="fas fa-cloud-upload-alt" style="font-size: 2.5rem; color: var(--primary); margin-bottom: 0.5rem; display: block; margin-left: auto; margin-right: auto;"></i>
+                            <p style="margin: 0.5rem 0; font-size: 0.9rem; font-weight: 600; color: #475569;">Drag & Drop images here or <span style="color: var(--primary); text-decoration: underline;">click to browse</span></p>
+                            <small style="color: #94a3b8; font-size: 0.75rem;">Supports: JPG, PNG, WEBP (Max 5MB each)</small>
+                        </div>
+                        <input type="file" name="site_images[]" id="quick-file-input" multiple accept="image/*" style="display: none;" onchange="handleQuickFiles(this.files)">
+                    </div>
+                    <div id="quick-preview-container" class="preview-grid"></div>
+                </div>
+            </div>
+            <div style="margin-top: 2rem; text-align: right; border-top: 1px solid #e2e8f0; padding-top: 1.25rem; display: flex; justify-content: flex-end; gap: 0.75rem;">
+                <button type="button" class="btn" onclick="closeSiteModal()" style="height: 38px; border-radius: 8px; background: #f1f5f9; border: 1px solid #e2e8f0; color: #475569; font-weight: 700; padding: 0 1.5rem; cursor: pointer; transition: all 0.2s;">Cancel</button>
+                <button type="submit" class="btn btn-primary" style="height: 38px; border-radius: 8px; font-weight: 700; padding: 0 1.5rem; cursor: pointer; transition: all 0.2s;">Save Site Information</button>
+            </div>
+        </form>
     </div>
 </div>
 

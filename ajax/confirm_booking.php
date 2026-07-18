@@ -35,17 +35,26 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         $stmt = $pdo->prepare("UPDATE proposals SET status = 'confirmed' WHERE id = ?");
         $stmt->execute([$proposalId]);
 
-        // Admin activates booking immediately; non-admin goes to pending_approval
-        $bookingStatus   = $isAdmin ? 'active' : 'pending';
-        $approvalStatus  = $isAdmin ? 'approved' : 'pending_approval';
+        $bookingStatus   = 'active';
+        $approvalStatus  = 'approved';
+        $bookingNum      = generateSequenceNumber($pdo, 'booking');
+
+        $entityId = $proposal['entity_id'] ?? $_SESSION['active_entity_id'] ?? null;
+        if (!$entityId) {
+            $stmtEntity = $pdo->query("SELECT id FROM entities LIMIT 1");
+            $entityId = $stmtEntity->fetchColumn() ?: null;
+        }
 
         // 2. Create Booking
-        $stmtBooking = $pdo->prepare("INSERT INTO bookings (proposal_id, client_id, campaign_name, billing_gstin, start_date, end_date, total_amount, tax_amount, grand_total, status, approval_status) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)");
+        $stmtBooking = $pdo->prepare("INSERT INTO bookings (proposal_id, booking_number, client_id, entity_id, campaign_name, billing_gstin, tax_type, start_date, end_date, total_amount, tax_amount, grand_total, status, approval_status) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)");
         $stmtBooking->execute([
             $proposalId,
+            $bookingNum,
             $proposal['client_id'],
+            $entityId,
             $proposal['campaign_name'],
             $proposal['billing_gstin'],
+            $proposal['tax_type'],
             $proposal['start_date'],
             $proposal['end_date'],
             $proposal['total_amount'],
@@ -89,21 +98,13 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             $stmtOps->execute([$bookingId, $item['site_id']]);
         }
 
-        // Create approval request for booking (non-admin)
-        if (!$isAdmin) {
-            $stmtAR = $pdo->prepare("INSERT INTO approval_requests (entity_type, entity_id, entity_ref, requested_by, status) VALUES ('booking', ?, ?, ?, 'pending')");
-            $stmtAR->execute([$bookingId, "Booking #$bookingId (from Proposal #$proposalId)", $_SESSION['user_id']]);
-        }
-
         logActivity('converted proposal to booking', 'bookings', $bookingId, "Booking ID: $bookingId");
 
         $pdo->commit();
         echo json_encode([
             'success'         => true,
             'approval_status' => $approvalStatus,
-            'message'         => $isAdmin
-                ? 'Booking confirmed successfully.'
-                : 'Booking submitted for admin approval.'
+            'message'         => 'Booking confirmed successfully.'
         ]);
 
     } catch (Exception $e) {

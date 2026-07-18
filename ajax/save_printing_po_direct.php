@@ -48,19 +48,27 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             }
         }
 
-        // Check GST
-        $stmtGst = $pdo->prepare("SELECT gstin FROM partners WHERE id = ?");
+        // Check GST and state in database
+        $stmtGst = $pdo->prepare("SELECT gstin, state FROM partners WHERE id = ?");
         $stmtGst->execute([$vendor_id]);
-        $db_vendor_gst = trim($stmtGst->fetchColumn() ?: '');
+        $vendorRow = $stmtGst->fetch(PDO::FETCH_ASSOC);
+        $db_vendor_gst = trim($vendorRow['gstin'] ?? '');
+        $vendor_state = trim($vendorRow['state'] ?? '');
         $vendor_has_gst = vendorHasGST($db_vendor_gst);
 
         $cgst = 0; $sgst = 0; $igst = 0;
         if ($vendor_has_gst) {
-            $igst = $net_total * 0.18; // Defaulting to IGST for simplicity, can be dynamic
+            $isVendorInterstate = (strcasecmp($vendor_state, 'West Bengal') !== 0 && substr($db_vendor_gst, 0, 2) !== '19');
+            if ($isVendorInterstate) {
+                $igst = $net_total * 0.18;
+            } else {
+                $cgst = $net_total * 0.09;
+                $sgst = $net_total * 0.09;
+            }
         }
         $grandTotal = $net_total + $cgst + $sgst + $igst;
 
-        $poNum = 'PPO-' . date('Ymd') . '-' . rand(100, 999);
+        $poNum = generateSequenceNumber($pdo, 'vendor_printing_po');
         $poStatus = $isAdmin ? 'approved' : 'pending';
         $approvalStatus = $isAdmin ? 'approved' : 'pending_approval';
 
@@ -84,6 +92,12 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         ]);
         $poId = $pdo->lastInsertId();
 
+        // Create approval request for non-admin
+        if (!$isAdmin) {
+            $stmtAR = $pdo->prepare("INSERT INTO approval_requests (entity_type, entity_id, entity_ref, requested_by, status) VALUES ('purchase_order', ?, ?, ?, 'pending')");
+            $stmtAR->execute([$poId, $poNum, $_SESSION['user_id'] ?? 0]);
+        }
+
         // 3. Insert into po_items
         $stmtPOItem = $pdo->prepare("INSERT INTO po_items (po_id, site_id, monthly_rate, cost) VALUES (?, ?, ?, ?)");
         foreach ($items as $item) {
@@ -96,7 +110,12 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         }
 
         $pdo->commit();
-        echo json_encode(['success' => true, 'po_id' => $poId, 'message' => 'PO saved successfully.']);
+        echo json_encode([
+            'success' => true, 
+            'po_id' => $poId, 
+            'approval_status' => $approvalStatus,
+            'message' => $isAdmin ? 'PO saved successfully.' : 'PO submitted for admin approval.'
+        ]);
 
     } catch (Exception $e) {
         $pdo->rollBack();

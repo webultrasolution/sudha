@@ -11,17 +11,42 @@ if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
 
 $data = json_decode(file_get_contents('php://input'), true);
 $trashId = isset($data['trash_id']) ? intval($data['trash_id']) : 0;
-if (!$trashId) {
-    echo json_encode(['success' => false, 'message' => 'Missing trash_id']);
+$trashIdsInput = isset($data['trash_ids']) ? $data['trash_ids'] : null;
+
+$trashIds = [];
+if (is_array($trashIdsInput)) {
+    $trashIds = array_map('intval', $trashIdsInput);
+} elseif (!empty($trashIdsInput)) {
+    if (is_string($trashIdsInput)) {
+        $trashIds = array_map('intval', explode(',', $trashIdsInput));
+    } else {
+        $trashIds = [intval($trashIdsInput)];
+    }
+} elseif ($trashId > 0) {
+    $trashIds = [$trashId];
+}
+
+$trashIds = array_filter($trashIds);
+
+if (empty($trashIds)) {
+    echo json_encode(['success' => false, 'message' => 'Missing trash_id(s)']);
     exit;
 }
 
 try {
-    $ok = restore_trash_item($pdo, $trashId);
-    if ($ok) echo json_encode(['success' => true]);
-    else echo json_encode(['success' => false, 'message' => 'Failed to restore']);
+    $success = true;
+    foreach ($trashIds as $id) {
+        $ok = restore_trash_item($pdo, $id);
+        if (!$ok) {
+            $success = false;
+        }
+    }
+    if ($success) {
+        echo json_encode(['success' => true]);
+    } else {
+        echo json_encode(['success' => false, 'message' => 'Failed to restore one or more items']);
+    }
 } catch (Exception $e) {
     echo json_encode(['success' => false, 'message' => $e->getMessage()]);
 }
-
 ?>

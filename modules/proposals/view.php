@@ -96,7 +96,13 @@ $taMarkupPct = ($taCost > 0) ? ($taMarkup / $taCost) * 100 : 0;
             </span>
         </div>
         <p style="color: #64748b; margin: 0; font-size: 0.95rem; font-weight: 500;">
-            <strong style="color: #334155;"><?php echo $p['client_name']; ?></strong> • Workspace: <?php echo date('d M', strtotime($p['start_date'])); ?> to <?php echo date('d M Y', strtotime($p['end_date'])); ?>
+            <strong style="color: #334155;"><?php echo $p['client_name']; ?></strong> • Workspace: <?php 
+            if (!empty($p['start_date']) && $p['start_date'] !== '0000-00-00' && !empty($p['end_date']) && $p['end_date'] !== '0000-00-00') {
+                echo date('d M', strtotime($p['start_date'])) . ' to ' . date('d M Y', strtotime($p['end_date']));
+            } else {
+                echo 'N/A';
+            }
+            ?>
         </p>
     </div>
     <div style="display: flex; gap: 1rem; align-items: center;">

@@ -13,7 +13,9 @@ try {
     if ($po_number) {
         $stmt = $pdo->prepare("
             SELECT r.*, s.name as site_name, s.site_code, s.width, s.height, s.location, s.city, s.state,
-                   s.hsn_code, s.mounting_hsn, c.name as client_name, c.city as client_city
+                   s.hsn_code, s.mounting_hsn, c.name as client_name, c.city as client_city,
+                   c.address as client_address, c.gstin as client_gstin, c.state as client_state,
+                   c.pan as client_pan, c.phone as client_phone, c.additional_gst
             FROM client_mounting_rates r
             LEFT JOIN sites s ON r.site_id = s.id
             JOIN partners c ON r.client_id = c.id
@@ -24,7 +26,9 @@ try {
         $in   = str_repeat('?,', count($rate_ids) - 1) . '?';
         $stmt = $pdo->prepare("
             SELECT r.*, s.name as site_name, s.site_code, s.width, s.height, s.location, s.city, s.state,
-                   s.hsn_code, s.mounting_hsn, c.name as client_name, c.city as client_city
+                   s.hsn_code, s.mounting_hsn, c.name as client_name, c.city as client_city,
+                   c.address as client_address, c.gstin as client_gstin, c.state as client_state,
+                   c.pan as client_pan, c.phone as client_phone, c.additional_gst
             FROM client_mounting_rates r
             LEFT JOIN sites s ON r.site_id = s.id
             JOIN partners c ON r.client_id = c.id
@@ -42,7 +46,9 @@ try {
             if ($po_number) {
                 $stmt = $pdo->prepare("
                     SELECT r.*, s.name as site_name, s.site_code, s.width, s.height, s.location, s.city, s.state,
-                           s.hsn_code, s.mounting_hsn, c.name as client_name, c.city as client_city
+                           s.hsn_code, s.mounting_hsn, c.name as client_name, c.city as client_city,
+                           c.address as client_address, c.gstin as client_gstin, c.state as client_state,
+                           c.pan as client_pan, c.phone as client_phone, c.additional_gst
                     FROM client_mounting_rates r
                     LEFT JOIN sites s ON r.site_id = s.id
                     JOIN partners c ON r.client_id = c.id
@@ -53,7 +59,9 @@ try {
                 $in   = str_repeat('?,', count($rate_ids) - 1) . '?';
                 $stmt = $pdo->prepare("
                     SELECT r.*, s.name as site_name, s.site_code, s.width, s.height, s.location, s.city, s.state,
-                           s.hsn_code, s.mounting_hsn, c.name as client_name, c.city as client_city
+                           s.hsn_code, s.mounting_hsn, c.name as client_name, c.city as client_city,
+                           c.address as client_address, c.gstin as client_gstin, c.state as client_state,
+                           c.pan as client_pan, c.phone as client_phone, c.additional_gst
                     FROM client_mounting_rates r
                     LEFT JOIN sites s ON r.site_id = s.id
                     JOIN partners c ON r.client_id = c.id
@@ -72,10 +80,50 @@ try {
 if (empty($rows)) die("No records found.");
 
 $first      = $rows[0];
+
+// Block view if not approved and user is not admin
+$isAdmin = ($_SESSION['user_role'] ?? '') === 'admin';
+if (!$isAdmin && $first['approval_status'] !== 'approved') {
+    die("<div style='padding: 50px; text-align: center; font-family: sans-serif;'><h1 style='color: #ef4444;'>Access Denied</h1><p>This Client Mounting Invoice is awaiting admin approval and cannot be viewed yet.</p></div>");
+}
+
 $invoiceNo  = $first['custom_invoice_number'] ?: ($first['po_number'] ?? 'DRAFT');
 $invoiceDate = $first['invoice_date'] ?: $first['created_at'];
-$gstType    = $first['gst_type'] ?? 'igst';
 $isFinalInv = $first['is_final_invoice'] ?? 0;
+
+$billing_gst = $first['billing_gstin'] ?? '';
+$client_gstin = $first['client_gstin'] ?: 'N/A';
+$clientAddress = !empty($first['client_address']) ? $first['client_address'] : ($first['client_city'] ?: 'N/A');
+$clientState = $first['client_state'] ?? '';
+
+if (!empty($billing_gst)) {
+    if ($billing_gst === $first['client_gstin']) {
+        $client_gstin = $first['client_gstin'];
+        $clientAddress = !empty($first['client_address']) ? $first['client_address'] : ($first['client_city'] ?: 'N/A');
+        $clientState = $first['client_state'] ?? '';
+    } else {
+        if (!empty($first['additional_gst'])) {
+            $extra = json_decode($first['additional_gst'], true);
+            if (is_array($extra)) {
+                foreach ($extra as $item) {
+                    if (isset($item['gstin']) && $item['gstin'] === $billing_gst) {
+                        $client_gstin = $billing_gst;
+                        $clientAddress = $item['address'] ?? '';
+                        if (!empty($item['city'])) {
+                            $clientAddress .= (!empty($clientAddress) ? ", " : "") . $item['city'];
+                        }
+                        if (!empty($item['district'])) {
+                            $clientAddress .= (!empty($clientAddress) ? ", " : "") . $item['district'];
+                        }
+                        $clientState = $item['state'] ?? '';
+                        break;
+                    }
+                }
+            }
+        }
+    }
+}
+$isInterState = (strtolower(trim($clientState)) !== 'west bengal' && substr($client_gstin, 0, 2) !== '19');
 
 // Company settings — uses active session entity
 $co                 = resolveCompanyDetails();
@@ -85,10 +133,19 @@ $company_pan        = $co['pan'];
 $company_address    = $co['address'];
 $company_phone      = $co['phone'];
 $company_email      = $co['email'];
+$company_logo       = $co['logo'];
 $company_letterhead = $co['letterhead'];
 $company_signature  = $co['signature'];
-$company_logo       = $co['logo'];
-$company_msme       = $co['msme_number'];
+$company_bank_details    = $co['bank_details'];
+$company_terms           = $isFinalInv ? $co['invoice_terms'] : $co['terms_conditions'];
+$company_msme            = $co['msme_number'];
+$company_cin             = $co['cin'] ?? '';
+$company_tan             = $co['tan'] ?? '';
+
+// Derive short name (first 2 words) for large header text
+$name_words       = explode(' ', trim($company_name));
+$company_short    = strtoupper(implode(' ', array_slice($name_words, 0, 2)));
+$company_full_uc  = strtoupper($company_name);
 
 // Calculate totals
 $subTotal = 0;
@@ -96,181 +153,384 @@ foreach ($rows as $row) {
     $sqft = ($row['width'] ?? 0) * ($row['height'] ?? 0);
     $subTotal += $sqft * $row['rate_per_sqft'];
 }
-$cgst = $sgst = $igst = 0;
-if ($gstType === 'igst') {
-    $igst = round($subTotal * 0.18, 2);
+
+if ($isFinalInv) {
+    $cgst = floatval($first['cgst'] ?? 0);
+    $sgst = floatval($first['sgst'] ?? 0);
+    $igst = floatval($first['igst'] ?? 0);
+    $totalAmt = floatval($first['total_amount'] ?? 0);
 } else {
-    $cgst = $sgst = round($subTotal * 0.09, 2);
+    if ($isInterState) {
+        $igst = round($subTotal * 0.18, 2);
+        $cgst = 0;
+        $sgst = 0;
+    } else {
+        $cgst = round($subTotal * 0.09, 2);
+        $sgst = round($subTotal * 0.09, 2);
+        $igst = 0;
+    }
+    $totalAmt = $subTotal + $cgst + $sgst + $igst;
 }
-$totalAmt = $subTotal + $cgst + $sgst + $igst;
+
+$cgst_pct = $isInterState ? 0 : 9;
+$sgst_pct = $isInterState ? 0 : 9;
+$igst_pct = $isInterState ? 18 : 0;
 ?>
 <!DOCTYPE html>
 <html lang="en">
 <head>
     <meta charset="UTF-8">
-    <title>Mounting Invoice - <?php echo htmlspecialchars($invoiceNo); ?></title>
+    <title>Client Mounting Invoice - <?php echo htmlspecialchars($first['client_name'], ENT_QUOTES, 'UTF-8', false); ?></title>
     <style>
-        * { margin:0; padding:0; box-sizing:border-box; }
-        body { font-family: 'Arial', sans-serif; font-size: 12px; color: #1e293b; background: #f8fafc; }
-        .invoice-wrapper { max-width: 900px; margin: 20px auto; background: white; box-shadow: 0 4px 20px rgba(0,0,0,0.1); border-radius: 8px; overflow: hidden; }
-        .inv-header { background: #0d9488; color: white; padding: 24px 32px; display: flex; justify-content: space-between; align-items: flex-start; }
-        .inv-header h1 { font-size: 22px; font-weight: 900; letter-spacing: 1px; margin-bottom: 4px; }
-        .inv-header .inv-type { background: rgba(255,255,255,0.2); display: inline-block; padding: 3px 10px; border-radius: 20px; font-size: 10px; font-weight: 800; text-transform: uppercase; letter-spacing: 1px; }
-        .inv-meta { text-align: right; font-size: 11px; line-height: 1.8; }
-        .inv-meta strong { font-size: 13px; }
-        .inv-body { padding: 24px 32px; }
-        .party-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 24px; margin-bottom: 24px; }
-        .party-box { background: #f8fafc; border-radius: 8px; padding: 16px; border-left: 3px solid #0d9488; }
-        .party-box h4 { font-size: 9px; color: #94a3b8; font-weight: 800; text-transform: uppercase; letter-spacing: 1px; margin-bottom: 8px; }
-        .party-box .name { font-size: 14px; font-weight: 800; color: #0f172a; margin-bottom: 4px; }
-        .party-box p { font-size: 11px; color: #64748b; line-height: 1.6; }
-        table.items { width: 100%; border-collapse: collapse; margin-bottom: 20px; }
-        table.items th { background: #0d9488; color: white; padding: 10px 12px; font-size: 10px; font-weight: 800; text-transform: uppercase; letter-spacing: 0.5px; text-align: left; }
-        table.items td { padding: 10px 12px; border-bottom: 1px solid #f1f5f9; font-size: 11px; vertical-align: middle; }
-        table.items tr:nth-child(even) td { background: #f8fafc; }
-        .hsn-badge { background: #f0fdfa; color: #0d9488; padding: 2px 7px; border-radius: 4px; font-size: 10px; font-weight: 800; font-family: monospace; }
-        .totals-section { display: flex; justify-content: flex-end; margin-bottom: 24px; }
-        .totals-box { width: 300px; }
-        .tot-row { display: flex; justify-content: space-between; padding: 6px 0; font-size: 12px; border-bottom: 1px solid #f1f5f9; }
-        .tot-row.grand { background: #0d9488; color: white; padding: 10px 12px; border-radius: 6px; margin-top: 8px; font-weight: 900; font-size: 14px; }
-        .footer-notes { background: #f8fafc; border-radius: 8px; padding: 16px; margin-top: 20px; font-size: 11px; color: #64748b; }
-        .sign-section { display: flex; justify-content: space-between; margin-top: 32px; padding-top: 16px; border-top: 1px solid #e2e8f0; }
-        .sign-box { text-align: center; }
-        .sign-box .sign-line { width: 150px; border-bottom: 1px solid #475569; margin: 40px auto 6px; }
-        .sign-box p { font-size: 10px; font-weight: 700; color: #475569; }
-        .print-bar { background: white; border-bottom: 1px solid #e2e8f0; padding: 12px 32px; display: flex; gap: 1rem; justify-content: flex-end; }
-        .btn-print { background: #0d9488; color: white; border: none; padding: 8px 20px; border-radius: 6px; cursor: pointer; font-weight: 700; font-size: 12px; display: flex; align-items: center; gap: 6px; }
-        .btn-back  { background: #f1f5f9; color: #475569; border: none; padding: 8px 20px; border-radius: 6px; cursor: pointer; font-weight: 700; font-size: 12px; text-decoration: none; display: flex; align-items: center; gap: 6px; }
+        @page {
+            size: A4;
+            margin: 8mm 10mm;
+            @bottom-right {
+                content: counter(page) "/" counter(pages);
+                font-family: Arial, sans-serif;
+                font-size: 9px;
+                color: #555;
+            }
+        }
+        .avoid-break {
+            page-break-inside: avoid;
+            break-inside: avoid;
+            margin-top: 20px;
+        }
+        body { font-family: 'Arial', sans-serif; margin: 0; padding: 20px; color: #000; font-size: 11px; line-height: 1.3; background: #f1f5f9; }
+        .po-wrapper {
+            border: 1px solid #d1d5db;
+            width: 210mm;
+            min-height: 297mm;
+            margin: 0 auto;
+            position: relative;
+            background: #fff;
+            padding: 12mm 14mm;
+            box-shadow: 0 4px 10px rgba(0,0,0,0.15);
+            box-sizing: border-box;
+            display: block;
+        }
+
+        .header-top { border-bottom: 1px solid #000; padding: 5px 10px; }
+        .header-top p { margin: 0; }
+
+        .main-info { display: flex; border-bottom: 1px solid #000; }
+        .info-col { flex: 1; padding: 6px; }
+        .info-col:first-child { border-right: 1px solid #000; }
+
+        .info-row { display: flex; margin-bottom: 3px; }
+        .info-label { width: 110px; font-weight: normal; }
+        .info-sep { width: 15px; }
+        .info-value { flex: 1; font-weight: normal; }
+
+        .section-title { font-weight: bold; text-decoration: underline; margin-bottom: 5px; font-style: italic; }
+        .table-title { background: #f0f0f0; border-bottom: 1px solid #000; text-align: center; font-weight: bold; padding: 4px; letter-spacing: 2px; text-transform: uppercase; }
+
+        table { width: 100%; border-collapse: collapse; border: 1px solid #000; }
+        th { border-bottom: 1px solid #000; border-right: 1px solid #000; padding: 4px; text-align: center; font-weight: bold; background: #fafafa; }
+        th:last-child { border-right: none; }
+        td { border-bottom: 1px solid #000; border-right: 1px solid #000; padding: 4px 5px; vertical-align: top; text-align: center; }
+        td:last-child { border-right: none; }
+
+        .totals-row td { border-bottom: none; border-top: 1px solid #000; font-weight: bold; }
+        .footer { display: flex; border: 1px solid #000; }
+        .footer-left { flex: 2; padding: 10px; border-right: 1px solid #000; min-height: 80px; }
+        .footer-right { flex: 1; padding: 10px; text-align: center; display: flex; flex-direction: column; justify-content: space-between; }
+
+        .btn-print { position: fixed; bottom: 30px; right: 30px; background: #000; color: #fff; border: none; padding: 10px 20px; cursor: pointer; border-radius: 4px; font-weight: bold; }
+        .btn-back { position: fixed; bottom: 30px; right: 180px; background: #6366f1; color: #fff; border: none; padding: 10px 20px; cursor: pointer; border-radius: 4px; font-weight: bold; text-decoration: none; font-size: 12px; }
         @media print {
-            .print-bar { display: none !important; }
-            body { background: white; }
-            .invoice-wrapper { box-shadow: none; margin: 0; border-radius: 0; }
+            .btn-print, .btn-back { display: none; }
+            body { padding: 0; background: #fff; }
+            .po-wrapper {
+                border: none;
+                width: 100%;
+                min-height: auto;
+                box-shadow: none;
+                padding: 0;
+                margin: 0;
+                display: block;
+            }
+            thead { display: table-header-group; }
+            tr { page-break-inside: avoid; break-inside: avoid; }
+            .avoid-break {
+                margin-top: 15px;
+                display: block;
+            }
         }
     </style>
 </head>
 <body>
 
-<div class="print-bar">
-    <a href="mounting.php" class="btn-back">← Back to List</a>
-    <button class="btn-print" onclick="window.print()">🖨 Print Invoice</button>
-</div>
+<button class="btn-print" onclick="window.print()">PRINT MOUNTING PO</button>
+<a class="btn-back" href="mounting.php?client_id=<?php echo $client_id; ?>">← BACK TO SELECTION</a>
 
-<div class="invoice-wrapper">
-
-    <!-- Header -->
-    <div class="inv-header">
-        <div>
-            <?php if ($company_logo): ?>
-                <img src="<?php echo BASE_URL; ?>assets/images/<?php echo $company_logo; ?>" style="height:40px; margin-bottom:8px; filter:brightness(10); display:block;">
+<div class="po-wrapper">
+    <!-- Header with Letterhead or Manual Info -->
+    <div style="display: flex; justify-content: space-between; align-items: flex-start; padding: 10px 10px 2px;">
+        <div style="flex: 1.4; text-align: left;">
+            <?php if ($company_letterhead): ?>
+                <img src="<?php echo BASE_URL; ?>assets/images/<?php echo $company_letterhead; ?>"
+                    style="max-height: 110px; width: auto; display: block; margin-bottom: 5px;">
+            <?php else: ?>
+                <h2 style="margin: 0; text-transform: uppercase; font-size: 18px; color: #8B1A1A;"><?php echo htmlspecialchars($company_name); ?></h2>
             <?php endif; ?>
-            <h1><?php echo htmlspecialchars($company_name); ?></h1>
-            <p style="font-size:11px; opacity:0.85; margin-top:4px;"><?php echo htmlspecialchars($company_address); ?></p>
-            <p style="font-size:11px; opacity:0.85;">📞 <?php echo $company_phone; ?> &nbsp;|&nbsp; ✉ <?php echo $company_email; ?></p>
-            <p style="font-size:11px; opacity:0.85; margin-top:4px;">GSTIN: <strong><?php echo $company_gstin; ?></strong> &nbsp;|&nbsp; PAN: <?php echo $company_pan; ?></p>
-            <?php if ($company_msme): ?><p style="font-size:11px; opacity:0.85; margin-top:2px;">MSME: <?php echo htmlspecialchars($company_msme); ?></p><?php endif; ?>
         </div>
-        <div class="inv-meta">
-            <div class="inv-type"><?php echo $isFinalInv ? 'Final Tax Invoice' : 'Proforma Invoice'; ?> — Mounting</div>
-            <p style="margin-top:10px;"><strong style="font-size:15px;"><?php echo htmlspecialchars($invoiceNo); ?></strong></p>
-            <p>Date: <?php echo date('d M Y', strtotime($invoiceDate)); ?></p>
-            <?php if ($first['po_number']): ?>
-            <p>PO Ref: <?php echo htmlspecialchars($first['po_number']); ?></p>
+        <div style="flex: 1.2; text-align: center; padding-top: 15px;">
+            <div style="font-size: 15px; font-weight: bold; text-decoration: underline; letter-spacing: 1.5px; text-transform: uppercase;">TAX INVOICE</div>
+        </div>
+        <div style="flex: 0.8; text-align: right; font-style: italic; font-size: 10px; padding-top: 15px; color: #555;">
+            Original Copy
+        </div>
+    </div>
+    <div style="padding: 0 10px 10px; font-size: 10px; line-height: 1.4; color: #000; border-bottom: 1px solid #000; margin-bottom: 10px;">
+        <?php echo nl2br(htmlspecialchars($company_address)); ?><br>
+        Ph : <?php echo htmlspecialchars($company_phone); ?> &nbsp;|&nbsp; Email : <?php echo htmlspecialchars($company_email); ?>
+    </div>
+
+    <!-- PO Info -->
+    <div class="main-info">
+        <div class="info-col">
+            <div style="margin-bottom: 15px;">
+                <?php if (!empty($first['customer_po_no'])): ?>
+                <div class="info-row">
+                    <span class="info-label">Client PO</span>
+                    <span class="info-sep">:</span>
+                    <span class="info-value"><?php echo htmlspecialchars($first['customer_po_no']); ?></span>
+                </div>
+                <?php if (!empty($first['customer_po_date']) && $first['customer_po_date'] !== '0000-00-00'): ?>
+                <div class="info-row">
+                    <span class="info-label">PO Date</span>
+                    <span class="info-sep">:</span>
+                    <span class="info-value"><?php echo date('d-m-Y', strtotime($first['customer_po_date'])); ?></span>
+                </div>
+                <?php endif; ?>
+                <?php endif; ?>
+
+                <?php
+                $camp_brand = [];
+                if (!empty($first['campaign_name'])) $camp_brand[] = trim($first['campaign_name']);
+                if (!empty($first['brand_name'])) $camp_brand[] = trim($first['brand_name']);
+                $display_camp_brand = implode(' / ', $camp_brand);
+                if (!empty($display_camp_brand)): ?>
+                <div class="info-row">
+                    <span class="info-label">Campaign / Brand</span>
+                    <span class="info-sep">:</span>
+                    <span class="info-value"><strong><?php echo htmlspecialchars($display_camp_brand); ?></strong></span>
+                </div>
+                <?php endif; ?>
+
+                <div class="section-title" style="margin-top: 10px;">Client / Customer:</div>
+                <div style="font-weight: bold; font-size: 12px; margin-bottom: 2px;"><?php echo htmlspecialchars($first['client_name'], ENT_QUOTES, 'UTF-8', false); ?></div>
+                <div style="width: 250px;"><?php echo htmlspecialchars($clientAddress, ENT_QUOTES, 'UTF-8', false); ?></div>
+                
+                <div class="info-row" style="margin-top: 5px;">
+                    <span class="info-label">GSTIN / UIN</span>
+                    <span class="info-sep">:</span>
+                    <span class="info-value"><strong><?php echo htmlspecialchars($client_gstin); ?></strong></span>
+                </div>
+                <?php if (!empty($clientState)): ?>
+                <div class="info-row">
+                    <span class="info-label">State / Code</span>
+                    <span class="info-sep">:</span>
+                    <span class="info-value"><?php echo htmlspecialchars($clientState); ?></span>
+                </div>
+                <?php endif; ?>
+                <div class="info-row">
+                    <span class="info-label">Contact Person</span>
+                    <span class="info-sep">:</span>
+                    <span class="info-value"><?php echo htmlspecialchars($first['contact_person'] ?? '', ENT_QUOTES, 'UTF-8', false); ?></span>
+                </div>
+                <div class="info-row">
+                    <span class="info-label">Phone</span>
+                    <span class="info-sep">:</span>
+                    <span class="info-value"><?php echo htmlspecialchars($first['client_phone'] ?? '', ENT_QUOTES, 'UTF-8', false); ?></span>
+                </div>
+            </div>
+        </div>
+
+        <div class="info-col">
+            <div class="info-row">
+                <span class="info-label">Invoice Number</span>
+                <span class="info-sep">:</span>
+                <span class="info-value"><strong><?php echo htmlspecialchars($invoiceNo); ?></strong></span>
+            </div>
+            <div class="info-row">
+                <span class="info-label">Invoice Date</span>
+                <span class="info-sep">:</span>
+                <span class="info-value"><?php echo date('d-m-Y', strtotime($invoiceDate)); ?></span>
+            </div>
+            <div class="info-row">
+                <span class="info-label">Type</span>
+                <span class="info-sep">:</span>
+                <span class="info-value"><strong>TAX INVOICE (FINAL)</strong></span>
+            </div>
+            <?php if (!empty($first['remarks'])): ?>
+            <div class="info-row">
+                <span class="info-label">Remark</span>
+                <span class="info-sep">:</span>
+                <span class="info-value"><?php echo htmlspecialchars($first['remarks']); ?></span>
+            </div>
             <?php endif; ?>
-            <?php if ($first['customer_po_no']): ?>
-            <p>Client PO: <?php echo htmlspecialchars($first['customer_po_no']); ?><?php if($first['customer_po_date']) echo ' (' . date('d M Y', strtotime($first['customer_po_date'])) . ')'; ?></p>
+            <div class="info-row" style="margin-top: 5px;">
+                <span class="info-label">PAN</span>
+                <span class="info-sep">:</span>
+                <span class="info-value"><?php echo htmlspecialchars($company_pan); ?></span>
+            </div>
+            <div class="info-row">
+                <span class="info-label">GSTIN</span>
+                <span class="info-sep">:</span>
+                <span class="info-value"><?php echo htmlspecialchars($company_gstin); ?></span>
+            </div>
+            <?php if (!empty($company_cin)): ?>
+            <div class="info-row">
+                <span class="info-label">CIN</span>
+                <span class="info-sep">:</span>
+                <span class="info-value"><?php echo htmlspecialchars($company_cin); ?></span>
+            </div>
+            <?php endif; ?>
+            <?php if (!empty($company_tan)): ?>
+            <div class="info-row">
+                <span class="info-label">TAN</span>
+                <span class="info-sep">:</span>
+                <span class="info-value"><?php echo htmlspecialchars($company_tan); ?></span>
+            </div>
             <?php endif; ?>
         </div>
     </div>
 
-    <div class="inv-body">
+    <div class="table-title">TAX INVOICE DETAILS:</div>
 
-        <!-- Bill To / From -->
-        <div class="party-grid">
-            <div class="party-box">
-                <h4>Bill From</h4>
-                <div class="name"><?php echo htmlspecialchars($company_name); ?></div>
-                <p><?php echo htmlspecialchars($company_address); ?></p>
-                <p>GSTIN: <?php echo $company_gstin; ?></p>
-            </div>
-            <div class="party-box">
-                <h4>Bill To</h4>
-                <div class="name"><?php echo htmlspecialchars($first['client_name']); ?></div>
-                <?php if ($first['client_city']): ?><p><?php echo htmlspecialchars($first['client_city']); ?></p><?php endif; ?>
-            </div>
-        </div>
-
-        <!-- Items Table -->
-        <table class="items">
-            <thead>
-                <tr>
-                    <th style="width:35px;">#</th>
-                    <th>Site / Location</th>
-                    <th style="width:90px;">Mounting HSN</th>
-                    <th style="width:90px;">Size (ft)</th>
-                    <th style="width:70px;">SQFT</th>
-                    <th style="width:80px;">Type</th>
-                    <th style="width:90px; text-align:right;">Rate/SQFT</th>
-                    <th style="width:100px; text-align:right;">Amount (₹)</th>
-                </tr>
-            </thead>
-            <tbody>
+    <table>
+        <thead>
+            <tr>
+                <th style="width: 30px;">S.N.</th>
+                <th>SITE / LOCATION</th>
+                <th style="width: 70px;">HSN/SAC<br>Code</th>
+                <th style="width: 70px;">SIZE</th>
+                <th style="width: 70px;">SQFT</th>
+                <th style="width: 70px;">MEDIA</th>
+                <th style="width: 70px;">Rate/SQFT</th>
+                <th style="width: 90px;">Total Cost(₹)</th>
+            </tr>
+        </thead>
+        <tbody>
             <?php $sn=1; foreach ($rows as $row):
                 $sqft   = ($row['width'] ?? 0) * ($row['height'] ?? 0);
                 $amount = $sqft * $row['rate_per_sqft'];
-                $hsn    = $row['mounting_hsn'] ?: $row['hsn_code'] ?: '';
+                $hsn    = $row['mounting_hsn'] ?: $row['hsn_code'] ?: '998366';
             ?>
             <tr>
                 <td><?php echo $sn++; ?></td>
-                <td>
+                <td style="text-align: left; padding-left: 10px;">
                     <strong><?php echo htmlspecialchars($row['site_name'] ?? 'Generic'); ?></strong>
-                    <?php if ($row['site_code']): ?><br><span style="font-size:10px;color:#f97316;font-weight:700;"><?php echo $row['site_code']; ?></span><?php endif; ?>
-                    <?php if ($row['location']): ?><br><span style="font-size:10px;color:#94a3b8;"><?php echo htmlspecialchars($row['location']); ?>, <?php echo htmlspecialchars($row['city'] ?? ''); ?></span><?php endif; ?>
+                    <?php if ($row['site_code']): ?><br><span style="font-size: 9px; color: #555;"><?php echo $row['site_code']; ?> • <?php echo htmlspecialchars($row['city'] ?? ''); ?></span><?php endif; ?>
                 </td>
-                <td><?php echo $hsn ? '<span class="hsn-badge">' . htmlspecialchars($hsn) . '</span>' : '—'; ?></td>
-                <td><?php echo $row['width'] ?? 0; ?>' × <?php echo $row['height'] ?? 0; ?>'</td>
-                <td><?php echo number_format($sqft); ?></td>
-                <td><?php echo htmlspecialchars($row['mounting_type'] ?? ''); ?></td>
-                <td style="text-align:right;">₹<?php echo number_format($row['rate_per_sqft'], 2); ?></td>
-                <td style="text-align:right; font-weight:700;">₹<?php echo number_format($amount, 2); ?></td>
+                <td><?php echo htmlspecialchars($hsn); ?></td>
+                <td><?php echo ($row['width'] && $row['height']) ? $row['width'] . "x" . $row['height'] : '-'; ?></td>
+                <td><?php echo $sqft > 0 ? number_format($sqft) : '-'; ?></td>
+                <td style="font-size: 9px;"><?php echo htmlspecialchars($row['mounting_type'] ?? ''); ?></td>
+                <td>₹<?php echo number_format($row['rate_per_sqft'], 2); ?></td>
+                <td style="text-align: right; padding-right: 10px; font-weight: bold;"><?php echo number_format($amount, 2); ?></td>
             </tr>
             <?php endforeach; ?>
-            </tbody>
-        </table>
 
-        <!-- Totals -->
-        <div class="totals-section">
-            <div class="totals-box">
-                <div class="tot-row"><span>Sub Total</span><span>₹<?php echo number_format($subTotal, 2); ?></span></div>
-                <?php if ($gstType === 'igst'): ?>
-                <div class="tot-row"><span>IGST (18%)</span><span>₹<?php echo number_format($igst, 2); ?></span></div>
-                <?php else: ?>
-                <div class="tot-row"><span>CGST (9%)</span><span>₹<?php echo number_format($cgst, 2); ?></span></div>
-                <div class="tot-row"><span>SGST (9%)</span><span>₹<?php echo number_format($sgst, 2); ?></span></div>
-                <?php endif; ?>
-                <div class="tot-row grand"><span>Grand Total</span><span>₹<?php echo number_format($totalAmt, 2); ?></span></div>
+            <tr class="totals-row">
+                <td colspan="7" style="text-align: right; padding-right: 10px;">Taxable Amount (Total Cost)</td>
+                <td style="text-align: right; padding-right: 10px;"><?php echo number_format($subTotal, 2); ?></td>
+            </tr>
+            <tr class="totals-row">
+                <td colspan="7" style="text-align: right; padding-right: 10px;">CGST (<?php echo $cgst_pct; ?>%)</td>
+                <td style="text-align: right; padding-right: 10px;"><?php echo number_format($cgst, 2); ?></td>
+            </tr>
+            <tr class="totals-row">
+                <td colspan="7" style="text-align: right; padding-right: 10px;">SGST (<?php echo $sgst_pct; ?>%)</td>
+                <td style="text-align: right; padding-right: 10px;"><?php echo number_format($sgst, 2); ?></td>
+            </tr>
+            <tr class="totals-row">
+                <td colspan="7" style="text-align: right; padding-right: 10px;">IGST (<?php echo $igst_pct; ?>%)</td>
+                <td style="text-align: right; padding-right: 10px;"><?php echo number_format($igst, 2); ?></td>
+            </tr>
+            <tr class="totals-row" style="background: #f9f9f9; border-top: 2px solid #000;">
+                <td colspan="7" style="text-align: right; padding-right: 10px; font-size: 12px; height: 30px; vertical-align: middle;">Gross Payable Amount</td>
+                <td style="text-align: right; padding-right: 10px; font-size: 12px; vertical-align: middle;"><?php echo number_format($totalAmt, 2); ?></td>
+            </tr>
+        </tbody>
+    </table>
+
+    <!-- HSN/SAC Breakdown Table -->
+    <?php
+    // Group items by HSN code
+    $hsnGroups = [];
+    foreach ($rows as $row) {
+        $hsn = $row['mounting_hsn'] ?: $row['hsn_code'] ?: '998366';
+        $sqft = ($row['width'] ?? 0) * ($row['height'] ?? 0);
+        $amount = $sqft * $row['rate_per_sqft'];
+        $hsnGroups[$hsn] = ($hsnGroups[$hsn] ?? 0) + $amount;
+    }
+    ?>
+    <table style="border-top: 1.5px solid #000; border-bottom: 1px solid #000; margin-top: 6px; margin-bottom: 10px;">
+        <thead>
+            <tr style="background: #f2f2f2;">
+                <th style="text-align: left; padding-left: 8px; width: 90px; border-top: none;">HSN/SAC</th>
+                <th style="width: 70px; border-top: none;">Tax Rate</th>
+                <th style="text-align: right; padding-right: 8px; border-top: none;">Taxable Amt.</th>
+                <th style="text-align: right; padding-right: 8px; border-top: none;">CGST Amt.</th>
+                <th style="text-align: right; padding-right: 8px; border-top: none;">SGST Amt.</th>
+                <th style="text-align: right; padding-right: 8px; border-top: none; border-right: none;">IGST Amt.</th>
+            </tr>
+        </thead>
+        <tbody>
+            <?php foreach ($hsnGroups as $hsn => $taxableAmt):
+                $hsnGst = calculateGST($taxableAmt, $isInterState);
+            ?>
+            <tr>
+                <td style="text-align: left; padding-left: 8px; border-left: none;"><?php echo htmlspecialchars($hsn); ?></td>
+                <td style="text-align: center;">18%</td>
+                <td style="text-align: right; padding-right: 8px;"><?php echo number_format($taxableAmt, 2); ?></td>
+                <td style="text-align: right; padding-right: 8px;"><?php echo number_format($hsnGst['cgst'], 2); ?></td>
+                <td style="text-align: right; padding-right: 8px;"><?php echo number_format($hsnGst['sgst'], 2); ?></td>
+                <td style="text-align: right; padding-right: 8px; border-right: none;"><?php echo number_format($hsnGst['igst'], 2); ?></td>
+            </tr>
+            <?php endforeach; ?>
+        </tbody>
+    </table>
+
+    <div class="avoid-break">
+        <div style="padding: 10px; border-top: 1px solid #000; font-size: 11px;">
+            <strong>Amount in Words:</strong> <span style="text-transform: capitalize;"><?php echo amountInWords($totalAmt); ?> Only</span>
+        </div>
+
+        <div style="padding: 5px 10px; border-top: 1px solid #000; font-size: 8.5px; line-height: 1.25;">
+            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 5px;">
+                <div style="font-weight: bold; text-decoration: underline; font-size: 10px;">Terms & Conditions</div>
+            </div>
+            <div style="margin: 0; line-height: 1.2; white-space: pre-wrap;">
+                <?php echo nl2br(htmlspecialchars($company_terms)); ?>
             </div>
         </div>
 
-        <!-- Signature -->
-        <div class="sign-section">
-            <div class="sign-box">
-                <div class="sign-line"></div>
-                <p>Authorised Signatory</p>
-                <p style="margin-top:2px; color:#0d9488;"><?php echo htmlspecialchars($company_name); ?></p>
+        <div class="footer">
+            <div class="footer-left">
+                <div style="font-weight: bold; text-decoration: underline; margin-bottom: 5px;">Bank Details:</div>
+                <p style="margin: 2px 0;">Bank Name: <strong><?php echo getSetting('bank_name', 'Your Bank Name'); ?></strong></p>
+                <p style="margin: 2px 0;">Account No: <strong><?php echo getSetting('bank_account', 'XXXX-XXXX-XXXX'); ?></strong></p>
+                <p style="margin: 2px 0;">IFSC Code: <strong><?php echo getSetting('bank_ifsc', 'XXXX0000000'); ?></strong></p>
             </div>
-            <div style="text-align:right; font-size:11px; color:#64748b;">
-                <p>This is a computer-generated invoice.</p>
-                <p>Printed on: <?php echo date('d M Y, h:i A'); ?></p>
+            <div class="footer-right">
+                <div>For <strong><?php echo htmlspecialchars($company_name); ?></strong></div>
+                <div style="margin-top: 15px;">
+                    <img src="<?php echo BASE_URL; ?>assets/images/<?php echo htmlspecialchars($company_signature); ?>" style="height: 45px; display: block; margin: 0 auto;" onerror="this.style.display='none'">
+                    <div style="border-top: 1px solid #000; width: 150px; margin: 5px auto 0;"></div>
+                    <div style="font-weight: bold; margin-top: 2px;">Authorised Signatory</div>
+                </div>
             </div>
         </div>
+    </div>
+</div>
+<div style="max-width: 800px; margin: 10px auto; text-align: center; font-size: 9px; color: #888;">
+    This is a computer generated Invoice and does not require physical signature.
+</div>
 
-        <!-- Notes -->
-        <div class="footer-notes">
-            <strong>Terms &amp; Conditions:</strong>
-            <p style="margin-top:4px;">Payment due within 30 days. All disputes subject to local jurisdiction.</p>
-        </div>
-
-    </div><!-- /inv-body -->
-</div><!-- /invoice-wrapper -->
 </body>
 </html>

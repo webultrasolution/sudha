@@ -12,7 +12,7 @@ include_once __DIR__ . '/../../includes/header.php';
 $type = isset($_GET['type']) ? $_GET['type'] : 'client';
 
 // Fetch Partners based on type
-$stmt = $pdo->prepare("SELECT id, name, city, gstin FROM partners WHERE type = ? ORDER BY name ASC");
+$stmt = $pdo->prepare("SELECT id, name, city, gstin, contact_person, phone, email FROM partners WHERE type = ? ORDER BY name ASC");
 $stmt->execute([$type]);
 $partners = $stmt->fetchAll();
 ?>
@@ -53,22 +53,24 @@ $partners = $stmt->fetchAll();
                     // Total Billed to Client (Invoices + Printing POs)
                     $stmtBilled = $pdo->prepare("
                         SELECT 
-                            (SELECT COALESCE(SUM(i.total_amount), 0) FROM invoices i JOIN bookings b ON i.booking_id = b.id WHERE b.client_id = ?)
+                            (SELECT COALESCE(SUM(i.total_amount), 0) FROM invoices i JOIN bookings b ON i.booking_id = b.id WHERE b.client_id = ? AND i.approval_status = 'approved')
                             +
-                            (SELECT COALESCE(SUM(r.rate_per_sqft * COALESCE(s.width, 0) * COALESCE(s.height, 0)), 0) FROM client_printing_rates r LEFT JOIN sites s ON r.site_id = s.id WHERE r.client_id = ?)
+                            (SELECT COALESCE(SUM(r.rate_per_sqft * COALESCE(s.width, 0) * COALESCE(s.height, 0) * 1.18), 0) FROM client_printing_rates r LEFT JOIN sites s ON r.site_id = s.id WHERE r.client_id = ? AND r.is_final_invoice = 1 AND r.approval_status = 'approved')
+                            +
+                            (SELECT COALESCE(SUM(m.rate_per_sqft * COALESCE(s.width, 0) * COALESCE(s.height, 0) * 1.18), 0) FROM client_mounting_rates m LEFT JOIN sites s ON m.site_id = s.id WHERE m.client_id = ? AND m.is_final_invoice = 1 AND m.approval_status = 'approved')
                     ");
-                    $stmtBilled->execute([$p['id'], $p['id']]);
+                    $stmtBilled->execute([$p['id'], $p['id'], $p['id']]);
                     $totalBilled = $stmtBilled->fetchColumn() ?: 0;
 
                     // Total Paid by Client (Receivables)
-                    $stmtPaid = $pdo->prepare("SELECT SUM(amount) FROM payments WHERE partner_id = ? AND type = 'credit'");
+                    $stmtPaid = $pdo->prepare("SELECT SUM(amount) FROM payments WHERE partner_id = ? AND type = 'receivable' AND (approval_status = 'approved' OR approval_status IS NULL OR approval_status = '')");
                     $stmtPaid->execute([$p['id']]);
                     $totalPaid = $stmtPaid->fetchColumn() ?: 0;
                 } else {
                     // Total Billed by Vendor (Purchase Orders and Printing POs) — use fallback calc if total_amount is null/0
                     $stmtBilled = $pdo->prepare("
                         SELECT 
-                            (SELECT COALESCE(SUM(COALESCE(NULLIF(total_amount, 0), po_amount + COALESCE(cgst_amount,0) + COALESCE(sgst_amount,0) + COALESCE(igst_amount,0))), 0) FROM purchase_orders WHERE vendor_id = ?)
+                            (SELECT COALESCE(SUM(COALESCE(NULLIF(total_amount, 0), po_amount + COALESCE(cgst_amount,0) + COALESCE(sgst_amount,0) + COALESCE(igst_amount,0))), 0) FROM purchase_orders WHERE vendor_id = ? AND approval_status = 'approved')
                             +
                             (SELECT COALESCE(SUM(r.rate_per_sqft * COALESCE(s.width, 0) * COALESCE(s.height, 0)), 0) FROM vendor_printing_rates r LEFT JOIN sites s ON r.site_id = s.id WHERE r.vendor_id = ?)
                     ");
@@ -76,7 +78,7 @@ $partners = $stmt->fetchAll();
                     $totalBilled = $stmtBilled->fetchColumn() ?: 0;
 
                     // Total Paid to Vendor (Payables)
-                    $stmtPaid = $pdo->prepare("SELECT SUM(amount) FROM payments WHERE partner_id = ? AND type = 'payable'");
+                    $stmtPaid = $pdo->prepare("SELECT SUM(amount) FROM payments WHERE partner_id = ? AND type = 'payable' AND (approval_status = 'approved' OR approval_status IS NULL OR approval_status = '')");
                     $stmtPaid->execute([$p['id']]);
                     $totalPaid = $stmtPaid->fetchColumn() ?: 0;
                 }
@@ -86,7 +88,26 @@ $partners = $stmt->fetchAll();
             <tr class="ledger-row" style="background: #fff; border-bottom: 1px solid #f1f5f9;">
                 <td style="padding: 1rem;">
                     <div style="font-weight: 700; color: #0f172a;"><?php echo $p['name']; ?></div>
-                    <div style="font-size: 0.7rem; color: #94a3b8; font-family: monospace;"><?php echo $p['gstin'] ?: 'NO-GST'; ?></div>
+                    <div style="font-size: 0.75rem; color: #94a3b8; font-family: monospace; display: flex; align-items: center; gap: 8px;">
+                        <span>GST: <?php echo $p['gstin'] ?: 'NO-GST'; ?></span>
+                    </div>
+                    <div style="font-size: 0.75rem; color: #64748b; margin-top: 4px; display: flex; flex-wrap: wrap; gap: 8px; align-items: center;">
+                        <?php if (!empty($p['contact_person'])): ?>
+                            <span style="background: #f1f5f9; padding: 1px 6px; border-radius: 4px; font-weight: 500; font-size: 0.7rem; color: #475569;">
+                                <i class="fas fa-user" style="color: #94a3b8; margin-right: 3px;"></i><?php echo htmlspecialchars($p['contact_person']); ?>
+                            </span>
+                        <?php endif; ?>
+                        <?php if (!empty($p['phone'])): ?>
+                            <a href="tel:<?php echo htmlspecialchars($p['phone']); ?>" style="color: #3b82f6; text-decoration: none; display: inline-flex; align-items: center; font-size: 0.7rem; font-weight: 600;">
+                                <i class="fas fa-phone-alt" style="color: #94a3b8; margin-right: 3px;"></i><?php echo htmlspecialchars($p['phone']); ?>
+                            </a>
+                        <?php endif; ?>
+                        <?php if (!empty($p['email'])): ?>
+                            <a href="mailto:<?php echo htmlspecialchars($p['email']); ?>" style="color: #3b82f6; text-decoration: none; display: inline-flex; align-items: center; font-size: 0.7rem; font-weight: 600;">
+                                <i class="fas fa-envelope" style="color: #94a3b8; margin-right: 3px;"></i><?php echo htmlspecialchars($p['email']); ?>
+                            </a>
+                        <?php endif; ?>
+                    </div>
                 </td>
                 <td style="padding: 1rem; color: #64748b; font-weight: 500;"><?php echo $p['city']; ?></td>
                 <td style="padding: 1rem; text-align: right; font-weight: 600; color: #475569;"><?php echo formatCurrency($totalBilled); ?></td>

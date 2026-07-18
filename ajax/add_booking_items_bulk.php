@@ -25,9 +25,16 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             exit;
         }
 
+        $days = 30;
+        if ($booking && !empty($booking['start_date']) && !empty($booking['end_date'])) {
+            $d1 = new DateTime($booking['start_date']);
+            $d2 = new DateTime($booking['end_date']);
+            $days = $d1->diff($d2)->days + 1;
+        }
+
         $stmtSite = $pdo->prepare("SELECT card_rate, purchase_rate FROM sites WHERE id = ?");
         // We include selected_image since we added it to booking_items
-        $stmtItem = $pdo->prepare("INSERT INTO booking_items (booking_id, site_id, purchase_rate, sale_rate, start_date, end_date, days, purchase_amount, amount, selected_image) VALUES (?, ?, ?, ?, ?, ?, 30, 0, ?, ?)");
+        $stmtItem = $pdo->prepare("INSERT INTO booking_items (booking_id, site_id, purchase_rate, sale_rate, start_date, end_date, days, purchase_amount, amount, selected_image) VALUES (?, ?, ?, ?, ?, ?, ?, 0, ?, ?)");
         $stmtOps = $pdo->prepare("INSERT INTO operations (booking_id, site_id, status) VALUES (?, ?, 'pending')");
 
         foreach ($sitesData as $s) {
@@ -44,6 +51,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             if ($site) {
                 $pRate = floatval($site['purchase_rate']);
                 $sRate = floatval($site['card_rate']); // Default to card rate
+                $itemAmount = $sRate * $days / 30;
                 
                 // Insert booking item
                 $stmtItem->execute([
@@ -53,7 +61,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                     $sRate, 
                     $booking['start_date'], 
                     $booking['end_date'], 
-                    $sRate, 
+                    $days, 
+                    $itemAmount, 
                     $img
                 ]);
 

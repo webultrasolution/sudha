@@ -42,6 +42,38 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action']) && $_POST['
     exit;
 }
 
+if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action']) && $_POST['action'] === 'resubmit') {
+    include_once __DIR__ . '/../../config/db.php';
+    include_once __DIR__ . '/../../includes/functions.php';
+    checkAuth();
+    requirePermission('financials', 'edit');
+    header('Content-Type: application/json');
+    $id = intval($_POST['id']);
+    try {
+        $pdo->beginTransaction();
+
+        // 1. Update PO status back to pending_approval / draft status
+        $stmt = $pdo->prepare("UPDATE purchase_orders SET approval_status = 'pending_approval', status = 'draft', rejection_reason = NULL WHERE id = ?");
+        $stmt->execute([$id]);
+
+        // 2. Clear old request and insert a new approval request in queue
+        $pdo->prepare("DELETE FROM approval_requests WHERE entity_type = 'purchase_order' AND entity_id = ?")->execute([$id]);
+        
+        $poRef = $pdo->query("SELECT po_number FROM purchase_orders WHERE id = $id")->fetchColumn();
+        $stmtAR = $pdo->prepare("INSERT INTO approval_requests (entity_type, entity_id, entity_ref, requested_by, status) VALUES ('purchase_order', ?, ?, ?, 'pending')");
+        $stmtAR->execute([$id, $poRef, $_SESSION['user_id'] ?? 0]);
+
+        logActivity('resubmitted PO for approval', 'financials', $id, "Purchase Order #$poRef resubmitted.");
+
+        $pdo->commit();
+        echo json_encode(['success' => true]);
+    } catch (Exception $e) {
+        if ($pdo->inTransaction()) $pdo->rollBack();
+        echo json_encode(['success' => false, 'message' => $e->getMessage()]);
+    }
+    exit;
+}
+
 $activePage = 'pos';
 $pageTitle = 'Purchase Order Management';
 include_once __DIR__ . '/../../includes/header.php';
@@ -55,6 +87,12 @@ $campaignFilter = trim($_GET['campaign_name'] ?? '');
 
 $whereClauses = [];
 $params = [];
+
+$activeEntityId = $_SESSION['active_entity_id'] ?? null;
+if ($activeEntityId) {
+    $whereClauses[] = "po.entity_id = ?";
+    $params[] = $activeEntityId;
+}
 
 if ($selectedVendorId > 0) {
     $whereClauses[] = "po.vendor_id = ?";
@@ -72,11 +110,12 @@ if (!empty($whereClauses)) {
 
 // Fetch filtered POs with attachments
 $stmt = $pdo->prepare("
-    SELECT po.*, po.campaign_name, v.name as vendor_name, u.username as creator,
+    SELECT po.*, po.campaign_name, v.name as vendor_name, u.username as creator, e.name as entity_name,
            (SELECT GROUP_CONCAT(filename SEPARATOR '||') FROM po_attachments WHERE po_id = po.id) as attachments
     FROM purchase_orders po 
     JOIN partners v ON po.vendor_id = v.id 
     LEFT JOIN users u ON po.employee_id = u.id 
+    LEFT JOIN entities e ON po.entity_id = e.id
     $whereSql
     ORDER BY po.id DESC
 ");
@@ -153,7 +192,14 @@ $vendorsList = $pdo->query("SELECT id, name FROM partners WHERE type = 'vendor' 
         <tbody>
             <?php foreach ($pos as $p): ?>
                 <tr>
-                    <td><strong><?php echo $p['po_number']; ?></strong></td>
+                    <td>
+                        <strong><?php echo $p['po_number']; ?></strong>
+                        <?php if (!empty($p['entity_name'])): ?>
+                            <div style="font-size: 0.7rem; color: #0d9488; font-weight: 800; margin-top: 3px;">
+                                <i class="fas fa-building" style="font-size: 0.65rem;"></i> <?php echo htmlspecialchars($p['entity_name']); ?>
+                            </div>
+                        <?php endif; ?>
+                    </td>
                     <td><?php echo htmlspecialchars($p['campaign_name'] ?: '—'); ?></td>
                     <td><?php echo $p['vendor_name']; ?></td>
                     <td>
@@ -167,7 +213,11 @@ $vendorsList = $pdo->query("SELECT id, name FROM partners WHERE type = 'vendor' 
                         ?>
                     </td>
                     <td><?php echo date('d M Y', strtotime($p['po_date'])); ?></td>
-                    <td><?php echo formatCurrency($p['total_amount']); ?></td>
+                    <td style="font-size: 0.85rem; line-height: 1.4; white-space: nowrap; text-align: left; vertical-align: middle;">
+                        <div style="font-weight: 500; color: #64748b;">Base: <span style="font-weight: 700; color: #334155;"><?php echo formatCurrency($p['po_amount']); ?></span></div>
+                        <div style="font-weight: 500; color: #64748b;">Tax: <span style="font-weight: 700; color: #334155;"><?php echo formatCurrency($p['cgst_amount'] + $p['sgst_amount'] + $p['igst_amount']); ?></span></div>
+                        <div style="font-weight: 700; color: #059669; border-top: 1px dashed #cbd5e1; margin-top: 2px; padding-top: 2px;">Total: <span><?php echo formatCurrency($p['total_amount']); ?></span></div>
+                    </td>
                     <td>
                         <span class="status-pill status-<?php echo $p['status']; ?>">
                             <?php echo ucfirst($p['status']); ?>
@@ -187,6 +237,11 @@ $vendorsList = $pdo->query("SELECT id, name FROM partners WHERE type = 'vendor' 
                                     <i class="fas fa-times-circle"></i> Rejected
                                 </span>
                             </div>
+                            <?php if (!empty($p['rejection_reason'])): ?>
+                                <div style="font-size: 0.7rem; color: #ef4444; margin-top: 4px; max-width: 150px; word-break: break-word; font-weight: 500;">
+                                    <strong>Reason:</strong> <?php echo htmlspecialchars($p['rejection_reason']); ?>
+                                </div>
+                            <?php endif; ?>
                         <?php endif; ?>
                     </td>
                     <td>
@@ -475,6 +530,40 @@ $vendorsList = $pdo->query("SELECT id, name FROM partners WHERE type = 'vendor' 
                     } else {
                         Swal.fire('Error', res.message, 'error');
                     }
+                });
+            }
+        });
+    }
+
+    function resubmitPO(id) {
+        Swal.fire({
+            title: 'Resubmit Purchase Order?',
+            text: "This will clear the rejection status and submit the PO again for approval.",
+            icon: 'question',
+            showCancelButton: true,
+            confirmButtonColor: '#10b981',
+            cancelButtonColor: '#475569',
+            confirmButtonText: 'Yes, submit it'
+        }).then((result) => {
+            if (result.isConfirmed) {
+                Swal.fire({
+                    title: 'Submitting...',
+                    allowOutsideClick: false,
+                    didOpen: () => { Swal.showLoading(); }
+                });
+                fetch('purchase_orders.php', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+                    body: `action=resubmit&id=${id}`
+                }).then(r => r.json()).then(res => {
+                    if (res.success) {
+                        Swal.fire('Submitted!', 'Purchase Order has been resubmitted for approval.', 'success').then(() => location.reload());
+                    } else {
+                        Swal.fire('Error', res.message, 'error');
+                    }
+                }).catch(err => {
+                    console.error(err);
+                    Swal.fire('Error', 'Something went wrong.', 'error');
                 });
             }
         });

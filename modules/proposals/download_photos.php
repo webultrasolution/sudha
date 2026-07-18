@@ -30,25 +30,61 @@ if (empty($images)) {
 $zipName = "Photos_" . str_replace(' ', '_', $proposal['campaign_name']) . "_" . date('Ymd') . ".zip";
 $zipPath = sys_get_temp_dir() . '/' . $zipName;
 
-$zip = new ZipArchive();
-if ($zip->open($zipPath, ZipArchive::CREATE | ZipArchive::OVERWRITE) !== TRUE) {
-    die("Could not create ZIP archive");
-}
-
 $uploadDir = __DIR__ . '/../../uploads/sites/';
 $addedFiles = [];
 
-foreach ($images as $img) {
-    $filePath = $uploadDir . $img['filename'];
-    if (file_exists($filePath)) {
-        // Create a friendly name for the image in the zip
-        $friendlyName = $img['city'] . "_" . str_replace(['/', '\\', ' ', ','], '_', $img['location']) . "_" . basename($img['filename']);
-        $zip->addFile($filePath, $friendlyName);
-        $addedFiles[] = $filePath;
+if (class_exists('ZipArchive')) {
+    $zip = new ZipArchive();
+    if ($zip->open($zipPath, ZipArchive::CREATE | ZipArchive::OVERWRITE) !== TRUE) {
+        die("Could not create ZIP archive");
+    }
+
+    foreach ($images as $img) {
+        $filePath = $uploadDir . $img['filename'];
+        if (file_exists($filePath)) {
+            // Create a friendly name for the image in the zip
+            $friendlyName = $img['city'] . "_" . str_replace(['/', '\\', ' ', ','], '_', $img['location']) . "_" . basename($img['filename']);
+            $zip->addFile($filePath, $friendlyName);
+            $addedFiles[] = $filePath;
+        }
+    }
+    $zip->close();
+} else {
+    // Fallback using exec and system 'zip' command
+    $tempDir = sys_get_temp_dir() . '/zip_temp_' . uniqid();
+    if (!mkdir($tempDir, 0777, true)) {
+        die("Could not create temporary directory for zipping");
+    }
+
+    foreach ($images as $img) {
+        $filePath = $uploadDir . $img['filename'];
+        if (file_exists($filePath)) {
+            // Create a friendly name for the image in the zip
+            $friendlyName = $img['city'] . "_" . str_replace(['/', '\\', ' ', ','], '_', $img['location']) . "_" . basename($img['filename']);
+            copy($filePath, $tempDir . '/' . $friendlyName);
+            $addedFiles[] = $filePath;
+        }
+    }
+
+    if (!empty($addedFiles)) {
+        $cmd = "cd " . escapeshellarg($tempDir) . " && zip -q " . escapeshellarg($zipPath) . " *";
+        $output = [];
+        $return_var = -1;
+        exec($cmd, $output, $return_var);
+        
+        // Clean up temp files
+        foreach (glob("$tempDir/*") as $tempFile) {
+            unlink($tempFile);
+        }
+        rmdir($tempDir);
+
+        if ($return_var !== 0) {
+            die("Could not create ZIP archive using system command line");
+        }
+    } else {
+        rmdir($tempDir);
     }
 }
-
-$zip->close();
 
 if (empty($addedFiles)) {
     die("Photos were found in database but files are missing on server.");

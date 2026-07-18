@@ -21,13 +21,6 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         
         $pdo->prepare("UPDATE proposals SET grand_total = ? WHERE id = ?")->execute([$newGrand, $id]);
         
-        // Revert proposal to pending_approval if non-admin edited an approved proposal
-        $isAdmin = ($_SESSION['user_role'] ?? '') === 'admin';
-        if (!$isAdmin) {
-            $propRef = $pdo->query("SELECT proposal_number FROM proposals WHERE id = $id")->fetchColumn();
-            revertToPendingOnEdit($pdo, 'proposals', $id, 'proposal', $propRef, $_SESSION['user_id'] ?? 0);
-        }
-        
         echo json_encode(['success' => true]);
     }
 }

@@ -12,7 +12,7 @@ if (!$booking_id) {
 }
 
 // Check Invoice Approval Status
-$stmtInvCheck = $pdo->prepare("SELECT * FROM invoices WHERE booking_id = ? AND type = 'ro' LIMIT 1");
+$stmtInvCheck = $pdo->prepare("SELECT * FROM invoices WHERE booking_id = ? AND type = 'tax' LIMIT 1");
 $stmtInvCheck->execute([$booking_id]);
 $invoiceData = $stmtInvCheck->fetch();
 
@@ -22,6 +22,10 @@ $isAdmin = ($_SESSION['user_role'] ?? '') === 'admin';
 
 if ($invoiceData && ($invoiceData['approval_status'] ?? '') === 'pending_approval' && !$isAdmin) {
     die("<div style='font-family: sans-serif; padding: 2rem; text-align: center; color: #64748b;'><h3>Access Denied</h3><p>This invoice is pending admin approval and cannot be viewed or printed yet.</p></div>");
+}
+
+if ($invoiceData && ($invoiceData['approval_status'] ?? '') === 'rejected' && !$isAdmin) {
+    die("<div style='font-family: sans-serif; padding: 2rem; text-align: center; color: #ef4444;'><h3>Access Denied</h3><p>This invoice has been rejected by the administrator and cannot be viewed or printed.</p></div>");
 }
 
 // Fetch Booking & Client Details
@@ -74,11 +78,17 @@ $company_email      = $co['email'];
 $company_letterhead = $co['letterhead'];
 $company_signature  = $co['signature'];
 $company_msme       = $co['msme_number'];
+$company_cin        = $co['cin'] ?? '';
+$company_tan        = $co['tan'] ?? '';
 
 // Tax Calculation Logic
-$subtotal = $b['total_amount'];
+$subtotal = 0;
+foreach ($items as $item) {
+    $subtotal += floatval($item['amount']);
+}
 $isInterState = (strtolower(trim($b['client_state'])) !== 'west bengal');
 $gst = calculateGST($subtotal, $isInterState);
+$grand_total = $subtotal + $gst['total'];
 
 ?>
 <!DOCTYPE html>
@@ -87,11 +97,22 @@ $gst = calculateGST($subtotal, $isInterState);
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>RO Invoice - BK-<?php echo str_pad($b['id'], 4, '0', STR_PAD_LEFT); ?></title>
+    <title>RO Invoice - <?php echo htmlspecialchars(!empty($b['booking_number']) ? $b['booking_number'] : 'BK-' . str_pad($b['id'], 4, '0', STR_PAD_LEFT)); ?></title>
     <style>
         @page {
             size: A4;
-            margin: 0;
+            margin: 8mm 10mm;
+            @bottom-right {
+                content: counter(page) "/" counter(pages);
+                font-family: Arial, sans-serif;
+                font-size: 9px;
+                color: #555;
+            }
+        }
+        .avoid-break {
+            page-break-inside: avoid;
+            break-inside: avoid;
+            margin-top: 20px;
         }
 
         body {
@@ -101,13 +122,20 @@ $gst = calculateGST($subtotal, $isInterState);
             color: #000;
             font-size: 11px;
             line-height: 1.3;
+            background: #f1f5f9;
         }
 
         .invoice-wrapper {
-            border: 1px solid #000;
-            max-width: 800px;
+            border: 1px solid #d1d5db;
+            width: 210mm;
+            min-height: 297mm;
             margin: 0 auto;
             position: relative;
+            background: #fff;
+            padding: 12mm 14mm;
+            box-shadow: 0 4px 10px rgba(0,0,0,0.15);
+            box-sizing: border-box;
+            display: block;
         }
 
         .header-top {
@@ -126,7 +154,7 @@ $gst = calculateGST($subtotal, $isInterState);
 
         .info-col {
             flex: 1;
-            padding: 10px;
+            padding: 6px;
         }
 
         .info-col:first-child {
@@ -139,7 +167,7 @@ $gst = calculateGST($subtotal, $isInterState);
         }
 
         .info-label {
-            width: 80px;
+            width: 110px;
             font-weight: normal;
         }
 
@@ -171,12 +199,13 @@ $gst = calculateGST($subtotal, $isInterState);
         table {
             width: 100%;
             border-collapse: collapse;
+            border: 1px solid #000;
         }
 
         th {
             border-bottom: 1px solid #000;
             border-right: 1px solid #000;
-            padding: 5px;
+            padding: 4px;
             text-align: center;
             font-weight: bold;
         }
@@ -186,9 +215,9 @@ $gst = calculateGST($subtotal, $isInterState);
         }
 
         td {
-            border-bottom: 1px solid #d0d0d0;
+            border-bottom: 1px solid #000;
             border-right: 1px solid #000;
-            padding: 8px 5px;
+            padding: 4px 5px;
             vertical-align: top;
             text-align: center;
         }
@@ -211,14 +240,14 @@ $gst = calculateGST($subtotal, $isInterState);
 
         .footer {
             display: flex;
-            border-top: 1px solid #000;
+            border: 1px solid #000;
         }
 
         .footer-left {
             flex: 2;
             padding: 10px;
             border-right: 1px solid #000;
-            min-height: 100px;
+            min-height: 70px;
         }
 
         .footer-right {
@@ -250,11 +279,23 @@ $gst = calculateGST($subtotal, $isInterState);
 
             body {
                 padding: 0;
+                background: #fff;
             }
 
             .invoice-wrapper {
                 border: none;
                 width: 100%;
+                min-height: auto;
+                box-shadow: none;
+                padding: 0;
+                margin: 0;
+                display: block;
+            }
+            thead { display: table-header-group; }
+            tr { page-break-inside: avoid; break-inside: avoid; }
+            .avoid-break {
+                margin-top: 15px;
+                display: block;
             }
         }
     </style>
@@ -266,17 +307,28 @@ $gst = calculateGST($subtotal, $isInterState);
 
     <div class="invoice-wrapper">
         <!-- Header with Letterhead or Manual Info -->
-        <?php if ($company_letterhead): ?>
-            <img src="<?php echo BASE_URL; ?>assets/images/<?php echo $company_letterhead; ?>"
-                style="width: 100%; height: auto; display: block; border-bottom: 1px solid #000;">
-        <?php else: ?>
-            <div class="header-top" style="text-align: center;">
-                <h2 style="margin: 0; text-transform: uppercase;"><?php echo $company_name; ?></h2>
-                <p><?php echo $company_address; ?></p>
-                <p>Ph: <?php echo $company_phone; ?> | Email: <?php echo $company_email; ?></p>
-                <?php if ($company_msme): ?><p>MSME: <?php echo htmlspecialchars($company_msme); ?></p><?php endif; ?>
+        <div style="display: flex; justify-content: space-between; align-items: flex-start; padding: 10px 10px 2px;">
+            <div style="flex: 1.4; text-align: left;">
+                <?php if ($company_letterhead): ?>
+                    <img src="<?php echo BASE_URL; ?>assets/images/<?php echo $company_letterhead; ?>"
+                        style="max-height: 110px; width: auto; display: block; margin-bottom: 5px;">
+                <?php else: ?>
+                    <h2 style="margin: 0; text-transform: uppercase; font-size: 18px; color: #8B1A1A;"><?php echo htmlspecialchars($company_name); ?></h2>
+                <?php endif; ?>
             </div>
-        <?php endif; ?>
+            <div style="flex: 1.2; text-align: center; padding-top: 15px;">
+                <div style="font-size: 15px; font-weight: bold; text-decoration: underline; letter-spacing: 1.5px; text-transform: uppercase;">TAX INVOICE</div>
+            </div>
+            <div style="flex: 0.8; text-align: right; font-style: italic; font-size: 10px; padding-top: 15px; color: #555;">
+                Original Copy
+            </div>
+        </div>
+        <div style="padding: 0 10px 10px; font-size: 10px; line-height: 1.4; color: #000; border-bottom: 1px solid #000; margin-bottom: 10px;">
+            <?php echo nl2br(htmlspecialchars($company_address)); ?><br>
+            Ph : <?php echo htmlspecialchars($company_phone); ?> &nbsp;|&nbsp; Email : <?php echo htmlspecialchars($company_email); ?>
+        </div>
+
+
 
         <!-- Order & Invoice Info -->
         <div class="main-info">
@@ -328,7 +380,7 @@ $gst = calculateGST($subtotal, $isInterState);
                     <span class="info-label">Invoice No.</span>
                     <span class="info-sep">:</span>
                     <span
-                        class="info-value"><?php echo !empty($invoiceData['invoice_number']) ? $invoiceData['invoice_number'] : ('SCR/' . date('y', strtotime($b['created_at'])) . '-' . date('y', strtotime($b['created_at'] . ' +1 year')) . '/' . str_pad($b['id'], 3, '0', STR_PAD_LEFT)); ?></span>
+                        class="info-value"><?php echo !empty($invoiceData['invoice_number']) ? $invoiceData['invoice_number'] : ('SCR/' . getFinancialYear($b['created_at']) . '/' . str_pad($b['id'], 4, '0', STR_PAD_LEFT)); ?></span>
                 </div>
                 <div class="info-row">
                     <span class="info-label">Invoice Date</span>
@@ -346,6 +398,20 @@ $gst = calculateGST($subtotal, $isInterState);
                     <span class="info-sep">:</span>
                     <span class="info-value"><?php echo $company_gstin; ?></span>
                 </div>
+                <?php if (!empty($company_cin)): ?>
+                <div class="info-row">
+                    <span class="info-label">CIN</span>
+                    <span class="info-sep">:</span>
+                    <span class="info-value"><?php echo htmlspecialchars($company_cin); ?></span>
+                </div>
+                <?php endif; ?>
+                <?php if (!empty($company_tan)): ?>
+                <div class="info-row">
+                    <span class="info-label">TAN</span>
+                    <span class="info-sep">:</span>
+                    <span class="info-value"><?php echo htmlspecialchars($company_tan); ?></span>
+                </div>
+                <?php endif; ?>
             </div>
         </div>
 
@@ -355,7 +421,6 @@ $gst = calculateGST($subtotal, $isInterState);
                 <tr>
                     <th style="width: 30px;">S.N.</th>
                     <th>LOCATION</th>
-                    <th style="width: 70px;">HSN/SAC<br>Code</th>
                     <th style="width: 70px;">SIZE</th>
                     <th style="width: 100px;">PERIOD</th>
                     <th style="width: 90px;">Amount(₹)</th>
@@ -375,7 +440,6 @@ $gst = calculateGST($subtotal, $isInterState);
                                 As Per RO
                             </div>
                         </td>
-                        <td><?php echo $item['hsn_code'] ?: '998366'; ?></td>
                         <td></td>
                         <td></td>
                         <td style="text-align: right; padding-right: 10px; font-weight: bold;">
@@ -385,54 +449,50 @@ $gst = calculateGST($subtotal, $isInterState);
                 <?php endforeach; ?>
 
 
-                <?php if ($isInterState): ?>
-                    <tr class="gst-row">
-                        <td colspan="5" style="text-align: right; padding-right: 10px;">IGST (18%)</td>
-                        <td style="text-align: right; padding-right: 10px;"><?php echo number_format($gst['igst'], 2); ?>
-                        </td>
-                    </tr>
-                <?php else: ?>
-                    <tr class="gst-row">
-                        <td colspan="5" style="text-align: right; padding-right: 10px;">CGST (9%)</td>
-                        <td style="text-align: right; padding-right: 10px;"><?php echo number_format($gst['cgst'], 2); ?>
-                        </td>
-                    </tr>
-                    <tr class="gst-row">
-                        <td colspan="5" style="text-align: right; padding-right: 10px;">SGST (9%)</td>
-                        <td style="text-align: right; padding-right: 10px;"><?php echo number_format($gst['sgst'], 2); ?>
-                        </td>
-                    </tr>
-                <?php endif; ?>
+                <tr class="gst-row">
+                    <td colspan="4" style="text-align: right; padding-right: 10px;">CGST (<?php echo $isInterState ? '0' : '9'; ?>%)</td>
+                    <td style="text-align: right; padding-right: 10px;"><?php echo number_format($gst['cgst'], 2); ?></td>
+                </tr>
+                <tr class="gst-row">
+                    <td colspan="4" style="text-align: right; padding-right: 10px;">SGST (<?php echo $isInterState ? '0' : '9'; ?>%)</td>
+                    <td style="text-align: right; padding-right: 10px;"><?php echo number_format($gst['sgst'], 2); ?></td>
+                </tr>
+                <tr class="gst-row">
+                    <td colspan="4" style="text-align: right; padding-right: 10px;">IGST (<?php echo $isInterState ? '18' : '0'; ?>%)</td>
+                    <td style="text-align: right; padding-right: 10px;"><?php echo number_format($gst['igst'], 2); ?></td>
+                </tr>
 
                 <tr class="totals-row">
-                    <td colspan="5" style="text-align: right; padding-right: 10px; font-size: 12px;">Total Invoice Value
+                    <td colspan="4" style="text-align: right; padding-right: 10px; font-size: 12px;">Total Invoice Value
                     </td>
                     <td style="text-align: right; padding-right: 10px; font-size: 12px;">
-                        <?php echo number_format($b['grand_total'], 2); ?>
+                        <?php echo number_format($grand_total, 2); ?>
                     </td>
                 </tr>
             </tbody>
         </table>
 
-        <div style="padding: 10px; border-top: 1px solid #000;">
-            <strong>Amount in Words:</strong> <span
-                style="text-transform: capitalize;"><?php echo amountInWords($b['grand_total']); ?> Only</span>
-        </div>
-
-        <div class="footer">
-            <div class="footer-left">
-                <div style="font-weight: bold; text-decoration: underline; margin-bottom: 5px;">Bank Details:</div>
-                <div style="line-height: 1.4;">
-                    <?php echo nl2br(getSetting('company_bank_details', "A/C Name: $company_name\nBank: STATE BANK OF INDIA\nA/C No: 1234567890123\nIFSC: SBIN0000123")); ?>
-                </div>
+        <div class="avoid-break">
+            <div style="padding: 10px; border-top: 1px solid #000;">
+                <strong>Amount in Words:</strong> <span
+                    style="text-transform: capitalize;"><?php echo amountInWords($grand_total); ?> Only</span>
             </div>
-            <div class="footer-right">
-                <div>For <strong><?php echo $company_name; ?></strong></div>
-                <div style="margin-top: 30px;">
-                    <img src="<?php echo BASE_URL; ?>assets/images/<?php echo $company_signature; ?>"
-                        style="height: 40px; display: block; margin: 0 auto;" onerror="this.style.display='none'">
-                    <div style="border-top: 1px solid #000; width: 150px; margin: 5px auto 0;"></div>
-                    <div style="font-weight: bold; margin-top: 2px;">Authorised Signatory</div>
+
+            <div class="footer">
+                <div class="footer-left" style="padding: 6px 10px;">
+                    <div style="font-weight: bold; text-decoration: underline; margin-bottom: 3px;">Bank Details:</div>
+                    <div style="line-height: 1.2; font-size: 9.5px;">
+                        <?php echo nl2br(getSetting('company_bank_details', "A/C Name: $company_name\nBank: STATE BANK OF INDIA\nA/C No: 1234567890123\nIFSC: SBIN0000123")); ?>
+                    </div>
+                </div>
+                <div class="footer-right" style="padding: 6px 10px;">
+                    <div>For <strong><?php echo $company_name; ?></strong></div>
+                    <div style="margin-top: 15px;">
+                        <img src="<?php echo BASE_URL; ?>assets/images/<?php echo $company_signature; ?>"
+                            style="height: 45px; display: block; margin: 0 auto;" onerror="this.style.display='none'">
+                        <div style="border-top: 1px solid #000; width: 150px; margin: 5px auto 0;"></div>
+                        <div style="font-weight: bold; margin-top: 2px;">Authorised Signatory</div>
+                    </div>
                 </div>
             </div>
         </div>

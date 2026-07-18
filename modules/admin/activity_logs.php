@@ -64,7 +64,7 @@ $totalPages = ceil($totalRecords / $limit);
 
 // Fetch logs
 $stmt = $pdo->prepare("
-    SELECT al.*, u.username, u.full_name, u.role
+    SELECT al.*, u.username, COALESCE(u.name, u.full_name) as full_name, u.role
     FROM activity_log al
     LEFT JOIN users u ON al.user_id = u.id
     $whereSql
@@ -75,7 +75,7 @@ $stmt->execute($params);
 $logs = $stmt->fetchAll(PDO::FETCH_ASSOC);
 
 // Fetch users for filter dropdown
-$usersList = $pdo->query("SELECT id, username, full_name, role FROM users ORDER BY username ASC")->fetchAll();
+$usersList = $pdo->query("SELECT id, username, COALESCE(name, full_name) as full_name, role FROM users ORDER BY username ASC")->fetchAll();
 
 // Fetch unique entities for filter dropdown
 $entitiesList = $pdo->query("SELECT DISTINCT entity_type FROM activity_log WHERE entity_type IS NOT NULL AND entity_type != '' ORDER BY entity_type ASC")->fetchAll(PDO::FETCH_COLUMN);

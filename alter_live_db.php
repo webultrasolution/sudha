@@ -8,7 +8,9 @@ $queries = [
     "ALTER TABLE client_printing_rates ADD COLUMN custom_invoice_date DATE NULL;",
     "ALTER TABLE vendor_printing_rates ADD COLUMN vendor_invoice_no VARCHAR(100) NULL;",
     "ALTER TABLE vendor_printing_rates ADD COLUMN vendor_invoice_date DATE NULL;",
-    "ALTER TABLE sites ADD COLUMN mounting_hsn VARCHAR(50) DEFAULT NULL AFTER hsn_code;"
+    "ALTER TABLE sites ADD COLUMN mounting_hsn VARCHAR(50) DEFAULT NULL AFTER hsn_code;",
+    "ALTER TABLE proposal_items ADD COLUMN start_date DATE DEFAULT NULL AFTER days;",
+    "ALTER TABLE proposal_items ADD COLUMN end_date DATE DEFAULT NULL AFTER start_date;"
 ];
 
 foreach ($queries as $q) {

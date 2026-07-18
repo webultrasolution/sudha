@@ -33,11 +33,31 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     $userId = $_SESSION['user_id'] ?? 0;
     $approvalStatus = $isAdmin ? 'approved' : 'pending_approval';
 
+    $entityId = null;
+    if ($type === 'receivable' && $invoice_id) {
+        $stmtEnt = $pdo->prepare("SELECT entity_id FROM invoices WHERE id = ?");
+        $stmtEnt->execute([$invoice_id]);
+        $entityId = $stmtEnt->fetchColumn() ?: null;
+    } elseif ($type === 'payable' && $proposal_id) {
+        $stmtEnt = $pdo->prepare("SELECT entity_id FROM purchase_orders WHERE id = ?");
+        $stmtEnt->execute([$proposal_id]);
+        $entityId = $stmtEnt->fetchColumn() ?: null;
+    }
+    
+    if (!$entityId) {
+        $entityId = $_SESSION['active_entity_id'] ?? null;
+    }
+    if (!$entityId) {
+        $stmtEnt = $pdo->query("SELECT id FROM entities LIMIT 1");
+        $entityId = $stmtEnt->fetchColumn() ?: null;
+    }
+
     try {
-        $stmt = $pdo->prepare("INSERT INTO payments (partner_id, amount, payment_date, payment_mode, transaction_id, type, invoice_id, proposal_id, notes, approval_status) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)");
+        $stmt = $pdo->prepare("INSERT INTO payments (partner_id, entity_id, amount, payment_date, payment_mode, transaction_id, type, invoice_id, proposal_id, notes, approval_status) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)");
         
         $params = [
             $partner_id, 
+            $entityId,
             $amount, 
             $date, 
             $mode, 
@@ -60,23 +80,10 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 $stmtAR->execute([$paymentId, $refName, $userId]);
             }
             
-            // Update Invoice Status if linked and approved
-            if ($invoice_id && $isAdmin) {
-                file_put_contents(__DIR__ . '/../pay_debug.log', "Updating Invoice: $invoice_id" . PHP_EOL, FILE_APPEND);
-                
-                $paidStmt = $pdo->prepare("SELECT SUM(amount) FROM payments WHERE invoice_id = ? AND approval_status = 'approved'");
-                $paidStmt->execute([$invoice_id]);
-                $totalPaid = floatval($paidStmt->fetchColumn());
-
-                $invStmt = $pdo->prepare("SELECT total_amount FROM invoices WHERE id = ?");
-                $invStmt->execute([$invoice_id]);
-                $invTotal = floatval($invStmt->fetchColumn());
-
-                $status = ($totalPaid >= $invTotal) ? 'paid' : (($totalPaid > 0) ? 'partially_paid' : 'unpaid');
-                $upd = $pdo->prepare("UPDATE invoices SET payment_status = ? WHERE id = ?");
-                $upd->execute([$status, $invoice_id]);
-                
-                file_put_contents(__DIR__ . '/../pay_debug.log', "Invoice Updated to $status" . PHP_EOL, FILE_APPEND);
+            // Recalculate status if approved (when user is admin)
+            if ($isAdmin) {
+                file_put_contents(__DIR__ . '/../pay_debug.log', "Recalculating statuses: Inv=$invoice_id, PO=$proposal_id" . PHP_EOL, FILE_APPEND);
+                updateDocumentPaymentStatus($pdo, $invoice_id, $proposal_id);
             }
             
             echo json_encode(['success' => true, 'approval_status' => $approvalStatus]);

@@ -18,6 +18,10 @@ if ($invoiceData && ($invoiceData['approval_status'] ?? '') === 'pending_approva
     die("<div style='font-family:sans-serif;padding:2rem;text-align:center;color:#64748b;'><h3>Access Denied</h3><p>This invoice is pending admin approval and cannot be viewed or printed yet.</p></div>");
 }
 
+if ($invoiceData && ($invoiceData['approval_status'] ?? '') === 'rejected' && !$isAdmin) {
+    die("<div style='font-family:sans-serif;padding:2rem;text-align:center;color:#ef4444;'><h3>Access Denied</h3><p>This invoice has been rejected by the administrator and cannot be viewed or printed.</p></div>");
+}
+
 $stmt = $pdo->prepare("
     SELECT b.*, c.name as client_name, c.address as client_address, c.gstin as client_gstin,
            c.state as client_state, c.additional_gst, c.contact_person, c.phone, c.pan as client_pan
@@ -63,10 +67,13 @@ $company_address      = $co['address'];
 $company_phone        = $co['phone'];
 $company_email        = $co['email'];
 $company_logo         = $co['logo'];
+$company_letterhead   = $co['letterhead'];
 $company_signature    = $co['signature'];
 $company_bank_details    = $co['bank_details'];
-$company_terms           = $co['terms_conditions'];
+$company_terms           = $co['invoice_terms'];
 $company_msme            = $co['msme_number'];
+$company_cin             = $co['cin'] ?? '';
+$company_tan             = $co['tan'] ?? '';
 
 // Derive short name (first 2 words) for large header text
 $name_words       = explode(' ', trim($company_name));
@@ -74,13 +81,17 @@ $company_short    = strtoupper(implode(' ', array_slice($name_words, 0, 2)));
 $company_full_uc  = strtoupper($company_name);
 
 // Tax
-$subtotal     = $b['total_amount'];
+$subtotal = 0;
+foreach ($items as $item) {
+    $subtotal += floatval($item['amount']);
+}
 $isInterState = (strtolower(trim($b['client_state'] ?? '')) !== 'west bengal');
 $gst          = calculateGST($subtotal, $isInterState);
+$grand_total  = $subtotal + $gst['total'];
 
 $inv_number = !empty($invoiceData['invoice_number'])
     ? $invoiceData['invoice_number']
-    : ('SCR/' . date('y', strtotime($b['created_at'])) . '-' . date('y', strtotime($b['created_at'] . ' +1 year')) . '/' . str_pad($b['id'], 3, '0', STR_PAD_LEFT));
+    : ('SCR/' . getFinancialYear($b['created_at']) . '/' . str_pad($b['id'], 4, '0', STR_PAD_LEFT));
 
 $inv_date = (!empty($invoiceData['invoice_date']) && $invoiceData['invoice_date'] !== '0000-00-00')
     ? date('d-m-Y', strtotime($invoiceData['invoice_date']))
@@ -92,170 +103,173 @@ $inv_date = (!empty($invoiceData['invoice_date']) && $invoiceData['invoice_date'
 <meta charset="UTF-8">
 <title>Tax Invoice - <?php echo $inv_number; ?></title>
 <style>
-@page { size: A4; margin: 12mm 14mm; }
+@page {
+    size: A4;
+    margin: 8mm 10mm;
+    @bottom-right {
+        content: counter(page) "/" counter-pages;
+        font-family: Arial, sans-serif;
+        font-size: 9px;
+        color: #555;
+    }
+}
+.avoid-break {
+    page-break-inside: avoid;
+    break-inside: avoid;
+    margin-top: 20px;
+}
 * { box-sizing: border-box; margin: 0; padding: 0; }
 body {
-    font-family: Arial, sans-serif;
-    font-size: 11px;
+    font-family: 'Arial', sans-serif;
+    margin: 0;
+    padding: 20px;
     color: #000;
-    line-height: 1.45;
-    background: #fff;
+    font-size: 11px;
+    line-height: 1.3;
+    background: #f1f5f9;
 }
 .invoice-wrapper {
-    max-width: 780px;
+    border: 1px solid #d1d5db;
+    width: 210mm;
+    min-height: 297mm;
     margin: 0 auto;
-    padding: 10px 12px;
-    border: 1px solid #000;
+    position: relative;
+    background: #fff;
+    padding: 12mm 14mm;
+    box-shadow: 0 4px 10px rgba(0,0,0,0.15);
+    display: block;
 }
-
-/* ── HEADER ─────────────────────────────── */
-.inv-header {
+.header-top {
+    border-bottom: 1px solid #000;
+    padding: 5px 10px;
+}
+.header-top p {
+    margin: 0;
+}
+.main-info {
     display: flex;
-    align-items: flex-start;
-    justify-content: space-between;
-    margin-bottom: 6px;
+    border-bottom: 1px solid #000;
+    margin-bottom: 10px;
 }
-.inv-header-left {
-    display: flex;
-    align-items: flex-start;
-    gap: 10px;
-    flex: 1.4;
-}
-.company-logo {
-    width: 90px;
-    height: auto;
-    flex-shrink: 0;
-}
-.company-name-block { line-height: 1.2; }
-.company-name-block .short-name {
-    font-size: 20px;
-    font-weight: bold;
-    color: #8B1A1A;
-    letter-spacing: 1px;
-}
-.company-name-block .full-name {
-    font-size: 9.5px;
-    font-weight: bold;
-    color: #8B1A1A;
-    letter-spacing: 0.4px;
-    margin-top: 2px;
-}
-.inv-header-center {
+.info-col {
     flex: 1;
-    text-align: center;
-    padding-top: 8px;
+    padding: 6px;
 }
-.inv-title {
-    font-size: 15px;
-    font-weight: bold;
-    text-decoration: underline;
-    letter-spacing: 2px;
+.info-col:first-child {
+    border-right: 1px solid #000;
 }
-.inv-header-right {
-    flex: 1;
-    text-align: right;
-    font-style: italic;
-    font-size: 11px;
-    padding-top: 4px;
-}
-
-/* ── DIVIDER ─────────────────────────────── */
-.divider {
-    border: none;
-    border-top: 1.5px solid #000;
-    margin: 0 0 0;
-}
-
-/* ── INFO SECTION ────────────────────────── */
-.info-section {
-    display: flex;
-    padding: 10px 0 8px;
-    border-bottom: 1px solid #555;
-}
-.info-left  { flex: 1.3; padding-right: 15px; }
-.info-right { flex: 1; border-left: 1px solid #ccc; padding-left: 15px; padding-top: 0; }
 .info-row {
     display: flex;
     margin-bottom: 3px;
-    font-size: 11px;
 }
-.info-label { min-width: 115px; color: #222; }
-.info-sep   { width: 12px; text-align: center; }
-.info-value { flex: 1; }
-.client-title {
-    font-style: italic;
+.info-label {
+    width: 110px;
+    font-weight: normal;
+}
+.info-sep {
+    width: 15px;
+}
+.info-value {
+    flex: 1;
+    font-weight: normal;
+}
+.section-title {
     font-weight: bold;
     text-decoration: underline;
-    margin: 12px 0 5px;
-    font-size: 11px;
+    margin-bottom: 5px;
+    font-style: italic;
 }
-.client-name {
-    font-weight: bold;
-    font-size: 12px;
-    margin-bottom: 4px;
-}
-.client-address {
-    max-width: 270px;
-    line-height: 1.55;
-    margin-bottom: 6px;
-    color: #111;
-}
-
-/* ── TABLE ───────────────────────────────── */
 table {
     width: 100%;
     border-collapse: collapse;
-    margin-top: 0;
-}
-thead tr { background: #f2f2f2; }
-th {
     border: 1px solid #000;
-    padding: 5px 4px;
+}
+th {
+    border-bottom: 1px solid #000;
+    border-right: 1px solid #000;
+    padding: 4px;
     text-align: center;
-    font-size: 10px;
     font-weight: bold;
-    line-height: 1.3;
+    font-size: 10px;
+}
+th:last-child {
+    border-right: none;
 }
 td {
-    border-left: 1px solid #000;
+    border-bottom: 1px solid #000;
     border-right: 1px solid #000;
-    border-bottom: 1px solid #ddd;
-    padding: 7px 4px;
-    vertical-align: middle;
+    padding: 4px 5px;
+    vertical-align: top;
     text-align: center;
     font-size: 10px;
+}
+td:last-child {
+    border-right: none;
+}
+.totals-row td {
+    border-bottom: none;
+    border-top: 1px solid #000;
+    font-weight: bold;
 }
 .gst-row td {
     border-bottom: none;
-    color: #333;
+    font-weight: normal;
+    color: #444;
 }
-.total-row td {
-    border-top: 1.5px solid #000;
-    border-bottom: 1.5px solid #000;
-    font-weight: bold;
-    font-size: 11.5px;
+.footer {
+    display: flex;
+    border: 1px solid #000;
 }
-
-/* footer styles are inline for flexibility */
-
-/* ── PRINT BUTTON ────────────────────────── */
+.footer-left {
+    flex: 2;
+    padding: 10px;
+    border-right: 1px solid #000;
+    min-height: 70px;
+}
+.footer-right {
+    flex: 1;
+    padding: 10px;
+    text-align: center;
+    display: flex;
+    flex-direction: column;
+    justify-content: space-between;
+}
 .btn-print {
     position: fixed;
-    bottom: 24px;
-    right: 24px;
-    background: #1e293b;
+    bottom: 30px;
+    right: 30px;
+    background: #000;
     color: #fff;
     border: none;
-    padding: 9px 20px;
+    padding: 10px 20px;
     cursor: pointer;
     border-radius: 4px;
-    font-size: 12px;
     font-weight: bold;
     z-index: 999;
 }
 @media print {
-    .btn-print { display: none; }
-    body { padding: 0; }
+    .btn-print {
+        display: none;
+    }
+    body {
+        padding: 0;
+        background: #fff;
+    }
+    .invoice-wrapper {
+        border: none;
+        width: 100%;
+        min-height: auto;
+        box-shadow: none;
+        padding: 0;
+        margin: 0;
+        display: block;
+    }
+    thead { display: table-header-group; }
+    tr { page-break-inside: avoid; break-inside: avoid; }
+    .avoid-break {
+        margin-top: 15px;
+        display: block;
+    }
 }
 </style>
 </head>
@@ -265,70 +279,72 @@ td {
 
 <div class="invoice-wrapper">
 
-    <!-- ── HEADER ── -->
-    <div class="inv-header">
-        <div class="inv-header-left">
-            <?php if ($company_logo): ?>
-            <img src="<?php echo BASE_URL; ?>assets/images/<?php echo htmlspecialchars($company_logo); ?>"
-                 class="company-logo" onerror="this.style.display='none'">
+    <!-- Header with Letterhead or Manual Info -->
+    <div style="display: flex; justify-content: space-between; align-items: flex-start; padding: 10px 10px 2px;">
+        <div style="flex: 1.4; text-align: left;">
+            <?php if ($company_letterhead): ?>
+                <img src="<?php echo BASE_URL; ?>assets/images/<?php echo $company_letterhead; ?>"
+                    style="max-height: 110px; width: auto; display: block; margin-bottom: 5px;">
             <?php else: ?>
-            <div class="company-name-block">
-                <div class="short-name"><?php echo htmlspecialchars($company_short); ?></div>
-                <div class="full-name"><?php echo htmlspecialchars($company_full_uc); ?></div>
-            </div>
+                <h2 style="margin: 0; text-transform: uppercase; font-size: 18px; color: #8B1A1A;"><?php echo htmlspecialchars($company_name); ?></h2>
             <?php endif; ?>
         </div>
-        <div class="inv-header-center">
-            <div class="inv-title">TAX INVOICE</div>
+        <div style="flex: 1.2; text-align: center; padding-top: 15px;">
+            <div style="font-size: 15px; font-weight: bold; text-decoration: underline; letter-spacing: 1.5px; text-transform: uppercase;">TAX INVOICE</div>
         </div>
-        <div class="inv-header-right"><em>Original Copy</em></div>
+        <div style="flex: 0.8; text-align: right; font-style: italic; font-size: 10px; padding-top: 15px; color: #555;">
+            Original Copy
+        </div>
     </div>
-    <div class="company-contact">
+    <div style="padding: 0 10px 10px; font-size: 10px; line-height: 1.4; color: #000; border-bottom: 1px solid #000; margin-bottom: 10px;">
         <?php echo nl2br(htmlspecialchars($company_address)); ?><br>
-        Ph : <?php echo htmlspecialchars($company_phone); ?> &nbsp;&nbsp;
-        Email : <?php echo htmlspecialchars($company_email); ?>
-        <?php if ($company_msme): ?> &nbsp;&nbsp; MSME : <?php echo htmlspecialchars($company_msme); ?><?php endif; ?>
+        Ph : <?php echo htmlspecialchars($company_phone); ?> &nbsp;|&nbsp; Email : <?php echo htmlspecialchars($company_email); ?>
     </div>
-    <hr class="divider">
 
-    <!-- ── INFO SECTION ── -->
-    <div class="info-section">
-        <!-- Left: Order info + Client details -->
-        <div class="info-left">
+    <!-- Order & Invoice Info -->
+    <div class="main-info">
+        <div class="info-col">
             <div class="info-row">
                 <span class="info-label">Order No.</span>
                 <span class="info-sep">:</span>
-                <span class="info-value"><?php echo htmlspecialchars($b['customer_po_no'] ?: 'NA'); ?></span>
+                <span class="info-value"><?php echo $b['customer_po_no'] ?: 'N/A'; ?></span>
             </div>
             <div class="info-row">
                 <span class="info-label">Order Date</span>
                 <span class="info-sep">:</span>
-                <span class="info-value"><?php echo $b['customer_po_date'] ? date('d-m-Y', strtotime($b['customer_po_date'])) : 'NA'; ?></span>
+                <span class="info-value"><?php echo $b['customer_po_date'] ? date('d.m.Y', strtotime($b['customer_po_date'])) : 'N/A'; ?></span>
+            </div>
+            <div class="info-row">
+                <span class="info-label">Campaign</span>
+                <span class="info-sep">:</span>
+                <span class="info-value"><strong><?php echo htmlspecialchars($b['campaign_name'] ?? 'N/A'); ?></strong></span>
             </div>
 
-            <div class="client-title">Client Details :</div>
-            <div class="client-name"><?php echo htmlspecialchars($b['client_name']); ?></div>
-            <div class="client-address"><?php echo nl2br(htmlspecialchars($b['client_address'])); ?></div>
-
-            <div class="info-row">
-                <span class="info-label">Place of Supply</span>
-                <span class="info-sep">:</span>
-                <span class="info-value"><?php echo htmlspecialchars($b['client_state']); ?></span>
-            </div>
-            <div class="info-row">
-                <span class="info-label">Customer PAN</span>
-                <span class="info-sep">:</span>
-                <span class="info-value"><?php echo htmlspecialchars($b['client_pan'] ?: 'N/A'); ?></span>
-            </div>
-            <div class="info-row">
-                <span class="info-label">GSTIN / UIN</span>
-                <span class="info-sep">:</span>
-                <span class="info-value"><?php echo htmlspecialchars($b['client_gstin'] ?: 'N/A'); ?></span>
+            <div style="margin-top: 15px;">
+                <div class="section-title">Client Details:</div>
+                <div style="font-weight: bold; font-size: 12px; margin-bottom: 2px;">
+                    <?php echo $b['client_name']; ?>
+                </div>
+                <div style="width: 250px;"><?php echo $b['client_address']; ?></div>
+                <div class="info-row" style="margin-top: 5px;">
+                    <span class="info-label">Place of Supply</span>
+                    <span class="info-sep">:</span>
+                    <span class="info-value"><?php echo $b['client_state']; ?></span>
+                </div>
+                <div class="info-row">
+                    <span class="info-label">Customer PAN</span>
+                    <span class="info-sep">:</span>
+                    <span class="info-value"><?php echo $b['client_pan'] ?: 'N/A'; ?></span>
+                </div>
+                <div class="info-row">
+                    <span class="info-label">GSTIN / UIN</span>
+                    <span class="info-sep">:</span>
+                    <span class="info-value"><?php echo $b['client_gstin'] ?: 'N/A'; ?></span>
+                </div>
             </div>
         </div>
 
-        <!-- Right: Invoice details -->
-        <div class="info-right">
+        <div class="info-col">
             <div class="info-row">
                 <span class="info-label">Invoice No.</span>
                 <span class="info-sep">:</span>
@@ -342,13 +358,34 @@ td {
             <div class="info-row">
                 <span class="info-label">PAN No.</span>
                 <span class="info-sep">:</span>
-                <span class="info-value"><?php echo htmlspecialchars($company_pan); ?></span>
+                <span class="info-value"><?php echo $company_pan; ?></span>
             </div>
             <div class="info-row">
                 <span class="info-label">GSTIN</span>
                 <span class="info-sep">:</span>
-                <span class="info-value"><?php echo htmlspecialchars($company_gstin); ?></span>
+                <span class="info-value"><?php echo $company_gstin; ?></span>
             </div>
+            <?php if ($company_msme): ?>
+            <div class="info-row">
+                <span class="info-label">MSME</span>
+                <span class="info-sep">:</span>
+                <span class="info-value"><?php echo htmlspecialchars($company_msme); ?></span>
+            </div>
+            <?php endif; ?>
+            <?php if (!empty($company_cin)): ?>
+            <div class="info-row">
+                <span class="info-label">CIN</span>
+                <span class="info-sep">:</span>
+                <span class="info-value"><?php echo htmlspecialchars($company_cin); ?></span>
+            </div>
+            <?php endif; ?>
+            <?php if (!empty($company_tan)): ?>
+            <div class="info-row">
+                <span class="info-label">TAN</span>
+                <span class="info-sep">:</span>
+                <span class="info-value"><?php echo htmlspecialchars($company_tan); ?></span>
+            </div>
+            <?php endif; ?>
         </div>
     </div>
 
@@ -371,7 +408,6 @@ td {
                 $parts = [];
                 if (!empty(trim($item['city'])))       $parts[] = trim($item['city']);
                 if (!empty(trim($item['site_name'])))  $parts[] = trim($item['site_name']);
-                if (!empty(trim($item['location'])))   $parts[] = trim($item['location']);
                 if (!empty(trim($item['media_type']))) $parts[] = trim($item['media_type']);
             ?>
             <tr>
@@ -391,100 +427,109 @@ td {
             </tr>
             <?php endforeach; ?>
 
+            <!-- Total Before Tax -->
+            <tr class="gst-row" style="font-weight: bold; border-top: 1.5px solid #000;">
+                <td colspan="5" style="text-align:right; padding-right:10px;">Total Before Tax</td>
+                <td style="text-align:right; padding-right:10px; font-weight:bold;"><?php echo number_format($subtotal, 2); ?></td>
+            </tr>
+
+            <!-- GST Breakdown -->
+            <tr class="gst-row" style="font-weight: bold;">
+                <td colspan="5" style="text-align:right; padding-right:10px;">CGST (<?php echo $isInterState ? '0' : '9'; ?>%)</td>
+                <td style="text-align:right; padding-right:10px;"><?php echo number_format($gst['cgst'], 2); ?></td>
+            </tr>
+            <tr class="gst-row" style="font-weight: bold;">
+                <td colspan="5" style="text-align:right; padding-right:10px;">SGST (<?php echo $isInterState ? '0' : '9'; ?>%)</td>
+                <td style="text-align:right; padding-right:10px;"><?php echo number_format($gst['sgst'], 2); ?></td>
+            </tr>
+            <tr class="gst-row" style="font-weight: bold;">
+                <td colspan="5" style="text-align:right; padding-right:10px;">IGST (<?php echo $isInterState ? '18' : '0'; ?>%)</td>
+                <td style="text-align:right; padding-right:10px;"><?php echo number_format($gst['igst'], 2); ?></td>
+            </tr>
+
             <!-- Grand Total -->
-            <tr class="total-row">
-                <td colspan="4" style="text-align:right; padding-right:10px; font-weight:bold;">Grand Total</td>
-                <td style="text-align:center; font-weight:bold; border-left:1px solid #000;">&#8377;</td>
-                <td style="text-align:right; padding-right:10px; font-weight:bold;"><?php echo number_format($b['grand_total'], 2); ?></td>
+            <tr class="totals-row">
+                <td colspan="5" style="text-align:right; padding-right:10px; font-size:12px;">Grand Total</td>
+                <td style="text-align:right; padding-right:10px; font-weight:bold; font-size:12px;"><?php echo number_format($grand_total, 2); ?></td>
             </tr>
         </tbody>
     </table>
 
-    <!-- ── HSN/SAC TAX BREAKDOWN ── -->
-    <?php
-    // Group items by HSN code
-    $hsnGroups = [];
-    foreach ($items as $item) {
-        $hsn = $item['hsn_code'] ?: '998366';
-        $hsnGroups[$hsn] = ($hsnGroups[$hsn] ?? 0) + floatval($item['amount'] ?? 0);
-    }
-    ?>
-    <table style="border-top:1.5px solid #000; border-bottom:1px solid #000;">
-        <thead>
-            <tr style="background:#f2f2f2;">
-                <th style="text-align:left; padding-left:8px; width:90px; border-top:none;">HSN/SAC</th>
-                <th style="width:70px; border-top:none;">Tax Rate</th>
-                <th style="text-align:right; padding-right:8px; border-top:none;">Taxable Amt.</th>
-                <?php if ($isInterState): ?>
-                <th style="text-align:right; padding-right:8px; border-top:none;" colspan="2">IGST Amt.</th>
-                <?php else: ?>
-                <th style="text-align:right; padding-right:8px; border-top:none;">CGST Amt.</th>
-                <th style="text-align:right; padding-right:8px; border-top:none; border-right:none;">SGST Amt.</th>
-                <?php endif; ?>
-            </tr>
-        </thead>
-        <tbody>
-            <?php foreach ($hsnGroups as $hsn => $taxableAmt):
-                $hsnGst = calculateGST($taxableAmt, $isInterState);
-            ?>
-            <tr>
-                <td style="text-align:left; padding-left:8px; border-left:none;"><?php echo htmlspecialchars($hsn); ?></td>
-                <td style="text-align:center;">18%</td>
-                <td style="text-align:right; padding-right:8px;"><?php echo number_format($taxableAmt, 2); ?></td>
-                <?php if ($isInterState): ?>
-                <td style="text-align:right; padding-right:8px;" colspan="2"><?php echo number_format($hsnGst['igst'], 2); ?></td>
-                <?php else: ?>
-                <td style="text-align:right; padding-right:8px;"><?php echo number_format($hsnGst['cgst'], 2); ?></td>
-                <td style="text-align:right; padding-right:8px; border-right:none;"><?php echo number_format($hsnGst['sgst'], 2); ?></td>
-                <?php endif; ?>
-            </tr>
-            <?php endforeach; ?>
-        </tbody>
-    </table>
+    <div class="avoid-break">
+        <!-- ── HSN/SAC TAX BREAKDOWN ── -->
+        <?php
+        // Group items by HSN code
+        $hsnGroups = [];
+        foreach ($items as $item) {
+            $hsn = $item['hsn_code'] ?: '998366';
+            $hsnGroups[$hsn] = ($hsnGroups[$hsn] ?? 0) + floatval($item['amount'] ?? 0);
+        }
+        ?>
+        <table style="border:1px solid #000; margin-top: 10px;">
+            <thead>
+                <tr style="background:#f2f2f2;">
+                    <th style="text-align:left; padding-left:8px; width:90px; border-top:none;">HSN/SAC</th>
+                    <th style="width:70px; border-top:none;">Tax Rate</th>
+                    <th style="text-align:right; padding-right:8px; border-top:none;">Taxable Amt.</th>
+                    <th style="text-align:right; padding-right:8px; border-top:none;">CGST Amt.</th>
+                    <th style="text-align:right; padding-right:8px; border-top:none;">SGST Amt.</th>
+                    <th style="text-align:right; padding-right:8px; border-top:none; border-right:none;">IGST Amt.</th>
+                </tr>
+            </thead>
+            <tbody>
+                <?php foreach ($hsnGroups as $hsn => $taxableAmt):
+                    $hsnGst = calculateGST($taxableAmt, $isInterState);
+                ?>
+                <tr>
+                    <td style="text-align:left; padding-left:8px; border-left:none;"><?php echo htmlspecialchars($hsn); ?></td>
+                    <td style="text-align:center;">18%</td>
+                    <td style="text-align:right; padding-right:8px;"><?php echo number_format($taxableAmt, 2); ?></td>
+                    <td style="text-align:right; padding-right:8px;"><?php echo number_format($hsnGst['cgst'], 2); ?></td>
+                    <td style="text-align:right; padding-right:8px;"><?php echo number_format($hsnGst['sgst'], 2); ?></td>
+                    <td style="text-align:right; padding-right:8px; border-right:none;"><?php echo number_format($hsnGst['igst'], 2); ?></td>
+                </tr>
+                <?php endforeach; ?>
+            </tbody>
+        </table>
 
-    <!-- ── AMOUNT IN WORDS ── -->
-    <div style="padding:8px 10px; border-bottom:1px solid #000; font-size:11px;">
-        <strong><?php echo ucwords(strtolower(amountInWords($b['grand_total']))); ?> Only</strong>
-    </div>
+        <!-- ── AMOUNT IN WORDS ── -->
+        <div style="padding:10px; border-top:1px solid #000; border-bottom:1px solid #000; font-size:11px;">
+            <strong>Amount in Words:</strong> <span style="text-transform: capitalize;"><?php echo amountInWords($grand_total); ?> Only</span>
+        </div>
 
-    <!-- ── BANK DETAILS ── -->
-    <div style="display:flex; border-bottom:1px solid #000;">
-        <div style="padding:8px 10px; font-size:10px; min-width:90px; font-weight:bold; border-right:1px solid #000; flex-shrink:0;">
-            Bank Details
-        </div>
-        <div style="padding:8px 12px; font-size:10px; line-height:1.6; flex:1;">
-            <?php
-            $bank = $company_bank_details ?: "A/C Name: {$company_name}\nBank: STATE BANK OF INDIA\nA/C No: 1234567890123\nIFSC: SBIN0000123";
-            echo nl2br(htmlspecialchars(strtoupper($bank)));
-            ?>
-        </div>
-    </div>
-
-    <!-- ── TERMS & SIGNATURE ── -->
-    <div style="display:flex; min-height:110px;">
-        <!-- Terms & Conditions -->
-        <div style="flex:1.4; padding:10px; border-right:1px solid #000; font-size:9.5px; line-height:1.6;">
-            <div style="font-weight:bold; margin-bottom:4px;">Terms &amp; Conditions</div>
-            <?php if (!empty($company_terms)): ?>
-                <?php echo nl2br(htmlspecialchars($company_terms)); ?>
-            <?php else: ?>
-                <div>E.&amp; O.E.</div>
-                <div>1. Interest @ 18% p.a. will be charged if the payment is not made with in the stipulated time.</div>
-                <div>2. Subject to &lsquo;Malda&rsquo; Jurisdiction only.</div>
-            <?php endif; ?>
-        </div>
-        <!-- Authorised Signatory -->
-        <div style="flex:1; padding:10px; display:flex; flex-direction:column; justify-content:space-between; text-align:center; font-size:10px;">
-            <div style="text-align:left; font-weight:bold; font-size:10px;">
-                For, <?php echo htmlspecialchars(strtoupper($company_name)); ?>
+        <!-- ── FOOTER (BANK + TERMS & SIGNATURE) ── -->
+        <div class="footer">
+            <div class="footer-left" style="padding: 6px 10px;">
+                <div style="font-weight: bold; text-decoration: underline; margin-bottom: 3px;">Bank Details:</div>
+                <div style="line-height: 1.2; margin-bottom: 6px; font-size: 9.5px;">
+                    <?php
+                    $bank = $company_bank_details ?: "A/C Name: {$company_name}\nBank: STATE BANK OF INDIA\nA/C No: 1234567890123\nIFSC: SBIN0000123";
+                    echo nl2br(htmlspecialchars(strtoupper($bank)));
+                    ?>
+                </div>
+                <div style="border-top: 1px dashed #ccc; padding-top: 4px; font-size: 8.5px; line-height: 1.2;">
+                    <div style="font-weight: bold; margin-bottom: 2px;">Terms &amp; Conditions</div>
+                    <?php if (!empty($company_terms)): ?>
+                        <?php echo nl2br(htmlspecialchars($company_terms)); ?>
+                    <?php else: ?>
+                        <div>E.&amp; O.E.</div>
+                        <div>1. Interest @ 18% p.a. will be charged if the payment is not made within the stipulated time.</div>
+                        <div>2. Subject to &lsquo;Malda&rsquo; Jurisdiction only.</div>
+                    <?php endif; ?>
+                </div>
             </div>
-            <div>
-                <img src="<?php echo BASE_URL; ?>assets/images/<?php echo htmlspecialchars($company_signature); ?>"
-                     style="height:48px; display:block; margin:0 auto;" onerror="this.style.display='none'">
-                <div style="font-weight:bold; margin-top:4px;">Authorised Signatory</div>
+            <div class="footer-right" style="padding: 6px 10px;">
+                <div>For <strong><?php echo strtoupper($company_name); ?></strong></div>
+                <div style="margin-top: 15px;">
+                    <img src="<?php echo BASE_URL; ?>assets/images/<?php echo htmlspecialchars($company_signature); ?>"
+                         style="height: 45px; display: block; margin: 0 auto;" onerror="this.style.display='none'">
+                    <div style="border-top: 1px solid #000; width: 150px; margin: 5px auto 0;"></div>
+                    <div style="font-weight: bold; margin-top: 2px;">Authorised Signatory</div>
+                </div>
             </div>
         </div>
     </div>
+
 
 </div><!-- /.invoice-wrapper -->
 

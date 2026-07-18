@@ -788,8 +788,14 @@ function submitQuickClient() {
             opt.dataset.contact = contact;
             opt.selected = true;
             select.add(opt);
+            
+            if (select.refreshSearchable) {
+                select.refreshSearchable();
+            }
+
             document.getElementById('contact_person').value = contact;
             closeClientModal();
+            handleClientChange();
         }
     });
 }
@@ -932,6 +938,36 @@ document.addEventListener('keydown', function(e) {
         if(e.key === 'Escape') closeLightbox();
     }
 });
+
+// Calculate total days on page load
+calculateTotalDays();
+
+// Initialize Searchable Dropdowns
+(function() {
+    function tryInit() {
+        if (typeof initSearchableSelect === 'function') {
+            initSearchableSelect('client_id', 'Search Company / Client...');
+            initSearchableSelect('filter-vendor', 'Search Vendor...');
+            console.log("Searchable selects initialized successfully on create_vendor_po.php");
+        } else {
+            console.warn("initSearchableSelect function not available yet, retrying on window load...");
+            window.addEventListener('load', () => {
+                if (typeof initSearchableSelect === 'function') {
+                    initSearchableSelect('client_id', 'Search Company / Client...');
+                    initSearchableSelect('filter-vendor', 'Search Vendor...');
+                    console.log("Searchable selects initialized successfully on window load");
+                } else {
+                    console.error("initSearchableSelect function could not be loaded!");
+                }
+            });
+        }
+    }
+    if (document.readyState === 'loading') {
+        document.addEventListener('DOMContentLoaded', tryInit);
+    } else {
+        tryInit();
+    }
+})();
 </script>
 
 <!-- Simple Lightbox HTML -->

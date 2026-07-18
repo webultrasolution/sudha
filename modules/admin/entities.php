@@ -25,7 +25,10 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     $address = $_POST['address'];
     $bank_details      = $_POST['bank_details'];
     $terms_conditions  = $_POST['terms_conditions'] ?? '';
+    $invoice_terms     = $_POST['invoice_terms'] ?? '';
     $msme_number       = $_POST['msme_number'] ?? '';
+    $cin               = $_POST['cin'] ?? '';
+    $tan               = $_POST['tan'] ?? '';
 
     $uploadDir = __DIR__ . '/../../assets/images/';
     if (!is_dir($uploadDir)) mkdir($uploadDir, 0777, true);
@@ -56,12 +59,12 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
     try {
         if ($id > 0) {
-            $stmt = $pdo->prepare("UPDATE entities SET name=?, gstin=?, pan=?, address=?, bank_details=?, terms_conditions=?, msme_number=?, logo=?, letterhead=?, signature=? WHERE id=?");
-            $stmt->execute([$name, $gstin, $pan, $address, $bank_details, $terms_conditions, $msme_number, $logo, $letterhead, $signature, $id]);
+            $stmt = $pdo->prepare("UPDATE entities SET name=?, gstin=?, pan=?, address=?, bank_details=?, terms_conditions=?, invoice_terms=?, msme_number=?, logo=?, letterhead=?, signature=?, cin=?, tan=? WHERE id=?");
+            $stmt->execute([$name, $gstin, $pan, $address, $bank_details, $terms_conditions, $invoice_terms, $msme_number, $logo, $letterhead, $signature, $cin, $tan, $id]);
             $message = "Entity updated successfully!";
         } else {
-            $stmt = $pdo->prepare("INSERT INTO entities (name, gstin, pan, address, bank_details, terms_conditions, msme_number, logo, letterhead, signature) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)");
-            $stmt->execute([$name, $gstin, $pan, $address, $bank_details, $terms_conditions, $msme_number, $logo, $letterhead, $signature]);
+            $stmt = $pdo->prepare("INSERT INTO entities (name, gstin, pan, address, bank_details, terms_conditions, invoice_terms, msme_number, logo, letterhead, signature, cin, tan) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)");
+            $stmt->execute([$name, $gstin, $pan, $address, $bank_details, $terms_conditions, $invoice_terms, $msme_number, $logo, $letterhead, $signature, $cin, $tan]);
             $message = "New Entity added successfully!";
         }
     } catch (Exception $e) {
@@ -109,6 +112,12 @@ include_once __DIR__ . '/../../includes/header.php';
                         <div style="margin-top: 0.5rem; display: flex; flex-wrap: wrap; gap: 0.5rem;">
                             <span style="font-size: 0.65rem; background: #eff6ff; color: #3b82f6; padding: 2px 8px; border-radius: 50px; font-weight: 700;">GST: <?php echo htmlspecialchars($entity['gstin'] ?: 'N/A'); ?></span>
                             <span style="font-size: 0.65rem; background: #fef2f2; color: #ef4444; padding: 2px 8px; border-radius: 50px; font-weight: 700;">PAN: <?php echo htmlspecialchars($entity['pan'] ?: 'N/A'); ?></span>
+                            <?php if (!empty($entity['cin'])): ?>
+                                <span style="font-size: 0.65rem; background: #f0fdf4; color: #15803d; padding: 2px 8px; border-radius: 50px; font-weight: 700;">CIN: <?php echo htmlspecialchars($entity['cin']); ?></span>
+                            <?php endif; ?>
+                            <?php if (!empty($entity['tan'])): ?>
+                                <span style="font-size: 0.65rem; background: #faf5ff; color: #7e22ce; padding: 2px 8px; border-radius: 50px; font-weight: 700;">TAN: <?php echo htmlspecialchars($entity['tan']); ?></span>
+                            <?php endif; ?>
                         </div>
                         <p style="font-size: 0.75rem; color: #64748b; margin-top: 0.75rem; line-height: 1.4;">
                             <i class="fas fa-map-marker-alt" style="width: 15px;"></i> <?php echo htmlspecialchars($entity['address'] ?: 'No address specified'); ?>
@@ -154,6 +163,14 @@ include_once __DIR__ . '/../../includes/header.php';
                     <label>PAN</label>
                     <input type="text" name="pan" id="entityPan" placeholder="Optional">
                 </div>
+                <div class="form-group">
+                    <label>CIN</label>
+                    <input type="text" name="cin" id="entityCin" placeholder="Optional">
+                </div>
+                <div class="form-group">
+                    <label>TAN</label>
+                    <input type="text" name="tan" id="entityTan" placeholder="Optional">
+                </div>
                 <div class="form-group" style="grid-column: span 2;">
                     <label>Address</label>
                     <textarea name="address" id="entityAddress" rows="2" placeholder="Full address..."></textarea>
@@ -163,8 +180,12 @@ include_once __DIR__ . '/../../includes/header.php';
                     <textarea name="bank_details" id="entityBank" rows="3" placeholder="Bank Name&#10;A/C No: XXXX&#10;IFSC: XXXX"></textarea>
                 </div>
                 <div class="form-group" style="grid-column: span 2;">
-                    <label>Terms &amp; Conditions <span style="color:#94a3b8;font-weight:400;">(shown on invoices)</span></label>
-                    <textarea name="terms_conditions" id="entityTerms" rows="4" placeholder="1. Payment due within 30 days.&#10;2. Subject to local jurisdiction only."></textarea>
+                    <label>Purchase Order Terms &amp; Conditions</label>
+                    <textarea name="terms_conditions" id="entityTerms" rows="3" placeholder="1. Payment due within 30 days.&#10;2. Subject to local jurisdiction only."></textarea>
+                </div>
+                <div class="form-group" style="grid-column: span 2;">
+                    <label>Tax Invoice Terms &amp; Conditions</label>
+                    <textarea name="invoice_terms" id="entityInvoiceTerms" rows="3" placeholder="1. Payment within 15 days of invoice date.&#10;2. Subject to local jurisdiction."></textarea>
                 </div>
                 <div class="form-group">
                     <label>MSME Number <span style="color:#94a3b8;font-weight:400;">(shown on all PDFs)</span></label>
@@ -248,7 +269,10 @@ function resetModal() {
     document.getElementById('entityAddress').value = '';
     document.getElementById('entityBank').value  = '';
     document.getElementById('entityTerms').value = '';
+    document.getElementById('entityInvoiceTerms').value = '';
     document.getElementById('entityMsme').value  = '';
+    document.getElementById('entityCin').value   = '';
+    document.getElementById('entityTan').value   = '';
     document.getElementById('existingLogo').value = '';
     document.getElementById('existingLetterhead').value = '';
     document.getElementById('existingSignature').value = '';
@@ -276,7 +300,10 @@ function editEntity(entity) {
     document.getElementById('entityAddress').value  = entity.address || '';
     document.getElementById('entityBank').value     = entity.bank_details || '';
     document.getElementById('entityTerms').value    = entity.terms_conditions || '';
+    document.getElementById('entityInvoiceTerms').value = entity.invoice_terms || '';
     document.getElementById('entityMsme').value     = entity.msme_number || '';
+    document.getElementById('entityCin').value      = entity.cin || '';
+    document.getElementById('entityTan').value      = entity.tan || '';
     document.getElementById('existingLogo').value        = entity.logo || '';
     document.getElementById('existingLetterhead').value  = entity.letterhead || '';
     document.getElementById('existingSignature').value   = entity.signature || '';

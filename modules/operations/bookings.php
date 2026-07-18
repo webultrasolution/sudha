@@ -25,7 +25,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action']) && $_POST['
         $pdo->commit();
         echo json_encode(['success' => true]);
     } catch (Exception $e) {
-        $pdo->rollBack();
+        if ($pdo->inTransaction()) $pdo->rollBack();
         echo json_encode(['success' => false, 'message' => $e->getMessage()]);
     }
     exit;
@@ -49,14 +49,24 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action']) && $_POST['
     try {
         $pdo->beginTransaction();
 
+        $bookingNum = generateSequenceNumber($pdo, 'booking');
+
+        $entityId = $originalBooking['entity_id'] ?? $_SESSION['active_entity_id'] ?? null;
+        if (!$entityId) {
+            $stmtEntity = $pdo->query("SELECT id FROM entities LIMIT 1");
+            $entityId = $stmtEntity->fetchColumn() ?: null;
+        }
+
         $insertBooking = $pdo->prepare(
-            "INSERT INTO bookings (proposal_id, client_id, campaign_name, start_date, end_date, total_amount, tax_amount, grand_total, printing_cost, mounting_cost, status, approval_status, confirmation_type, customer_po_no, customer_po_date, email_date, customer_po_file, mounting_date, brand_name, external_po, contact_person, billing_gstin, tax_type)
-             VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'pending', 'pending_approval', ?, NULL, NULL, NULL, NULL, NULL, ?, '', ?, ?, ?)"
+            "INSERT INTO bookings (booking_number, proposal_id, client_id, entity_id, campaign_name, start_date, end_date, total_amount, tax_amount, grand_total, printing_cost, mounting_cost, status, approval_status, confirmation_type, customer_po_no, customer_po_date, email_date, customer_po_file, mounting_date, brand_name, external_po, contact_person, billing_gstin, tax_type)
+             VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'active', 'approved', ?, NULL, NULL, NULL, NULL, NULL, ?, '', ?, ?, ?)"
         );
 
         $insertBooking->execute([
+            $bookingNum,
             $originalBooking['proposal_id'],
             $originalBooking['client_id'],
+            $entityId,
             $originalBooking['campaign_name'],
             $originalBooking['start_date'],
             $originalBooking['end_date'],
@@ -121,7 +131,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action']) && $_POST['
 
         echo json_encode(['success' => true, 'booking_id' => $newBookingId]);
     } catch (Exception $e) {
-        $pdo->rollBack();
+        if ($pdo->inTransaction()) $pdo->rollBack();
         echo json_encode(['success' => false, 'message' => $e->getMessage()]);
     }
     exit;
@@ -136,6 +146,13 @@ $campaignFilter = trim($_GET['campaign_name'] ?? '');
 
 $where = 'WHERE 1=1';
 $params = [];
+
+$activeEntityId = $_SESSION['active_entity_id'] ?? null;
+if ($activeEntityId) {
+    $where .= ' AND b.entity_id = ?';
+    $params[] = $activeEntityId;
+}
+
 if ($clientFilter) {
     $where .= ' AND b.client_id = ?';
     $params[] = $clientFilter;
@@ -146,10 +163,13 @@ if ($campaignFilter !== '') {
 }
 
 $bookings = $pdo->prepare("
-    SELECT b.*, p.proposal_number, c.name as client_name
+    SELECT b.*, p.proposal_number, c.name as client_name,
+           i.invoice_number, i.approval_status AS invoice_approval_status,
+           i.rejection_reason AS invoice_rejection_reason
     FROM bookings b 
     LEFT JOIN proposals p ON b.proposal_id = p.id 
     LEFT JOIN partners c ON b.client_id = c.id 
+    LEFT JOIN invoices i ON b.id = i.booking_id AND i.type = 'tax'
     $where
     ORDER BY b.id DESC
 ");
@@ -200,7 +220,7 @@ $clients = $pdo->query("SELECT id, name FROM partners WHERE type = 'client' ORDE
                 <th>Period</th>
                 <th>Amount</th>
                 <th>Execution Status</th>
-                <th>Actions</th>
+                <th style="text-align: center; width: 100px;">Actions</th>
             </tr>
         </thead>
         <tbody>
@@ -213,7 +233,7 @@ $clients = $pdo->query("SELECT id, name FROM partners WHERE type = 'client' ORDE
                 <tr>
                     <td>
                         <a href="view_booking.php?id=<?php echo $b['id']; ?>" style="text-decoration: none; color: inherit; transition: color 0.2s;" onmouseover="this.style.color='var(--primary)';" onmouseout="this.style.color='inherit';">
-                            <strong>#BK-<?php echo str_pad($b['id'], 4, '0', STR_PAD_LEFT); ?></strong>
+                            <strong><?php echo htmlspecialchars(!empty($b['booking_number']) ? $b['booking_number'] : '#BK-' . str_pad($b['id'], 4, '0', STR_PAD_LEFT)); ?></strong>
                         </a>
                     </td>
                     <td>
@@ -240,10 +260,18 @@ $clients = $pdo->query("SELECT id, name FROM partners WHERE type = 'client' ORDE
                     </td>
                     <td><?php echo $b['client_name']; ?></td>
                     <td style="font-size: 0.875rem; white-space: nowrap;">
-                        <?php echo date('d M', strtotime($b['start_date'])); ?> - <?php echo date('d M Y', strtotime($b['end_date'])); ?>
+                        <?php 
+                        if (!empty($b['start_date']) && $b['start_date'] !== '0000-00-00' && !empty($b['end_date']) && $b['end_date'] !== '0000-00-00') {
+                            echo date('d M', strtotime($b['start_date'])) . ' - ' . date('d M Y', strtotime($b['end_date']));
+                        } else {
+                            echo 'N/A';
+                        }
+                        ?>
                     </td>
-                    <td style="font-weight: 800; color: #059669; white-space: nowrap;">
-                        <?php echo formatCurrency($b['grand_total']); ?>
+                    <td style="font-size: 0.85rem; line-height: 1.4; white-space: nowrap; text-align: left; vertical-align: middle;">
+                        <div style="font-weight: 500; color: #64748b;">Base: <span style="font-weight: 700; color: #334155;"><?php echo formatCurrency($b['total_amount']); ?></span></div>
+                        <div style="font-weight: 500; color: #64748b;">Tax: <span style="font-weight: 700; color: #334155;"><?php echo formatCurrency($b['tax_amount']); ?></span></div>
+                        <div style="font-weight: 700; color: #059669; border-top: 1px dashed #cbd5e1; margin-top: 2px; padding-top: 2px;">Total: <span><?php echo formatCurrency($b['grand_total']); ?></span></div>
                     </td>
                     <td>
                         <span class="exec-status status-<?php echo $b['status']; ?>">
@@ -262,15 +290,50 @@ $clients = $pdo->query("SELECT id, name FROM partners WHERE type = 'client' ORDE
                                 </span>
                             </div>
                         <?php endif; ?>
+                        
+                        <div style="margin-top: 6px;">
+                            <?php if (!empty($b['invoice_number'])): ?>
+                                <?php if ($b['invoice_approval_status'] === 'approved'): ?>
+                                    <a href="generate_invoice.php?booking_id=<?php echo $b['id']; ?>" target="_blank" style="text-decoration: none; display: inline-flex;">
+                                        <span class="badge" style="background: #ecfdf5; color: #047857; border: 1px solid #a7f3d0; padding: 0.15rem 0.5rem; border-radius: 4px; font-size: 0.65rem; font-weight: 700; display: inline-flex; align-items: center; gap: 4px; cursor: pointer; transition: all 0.2s;" onmouseover="this.style.background='#d1fae5';" onmouseout="this.style.background='#ecfdf5';" title="Invoice Approved - Click to View">
+                                            <i class="fas fa-file-invoice-dollar"></i> <?php echo htmlspecialchars($b['invoice_number']); ?>
+                                        </span>
+                                    </a>
+                                <?php elseif ($b['invoice_approval_status'] === 'rejected'): ?>
+                                    <div style="display: flex; flex-direction: column; align-items: flex-start; gap: 4px;">
+                                        <span class="badge" style="background: #fee2e2; color: #b91c1c; border: 1px solid #fca5a5; padding: 0.15rem 0.5rem; border-radius: 4px; font-size: 0.65rem; font-weight: 700; display: inline-flex; align-items: center; gap: 4px;" title="Invoice Rejected (Cannot View)">
+                                            <i class="fas fa-times-circle"></i> <?php echo htmlspecialchars($b['invoice_number']); ?> (Rejected)
+                                        </span>
+                                        <?php if (!empty($b['invoice_rejection_reason'])): ?>
+                                            <span style="font-size: 0.65rem; color: #b91c1c; font-weight: 600; max-width: 150px; line-height: 1.2;">Reason: <?php echo htmlspecialchars($b['invoice_rejection_reason']); ?></span>
+                                        <?php endif; ?>
+                                    </div>
+                                <?php else: ?>
+                                    <a href="generate_invoice.php?booking_id=<?php echo $b['id']; ?>" target="_blank" style="text-decoration: none; display: inline-flex;">
+                                        <span class="badge" style="background: #fff7ed; color: #c2410c; border: 1px solid #fed7aa; padding: 0.15rem 0.5rem; border-radius: 4px; font-size: 0.65rem; font-weight: 700; display: inline-flex; align-items: center; gap: 4px; cursor: pointer; transition: all 0.2s;" onmouseover="this.style.background='#ffedd5';" onmouseout="this.style.background='#fff7ed';" title="Invoice Pending Approval - Click to View">
+                                            <i class="fas fa-clock"></i> <?php echo htmlspecialchars($b['invoice_number']); ?> (Pending)
+                                        </span>
+                                    </a>
+                                <?php endif; ?>
+                            <?php else: ?>
+                                <span class="badge" style="background: #f1f5f9; color: #64748b; border: 1px solid #cbd5e1; padding: 0.15rem 0.5rem; border-radius: 4px; font-size: 0.65rem; font-weight: 600; display: inline-flex; align-items: center; gap: 4px;" title="No Invoice Generated Yet">
+                                    <i class="fas fa-file-excel"></i> Invoice: No
+                                </span>
+                            <?php endif; ?>
+                        </div>
                     </td>
-                    <td>
-                        <a href="mounting.php?booking_id=<?php echo $b['id']; ?>" class="btn-icon btn-view" title="View Operations"><i class="fas fa-clipboard-list"></i></a>
-                        <?php if (canAdd('bookings')): ?>
-                        <button class="btn-icon btn-copy" onclick="duplicateBooking(<?php echo $b['id']; ?>)" title="Copy Booking"><i class="fas fa-copy"></i></button>
-                        <?php endif; ?>
-                        <?php if (canDelete('bookings')): ?>
-                        <button class="btn-icon btn-delete" onclick="deleteBooking(<?php echo $b['id']; ?>)"><i class="fas fa-trash"></i></button>
-                        <?php endif; ?>
+                    <td style="text-align: center; width: 100px; white-space: nowrap;">
+                        <div style="display: inline-flex; gap: 6px; align-items: center; justify-content: center;">
+                            <?php if (canEdit('bookings')): ?>
+                            <a href="direct_booking.php?action=edit&id=<?php echo $b['id']; ?>" class="btn-icon btn-edit" title="Edit Booking" style="margin: 0; color: #0284c7; background: #f0f9ff; border-color: #e0f2fe;"><i class="fas fa-edit"></i></a>
+                            <?php endif; ?>
+                            <?php if (canAdd('bookings')): ?>
+                            <button class="btn-icon btn-copy" onclick="duplicateBooking(<?php echo $b['id']; ?>)" title="Copy Booking" style="margin: 0;"><i class="fas fa-copy"></i></button>
+                            <?php endif; ?>
+                            <?php if (canDelete('bookings')): ?>
+                            <button class="btn-icon btn-delete" onclick="deleteBooking(<?php echo $b['id']; ?>)" title="Delete Booking" style="margin: 0;"><i class="fas fa-trash"></i></button>
+                            <?php endif; ?>
+                        </div>
                     </td>
                 </tr>
                 <?php endforeach; ?>
@@ -287,8 +350,8 @@ $clients = $pdo->query("SELECT id, name FROM partners WHERE type = 'client' ORDE
 .status-completed { background: #f1f5f9; color: #475569; }
 .status-cancelled { background: #fee2e2; color: #991b1b; }
 @keyframes pulse-approval { 0%, 100% { opacity: 1; } 50% { opacity: 0.5; } }
-.btn-icon { background: none; border: none; cursor: pointer; color: var(--secondary); text-decoration: none; margin-right: 0.5rem; }
-.btn-icon:hover { color: var(--primary); }
+.btn-icon.btn-copy { color: #0284c7; background: #f0f9ff; border-color: #e0f2fe; }
+.btn-icon.btn-copy:hover { background: #e0f2fe; color: #0369a1; }
 </style>
 
 <script>
@@ -316,8 +379,8 @@ function deleteBooking(id) {
 
 function duplicateBooking(id) {
     Swal.fire({
-        title: 'Duplicate Booking?',
-        text: 'This will create a new pending booking copy for editing and publishing later.',
+        title: 'Copy Booking?',
+        text: 'This will create a new booking copy for editing and publishing later.',
         icon: 'question',
         showCancelButton: true,
         confirmButtonColor: '#0f172a',

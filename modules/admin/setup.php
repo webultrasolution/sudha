@@ -15,8 +15,8 @@ try {
     $users = [
         ['admin', 'admin123', 'admin', 'System Admin', 'admin@easyoutdoor.com'],
         ['sales', 'sales123', 'sales', 'Sales Manager', 'sales@easyoutdoor.com'],
-        ['ops', 'ops123', 'operations', 'Ops Lead', 'ops@easyoutdoor.com'],
-        ['accounts', 'accounts123', 'accounts', 'Accountant', 'accounts@easyoutdoor.com']
+        ['ops', 'ops123', 'staff', 'Ops Lead', 'ops@easyoutdoor.com'],
+        ['accounts', 'accounts123', 'manager', 'Accountant', 'accounts@easyoutdoor.com']
     ];
 
     $stmt = $pdo->prepare("INSERT IGNORE INTO users (username, password, role, full_name, email) VALUES (?, ?, ?, ?, ?)");

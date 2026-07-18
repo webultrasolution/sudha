@@ -1,7 +1,7 @@
 <?php
 include_once __DIR__ . '/../../config/db.php';
 include_once __DIR__ . '/../../includes/functions.php';
-requireRole('admin');
+requirePermission('users', 'edit');
 
 // Table Creation (Migration with Granular Permissions)
 $pdo->exec("CREATE TABLE IF NOT EXISTS role_permissions (
@@ -17,14 +17,38 @@ $pdo->exec("CREATE TABLE IF NOT EXISTS role_permissions (
 
 // Defined Modules with Descriptions
 $modules = [
-    'dashboard'  => ['name' => 'Dashboard', 'icon' => 'fa-th-large', 'desc' => 'Allow access to visual business intelligence dashboard and charts.'],
-    'clients'    => ['name' => 'Clients', 'icon' => 'fa-building', 'desc' => 'Manage client database, business parameters, and accounting links.'],
-    'vendors'    => ['name' => 'Vendors', 'icon' => 'fa-truck-loading', 'desc' => 'Manage partners, vendors, printing rates, and purchase orders.'],
-    'inventory'  => ['name' => 'Inventory', 'icon' => 'fa-map-marked-alt', 'desc' => 'Control outdoor media sites, pricing, specifications, and availability.'],
-    'proposals'  => ['name' => 'Proposals', 'icon' => 'fa-file-contract', 'desc' => 'Draft campaign plans, media calculations, and proposals.'],
-    'bookings'   => ['name' => 'Bookings', 'icon' => 'fa-calendar-check', 'desc' => 'Track confirmed campaigns, client orders, and performance details.'],
-    'financials' => ['name' => 'Financials', 'icon' => 'fa-wallet', 'desc' => 'Oversee general ledgers, account balances, and PO approvals.'],
-    'users'      => ['name' => 'Users & Staff', 'icon' => 'fa-users-cog', 'desc' => 'Manage organization staff directory and access credentials.']
+    'dashboard'               => ['name' => 'Dashboard', 'icon' => 'fa-th-large', 'desc' => 'Allow access to visual business intelligence dashboard and charts.'],
+    
+    // Master Data
+    'clients'                 => ['name' => 'Company / Client', 'icon' => 'fa-building', 'desc' => 'Manage client database and settings.'],
+    'inventory'               => ['name' => 'Site / Location (Inventory)', 'icon' => 'fa-map-marked-alt', 'desc' => 'Control outdoor media sites and availability.'],
+    'vendors'                 => ['name' => 'Vendors', 'icon' => 'fa-truck-loading', 'desc' => 'Manage partners and suppliers.'],
+    
+    // Sales & Operations
+    'proposals'               => ['name' => 'Sales / Proposals', 'icon' => 'fa-file-contract', 'desc' => 'Draft campaign plans and proposals.'],
+    'bookings'                => ['name' => 'Bookings', 'icon' => 'fa-calendar-check', 'desc' => 'Track confirmed campaigns.'],
+    'vendors_printing_po'     => ['name' => 'Vendors Printing PO', 'icon' => 'fa-print', 'desc' => 'Manage POs issued to printing vendors.'],
+    'client_printing_invoice' => ['name' => 'Client Printing Invoice', 'icon' => 'fa-file-invoice', 'desc' => 'Create & view printing invoices raised to clients.'],
+    'client_mounting_invoice' => ['name' => 'Client Mounting Invoice', 'icon' => 'fa-tools', 'desc' => 'Create & view mounting invoices raised to clients.'],
+    
+    // Financials
+    'financials'              => ['name' => 'Financials Module', 'icon' => 'fa-wallet', 'desc' => 'Master access to ledger and payments area.'],
+    'invoices'                => ['name' => 'Invoices', 'icon' => 'fa-file-invoice-dollar', 'desc' => 'Generate and manage tax invoices.'],
+    'payments'                => ['name' => 'Payments', 'icon' => 'fa-money-bill-wave', 'desc' => 'Record and track client and vendor payments.'],
+    'vendors_purchase_orders' => ['name' => 'Vendors Purchase Orders (PO)', 'icon' => 'fa-shopping-cart', 'desc' => 'Manage, submit, and approve vendor POs.'],
+    'ledger'                  => ['name' => 'Ledger', 'icon' => 'fa-book', 'desc' => 'View general ledgers for partners.'],
+    
+    // Tools & Insights
+    'reports'                 => ['name' => 'Reports', 'icon' => 'fa-chart-pie', 'desc' => 'View business analytical reports.'],
+    'trash'                   => ['name' => 'Trash', 'icon' => 'fa-trash-alt', 'desc' => 'View and restore deleted records.'],
+    'approval_queue'          => ['name' => 'Approval Queue', 'icon' => 'fa-clipboard-check', 'desc' => 'Manage approval tickets for POs, invoices, and proposals.'],
+    'admin_settings'          => ['name' => 'Admin Settings', 'icon' => 'fa-cog', 'desc' => 'Modify system-wide parameters.'],
+    'multi_content'           => ['name' => 'Multi Content (Entities)', 'icon' => 'fa-layer-group', 'desc' => 'Manage business billing entities.'],
+    
+    // System Admins / Staff
+    'users'                   => ['name' => 'User Management', 'icon' => 'fa-users-cog', 'desc' => 'Create and modify login users.'],
+    'role_permissions'        => ['name' => 'Role Permissions', 'icon' => 'fa-user-shield', 'desc' => 'Configure granular access privileges for roles.'],
+    'system_activity_logs'    => ['name' => 'System Activity Logs', 'icon' => 'fa-history', 'desc' => 'Monitor user logins and activity history.']
 ];
 
 $roles = ['manager', 'sales', 'staff']; // Admin has all by default
@@ -171,6 +195,32 @@ include_once __DIR__ . '/../../includes/header.php';
             </button>
         </div>
     </form>
+</div>
+
+<!-- Detailed Flow and Mapping Guidance -->
+<div class="card" style="margin-top: 2rem; padding: 2rem; border-radius: 16px; box-shadow: 0 4px 20px rgba(0,0,0,0.05); border: none;">
+    <h3 style="color: #0f172a; margin: 0 0 1rem 0; font-size: 1.2rem; font-weight: 800; display: inline-flex; align-items: center; gap: 8px;">
+        <i class="fas fa-project-diagram" style="color: var(--primary);"></i> Access Options & Flow Guidelines
+    </h3>
+    <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 1.5rem;">
+        <div style="background: #f8fafc; padding: 1.25rem; border-radius: 12px; border: 1px solid #e2e8f0;">
+            <h4 style="margin: 0 0 0.75rem 0; color: #334155; font-weight: 700; font-size: 0.95rem;">Key Feature Controls:</h4>
+            <ul style="margin: 0; padding-left: 1.2rem; font-size: 0.85rem; color: #475569; line-height: 1.6;">
+                <li><strong>Dashboard</strong>: Grants entry-level visual logs and graphs analysis.</li>
+                <li><strong>Clients</strong>: Controls client lists, client printing invoices (`client_printing_rates.php`), and adding client printing rates.</li>
+                <li><strong>Vendors</strong>: Controls vendor listings, vendor printing POs, and purchase order resubmission options.</li>
+                <li><strong>Inventory</strong>: Grants site list access, adding or editing sites, prices, and media properties.</li>
+            </ul>
+        </div>
+        <div style="background: #f8fafc; padding: 1.25rem; border-radius: 12px; border: 1px solid #e2e8f0;">
+            <h4 style="margin: 0 0 0.75rem 0; color: #334155; font-weight: 700; font-size: 0.95rem;">Core Flows & Workflows:</h4>
+            <ul style="margin: 0; padding-left: 1.2rem; font-size: 0.85rem; color: #475569; line-height: 1.6;">
+                <li><strong>Proposals & Bookings</strong>: Used to lock/unlock proposal creation and campaign booking details. Editing locked bookings is allowed if the invoice is rejected.</li>
+                <li><strong>Financials & Ledger</strong>: Allows generating and viewing tax invoices, tracking ledgers, payments, and resubmitting rejected purchase orders.</li>
+                <li><strong>Users & Staff</strong>: Manage system logins, active/inactive user profiles, and granular role permissions settings.</li>
+            </ul>
+        </div>
+    </div>
 </div>
 
 <style>

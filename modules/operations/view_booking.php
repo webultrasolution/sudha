@@ -30,6 +30,9 @@ if (!$b) {
     exit;
 }
 
+// Pre-fill next sequential invoice number
+$nextInvoiceNumber = getPreviewSequenceNumber($pdo, 'invoice');
+
 // Fetch Items from booking_items
 $stmtItems = $pdo->prepare("
     SELECT bi.*, s.site_code, COALESCE(bi.custom_site_name, s.name) as site_name, COALESCE(bi.custom_location, s.location) as location, s.city, s.type as media_type, s.owner_type, 
@@ -71,16 +74,19 @@ $totalMargin = $taMargin + $haMargin;
 $grandTotal = $b['grand_total'];
 
 // Check if Final Tax Invoice already exists — locks cost editing
-$stmtInvCheck = $pdo->prepare("SELECT id FROM invoices WHERE booking_id = ? AND type = 'tax' LIMIT 1");
+$stmtInvCheck = $pdo->prepare("SELECT id, approval_status FROM invoices WHERE booking_id = ? AND type = 'tax' LIMIT 1");
 $stmtInvCheck->execute([$id]);
-$invoiceFinalized = (bool) $stmtInvCheck->fetchColumn();
+$invoiceRow = $stmtInvCheck->fetch(PDO::FETCH_ASSOC);
+$invoiceFinalized = (bool) $invoiceRow;
+$invoiceApprovalStatus = $invoiceRow['approval_status'] ?? '';
 
 // Check if RO Invoice already exists — locks cost editing
-$stmtRoCheck = $pdo->prepare("SELECT id FROM invoices WHERE booking_id = ? AND type = 'ro' LIMIT 1");
+$stmtRoCheck = $pdo->prepare("SELECT id FROM invoices WHERE booking_id = ? AND type = 'tax' LIMIT 1");
 $stmtRoCheck->execute([$id]);
 $roFinalized = (bool) $stmtRoCheck->fetchColumn();
 
-$isLocked = $invoiceFinalized || $roFinalized;
+// Locked only if invoice is finalized and not rejected (Disabled: Always unlock as requested)
+$isLocked = false;
 
 $isAdmin = ($_SESSION['user_role'] ?? '') === 'admin';
 
@@ -97,7 +103,7 @@ $vendors = $pdo->query("SELECT id, name FROM partners WHERE type = 'vendor' AND 
     <div>
         <div style="display: flex; align-items: center; gap: 1rem; margin-bottom: 0.5rem;">
             <h1 style="font-size: 1.75rem; font-weight: 800; color: #0f172a; margin: 0;">
-                #BK-<?php echo str_pad($b['id'], 4, '0', STR_PAD_LEFT); ?></h1>
+                <?php echo htmlspecialchars(!empty($b['booking_number']) ? $b['booking_number'] : '#BK-' . str_pad($b['id'], 4, '0', STR_PAD_LEFT)); ?></h1>
             <span
                 style="background: #f1f5f9; color: #475569; padding: 0.25rem 0.75rem; border-radius: 8px; font-size: 0.75rem; font-weight: 700;">
                 <?php echo $b['proposal_number'] ?: 'N/A'; ?>
@@ -120,8 +126,7 @@ $vendors = $pdo->query("SELECT id, name FROM partners WHERE type = 'vendor' AND 
         </div>
         <p style="color: #64748b; margin: 0 0 0.5rem 0; font-size: 0.95rem; font-weight: 500;">
             <strong style="color: #334155;"><?php echo htmlspecialchars($b['client_name']); ?></strong> • Tenure:
-            <?php echo date('d M', strtotime($b['start_date'])); ?> to
-            <?php echo date('d M Y', strtotime($b['end_date'])); ?>
+            <span id="display_tenure_dates"><?php echo date('d M', strtotime($b['start_date'])); ?> to <?php echo date('d M Y', strtotime($b['end_date'])); ?></span>
         </p>
         
         <?php
@@ -173,6 +178,21 @@ $vendors = $pdo->query("SELECT id, name FROM partners WHERE type = 'vendor' AND 
                     style="background: #10b981; color: white; padding: 0.75rem 1.5rem; border-radius: 10px; font-weight: 800; border: none; cursor: pointer; display: flex; align-items: center; gap: 0.5rem; text-decoration: none;">
                     <i class="fas fa-eye"></i> View Tax Invoice
                 </a>
+            <?php elseif (($existingInvoice['approval_status'] ?? '') === 'rejected'): ?>
+                <div style="display: flex; flex-direction: column; align-items: flex-end; gap: 4px;">
+                    <button class="btn" onclick="openInvoicePopup(<?php echo $b['id']; ?>)"
+                        style="background: #ef4444; color: white; padding: 0.75rem 1.5rem; border-radius: 10px; font-weight: 800; border: none; cursor: pointer; display: flex; align-items: center; gap: 0.5rem;">
+                        <i class="fas fa-redo"></i> Resubmit Invoice (Rejected)
+                    </button>
+                    <?php 
+                    // Fetch rejection reason
+                    $stmtRej = $pdo->prepare("SELECT remarks FROM approval_requests WHERE entity_type = 'invoice' AND entity_id = ? ORDER BY id DESC LIMIT 1");
+                    $stmtRej->execute([$existingInvoice['id']]);
+                    $rejReason = $stmtRej->fetchColumn();
+                    if ($rejReason): ?>
+                        <span style="font-size: 0.75rem; color: #ef4444; font-weight: 600;">Reason: <?php echo htmlspecialchars($rejReason); ?></span>
+                    <?php endif; ?>
+                </div>
             <?php else: ?>
                 <button class="btn"
                     style="background: #f8fafc; border: 1px solid #e2e8f0; color: #94a3b8; padding: 0.75rem 1.25rem; border-radius: 10px; font-weight: 700; font-size: 0.9rem; cursor: not-allowed; display: flex; align-items: center; gap: 0.5rem;"
@@ -189,7 +209,7 @@ $vendors = $pdo->query("SELECT id, name FROM partners WHERE type = 'vendor' AND 
 
         <?php
         // Check if RO invoice already exists
-        $stmtRoInv = $pdo->prepare("SELECT id, approval_status FROM invoices WHERE booking_id = ? AND type = 'ro' LIMIT 1");
+        $stmtRoInv = $pdo->prepare("SELECT id, approval_status FROM invoices WHERE booking_id = ? AND type = 'tax' LIMIT 1");
         $stmtRoInv->execute([$id]);
         $existingRoInvoice = $stmtRoInv->fetch();
 
@@ -207,10 +227,18 @@ $vendors = $pdo->query("SELECT id, name FROM partners WHERE type = 'vendor' AND 
                 </button>
             <?php endif; ?>
         <?php else: ?>
-            <a href="generate_ro_invoice.php?booking_id=<?php echo $id; ?>" target="_blank" class="btn"
-                style="background: #0f172a; color: white; padding: 0.75rem 1.5rem; border-radius: 10px; font-weight: 800; border: none; cursor: pointer; display: flex; align-items: center; gap: 0.5rem; text-decoration: none;">
-                <i class="fas fa-file-invoice-dollar"></i> Generate RO
-            </a>
+            <?php if ($invoiceFinalized): ?>
+                <a href="generate_ro_invoice.php?booking_id=<?php echo $id; ?>" target="_blank" class="btn"
+                    style="background: #0f172a; color: white; padding: 0.75rem 1.5rem; border-radius: 10px; font-weight: 800; border: none; cursor: pointer; display: flex; align-items: center; gap: 0.5rem; text-decoration: none;">
+                    <i class="fas fa-file-invoice-dollar"></i> Generate RO
+                </a>
+            <?php else: ?>
+                <button class="btn" disabled
+                    style="background: #f1f5f9; border: 1px solid #cbd5e1; color: #94a3b8; padding: 0.75rem 1.5rem; border-radius: 10px; font-weight: 800; border: none; cursor: not-allowed; display: flex; align-items: center; gap: 0.5rem;"
+                    title="Generate RO is only active after raising Final Tax Invoice.">
+                    <i class="fas fa-lock"></i> Generate RO
+                </button>
+            <?php endif; ?>
         <?php endif; ?>
 
             <button class="btn btn-primary" onclick="window.print()"
@@ -237,10 +265,8 @@ $vendors = $pdo->query("SELECT id, name FROM partners WHERE type = 'vendor' AND 
 
     <div class="p-panel">
         <h4 class="p-title"><i class="fas fa-clock"></i> Execution Timeline</h4>
-        <div class="p-row"><span>Start
-                Date</span><strong><?php echo date('d M Y', strtotime($b['start_date'])); ?></strong></div>
-        <div class="p-row"><span>End Date</span><strong><?php echo date('d M Y', strtotime($b['end_date'])); ?></strong>
-        </div>
+        <div class="p-row"><span>Start Date</span><strong id="display_execution_start"><?php echo date('d M Y', strtotime($b['start_date'])); ?></strong></div>
+        <div class="p-row"><span>End Date</span><strong id="display_execution_end"><?php echo date('d M Y', strtotime($b['end_date'])); ?></strong></div>
     </div>
 
     <div class="p-panel" style="background: #f8fafc; border-color: #cbd5e1;">
@@ -403,11 +429,19 @@ $stmtCheckPO = $pdo->prepare("SELECT id, approval_status FROM purchase_orders WH
                                                     <i class="fas fa-sync-alt"></i>
                                                 </button>
                                             <?php endif; ?>
-                                            <a href="https://wa.me/<?php echo preg_replace('/[^0-9]/', '', $item['vendor_phone'] ?? ''); ?>?text=Dear <?php echo urlencode($item['vendor_name'] ?? 'Vendor'); ?>, Please find the Purchase Order for Campaign: <?php echo urlencode($b['campaign_name'] ?? 'General'); ?>. Booking Ref: #BK-<?php echo str_pad($b['id'], 4, '0', STR_PAD_LEFT); ?>. Thank you."
+                                            <a href="https://wa.me/<?php echo preg_replace('/[^0-9]/', '', $item['vendor_phone'] ?? ''); ?>?text=Dear <?php echo urlencode($item['vendor_name'] ?? 'Vendor'); ?>, Please find the Purchase Order for Campaign: <?php echo urlencode($b['campaign_name'] ?? 'General'); ?>. Booking Ref: <?php echo urlencode(!empty($b['booking_number']) ? $b['booking_number'] : '#BK-' . str_pad($b['id'], 4, '0', STR_PAD_LEFT)); ?>. Thank you."
                                                 target="_blank" title="Send via WhatsApp"
                                                 style="background: #22c55e; color: white; width: 26px; height: 26px; border-radius: 6px; display: flex; align-items: center; justify-content: center; font-size: 0.7rem; text-decoration: none;">
                                                 <i class="fab fa-whatsapp"></i>
                                             </a>
+                                        <?php elseif (in_array($poApprovalStatus, ['draft', 'rejected'])): ?>
+                                            <?php if (canEdit('bookings')): ?>
+                                                <button onclick="saveAndGeneratePO(<?php echo $b['id']; ?>, <?php echo $item['vendor_id']; ?>)"
+                                                    title="Generate & Save PO to Database"
+                                                    style="background: #0f172a; color: white; width: 26px; height: 26px; border-radius: 6px; border: none; cursor: pointer; display: flex; align-items: center; justify-content: center; font-size: 0.7rem;">
+                                                    <i class="fas fa-save"></i>
+                                                </button>
+                                            <?php endif; ?>
                                         <?php else: ?>
                                             <button title="PO Pending Admin Approval"
                                                 style="background: #f8fafc; color: #94a3b8; border: 1px solid #cbd5e1; width: 26px; height: 26px; border-radius: 6px; display: flex; align-items: center; justify-content: center; font-size: 0.7rem; cursor: not-allowed; border: none;">
@@ -534,6 +568,29 @@ $stmtCheckPO = $pdo->prepare("SELECT id, approval_status FROM purchase_orders WH
                 </tr>
             <?php endforeach; ?>
         </tbody>
+        <tfoot style="background: #f8fafc; font-weight: 800; border-top: 2px solid #e2e8f0;">
+            <tr>
+                <td colspan="6" style="text-align: right; padding: 1rem; color: #475569; font-size: 0.9rem; vertical-align: middle;">Total / Summary:</td>
+                <td style="padding: 1rem; vertical-align: top; text-align: left;">
+                    <div style="margin-bottom: 0.5rem;">
+                        <span style="font-size: 0.65rem; font-weight: 800; color: #94a3b8; text-transform: uppercase; display: block; margin-bottom: 2px;">Total Purchase Cost</span>
+                        <span style="color: #334155; font-size: 0.9rem; font-weight: 800;"><?php echo number_format($taCost, 2); ?></span>
+                    </div>
+                    <div>
+                        <span style="font-size: 0.65rem; font-weight: 800; color: #94a3b8; text-transform: uppercase; display: block; margin-bottom: 2px;">Total Margin</span>
+                        <div style="display: inline-flex; align-items: center; gap: 0.4rem; background: #e0f2fe; color: #0369a1; padding: 0.25rem 0.6rem; border-radius: 6px; border: 1px solid #bae6fd; font-size: 0.8rem; font-weight: 800;">
+                            <i class="fas fa-chart-line"></i>
+                            <span><?php echo number_format($totalMargin, 2); ?></span>
+                        </div>
+                    </div>
+                </td>
+                <td style="text-align: right; padding: 1rem; vertical-align: middle;">
+                    <span style="font-size: 0.65rem; font-weight: 800; color: #94a3b8; text-transform: uppercase; display: block; margin-bottom: 2px;">Total Selling Cost</span>
+                    <span style="color: #0f172a; font-size: 1rem; font-weight: 900;"><?php echo number_format($b['total_amount'], 2); ?></span>
+                </td>
+                <td></td>
+            </tr>
+        </tfoot>
     </table>
 </div>
 
@@ -769,7 +826,7 @@ $stmtCheckPO = $pdo->prepare("SELECT id, approval_status FROM purchase_orders WH
                     style="height: 32px; font-size: 0.78rem; color: #1e293b !important; background: #fff; -webkit-text-fill-color: #1e293b; padding: 0 8px; box-sizing: border-box;">
                     <option value="" style="color:#1e293b;">All</option>
                     <?php foreach ($mediaTypes as $mt): ?>
-                        <option value="<?php echo $mt; ?>"><?php echo $mt; ?></option> <?php endforeach; ?>
+                        <option value="<?php echo htmlspecialchars($mt); ?>"><?php echo htmlspecialchars($mt); ?></option> <?php endforeach; ?>
                 </select>
             </div>
             <div class="search-group" style="flex: 1 1 110px; min-width: 90px; margin-bottom: 0;">
@@ -828,6 +885,16 @@ $stmtCheckPO = $pdo->prepare("SELECT id, approval_status FROM purchase_orders WH
                     style="height: 30px; font-size: 0.75rem; padding: 0 0.75rem; border-radius: 8px; background: #f1f5f9; color: #475569; border: 1px solid #e2e8f0; box-sizing: border-box;"><i
                         class="fas fa-times-circle"></i> Clear</button>
             </div>
+        </div>
+
+        <!-- Category Filter Tabs for Modal -->
+        <div class="inventory-tabs" id="modal-media-tabs" style="margin-bottom: 1rem;">
+            <button type="button" class="tab active" onclick="selectModalMediaTab('all', this)">All</button>
+            <?php foreach ($mediaTypes as $mtype): ?>
+                <button type="button" class="tab" onclick="selectModalMediaTab('<?php echo htmlspecialchars($mtype); ?>', this)">
+                    <?php echo htmlspecialchars($mtype); ?>
+                </button>
+            <?php endforeach; ?>
         </div>
 
         <div style="flex: 1; overflow-y: auto; border: 1px solid #e2e8f0; border-radius: 8px;">
@@ -1161,8 +1228,8 @@ $stmtCheckPO = $pdo->prepare("SELECT id, approval_status FROM purchase_orders WH
                     </select>
                 <?php endif; ?>
 
-                <label style="display:block; font-size: 0.75rem; font-weight: 700; color: #64748b; margin-bottom: 5px;">INVOICE NUMBER</label>
-                <input id="custom_invoice_number" class="swal2-input" placeholder="e.g. SCR/26-27/001 (Leave empty to auto-generate)" style="margin: 0 0 1rem 0; width: 100%; box-sizing: border-box;">
+                <label style="display:block; font-size: 0.75rem; font-weight: 700; color: #64748b; margin-bottom: 5px;">INVOICE NUMBER (Last Used: <?php echo getLastSequenceNumber($pdo, 'invoice'); ?>)</label>
+                <input id="custom_invoice_number" class="swal2-input" value="" placeholder="Type Invoice Number manually..." style="margin: 0 0 1rem 0; width: 100%; box-sizing: border-box;">
 
                 <label style="display:block; font-size: 0.75rem; font-weight: 700; color: #64748b; margin-bottom: 5px;">INVOICE DATE</label>
                 <input id="custom_invoice_date" type="date" class="swal2-input" value="<?php echo date('Y-m-d'); ?>" style="margin: 0 0 1rem 0; width: 100%; box-sizing: border-box;">
@@ -1201,6 +1268,8 @@ $stmtCheckPO = $pdo->prepare("SELECT id, approval_status FROM purchase_orders WH
                 const po_file = document.getElementById('customer_po_file').files[0];
                 const customInvoiceNo = document.getElementById('custom_invoice_number').value;
                 const customInvoiceDate = document.getElementById('custom_invoice_date').value;
+
+                if (!customInvoiceNo) { Swal.showValidationMessage(`Invoice Number is mandatory`); return false; }
 
                 if (type === 'po') {
                     if (!po_no) { Swal.showValidationMessage(`Customer PO Number is mandatory`); return false; }
@@ -1335,6 +1404,41 @@ $stmtCheckPO = $pdo->prepare("SELECT id, approval_status FROM purchase_orders WH
     const currentBookingId = <?php echo $id; ?>;
     const existingBookingSiteIds = <?php echo json_encode($existingBookingSiteIds); ?>;
 
+    let selectedModalMediaTab = 'all';
+    function selectModalMediaTab(mtype, btn) {
+        selectedModalMediaTab = mtype;
+        
+        // Update active class on tabs
+        const tabs = document.querySelectorAll('#modal-media-tabs .tab');
+        tabs.forEach(t => t.classList.remove('active'));
+        btn.classList.add('active');
+        
+        // Sync the modal-media select dropdown
+        const select = document.getElementById('modal-media');
+        if (select) {
+            select.value = mtype === 'all' ? '' : mtype;
+        }
+        
+        modalFetchSites(1);
+    }
+
+    document.addEventListener('DOMContentLoaded', () => {
+        const select = document.getElementById('modal-media');
+        if (select) {
+            select.addEventListener('change', function() {
+                const val = this.value || 'all';
+                const tabs = document.querySelectorAll('#modal-media-tabs .tab');
+                tabs.forEach(t => {
+                    const onclickAttr = t.getAttribute('onclick');
+                    if (onclickAttr && (onclickAttr.includes(`'${val}'`) || (val === 'all' && onclickAttr.includes("'all'")))) {
+                        tabs.forEach(x => x.classList.remove('active'));
+                        t.classList.add('active');
+                    }
+                });
+            });
+        }
+    });
+
     function openAddSiteModal() {
         document.getElementById('addSiteModal').style.display = 'flex';
         document.body.style.overflow = 'hidden';
@@ -1355,6 +1459,13 @@ $stmtCheckPO = $pdo->prepare("SELECT id, approval_status FROM purchase_orders WH
         document.getElementById('modal-vendor').value = '';
         document.querySelector('input[name="modal_ownership"][value="all"]').checked = true;
         document.querySelector('input[name="modal_availability"][value="available"]').checked = true;
+
+        // Reset category tabs to 'All'
+        const tabs = document.querySelectorAll('#modal-media-tabs .tab');
+        tabs.forEach(t => t.classList.remove('active'));
+        const allTab = Array.from(tabs).find(t => t.getAttribute('onclick') && t.getAttribute('onclick').includes("'all'"));
+        if (allTab) allTab.classList.add('active');
+        selectedModalMediaTab = 'all';
 
         if (showingBucketOnly) toggleModalBucket();
         modalFetchSites(1);

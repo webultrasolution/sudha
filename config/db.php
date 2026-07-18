@@ -1,5 +1,11 @@
 <?php
 
+if (session_status() === PHP_SESSION_NONE) {
+    // Set session lifetime to 30 days (2592000 seconds)
+    ini_set('session.gc_maxlifetime', 2592000);
+    ini_set('session.cookie_lifetime', 2592000);
+    session_start();
+}
 
 error_reporting(E_ALL);
 ini_set('display_errors', 1);
@@ -12,19 +18,26 @@ ini_set('error_log', __DIR__ . '/../php_error.log');
 // Database Configuration
 define('DB_HOST', 'localhost');
 
-if (in_array($_SERVER['HTTP_HOST'] ?? '', ['localhost', '127.0.0.1']) || php_sapi_name() === 'cli') {
+if (in_array($_SERVER['HTTP_HOST'] ?? '', ['localhost', '127.0.0.1']) || (php_sapi_name() === 'cli' && strpos(__DIR__, '/home/sudhacreative') === false)) {
     // Local Configuration
-    define('DB_NAME', 'easy_outdoor_crm');
+    define('DB_NAME', 'shudha');
     define('DB_USER', 'root');
     define('DB_PASS', '');
-    define('BASE_URL', 'http://localhost/test5/');
+    define('BASE_URL', 'http://localhost/sudha/');
 } else {
     // Live Configuration
-    define('DB_NAME', 'u511039083_sudha');
-    define('DB_USER', 'u511039083_sudha');
-    define('DB_PASS', 'dVq&1KmeM?0');
-    define('BASE_URL', 'https://sudha.webultrasolution.io/');
+    define('DB_NAME', 'sudhacreative');
+    define('DB_USER', 'sudhacreative');
+    define('DB_PASS', 'M2Noida@847226');
+    define('BASE_URL', 'https://sudhacreative.com/');
 }
+
+// SMTP Configuration
+define('SMTP_HOST', '194.238.17.209');
+define('SMTP_PORT', 25);
+define('SMTP_USER', 'info@sudhacreative.com');
+define('SMTP_PASS', 'M2Noida@278');
+define('SMTP_ENCRYPTION', 'tls');
 
 // App Constants
 define('APP_NAME', 'Sudha Creative CRM');

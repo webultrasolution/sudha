@@ -1,7 +1,4 @@
 <?php
-session_start();
-$_SESSION['user_id'] = 1;
-$_SESSION['user_name'] = 'System Admin';
-$_SESSION['user_role'] = 'admin';
-header("Location: index.php");
+// Auto login disabled for security
+header("Location: login.php");
 exit;

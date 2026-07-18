@@ -7,7 +7,7 @@ $id = isset($_GET['id']) ? intval($_GET['id']) : 0;
 $stmt = $pdo->prepare("
     SELECT p.*, c.name as client_name, c.address as client_address, c.city as client_city, c.email as client_email, c.phone as client_phone,
     c.gstin as client_gstin, c.contact_person,
-    u.full_name as creator_name
+    COALESCE(u.name, u.full_name) as creator_name
     FROM proposals p
     JOIN partners c ON p.client_id = c.id
     LEFT JOIN users u ON p.created_by = u.id
@@ -63,9 +63,9 @@ $items = $items->fetchAll();
         .header {
             display: flex;
             justify-content: space-between;
-            margin-bottom: 50px;
+            margin-bottom: 20px;
             border-bottom: 4px solid var(--primary);
-            padding-bottom: 20px;
+            padding-bottom: 10px;
         }
 
         .logo-area img {
@@ -94,7 +94,7 @@ $items = $items->fetchAll();
             display: grid;
             grid-template-columns: 1fr 1fr;
             gap: 40px;
-            margin-bottom: 40px;
+            margin-bottom: 20px;
         }
 
         .detail-box h3 {
@@ -120,12 +120,12 @@ $items = $items->fetchAll();
         table {
             width: 100%;
             border-collapse: collapse;
-            margin-bottom: 30px;
+            margin-bottom: 15px;
         }
 
         th {
             background: #f8fafc;
-            padding: 12px 10px;
+            padding: 8px 10px;
             text-align: left;
             font-size: 11px;
             text-transform: uppercase;
@@ -134,7 +134,7 @@ $items = $items->fetchAll();
         }
 
         td {
-            padding: 15px 10px;
+            padding: 10px 10px;
             border-bottom: 1px solid #f1f5f9;
             vertical-align: top;
         }
@@ -142,7 +142,7 @@ $items = $items->fetchAll();
         .total-section {
             margin-left: auto;
             width: 300px;
-            margin-top: 20px;
+            margin-top: 15px;
         }
 
         .total-row {
@@ -161,7 +161,7 @@ $items = $items->fetchAll();
         }
 
         .footer {
-            margin-top: 80px;
+            margin-top: 40px;
             font-size: 12px;
             color: var(--slate);
             border-top: 1px solid #e2e8f0;
@@ -189,10 +189,14 @@ $items = $items->fetchAll();
             QUOTATION</button>
     </div>
 
+    <?php
+    $company = resolveCompanyDetails();
+    $logoUrl = !empty($company['logo']) ? BASE_URL . 'assets/images/' . $company['logo'] : BASE_URL . 'assets/img/LOGO.png';
+    ?>
     <!-- Cover Page Info -->
     <div class="header">
         <div class="logo-area">
-            <img src="../../assets/img/LOGO.png" alt="Logo">
+            <img src="<?php echo $logoUrl; ?>" alt="Logo" style="max-height: 60px; object-fit: contain;">
         </div>
         <div class="proposal-info">
             <h2>QUOTATION</h2>
@@ -203,12 +207,13 @@ $items = $items->fetchAll();
 
     <div class="details-grid">
         <div class="detail-box">
-            <h3>From: Sudha Creative</h3>
-            <strong><?php echo COMPANY_NAME; ?></strong>
-            <p><?php echo COMPANY_ADDRESS; ?></p>
-            <p><?php echo COMPANY_CITY; ?></p>
-            <p style="margin-top: 8px; font-weight: 800; color: var(--primary);">GSTIN: <?php echo COMPANY_GSTIN; ?></p>
-            <p>Ph: <?php echo COMPANY_PHONE; ?></p>
+            <h3>From: <?php echo htmlspecialchars($company['name']); ?></h3>
+            <strong><?php echo htmlspecialchars($company['name']); ?></strong>
+            <p><?php echo nl2br(htmlspecialchars($company['address'])); ?></p>
+            <p style="margin-top: 8px; font-weight: 800; color: var(--primary);">GSTIN: <?php echo htmlspecialchars($company['gstin']); ?></p>
+            <?php if (!empty($company['phone'])): ?>
+                <p>Ph: <?php echo htmlspecialchars($company['phone']); ?></p>
+            <?php endif; ?>
         </div>
         <div class="detail-box">
             <h3>Prepared For</h3>
@@ -224,7 +229,7 @@ $items = $items->fetchAll();
     </div>
 
     <div
-        style="background: #f8fafc; padding: 25px; border-radius: 12px; border: 1px solid #e2e8f0; margin-bottom: 40px;">
+        style="background: #f8fafc; padding: 15px 20px; border-radius: 12px; border: 1px solid #e2e8f0; margin-bottom: 20px;">
         <div style="display: flex; justify-content: space-between; align-items: center;">
             <div>
                 <span
@@ -237,8 +242,13 @@ $items = $items->fetchAll();
                 <span
                     style="font-size: 11px; color: var(--slate); text-transform: uppercase; font-weight: 800; letter-spacing: 1px;">Duration</span>
                 <div style="font-weight: 700; font-size: 18px;">
-                    <?php echo date('d M Y', strtotime($proposal['start_date'])); ?> -
-                    <?php echo date('d M Y', strtotime($proposal['end_date'])); ?></div>
+                    <?php 
+                    if (!empty($proposal['start_date']) && $proposal['start_date'] !== '0000-00-00' && !empty($proposal['end_date']) && $proposal['end_date'] !== '0000-00-00') {
+                        echo date('d M Y', strtotime($proposal['start_date'])) . ' - ' . date('d M Y', strtotime($proposal['end_date']));
+                    } else {
+                        echo 'N/A';
+                    }
+                    ?></div>
             </div>
         </div>
     </div>
@@ -268,7 +278,6 @@ $items = $items->fetchAll();
                     <td>
                         <div style="font-weight: 700;"><?php echo htmlspecialchars($item['site_name'] ?? ''); ?></div>
                         <div style="font-size: 11px; color: var(--slate); font-weight: 600;">
-                            <?php echo htmlspecialchars($item['location'] ?? ''); ?>,
                             <?php echo htmlspecialchars($item['site_city'] ?? ''); ?></div>
                     </td>
                     <td style="font-weight: 600;"><?php echo (int) $item['width']; ?>' x <?php echo (int) $item['height']; ?>'

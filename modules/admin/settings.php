@@ -12,37 +12,74 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     try {
         $pdo->beginTransaction();
         
-        $stmt = $pdo->prepare("UPDATE settings SET setting_value = ? WHERE setting_key = ?");
+        $activeEntity = getActiveEntity();
         
-        foreach ($_POST as $key => $value) {
-            if ($key !== 'submit') {
-                $stmt->execute([$value, $key]);
-            }
-        }
+        // Fetch current settings for fallback
+        $stmt = $pdo->query("SELECT setting_key, setting_value FROM settings");
+        $settings = $stmt->fetchAll(PDO::FETCH_KEY_PAIR);
 
-        // Handle File Uploads (Logo & Signature)
+        // Handle File Uploads (Logo, Signature, Letterhead)
         $uploadDir = __DIR__ . '/../../assets/images/';
         if (!is_dir($uploadDir)) mkdir($uploadDir, 0777, true);
 
+        $logoVal = $activeEntity ? $activeEntity['logo'] : ($settings['company_logo'] ?? '');
         if (!empty($_FILES['company_logo']['name'])) {
-            $logoName = 'logo_' . time() . '_' . $_FILES['company_logo']['name'];
-            if (move_uploaded_file($_FILES['company_logo']['tmp_name'], $uploadDir . $logoName)) {
-                $stmt->execute([$logoName, 'company_logo']);
-            }
+            $logoVal = ($activeEntity ? 'entity_' : 'logo_') . time() . '_' . $_FILES['company_logo']['name'];
+            move_uploaded_file($_FILES['company_logo']['tmp_name'], $uploadDir . $logoVal);
         }
 
+        $sigVal = $activeEntity ? $activeEntity['signature'] : ($settings['company_signature'] ?? '');
         if (!empty($_FILES['company_signature']['name'])) {
-            $sigName = 'sig_' . time() . '_' . $_FILES['company_signature']['name'];
-            if (move_uploaded_file($_FILES['company_signature']['tmp_name'], $uploadDir . $sigName)) {
-                $stmt->execute([$sigName, 'company_signature']);
-            }
+            $sigVal = ($activeEntity ? 'entity_sig_' : 'sig_') . time() . '_' . $_FILES['company_signature']['name'];
+            move_uploaded_file($_FILES['company_signature']['tmp_name'], $uploadDir . $sigVal);
         }
 
+        $lhVal = $activeEntity ? $activeEntity['letterhead'] : ($settings['company_letterhead'] ?? '');
         if (!empty($_FILES['company_letterhead']['name'])) {
-            $lhName = 'lh_' . time() . '_' . $_FILES['company_letterhead']['name'];
-            if (move_uploaded_file($_FILES['company_letterhead']['tmp_name'], $uploadDir . $lhName)) {
-                $stmt->execute([$lhName, 'company_letterhead']);
+            $lhVal = ($activeEntity ? 'entity_lh_' : 'lh_') . time() . '_' . $_FILES['company_letterhead']['name'];
+            move_uploaded_file($_FILES['company_letterhead']['tmp_name'], $uploadDir . $lhVal);
+        }
+
+        if ($activeEntity) {
+            // Update Entity details
+            $stmt = $pdo->prepare("UPDATE entities SET name = ?, gstin = ?, pan = ?, address = ?, bank_details = ?, terms_conditions = ?, invoice_terms = ?, msme_number = ?, logo = ?, letterhead = ?, signature = ?, cin = ?, tan = ? WHERE id = ?");
+            $stmt->execute([
+                $_POST['company_name'] ?? '',
+                $_POST['company_gstin'] ?? '',
+                $_POST['company_pan'] ?? '',
+                $_POST['company_address'] ?? '',
+                $_POST['company_bank_details'] ?? '',
+                $_POST['po_terms'] ?? '',
+                $_POST['invoice_terms'] ?? '',
+                $_POST['company_msme_number'] ?? '',
+                $logoVal,
+                $lhVal,
+                $sigVal,
+                $_POST['company_cin'] ?? '',
+                $_POST['company_tan'] ?? '',
+                $activeEntity['id']
+            ]);
+
+            // Update other global settings in settings table
+            $stmtGlobal = $pdo->prepare("UPDATE settings SET setting_value = ? WHERE setting_key = ?");
+            $globalKeys = ['company_city', 'company_phone', 'company_email', 'po_important_note'];
+            foreach ($globalKeys as $key) {
+                if (isset($_POST[$key])) {
+                    $stmtGlobal->execute([$_POST[$key], $key]);
+                }
             }
+        } else {
+            // Update everything in settings table
+            $stmtGlobal = $pdo->prepare("UPDATE settings SET setting_value = ? WHERE setting_key = ?");
+            foreach ($_POST as $key => $value) {
+                if ($key !== 'submit') {
+                    $stmtGlobal->execute([$value, $key]);
+                }
+            }
+            // Execute file updates in settings
+            $stmtGlobal->execute([$logoVal, 'company_logo']);
+            $stmtGlobal->execute([$lhVal, 'company_letterhead']);
+            $stmtGlobal->execute([$sigVal, 'company_signature']);
         }
 
         $pdo->commit();
@@ -57,8 +94,26 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 $stmt = $pdo->query("SELECT setting_key, setting_value FROM settings");
 $settings = $stmt->fetchAll(PDO::FETCH_KEY_PAIR);
 
+// If active entity is set, override relevant fields
+$activeEntity = getActiveEntity();
+if ($activeEntity) {
+    $settings['company_name'] = $activeEntity['name'];
+    $settings['company_gstin'] = $activeEntity['gstin'];
+    $settings['company_pan'] = $activeEntity['pan'];
+    $settings['company_address'] = $activeEntity['address'];
+    $settings['company_msme_number'] = $activeEntity['msme_number'];
+    $settings['company_bank_details'] = $activeEntity['bank_details'];
+    $settings['po_terms'] = $activeEntity['terms_conditions'];
+    $settings['invoice_terms'] = $activeEntity['invoice_terms'];
+    $settings['company_logo'] = $activeEntity['logo'];
+    $settings['company_letterhead'] = $activeEntity['letterhead'];
+    $settings['company_signature'] = $activeEntity['signature'];
+    $settings['company_cin'] = $activeEntity['cin'];
+    $settings['company_tan'] = $activeEntity['tan'];
+}
+
 $activePage = 'settings';
-$pageTitle = 'Global Admin Settings';
+$pageTitle = $activeEntity ? 'Admin Settings - ' . htmlspecialchars($activeEntity['name']) : 'Global Admin Settings';
 include_once __DIR__ . '/../../includes/header.php';
 ?>
 
@@ -118,6 +173,14 @@ include_once __DIR__ . '/../../includes/header.php';
                             <label>MSME Number</label>
                             <input type="text" name="company_msme_number" value="<?php echo htmlspecialchars($settings['company_msme_number'] ?? ''); ?>" placeholder="e.g. UDYAM-WB-00-0000000">
                         </div>
+                        <div class="form-group">
+                            <label>CIN Number</label>
+                            <input type="text" name="company_cin" value="<?php echo htmlspecialchars($settings['company_cin'] ?? ''); ?>" placeholder="e.g. U12345WB2026PTC123456">
+                        </div>
+                        <div class="form-group">
+                            <label>TAN Number</label>
+                            <input type="text" name="company_tan" value="<?php echo htmlspecialchars($settings['company_tan'] ?? ''); ?>" placeholder="e.g. CALS01234A">
+                        </div>
                     </div>
                 </div>
 
@@ -139,7 +202,12 @@ include_once __DIR__ . '/../../includes/header.php';
 
                     <div class="form-group">
                         <label>Purchase Order Terms & Conditions</label>
-                        <textarea name="po_terms" rows="10"><?php echo htmlspecialchars($settings['po_terms'] ?? ''); ?></textarea>
+                        <textarea name="po_terms" rows="8"><?php echo htmlspecialchars($settings['po_terms'] ?? ''); ?></textarea>
+                    </div>
+
+                    <div class="form-group">
+                        <label>Tax Invoice Terms & Conditions</label>
+                        <textarea name="invoice_terms" rows="8"><?php echo htmlspecialchars($settings['invoice_terms'] ?? ''); ?></textarea>
                     </div>
                 </div>
             </div>
@@ -167,7 +235,7 @@ include_once __DIR__ . '/../../includes/header.php';
                     
                     <div style="margin-bottom: 1.5rem; padding: 1rem; background: #f8fafc; border: 2px dashed #e2e8f0; border-radius: 12px;">
                         <?php 
-                        $lh = getSetting('company_letterhead');
+                        $lh = $settings['company_letterhead'] ?? '';
                         if ($lh): ?>
                             <img src="<?php echo BASE_URL; ?>assets/images/<?php echo $lh; ?>" 
                                  style="max-width: 100%; max-height: 120px; object-fit: contain; margin-bottom: 1rem; border-radius: 4px;">
