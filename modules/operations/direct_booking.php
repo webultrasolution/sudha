@@ -266,6 +266,17 @@ $all_media_types = $pdo->query("SELECT name FROM media_types ORDER BY name ASC")
             <div style="display: flex; align-items: center; gap: 1rem;"><i class="fas fa-shopping-basket"></i> Review Selected Assets</div>
             <button onclick="closeBucket()" style="background: none; border: none; color: white; font-size: 1.5rem; cursor: pointer;">&times;</button>
         </div>
+        <div style="display: flex; background: #f1f5f9; padding: 0.5rem 1rem; gap: 0.5rem; border-bottom: 1px solid #e2e8f0;">
+            <button type="button" class="btn bucket-tab active" id="btn-tab-rental" onclick="switchBucketTab('rental')" style="flex: 1; font-weight: 800; font-size: 0.8rem; height: 38px; border-radius: 8px; border: 1px solid transparent; cursor: pointer; transition: all 0.2s;">
+                <i class="fas fa-ad"></i> Space Rental
+            </button>
+            <button type="button" class="btn bucket-tab" id="btn-tab-printing" onclick="switchBucketTab('printing')" style="flex: 1; font-weight: 800; font-size: 0.8rem; height: 38px; border-radius: 8px; border: 1px solid transparent; cursor: pointer; transition: all 0.2s;">
+                <i class="fas fa-print"></i> Printing Service
+            </button>
+            <button type="button" class="btn bucket-tab" id="btn-tab-mounting" onclick="switchBucketTab('mounting')" style="flex: 1; font-weight: 800; font-size: 0.8rem; height: 38px; border-radius: 8px; border: 1px solid transparent; cursor: pointer; transition: all 0.2s;">
+                <i class="fas fa-tools"></i> Mounting Service
+            </button>
+        </div>
         <div id="bucket-list" style="flex: 1; overflow-y: auto; padding: 1rem;"></div>
         <div style="padding: 1rem; border-top: 1px solid #e2e8f0; background: #f8fafc;">
             <button onclick="closeBucket()" class="btn btn-primary" style="width: 100%; height: 45px; border-radius: 10px; font-weight: 800;">CONTINUE SELECTION</button>
@@ -289,6 +300,8 @@ $all_media_types = $pdo->query("SELECT name FROM media_types ORDER BY name ASC")
 <style>
 .proposal-full-wrapper { padding: 2rem; background: #f8fafc; min-height: 100vh; }
 .p-panel { background: white; border-radius: 12px; padding: 1.5rem; border: 1px solid #e2e8f0; box-shadow: 0 4px 6px -1px rgba(0,0,0,0.05); }
+.bucket-tab { background: #e2e8f0; color: #475569; }
+.bucket-tab.active { background: var(--primary) !important; color: white !important; }
 .p-header { font-weight: 800; font-size: 0.95rem; color: var(--primary); margin-bottom: 1.25rem; border-bottom: 2px solid #f1f5f9; padding-bottom: 0.75rem; }
 .form-grid { display: grid; gap: 1rem; }
 .form-group label { display: block; font-size: 0.7rem; font-weight: 800; color: var(--secondary); margin-bottom: 0.4rem; text-transform: uppercase; }
