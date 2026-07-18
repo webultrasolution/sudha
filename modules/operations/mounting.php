@@ -201,7 +201,7 @@ $ratesStmt = $pdo->prepare("
         MAX(c.gstin) as client_gstin,
         MAX(c.additional_gst) as additional_gst,
         (SELECT remarks FROM approval_requests WHERE entity_type = 'client_mounting' AND entity_ref COLLATE utf8mb4_unicode_ci = r.po_number COLLATE utf8mb4_unicode_ci ORDER BY id DESC LIMIT 1) as rejection_reason,
-        (SELECT COUNT(*) FROM bookings WHERE booking_number = r.po_number) as is_unified
+        (SELECT COUNT(*) FROM bookings WHERE booking_number COLLATE utf8mb4_unicode_ci = r.po_number COLLATE utf8mb4_unicode_ci) as is_unified
     FROM client_mounting_rates r
     JOIN partners c ON r.client_id = c.id
     LEFT JOIN sites s ON r.site_id = s.id

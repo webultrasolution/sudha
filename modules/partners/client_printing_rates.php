@@ -173,7 +173,7 @@ $ratesStmt = $pdo->prepare("
         MAX(r.brand_name) as brand_name,
         MAX(r.custom_invoice_number) as custom_invoice_number,
         (SELECT remarks FROM approval_requests WHERE entity_type = 'client_printing' AND entity_ref COLLATE utf8mb4_unicode_ci = r.po_number COLLATE utf8mb4_unicode_ci ORDER BY id DESC LIMIT 1) as rejection_reason,
-        (SELECT COUNT(*) FROM bookings WHERE booking_number = r.po_number) as is_unified
+        (SELECT COUNT(*) FROM bookings WHERE booking_number COLLATE utf8mb4_unicode_ci = r.po_number COLLATE utf8mb4_unicode_ci) as is_unified
     FROM client_printing_rates r
     JOIN partners c ON r.client_id = c.id
     LEFT JOIN sites s ON r.site_id = s.id
