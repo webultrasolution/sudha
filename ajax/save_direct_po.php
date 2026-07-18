@@ -92,8 +92,10 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             }
         }
 
-        // 3. Create Single Booking (Direct)
-        $bookingNum = generateSequenceNumber($pdo, 'booking');
+        // 3. Create or Update Single Booking (Direct)
+        $bookingId = isset($data['booking_id']) ? intval($data['booking_id']) : null;
+        $isEdit = ($bookingId > 0);
+
         $bookingSubtotal = $overallSubtotal + $overallPrinting + $overallMounting;
         $overallTax = $bookingSubtotal * 0.18;
         $overallGrand = $bookingSubtotal + $overallTax;
@@ -107,12 +109,41 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             $entityId = $stmtEntity->fetchColumn() ?: null;
         }
 
-        $stmtBooking = $pdo->prepare("
-            INSERT INTO bookings (booking_number, client_id, entity_id, campaign_name, brand_name, external_po, contact_person, billing_gstin, tax_type, start_date, end_date, total_amount, tax_amount, grand_total, status, approval_status) 
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-        ");
-        $stmtBooking->execute([$bookingNum, $client_id, $entityId, $campaign_name, $brand_name, $external_po, $contact_person, $billing_gstin, $tax_type, $start_date, $end_date, $bookingSubtotal, $overallTax, $overallGrand, $bookingStatus, $bookingApprovalStatus]);
-        $bookingId = $pdo->lastInsertId();
+        if ($isEdit) {
+            $stmtBooking = $pdo->prepare("
+                UPDATE bookings SET 
+                    client_id = ?, entity_id = ?, campaign_name = ?, brand_name = ?, external_po = ?, 
+                    contact_person = ?, billing_gstin = ?, tax_type = ?, start_date = ?, end_date = ?, 
+                    total_amount = ?, tax_amount = ?, grand_total = ?
+                WHERE id = ?
+            ");
+            $stmtBooking->execute([
+                $client_id, $entityId, $campaign_name, $brand_name, $external_po, 
+                $contact_person, $billing_gstin, $tax_type, $start_date, $end_date, 
+                $bookingSubtotal, $overallTax, $overallGrand, $bookingId
+            ]);
+            
+            // Get existing booking number to reuse it for replicated records
+            $stmtBNum = $pdo->prepare("SELECT booking_number FROM bookings WHERE id = ?");
+            $stmtBNum->execute([$bookingId]);
+            $bookingNum = $stmtBNum->fetchColumn();
+
+            // Delete existing booking items
+            $pdo->prepare("DELETE FROM booking_items WHERE booking_id = ?")->execute([$bookingId]);
+            // Delete existing operations tasks
+            $pdo->prepare("DELETE FROM operations WHERE booking_id = ?")->execute([$bookingId]);
+            // Delete existing replicated printing/mounting rates
+            $pdo->prepare("DELETE FROM client_printing_rates WHERE po_number COLLATE utf8mb4_unicode_ci = ? COLLATE utf8mb4_unicode_ci")->execute([$bookingNum]);
+            $pdo->prepare("DELETE FROM client_mounting_rates WHERE po_number COLLATE utf8mb4_unicode_ci = ? COLLATE utf8mb4_unicode_ci")->execute([$bookingNum]);
+        } else {
+            $bookingNum = generateSequenceNumber($pdo, 'booking');
+            $stmtBooking = $pdo->prepare("
+                INSERT INTO bookings (booking_number, client_id, entity_id, campaign_name, brand_name, external_po, contact_person, billing_gstin, tax_type, start_date, end_date, total_amount, tax_amount, grand_total, status, approval_status) 
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            ");
+            $stmtBooking->execute([$bookingNum, $client_id, $entityId, $campaign_name, $brand_name, $external_po, $contact_person, $billing_gstin, $tax_type, $start_date, $end_date, $bookingSubtotal, $overallTax, $overallGrand, $bookingStatus, $bookingApprovalStatus]);
+            $bookingId = $pdo->lastInsertId();
+        }
 
         $lastPoId = 0;
         $poCount = 0;
@@ -191,11 +222,11 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
         $pdo->commit();
         
-        $message = "Booking created successfully.";
+        $message = $isEdit ? "Booking updated successfully." : "Booking created successfully.";
         if ($poCount > 0) {
             $message = $isAdmin
-                ? "Booking created successfully."
-                : "Booking created successfully. $poCount Purchase Orders submitted for admin approval.";
+                ? ($isEdit ? "Booking updated successfully." : "Booking created successfully.")
+                : ($isEdit ? "Booking updated successfully." : "Booking created successfully. $poCount Purchase Orders submitted for admin approval.");
         }
 
         echo json_encode([

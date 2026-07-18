@@ -4,6 +4,33 @@ $pageTitle = 'Create Direct Booking';
 $hideSidebar = true;
 include_once __DIR__ . '/../../includes/header.php';
 
+$isEdit = false;
+$editBooking = null;
+$editItems = [];
+
+if (isset($_GET['action']) && $_GET['action'] === 'edit' && isset($_GET['id'])) {
+    $editId = intval($_GET['id']);
+    $stmt = $pdo->prepare("SELECT * FROM bookings WHERE id = ?");
+    $stmt->execute([$editId]);
+    $editBooking = $stmt->fetch(PDO::FETCH_ASSOC);
+    if ($editBooking) {
+        $isEdit = true;
+        // Fetch items
+        $stmtItems = $pdo->prepare("
+            SELECT bi.*, COALESCE(bi.custom_site_name, s.name) as name, s.site_code,
+                   COALESCE(bi.custom_location, s.location) as location,
+                   s.city, s.width, s.height, s.light_type, s.hsn_code, s.type, s.owner_type,
+                   p.name as vendor_name, s.all_images
+            FROM booking_items bi
+            JOIN sites s ON bi.site_id = s.id
+            LEFT JOIN partners p ON s.vendor_id = p.id
+            WHERE bi.booking_id = ?
+        ");
+        $stmtItems->execute([$editId]);
+        $editItems = $stmtItems->fetchAll(PDO::FETCH_ASSOC);
+    }
+}
+
 // Fetch initial data for filters only
 $clients = $pdo->query("SELECT id, name, city, contact_person FROM partners WHERE type = 'client' ORDER BY name ASC")->fetchAll();
 $vendors = $pdo->query("SELECT id, name FROM partners WHERE type = 'vendor' ORDER BY name ASC")->fetchAll();
@@ -20,14 +47,15 @@ $all_media_types = $pdo->query("SELECT name FROM media_types ORDER BY name ASC")
 ?>
 
 <div class="proposal-full-wrapper">
+    <input type="hidden" id="booking_id" value="<?php echo $isEdit ? $editBooking['id'] : ''; ?>">
     <!-- Campaign Details Panel (Always Visible) -->
     <div class="p-panel" style="max-width: 100%; margin-bottom: 1.5rem;">
-        <div class="p-header">Campaign Details & Duration</div>
+        <div class="p-header"><?php echo $isEdit ? 'Edit Campaign Details & Duration' : 'Campaign Details & Duration'; ?></div>
         
         <div class="form-grid" style="grid-template-columns: 1fr 1fr 1fr; margin-bottom: 1rem;">
             <div class="form-group">
                 <label>Campaign Name <span style="color:red;">*</span></label>
-                <input type="text" id="campaign_name" class="p-input" placeholder="e.g. Summer Sale 2024" style="height: 38px;" required>
+                <input type="text" id="campaign_name" class="p-input" placeholder="e.g. Summer Sale 2024" style="height: 38px;" value="<?php echo $isEdit ? htmlspecialchars($editBooking['campaign_name']) : ''; ?>" required>
             </div>
             <div class="form-group">
                 <label style="display: flex; justify-content: space-between; align-items: center;">
@@ -39,7 +67,7 @@ $all_media_types = $pdo->query("SELECT name FROM media_types ORDER BY name ASC")
                 <select id="client_id" class="p-input" style="height: 38px;" onchange="handleClientChange()" required>
                     <option value="">-- Choose Client --</option>
                     <?php foreach ($clients as $c): ?>
-                        <option value="<?php echo $c['id']; ?>" data-contact="<?php echo htmlspecialchars($c['contact_person'] ?? ''); ?>">
+                        <option value="<?php echo $c['id']; ?>" data-contact="<?php echo htmlspecialchars($c['contact_person'] ?? ''); ?>" <?php echo ($isEdit && $editBooking['client_id'] == $c['id']) ? 'selected' : ''; ?>>
                             <?php echo $c['name']; ?> <?php echo $c['city'] ? "({$c['city']})" : ""; ?>
                         </option>
                     <?php endforeach; ?>
@@ -65,18 +93,18 @@ $all_media_types = $pdo->query("SELECT name FROM media_types ORDER BY name ASC")
             </div>
             <div class="form-group">
                 <label>Contact Person</label>
-                <input type="text" id="contact_person" class="p-input" placeholder="Full Name" style="height: 38px;">
+                <input type="text" id="contact_person" class="p-input" placeholder="Full Name" style="height: 38px;" value="<?php echo $isEdit ? htmlspecialchars($editBooking['contact_person']) : ''; ?>">
             </div>
         </div>
 
         <div class="form-grid" style="grid-template-columns: 1fr 1fr 1fr;">
             <div class="form-group">
                 <label>From Date <span style="color:red;">*</span></label>
-                <input type="date" id="start_date" class="p-input" style="height: 38px;" value="<?php echo date('Y-m-d'); ?>" onchange="calculateEndDate()" required>
+                <input type="date" id="start_date" class="p-input" style="height: 38px;" value="<?php echo $isEdit ? $editBooking['start_date'] : date('Y-m-d'); ?>" onchange="calculateEndDate()" required>
             </div>
             <div class="form-group">
                 <label>To Date <span style="color:red;">*</span></label>
-                <input type="date" id="end_date" class="p-input" style="height: 38px;" value="<?php echo date('Y-m-d', strtotime('+1 month')); ?>" onchange="calculateTotalDays()" required>
+                <input type="date" id="end_date" class="p-input" style="height: 38px;" value="<?php echo $isEdit ? $editBooking['end_date'] : date('Y-m-d', strtotime('+1 month')); ?>" onchange="calculateTotalDays()" required>
             </div>
             <div class="form-group">
                 <label>Total Days</label>
@@ -86,7 +114,7 @@ $all_media_types = $pdo->query("SELECT name FROM media_types ORDER BY name ASC")
         
         <div class="form-group" style="margin-top: 1.5rem;">
             <label>Internal Remarks</label>
-            <textarea id="remark" class="p-input" rows="2" placeholder="Notes for this booking..."></textarea>
+            <textarea id="remark" class="p-input" rows="2" placeholder="Notes for this booking..."><?php echo $isEdit ? htmlspecialchars($editBooking['remark'] ?? '') : ''; ?></textarea>
         </div>
     </div>
 
@@ -434,7 +462,33 @@ $all_media_types = $pdo->query("SELECT name FROM media_types ORDER BY name ASC")
 </style>
 
 <script>
-let selectedSites = [];
+let selectedSites = <?php echo $isEdit ? json_encode(array_map(function($item) {
+    $sqft = floatval($item['width']) * floatval($item['height']);
+    return [
+        'id' => intval($item['site_id']),
+        'name' => $item['name'],
+        'rate' => floatval($item['sale_rate']),
+        'code' => $item['site_code'],
+        'location' => $item['location'],
+        'vendor' => intval($item['mounting_vendor_id']),
+        'thumbnail' => $item['selected_image'],
+        'city' => $item['city'],
+        'card_rate' => floatval($item['sale_rate']),
+        'size' => $item['width'] . 'x' . $item['height'],
+        'type' => $item['type'],
+        'light_type' => $item['light_type'],
+        'owner_type' => $item['owner_type'],
+        'vendor_name' => $item['vendor_name'],
+        'all_images' => $item['all_images'],
+        'printing_vendor_id' => $item['printing_vendor_id'] ? intval($item['printing_vendor_id']) : null,
+        'printing_rate' => floatval($item['printing_rate']),
+        'printing_total' => floatval($item['printing_amount']),
+        'mounting_type' => 'Standard',
+        'mounting_rate' => floatval($item['mounting_rate']),
+        'mounting_total' => floatval($item['mounting_amount']),
+        'sqft' => $sqft
+    ];
+}, $editItems)) : '[]'; ?>;
 let currentPage = 1;
 let totalSites = 0;
 const pageSize = 6;
@@ -471,6 +525,11 @@ document.addEventListener('DOMContentLoaded', () => {
                 }
             });
         });
+    }
+    if (selectedSites.length > 0) {
+        recalcAll();
+        updateBucketUI();
+        calculateTotalDays();
     }
 });
 const baseUrl = "<?php echo BASE_URL; ?>";
@@ -1127,6 +1186,7 @@ function saveDirectBooking() {
     btn.disabled = true; btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> SAVING...';
 
     const data = {
+        booking_id: document.getElementById('booking_id')?.value || null,
         client_id: document.getElementById('client_id').value,
         campaign_name: document.getElementById('campaign_name').value,
         contact_person: document.getElementById('contact_person').value,
