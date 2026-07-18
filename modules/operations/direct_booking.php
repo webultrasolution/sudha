@@ -467,7 +467,14 @@ $all_media_types = $pdo->query("SELECT name FROM media_types ORDER BY name ASC")
     justify-content: center;
     font-size: 0.7rem;
     cursor: pointer;
-    border: none;
+    /* Hide number input spinners */
+input[type=number]::-webkit-inner-spin-button, 
+input[type=number]::-webkit-outer-spin-button { 
+    -webkit-appearance: none; 
+    margin: 0; 
+}
+input[type=number] {
+    -moz-appearance: textfield; /* Firefox */
 }
 </style>
 
@@ -541,6 +548,18 @@ document.addEventListener('DOMContentLoaded', () => {
         updateBucketUI();
         calculateTotalDays();
     }
+    // Prevent mouse wheel increment/decrement on number inputs
+    document.addEventListener('wheel', function(e) {
+        if (document.activeElement.type === 'number') {
+            document.activeElement.blur();
+        }
+    });
+    // Prevent up/down keys from changing values in number inputs
+    document.addEventListener('keydown', function(e) {
+        if (document.activeElement.type === 'number' && (e.key === 'ArrowUp' || e.key === 'ArrowDown')) {
+            e.preventDefault();
+        }
+    });
 });
 const baseUrl = "<?php echo BASE_URL; ?>";
 const imgBaseUrl = "../../uploads/sites/";

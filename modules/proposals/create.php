@@ -520,6 +520,16 @@ $printingRates = $pdo->query("SELECT * FROM vendor_printing_rates")->fetchAll(PD
 </div>
 
 <style>
+/* Hide number input spinners */
+input[type=number]::-webkit-inner-spin-button, 
+input[type=number]::-webkit-outer-spin-button { 
+    -webkit-appearance: none; 
+    margin: 0; 
+}
+input[type=number] {
+    -moz-appearance: textfield; /* Firefox */
+}
+
 .bucket-tab { background: #e2e8f0; color: #475569; }
 .bucket-tab.active { background: #059669 !important; color: white !important; }
 /* Search Panel Styles */
@@ -697,6 +707,18 @@ document.addEventListener('DOMContentLoaded', () => {
             });
         });
     }
+    // Prevent mouse wheel increment/decrement on number inputs
+    document.addEventListener('wheel', function(e) {
+        if (document.activeElement.type === 'number') {
+            document.activeElement.blur();
+        }
+    });
+    // Prevent up/down keys from changing values in number inputs
+    document.addEventListener('keydown', function(e) {
+        if (document.activeElement.type === 'number' && (e.key === 'ArrowUp' || e.key === 'ArrowDown')) {
+            e.preventDefault();
+        }
+    });
 });
 const baseUrl = "<?php echo BASE_URL; ?>";
 const imgBaseUrl = "<?php echo BASE_URL; ?>uploads/sites/";
