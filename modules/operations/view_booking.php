@@ -410,7 +410,13 @@ $stmtCheckPO = $pdo->prepare("SELECT id, approval_status FROM purchase_orders WH
                                                 style="color: #64748b; font-weight: 500; font-size: 0.65rem;">(<?php echo $item['vendor_contact']; ?>)</span>
                                         <?php endif; ?>
                                     </span>
-                                    <?php if ($poLocked): ?>
+                                    <?php if (floatval($item['amount']) <= 0): ?>
+                                        <button
+                                            title="PO Blocked: Space Rental is ₹0"
+                                            style="background: #dc2626; color: white; width: 26px; height: 26px; border-radius: 6px; border: none; cursor: not-allowed; display: flex; align-items: center; justify-content: center; font-size: 0.7rem;" disabled>
+                                            <i class="fas fa-ban"></i>
+                                        </button>
+                                    <?php elseif ($poLocked): ?>
                                         <?php if ($poApprovalStatus === 'approved' || $isAdmin): ?>
                                             <a href="generate_po.php?po_id=<?php echo $existingPoId; ?>" target="_blank"
                                                 title="View Saved PO"
