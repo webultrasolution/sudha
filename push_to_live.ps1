@@ -2,9 +2,9 @@ Add-Type -Path 'C:\Users\Lenovo\AppData\Local\Temp\winscp\WinSCPnet.dll'
 
 $sessionOptions = New-Object WinSCP.SessionOptions -Property @{
     Protocol = [WinSCP.Protocol]::Sftp
-    HostName = 'sudhacreative.com'
+    HostName = 'sudhacreative.tech'
     PortNumber = 22
-    UserName = 'root'
+    UserName = 'sudhacreative'
     Password = 'M2Noida@847226'
     GiveUpSecurityAndAcceptAnySshHostKey = $true
 }
@@ -46,7 +46,9 @@ try {
         "ajax/save_payment.php",
         "ajax/update_booking_item_period.php",
         "modules/operations/bookings.php",
+        "modules/operations/direct_booking.php",
         "modules/proposals/proposals.php",
+        "modules/proposals/create.php",
         "modules/proposals/view.php",
         "modules/proposals/export_pdf.php",
         "modules/proposals/export_quotation.php",
@@ -79,9 +81,13 @@ try {
         $remoteFile = $remoteRoot + $file.Replace('\', '/')
         
         Write-Host "Uploading $file ..." -ForegroundColor Yellow
-        $result = $session.PutFiles($localFile, $remoteFile, $False, $transferOptions)
-        $result.Check()
-        Write-Host "Uploaded $file!" -ForegroundColor Green
+        try {
+            $result = $session.PutFiles($localFile, $remoteFile, $False, $transferOptions)
+            $result.Check()
+            Write-Host "Uploaded $file!" -ForegroundColor Green
+        } catch {
+            Write-Host "Skipped $file -- Error: $($_.Exception.Message)" -ForegroundColor Red
+        }
     }
 
 } catch {

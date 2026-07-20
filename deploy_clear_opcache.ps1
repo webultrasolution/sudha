@@ -2,9 +2,9 @@ Add-Type -Path 'C:\Users\Lenovo\AppData\Local\Temp\winscp\WinSCPnet.dll'
 
 $sessionOptions = New-Object WinSCP.SessionOptions -Property @{
     Protocol = [WinSCP.Protocol]::Sftp
-    HostName = 'sudhacreative.com'
+    HostName = 'sudhacreative.tech'
     PortNumber = 22
-    UserName = 'root'
+    UserName = 'sudhacreative'
     Password = 'M2Noida@847226'
     GiveUpSecurityAndAcceptAnySshHostKey = $true
 }
@@ -22,7 +22,7 @@ try {
     $session.PutFiles("c:\x--ampp\htdocs\sudha\scratch_clear_opcache.php", "/home/sudhacreative/public_html/scratch_clear_opcache.php", $False, $transferOptions).Check()
     
     # Trigger it via web request to clear OPcache
-    $response = Invoke-WebRequest -Uri "https://sudhacreative.com/scratch_clear_opcache.php" -UseBasicParsing
+    $response = Invoke-WebRequest -Uri "https://sudhacreative.tech/scratch_clear_opcache.php" -UseBasicParsing
     Write-Host "OPcache reset output:"
     Write-Host $response.Content
     

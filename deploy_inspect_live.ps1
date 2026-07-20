@@ -2,9 +2,9 @@ Add-Type -Path 'C:\Users\Lenovo\AppData\Local\Temp\winscp\WinSCPnet.dll'
 
 $sessionOptions = New-Object WinSCP.SessionOptions -Property @{
     Protocol = [WinSCP.Protocol]::Sftp
-    HostName = 'sudhacreative.com'
+    HostName = 'sudhacreative.tech'
     PortNumber = 22
-    UserName = 'root'
+    UserName = 'sudhacreative'
     Password = 'M2Noida@847226'
     GiveUpSecurityAndAcceptAnySshHostKey = $true
 }
@@ -22,7 +22,7 @@ try {
     $session.PutFiles("c:\x--ampp\htdocs\sudha\inspect_db_temp.php", "/home/sudhacreative/public_html/inspect_db_temp.php", $False, $transferOptions).Check()
     
     # Request
-    $response = Invoke-WebRequest -Uri "https://sudhacreative.com/inspect_db_temp.php" -UseBasicParsing
+    $response = Invoke-WebRequest -Uri "https://sudhacreative.tech/inspect_db_temp.php" -UseBasicParsing
     Write-Host "Output from server:"
     Write-Host $response.Content
     

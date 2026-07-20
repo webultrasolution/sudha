@@ -29,7 +29,10 @@ if (in_array($_SERVER['HTTP_HOST'] ?? '', ['localhost', '127.0.0.1']) || (php_sa
     define('DB_NAME', 'sudhacreative');
     define('DB_USER', 'sudhacreative');
     define('DB_PASS', 'M2Noida@847226');
-    define('BASE_URL', 'https://sudhacreative.com/');
+    // Dynamically detect domain
+    $protocol = (!empty($_SERVER['HTTPS']) && $_SERVER['HTTPS'] !== 'off') ? 'https://' : 'http://';
+    $host = $_SERVER['HTTP_HOST'] ?? 'sudhacreative.tech';
+    define('BASE_URL', $protocol . $host . '/');
 }
 
 // SMTP Configuration
