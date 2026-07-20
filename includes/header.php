@@ -40,7 +40,7 @@ $activeEntity = getActiveEntity();
     <?php if (!isset($hideSidebar) || !$hideSidebar): ?>
     <div class="sidebar">
         <div class="sidebar-brand" style="margin-bottom: 1.5rem; padding: 0 0.5rem; margin-top: -0.5rem; display: flex; align-items: center; justify-content: space-between; gap: 0.5rem; width: 100%;">
-            <?php if ($activeEntity && $activeEntity['logo']): ?>
+            <?php if ($activeEntity && $activeEntity['logo'] && file_exists(__DIR__ . '/../assets/images/' . $activeEntity['logo'])): ?>
                 <img src="<?php echo BASE_URL; ?>assets/images/<?php echo $activeEntity['logo']; ?>" alt="<?php echo htmlspecialchars($activeEntity['name']); ?>" class="sidebar-logo" style="max-width: 100px; max-height: 45px; margin: 0;">
             <?php else: ?>
                 <img src="<?php echo BASE_URL; ?>assets/img/LOGO.png" alt="Sudha Creative" class="sidebar-logo" style="max-width: 100px; max-height: 45px; margin: 0;">

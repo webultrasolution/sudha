@@ -331,7 +331,7 @@ td:last-child {
     <!-- Header with Letterhead or Manual Info -->
     <div style="display: flex; justify-content: space-between; align-items: flex-start; padding: 10px 10px 2px;">
         <div style="flex: 1.4; text-align: left;">
-            <?php if ($company_letterhead): ?>
+            <?php if ($company_letterhead && file_exists(__DIR__ . '/../../assets/images/' . $company_letterhead)): ?>
                 <img src="<?php echo BASE_URL; ?>assets/images/<?php echo $company_letterhead; ?>"
                     style="max-height: 110px; width: auto; display: block; margin-bottom: 5px;">
             <?php else: ?>

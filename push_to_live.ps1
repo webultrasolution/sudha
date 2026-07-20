@@ -2,9 +2,9 @@ Add-Type -Path 'C:\Users\Lenovo\AppData\Local\Temp\winscp\WinSCPnet.dll'
 
 $sessionOptions = New-Object WinSCP.SessionOptions -Property @{
     Protocol = [WinSCP.Protocol]::Sftp
-    HostName = 'sudhacreative.tech'
+    HostName = '194.238.17.209'
     PortNumber = 22
-    UserName = 'sudhacreative'
+    UserName = 'root'
     Password = 'M2Noida@847226'
     GiveUpSecurityAndAcceptAnySshHostKey = $true
 }
@@ -20,12 +20,12 @@ try {
     $transferOptions.TransferMode = [WinSCP.TransferMode]::Automatic
     $transferOptions.ResumeSupport.State = [WinSCP.TransferResumeSupportState]::Off
 
-    if (-not $session.FileExists("/home/sudhacreative/public_html/templates")) {
-        $session.CreateDirectory("/home/sudhacreative/public_html/templates")
+    if (-not $session.FileExists("/home/sudhacreative.tech/public_html/templates")) {
+        $session.CreateDirectory("/home/sudhacreative.tech/public_html/templates")
         Write-Host "Created remote templates directory!" -ForegroundColor Green
     }
 
-    $remoteRoot = "/home/sudhacreative/public_html/"
+    $remoteRoot = "/home/sudhacreative.tech/public_html/"
     $localRoot  = "c:\x--ampp\htdocs\sudha\"
 
     $filesToUpload = @(
@@ -58,6 +58,7 @@ try {
         "ajax/save_booking_po.php",
         "ajax/save_direct_po.php",
         "ajax/upload_customer_po.php",
+        "modules/operations/generate_po.php",
         "modules/operations/generate_invoice.php",
         "modules/operations/generate_ro_invoice.php",
         "includes/header.php",
@@ -89,6 +90,10 @@ try {
             Write-Host "Skipped $file -- Error: $($_.Exception.Message)" -ForegroundColor Red
         }
     }
+
+    Write-Host "Correcting file ownership on server..." -ForegroundColor Yellow
+    $session.ExecuteCommand("chown -R sudhacreative.tech:sudhacreative.tech /home/sudhacreative.tech/public_html") | Out-Null
+    Write-Host "Ownership updated successfully!" -ForegroundColor Green
 
 } catch {
     Write-Host ("Error during upload: " + $_.Exception.Message) -ForegroundColor Red

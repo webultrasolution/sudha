@@ -266,7 +266,7 @@ $visual_data = $images_stmt->fetchAll();
 
     <?php
     $company = resolveCompanyDetails();
-    $logoUrl = !empty($company['logo']) ? BASE_URL . 'assets/images/' . $company['logo'] : BASE_URL . 'assets/img/LOGO.png';
+    $logoUrl = (!empty($company['logo']) && file_exists(__DIR__ . '/../../assets/images/' . $company['logo'])) ? BASE_URL . 'assets/images/' . $company['logo'] : BASE_URL . 'assets/img/LOGO.png';
     ?>
     <!-- Cover Page Info -->
     <div class="header">

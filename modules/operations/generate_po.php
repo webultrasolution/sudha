@@ -511,7 +511,7 @@ function getStateName($gstin)
         <!-- Header / Letterhead -->
         <div style="display: flex; justify-content: space-between; align-items: flex-start; padding: 10px 10px 2px;">
             <div style="flex: 1.4; text-align: left;">
-                <?php if (!empty($co['letterhead'])): ?>
+                <?php if (!empty($co['letterhead']) && file_exists(__DIR__ . '/../../assets/images/' . $co['letterhead'])): ?>
                     <img src="<?php echo BASE_URL; ?>assets/images/<?php echo $co['letterhead']; ?>"
                         style="max-height: 110px; width: auto; display: block; margin-bottom: 5px;">
                 <?php else: ?>
