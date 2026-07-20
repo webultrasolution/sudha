@@ -25,13 +25,30 @@ if (in_array($_SERVER['HTTP_HOST'] ?? '', ['localhost', '127.0.0.1']) || (php_sa
     define('DB_PASS', '');
     define('BASE_URL', 'http://localhost/sudha/');
 } else {
-    // Live Configuration
-    define('DB_NAME', 'sudhacreative');
-    define('DB_USER', 'sudhacreative');
-    define('DB_PASS', 'M2Noida@847226');
-    // Dynamically detect domain
+    // Dynamic Live/Staging Configuration
     $protocol = (!empty($_SERVER['HTTPS']) && $_SERVER['HTTPS'] !== 'off') ? 'https://' : 'http://';
     $host = $_SERVER['HTTP_HOST'] ?? 'sudhacreative.tech';
+    
+    // Check if running on staging (.tech)
+    $isStaging = false;
+    if (isset($_SERVER['HTTP_HOST'])) {
+        if (strpos($_SERVER['HTTP_HOST'], 'sudhacreative.tech') !== false) {
+            $isStaging = true;
+        }
+    } else {
+        if (strpos(__DIR__, 'sudhacreative.tech') !== false) {
+            $isStaging = true;
+        }
+    }
+    
+    if ($isStaging) {
+        define('DB_NAME', 'sudhacreative_tech');
+    } else {
+        define('DB_NAME', 'sudhacreative');
+    }
+    
+    define('DB_USER', 'sudhacreative');
+    define('DB_PASS', 'M2Noida@847226');
     define('BASE_URL', $protocol . $host . '/');
 }
 
