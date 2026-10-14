@@ -5,7 +5,8 @@
  * Sanitize input data
  */
 function clean($data) {
-    return htmlspecialchars(strip_tags(trim($data)));
+    if (is_array($data)) return array_map('clean', $data);
+    return htmlspecialchars(strip_tags(trim((string)$data)));
 }
 
 /**
@@ -68,7 +69,126 @@ function revertToPendingOnEdit($pdo, $table, $entityId, $entityType, $entityRef,
 
         $pdo->prepare("INSERT INTO approval_requests (entity_type, entity_id, entity_ref, requested_by, status) VALUES (?, ?, ?, ?, 'pending')")
             ->execute([$entityType, $entityId, $entityRef . ' (Edited)', $userId]);
+
+        if (in_array($entityType, ['invoice', 'purchase_order', 'payment'])) {
+            if (strpos($_SERVER['HTTP_HOST'] ?? '', 'sudhacreative.tech') !== false) {
+                include_once __DIR__ . '/accounting_poster.php';
+                deleteJournalEntry($pdo, $entityType, $entityId);
+            }
+        }
     }
+}
+
+/**
+ * Automatically syncs and updates booking totals and any linked Tax Invoices with latest booking items.
+ * Can be called whenever selling cost, period, units, print/mount rates, or items are updated.
+ *
+ * @param PDO $pdo
+ * @param int $bookingId
+ * @return array|false
+ */
+function syncBookingInvoiceFinancials($pdo, $bookingId) {
+    $bookingId = intval($bookingId);
+    if ($bookingId <= 0) return false;
+
+    // 1. Calculate sum totals from booking_items joined with sites
+    $stmtSums = $pdo->prepare("
+        SELECT 
+            COALESCE(SUM(bi.amount), 0) as rental_total,
+            COALESCE(SUM(bi.client_print_rate * s.width * s.height * COALESCE(bi.unit, 1)), 0) as print_total,
+            COALESCE(SUM(bi.client_mount_rate * s.width * s.height * COALESCE(bi.unit, 1)), 0) as mount_total
+        FROM booking_items bi
+        JOIN sites s ON bi.site_id = s.id
+        WHERE bi.booking_id = ?
+    ");
+    $stmtSums->execute([$bookingId]);
+    $sums = $stmtSums->fetch(PDO::FETCH_ASSOC);
+
+    $rentalTotal = floatval($sums['rental_total'] ?? 0);
+    $printTotal  = floatval($sums['print_total'] ?? 0);
+    $mountTotal  = floatval($sums['mount_total'] ?? 0);
+    $newSubtotal = $rentalTotal + $printTotal + $mountTotal;
+
+    // 2. Fetch booking metadata (tax_type, client_state, etc.)
+    $stmtBooking = $pdo->prepare("
+        SELECT b.id, b.booking_number, b.client_id, b.tax_type, c.state as client_state 
+        FROM bookings b 
+        LEFT JOIN partners c ON b.client_id = c.id 
+        WHERE b.id = ?
+    ");
+    $stmtBooking->execute([$bookingId]);
+    $booking = $stmtBooking->fetch(PDO::FETCH_ASSOC);
+    if (!$booking) return false;
+
+    $tax_type = $booking['tax_type'] ?: 'igst';
+    $isInterState = (strtolower(trim($booking['client_state'] ?? '')) !== 'west bengal');
+
+    $taxAmount = 0;
+    $cgst = 0;
+    $sgst = 0;
+    $igst = 0;
+
+    if ($tax_type !== 'none') {
+        if ($tax_type === 'cgst_sgst' || (!$isInterState && $tax_type !== 'igst')) {
+            $taxAmount = $newSubtotal * 0.18;
+            $cgst = $taxAmount / 2;
+            $sgst = $taxAmount / 2;
+            $igst = 0;
+        } else {
+            $taxAmount = $newSubtotal * 0.18;
+            $cgst = 0;
+            $sgst = 0;
+            $igst = $taxAmount;
+        }
+    }
+    $grandTotal = $newSubtotal + $taxAmount;
+
+    // 3. Update bookings table
+    $stmtUpdBooking = $pdo->prepare("
+        UPDATE bookings 
+        SET total_amount = ?, tax_amount = ?, grand_total = ? 
+        WHERE id = ?
+    ");
+    $stmtUpdBooking->execute([$newSubtotal, $taxAmount, $grandTotal, $bookingId]);
+
+    // 4. Update overall booking start/end dates if available
+    $stmtDates = $pdo->prepare("SELECT MIN(start_date) as min_start, MAX(end_date) as max_end FROM booking_items WHERE booking_id = ?");
+    $stmtDates->execute([$bookingId]);
+    $dates = $stmtDates->fetch(PDO::FETCH_ASSOC);
+    if ($dates && !empty($dates['min_start']) && !empty($dates['max_end'])) {
+        $stmtUpdateDates = $pdo->prepare("UPDATE bookings SET start_date = ?, end_date = ? WHERE id = ?");
+        $stmtUpdateDates->execute([$dates['min_start'], $dates['max_end'], $bookingId]);
+    }
+
+    // 5. Check if Tax Invoice exists for this booking and update it
+    $stmtInv = $pdo->prepare("SELECT id, invoice_number, total_amount FROM invoices WHERE booking_id = ? AND type = 'tax'");
+    $stmtInv->execute([$bookingId]);
+    $existingInvoices = $stmtInv->fetchAll(PDO::FETCH_ASSOC);
+
+    $invoiceUpdated = false;
+    foreach ($existingInvoices as $inv) {
+        $stmtUpdInv = $pdo->prepare("
+            UPDATE invoices 
+            SET sub_total = ?, cgst = ?, sgst = ?, igst = ?, total_amount = ? 
+            WHERE id = ?
+        ");
+        $stmtUpdInv->execute([$newSubtotal, $cgst, $sgst, $igst, $grandTotal, $inv['id']]);
+        $invoiceUpdated = true;
+
+        if (function_exists('logActivity')) {
+            logActivity('sync_invoice_with_booking', 'invoices', $inv['id'], "Invoice #{$inv['invoice_number']} synced with updated Booking #{$booking['booking_number']} (New Total: ₹" . number_format($grandTotal, 2) . ")");
+        }
+    }
+
+    return [
+        'rental_total'    => $rentalTotal,
+        'print_total'     => $printTotal,
+        'mount_total'     => $mountTotal,
+        'subtotal'        => $newSubtotal,
+        'tax_amount'      => $taxAmount,
+        'grand_total'     => $grandTotal,
+        'invoice_updated' => $invoiceUpdated
+    ];
 }
 
 /**
@@ -488,14 +608,14 @@ function checkAuth() {
         header("Location: " . BASE_URL . "login.php");
         exit;
     }
-    
-    // Check if user is active in DB
+
+    // Check if user is active in DB (a deleted user is treated as inactive)
     global $pdo;
     $stmt = $pdo->prepare("SELECT status FROM users WHERE id = ?");
     $stmt->execute([$_SESSION['user_id']]);
     $status = $stmt->fetchColumn();
     
-    if ($status === 'inactive') {
+    if ($status === 'inactive' || $status === false) {
         // Destroy session
         $_SESSION = [];
         if (ini_get("session.use_cookies")) {
@@ -513,11 +633,11 @@ function checkAuth() {
     }
 }
 
-function sendSystemEmail($to, $subject, $message) {
-    $smtp_host = defined('SMTP_HOST') ? SMTP_HOST : '194.238.17.209';
-    $smtp_port = defined('SMTP_PORT') ? SMTP_PORT : 25;
-    $smtp_user = defined('SMTP_USER') ? SMTP_USER : 'info@sudhacreative.com';
-    $smtp_pass = defined('SMTP_PASS') ? SMTP_PASS : 'M2Noida@278';
+function sendSystemEmail($to, $subject, $message, $attachments = []) {
+    $smtp_host = defined('SMTP_HOST') ? SMTP_HOST : 'smtp.gmail.com';
+    $smtp_port = defined('SMTP_PORT') ? SMTP_PORT : 587;
+    $smtp_user = defined('SMTP_USER') ? SMTP_USER : 'sudhacreativemalda@gmail.com';
+    $smtp_pass = defined('SMTP_PASS') ? SMTP_PASS : 'vzvz nlrg oube vwsd';
 
     $context = stream_context_create([
         'ssl' => [
@@ -575,18 +695,61 @@ function sendSystemEmail($to, $subject, $message) {
     fwrite($connection, "DATA\r\n");
     $response = fgets($connection, 515);
 
+    $boundary = md5(uniqid(time()));
+    
     $headers = "MIME-Version: 1.0\r\n";
-    $headers .= "Content-type: text/html; charset=utf-8\r\n";
     $headers .= "To: $to\r\n";
-    $headers .= "From: <$smtp_user>\r\n";
+    $headers .= "From: \"Sudha Creative\" <$smtp_user>\r\n";
+    $headers .= "Reply-To: <$smtp_user>\r\n";
     $headers .= "Subject: $subject\r\n";
+    
+    if (empty($attachments)) {
+        $headers .= "Content-type: text/html; charset=utf-8\r\n";
+        $body = $message;
+    } else {
+        $headers .= "Content-Type: multipart/mixed; boundary=\"$boundary\"\r\n";
+        
+        // HTML Body Part
+        $body = "--$boundary\r\n";
+        $body .= "Content-Type: text/html; charset=utf-8\r\n";
+        $body .= "Content-Transfer-Encoding: 8bit\r\n\r\n";
+        $body .= $message . "\r\n\r\n";
+        
+        // Attachments Part
+        foreach ($attachments as $att) {
+            $body .= "--$boundary\r\n";
+            $body .= "Content-Type: " . ($att['type'] ?? 'application/octet-stream') . "; name=\"" . $att['name'] . "\"\r\n";
+            $body .= "Content-Transfer-Encoding: base64\r\n";
+            $body .= "Content-Disposition: attachment; filename=\"" . $att['name'] . "\"\r\n\r\n";
+            
+            // Extract raw base64 data if it contains data URL prefix
+            $content = $att['content'];
+            if (strpos($content, ';base64,') !== false) {
+                $content = explode(';base64,', $content)[1];
+            }
+            
+            // Format to 76 characters line length
+            $body .= chunk_split($content) . "\r\n\r\n";
+        }
+        $body .= "--$boundary--";
+    }
 
-    fwrite($connection, "$headers\r\n$message\r\n.\r\n");
+    $payload = "$headers\r\n$body\r\n.\r\n";
+    $totalLen = strlen($payload);
+    $written = 0;
+    while ($written < $totalLen) {
+        $n = @fwrite($connection, substr($payload, $written, 65536));
+        if ($n === false || $n <= 0) {
+            break;
+        }
+        $written += $n;
+    }
+
     $response = fgets($connection, 515);
 
     fwrite($connection, "QUIT\r\n");
     fclose($connection);
-    return true;
+    return strpos($response, '250') !== false;
 }
 
 /**
@@ -650,45 +813,37 @@ function logActivity($action, $entityType = null, $entityId = null, $description
  * Convert number to words (Indian Style)
  */
 function amountInWords($number) {
-    $decimal = (int)round(($number - floor($number)) * 100);
-    $no = (int)floor($number);
-    $hundred = null;
-    $digits_length = strlen($no);
-    $i = 0;
-    $str = array();
-    $words = array(0 => '', 1 => 'one', 2 => 'two',
-        3 => 'three', 4 => 'four', 5 => 'five', 6 => 'six',
-        7 => 'seven', 8 => 'eight', 9 => 'nine',
-        10 => 'ten', 11 => 'eleven', 12 => 'twelve',
-        13 => 'thirteen', 14 => 'fourteen', 15 => 'fifteen',
-        16 => 'sixteen', 17 => 'seventeen', 18 => 'eighteen',
-        19 => 'nineteen', 20 => 'twenty', 30 => 'thirty',
-        40 => 'forty', 50 => 'fifty', 60 => 'sixty',
-        70 => 'seventy', 80 => 'eighty', 90 => 'ninety');
-    $digits = array('', 'hundred','thousand','lakh', 'crore');
-    while( $i < $digits_length ) {
-        $divider = ($i == 2) ? 10 : 100;
-        $curr_num = (int)floor($no % $divider);
-        $no = (int)floor($no / $divider);
-        $i += $divider == 10 ? 1 : 2;
-        if ($curr_num) {
-            $plural = (($counter = count($str)) && $curr_num > 9) ? 's' : null;
-            $hundred = ($counter == 1 && $str[0]) ? ' and ' : null;
-            $str [] = ($curr_num < 21) ? $words[$curr_num].' '. $digits[$counter]. $plural.' '.$hundred:$words[(int)floor($curr_num / 10) * 10].' '.$words[$curr_num % 10]. ' '.$digits[$counter].$plural.' '.$hundred;
-        } else $str[] = null;
+    // Work in whole paise so e.g. 99.996 becomes 100 rupees, not 99 rupees + "100" paise
+    $totalPaise = (int)round(abs((float)$number) * 100);
+    $rupees = intdiv($totalPaise, 100);
+    $paise = $totalPaise % 100;
+
+    $ones = ['', 'one', 'two', 'three', 'four', 'five', 'six', 'seven', 'eight', 'nine',
+        'ten', 'eleven', 'twelve', 'thirteen', 'fourteen', 'fifteen', 'sixteen',
+        'seventeen', 'eighteen', 'nineteen'];
+    $tens = ['', '', 'twenty', 'thirty', 'forty', 'fifty', 'sixty', 'seventy', 'eighty', 'ninety'];
+
+    $twoDigits = function ($n) use ($ones, $tens) {
+        if ($n < 20) return $ones[$n];
+        return trim($tens[intdiv($n, 10)] . ' ' . $ones[$n % 10]);
+    };
+
+    // Indian grouping: crore, lakh, thousand, hundred, remainder
+    $toWords = function ($n) use (&$toWords, $twoDigits) {
+        $parts = [];
+        if ($n >= 10000000) { $parts[] = $toWords(intdiv($n, 10000000)) . ' crore'; $n %= 10000000; }
+        if ($n >= 100000)   { $parts[] = $twoDigits(intdiv($n, 100000)) . ' lakh'; $n %= 100000; }
+        if ($n >= 1000)     { $parts[] = $twoDigits(intdiv($n, 1000)) . ' thousand'; $n %= 1000; }
+        if ($n >= 100)      { $parts[] = $twoDigits(intdiv($n, 100)) . ' hundred'; $n %= 100; }
+        if ($n > 0)         { $parts[] = ($parts ? 'and ' : '') . $twoDigits($n); }
+        return implode(' ', $parts);
+    };
+
+    $result = ucwords($rupees > 0 ? $toWords($rupees) : 'zero') . ' Rupees';
+    if ($paise > 0) {
+        $result .= ' And ' . ucwords($twoDigits($paise)) . ' Paise';
     }
-    $Rupees = trim(implode('', array_reverse($str)));
-    
-    $paise = '';
-    if ($decimal > 0) {
-        if ($decimal < 21) {
-            $paise = ' and ' . $words[$decimal] . ' Paise';
-        } else {
-            $paise = ' and ' . $words[(int)floor($decimal / 10) * 10] . ' ' . $words[$decimal % 10] . ' Paise';
-        }
-    }
-    
-    return ($Rupees ? ucwords($Rupees) . ' Rupees' : '') . ($paise ? ucwords($paise) . ' Only' : ' Only');
+    return $result . ' Only';
 }
 /**
  * Get Setting Value from Database
@@ -887,5 +1042,195 @@ function updateDocumentPaymentStatus($pdo, $invoiceId, $poId) {
             $upd->execute([$status, $poId]);
         }
     }
+}
+
+/**
+ * Check if a record creator's account is inactive.
+ */
+function isCreatorInactive($pdo, $creatorId) {
+    if (!$creatorId) return false;
+    $stmt = $pdo->prepare("SELECT status FROM users WHERE id = ?");
+    $stmt->execute([$creatorId]);
+    $status = $stmt->fetchColumn();
+    return ($status === 'inactive');
+}
+
+/**
+ * Check if the current logged-in user is allowed to modify a record.
+ * Regular users cannot edit records created by an inactive user, only Admins can.
+ */
+function canModifyRecord($pdo, $creatorId) {
+    if (session_status() === PHP_SESSION_NONE) session_start();
+    $role = $_SESSION['user_role'] ?? '';
+    
+    // If the creator is not inactive, anyone with standard permissions can edit
+    if (!isCreatorInactive($pdo, $creatorId)) {
+        return true;
+    }
+    
+    // If the creator IS inactive, only admins can modify/takeover the record
+    return ($role === 'admin');
+}
+
+/**
+ * Recalculate and update the totals, tax, and grand totals of a proposal in database.
+ */
+function recalculateProposalTotals($pdo, $proposalId) {
+    // 1. Get sum of amount and total_sqft from items
+    $stmt = $pdo->prepare("
+        SELECT COALESCE(SUM(pi.amount), 0) as total_display,
+               COALESCE(SUM(s.width * s.height * COALESCE(pi.unit, 1)), 0) as total_sqft
+        FROM proposal_items pi
+        JOIN sites s ON pi.site_id = s.id
+        WHERE pi.proposal_id = ?
+    ");
+    $stmt->execute([$proposalId]);
+    $itemStats = $stmt->fetch(PDO::FETCH_ASSOC);
+    $totalDisplay = floatval($itemStats['total_display']);
+    $totalSqft = floatval($itemStats['total_sqft']);
+
+    // 2. Fetch proposal settings (discounting_pct, printing_cost, mounting_cost, tax_type)
+    $stmtProp = $pdo->prepare("
+        SELECT discounting_pct, printing_cost, mounting_cost, tax_type 
+        FROM proposals 
+        WHERE id = ?
+    ");
+    $stmtProp->execute([$proposalId]);
+    $p = $stmtProp->fetch(PDO::FETCH_ASSOC);
+    if (!$p) return false;
+
+    $discountPct = floatval($p['discounting_pct']);
+    $printRate = floatval($p['printing_cost']); // printing_cost stores the per-sqft rate
+    $mountRate = floatval($p['mounting_cost']); // mounting_cost stores the per-sqft rate
+    $taxType = $p['tax_type'] ?? 'igst';
+
+    // 3. Compute Display Cost (after discount)
+    $discountVal = $totalDisplay * ($discountPct / 100);
+    $displayCost = $totalDisplay - $discountVal;
+
+    // 4. Compute Printing Cost = total_sqft * printing_rate
+    $totalPrintCost = $totalSqft * $printRate;
+
+    // 5. Compute Installation (Mounting) Cost = total_sqft * mounting_rate
+    $totalMountCost = $totalSqft * $mountRate;
+
+    // 6. Compute Subtotal = Display Cost + Printing Cost + Installation Cost
+    $subtotal = $displayCost + $totalPrintCost + $totalMountCost;
+
+    // 6. Compute Tax (GST) based on tax_type
+    $tax = ($taxType === 'no_tax') ? 0.00 : ($subtotal * 0.18);
+    $grandTotal = $subtotal + $tax;
+
+    // 7. Calculate start_date, end_date, total_days
+    $stmtMinMax = $pdo->prepare("
+        SELECT MIN(start_date) as min_start, MAX(end_date) as max_end 
+        FROM proposal_items 
+        WHERE proposal_id = ?
+    ");
+    $stmtMinMax->execute([$proposalId]);
+    $minMax = $stmtMinMax->fetch(PDO::FETCH_ASSOC);
+    $newStart = $minMax['min_start'] ?: null;
+    $newEnd = $minMax['max_end'] ?: null;
+    $newDays = null;
+    if (!empty($newStart) && !empty($newEnd)) {
+        $newDays = max(1, ceil((strtotime($newEnd) - strtotime($newStart)) / 86400) + 1);
+    }
+
+    // 8. Update proposals table
+    $stmtUpdate = $pdo->prepare("
+        UPDATE proposals 
+        SET total_amount = ?, 
+            total_sqft = ?, 
+            display_cost = ?,
+            tax_amount = ?, 
+            grand_total = ?, 
+            start_date = ?, 
+            end_date = ?, 
+            total_days = ? 
+        WHERE id = ?
+    ");
+    $stmtUpdate->execute([
+        $totalDisplay,
+        $totalSqft,
+        $displayCost,
+        $tax,
+        $grandTotal,
+        $newStart,
+        $newEnd,
+        $newDays,
+        $proposalId
+    ]);
+
+    return true;
+}
+
+/**
+ * Parse any attachment string (raw path, JSON-encoded array, comma-separated) into clean relative web paths.
+ * 
+ * @param mixed $rawValue
+ * @return array List of clean relative URLs (e.g. ['uploads/customer_pos/PO_150_1789214085.pdf'])
+ */
+function getAttachmentUrls($rawValue) {
+    if (empty($rawValue)) {
+        return [];
+    }
+
+    $files = [];
+
+    if (is_array($rawValue)) {
+        $rawList = $rawValue;
+    } else {
+        $str = trim((string)$rawValue);
+        if ($str === '' || $str === '[]' || $str === 'null' || $str === '""') {
+            return [];
+        }
+
+        if (substr($str, 0, 1) === '[' || substr($str, 0, 1) === '{' || substr($str, 0, 1) === '"') {
+            $decoded = json_decode($str, true);
+            if (json_last_error() === JSON_ERROR_NONE && !empty($decoded)) {
+                $rawList = is_array($decoded) ? $decoded : [$decoded];
+            } else {
+                $cleaned = trim($str, "[] \t\n\r\0\x0B");
+                $parts = explode(',', $cleaned);
+                $rawList = array_map(function($p) {
+                    return trim(trim($p), '"\'');
+                }, $parts);
+            }
+        } else {
+            $rawList = strpos($str, ',') !== false ? explode(',', $str) : [$str];
+        }
+    }
+
+    foreach ($rawList as $file) {
+        $file = trim((string)$file);
+        $file = trim($file, '"\'[]');
+        $file = stripslashes($file);
+        $file = preg_replace('#/+#', '/', $file);
+        $file = ltrim($file, '/');
+
+        if (!empty($file)) {
+            $files[] = $file;
+        }
+    }
+
+    return array_values(array_unique(array_filter($files)));
+}
+
+/**
+ * Get the first attachment URL from any raw value, formatted with BASE_URL.
+ * 
+ * @param mixed $rawValue
+ * @return string Full URL or empty string
+ */
+function getFirstAttachmentUrl($rawValue) {
+    $urls = getAttachmentUrls($rawValue);
+    if (empty($urls)) {
+        return '';
+    }
+    $first = $urls[0];
+    if (strpos($first, 'http://') === 0 || strpos($first, 'https://') === 0) {
+        return $first;
+    }
+    return BASE_URL . $first;
 }
 ?>

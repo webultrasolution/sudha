@@ -1,5 +1,6 @@
 <?php
 include_once __DIR__ . '/../config/db.php';
+require_once __DIR__ . '/../includes/ajax_auth.php';
 include_once __DIR__ . '/../includes/functions.php';
 
 if (session_status() === PHP_SESSION_NONE) {
@@ -97,22 +98,30 @@ try {
 
         $poNum = generateSequenceNumber($pdo, 'vendor_printing_po');
 
-        // Admin approves instantly; non-admin goes to queue
         $poStatus       = $isAdmin ? 'approved' : 'pending';
         $approvalStatus = $isAdmin ? 'approved' : 'pending_approval';
 
+        // Get active entity_id
+        $entityId = $_SESSION['active_entity_id'] ?? null;
+        if (!$entityId) {
+            $stmtEntity = $pdo->query("SELECT id FROM entities LIMIT 1");
+            $entityId = $stmtEntity->fetchColumn() ?: null;
+        }
+
         $stmtPO = $pdo->prepare("
-            INSERT INTO purchase_orders (vendor_id, employee_id, campaign_name, po_number, po_date, po_amount, cgst_amount, sgst_amount, igst_amount, total_amount, status, approval_status, remarks, type) 
-            VALUES (?, ?, ?, ?, CURDATE(), ?, ?, ?, ?, ?, ?, ?, ?, 'printing')
+            INSERT INTO purchase_orders (vendor_id, entity_id, employee_id, campaign_name, po_number, po_date, po_amount, cgst_amount, sgst_amount, igst_amount, total_amount, status, approval_status, remarks, type, created_by) 
+            VALUES (?, ?, ?, ?, ?, CURDATE(), ?, ?, ?, ?, ?, ?, ?, ?, 'printing', ?)
         ");
         $stmtPO->execute([
             $vid,
+            $entityId,
             $_SESSION['user_id'] ?? 0,
             'Printing PO',
             $poNum,
             $subtotal, $cgst, $sgst, $igst, $grandTotal,
             $poStatus, $approvalStatus,
-            "Printing PO - " . $group['vendor_name'] . ($remarks ? ". " . $remarks : "")
+            "Printing PO - " . $group['vendor_name'] . ($remarks ? ". " . $remarks : ""),
+            $_SESSION['user_id'] ?? null
         ]);
         $poId = $pdo->lastInsertId();
         $lastPoId = $poId;

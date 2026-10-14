@@ -23,7 +23,7 @@ try {
         FROM booking_items bi
         JOIN sites s ON bi.site_id = s.id
         WHERE bi.booking_id = ?
-        ORDER BY s.site_code ASC
+        ORDER BY bi.sort_order ASC, bi.id ASC
     ");
     $stmtS->execute([$booking_id]);
 } catch (PDOException $e) {
@@ -35,7 +35,7 @@ try {
                 FROM booking_items bi
                 JOIN sites s ON bi.site_id = s.id
                 WHERE bi.booking_id = ?
-                ORDER BY s.site_code ASC
+                ORDER BY bi.sort_order ASC, bi.id ASC
             ");
             $stmtS->execute([$booking_id]);
         } catch (Exception $ex) {

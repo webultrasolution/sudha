@@ -189,12 +189,13 @@ $uniqueUsersCount = $pdo->query("SELECT COUNT(DISTINCT user_id) FROM activity_lo
         <table class="table matrix-table" style="border: 1px solid #e2e8f0; border-radius: 12px; overflow: hidden;">
             <thead>
                 <tr>
-                    <th style="width: 80px; text-align: center;">ID</th>
-                    <th style="width: 220px; text-align: left;">Operative</th>
-                    <th style="width: 180px; text-align: center;">Action Code</th>
-                    <th style="width: 180px; text-align: center;">Reference Context</th>
+                    <th style="width: 70px; text-align: center;">ID</th>
+                    <th style="width: 200px; text-align: left;">Operative</th>
+                    <th style="width: 160px; text-align: center;">Action Code</th>
+                    <th style="width: 160px; text-align: center;">Reference Context</th>
                     <th style="text-align: left;">Detailed Audit Trail</th>
-                    <th style="width: 180px; text-align: center;">Timestamp</th>
+                    <th style="width: 130px; text-align: center;">Date</th>
+                    <th style="width: 140px; text-align: center;">Time (IST 12-Hr)</th>
                 </tr>
             </thead>
             <tbody>
@@ -258,14 +259,21 @@ $uniqueUsersCount = $pdo->query("SELECT COUNT(DISTINCT user_id) FROM activity_lo
                     <td style="text-align: left; color: #475569; font-weight: 500; font-size: 0.85rem; line-height: 1.4; word-break: break-word;">
                         <?php echo htmlspecialchars($l['description'] ?: 'No details recorded.'); ?>
                     </td>
-                    <td style="color: #64748b; font-size: 0.8rem; font-weight: 600;">
-                        <?php echo date('d M Y, h:i A', strtotime($l['created_at'])); ?>
+                    <td style="text-align: center; color: #334155; font-size: 0.82rem; font-weight: 700; white-space: nowrap;">
+                        <span style="display: inline-flex; align-items: center; gap: 4px;">
+                            <i class="far fa-calendar-alt" style="color: #64748b;"></i> <?php echo date('d M Y', strtotime($l['created_at'])); ?>
+                        </span>
+                    </td>
+                    <td style="text-align: center; white-space: nowrap;">
+                        <span style="background: #e0f2fe; color: #0369a1; font-weight: 700; font-size: 0.8rem; padding: 4px 10px; border-radius: 6px; display: inline-flex; align-items: center; gap: 5px; border: 1px solid #bae6fd;" title="<?php echo date('h:i:s A', strtotime($l['created_at'])); ?> IST">
+                            <i class="far fa-clock"></i> <?php echo date('h:i A', strtotime($l['created_at'])); ?>
+                        </span>
                     </td>
                 </tr>
                 <?php endforeach; ?>
                 <?php if (empty($logs)): ?>
                 <tr>
-                    <td colspan="6" style="text-align: center; padding: 3rem; color: #94a3b8;">
+                    <td colspan="7" style="text-align: center; padding: 3rem; color: #94a3b8;">
                         <i class="fas fa-search" style="font-size: 2.5rem; display: block; margin-bottom: 1rem; color: #cbd5e1;"></i>
                         No audit trail entries matched the selected filters.
                     </td>

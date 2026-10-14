@@ -1,6 +1,7 @@
 <?php
 include_once __DIR__ . '/../../config/db.php';
 include_once __DIR__ . '/../../includes/functions.php';
+checkAuth();
 
 date_default_timezone_set('Asia/Kolkata');
 
@@ -50,16 +51,58 @@ if (!empty($b['billing_gstin']) && $b['billing_gstin'] !== $b['client_gstin'] &&
 $stmtItems = $pdo->prepare("
     SELECT bi.*, COALESCE(bi.custom_site_name, s.name) as site_name, s.site_code,
            COALESCE(bi.custom_location, s.location) as location,
-           s.city, s.width, s.height, s.light_type, s.hsn_code, s.type as media_type
+           s.city, s.width, s.height, s.light_type, s.hsn_code, s.mounting_hsn, s.type as media_type
     FROM booking_items bi
     JOIN sites s ON bi.site_id = s.id
     WHERE bi.booking_id = ?
+    ORDER BY bi.sort_order ASC, bi.id ASC
 ");
 $stmtItems->execute([$booking_id]);
-$items = $stmtItems->fetchAll();
+$rawItems = $stmtItems->fetchAll();
 
-// Company details — entity priority: invoice entity → active session entity → settings
-$co                   = resolveCompanyDetails($invoiceData['entity_id'] ?? null);
+$items = [];
+$sn = 1;
+foreach ($rawItems as $item) {
+    $unit = max(1, intval($item['unit'] ?? 1));
+    $sqft = floatval($item['width']) * floatval($item['height']) * $unit;
+    
+    // Booking Item
+    $saleAmount = floatval($item['amount'] ?? 0);
+    if ($saleAmount > 0) {
+        $item['invoice_type'] = 'RENTAL';
+        $item['sale_amount'] = $saleAmount;
+        $item['sn'] = $sn;
+        $items[] = $item;
+    }
+    
+    // Print Item (HSN matches the site/rental HSN)
+    $printRate = floatval($item['client_print_rate'] ?? 0);
+    if ($printRate > 0) {
+        $printItem = $item;
+        $printItem['invoice_type'] = 'PRINTING';
+        $printItem['sale_amount'] = $printRate * $sqft;
+        $printItem['sn'] = '';
+        $printItem['hsn_code'] = !empty($item['hsn_code']) ? $item['hsn_code'] : '998366';
+        $items[] = $printItem;
+    }
+    
+    // Mount Item (HSN from site master mounting_hsn)
+    $mountRate = floatval($item['client_mount_rate'] ?? 0);
+    if ($mountRate > 0) {
+        $mountItem = $item;
+        $mountItem['invoice_type'] = 'MOUNTING';
+        $mountItem['sale_amount'] = $mountRate * $sqft;
+        $mountItem['sn'] = '';
+        $mountItem['hsn_code'] = !empty($item['mounting_hsn']) ? $item['mounting_hsn'] : (!empty($item['hsn_code']) ? $item['hsn_code'] : '998366');
+        $items[] = $mountItem;
+    }
+    
+    $sn++;
+}
+
+// Company details — entity priority: invoice entity → booking entity → active session entity → settings
+$entityIdToResolve    = !empty($invoiceData['entity_id']) ? $invoiceData['entity_id'] : (!empty($b['entity_id']) ? $b['entity_id'] : ($_SESSION['active_entity_id'] ?? null));
+$co                   = resolveCompanyDetails($entityIdToResolve);
 $company_name         = $co['name'];
 $company_gstin        = $co['gstin'];
 $company_pan          = $co['pan'];
@@ -80,59 +123,10 @@ $name_words       = explode(' ', trim($company_name));
 $company_short    = strtoupper(implode(' ', array_slice($name_words, 0, 2)));
 $company_full_uc  = strtoupper($company_name);
 
-$invoiceLines = [];
-$sn = 1;
-foreach ($items as $item) {
-    $sDate = (!empty($item['start_date']) && $item['start_date'] != '0000-00-00') ? $item['start_date'] : $b['start_date'];
-    $eDate = (!empty($item['end_date'])   && $item['end_date']   != '0000-00-00') ? $item['end_date']   : $b['end_date'];
-    
-    $parts = [];
-    if (!empty(trim($item['city'])))       $parts[] = trim($item['city']);
-    if (!empty(trim($item['site_name'])))  $parts[] = trim($item['site_name']);
-    
-    $siteDetails = implode(', ', $parts) . " (" . $item['site_code'] . ")";
-    
-    // 1. Rental Line
-    if (floatval($item['amount']) > 0) {
-        $invoiceLines[] = [
-            'sn' => $sn++,
-            'desc' => "Space Rental - " . $siteDetails,
-            'hsn' => $item['hsn_code'] ?: '998366',
-            'size' => $item['width'] . "'&times;" . $item['height'] . "'",
-            'period' => date('d.m.Y', strtotime($sDate)) . " to " . date('d.m.Y', strtotime($eDate)),
-            'amount' => floatval($item['amount'])
-        ];
-    }
-    
-    // 2. Printing Line
-    if (floatval($item['printing_amount'] ?? 0) > 0) {
-        $invoiceLines[] = [
-            'sn' => $sn++,
-            'desc' => "Printing Service (" . ($item['media_type'] ?: 'Flex') . ") - " . $siteDetails,
-            'hsn' => '998912',
-            'size' => $item['width'] . "'&times;" . $item['height'] . "'",
-            'period' => 'One-time',
-            'amount' => floatval($item['printing_amount'])
-        ];
-    }
-    
-    // 3. Mounting Line
-    if (floatval($item['mounting_amount'] ?? 0) > 0) {
-        $invoiceLines[] = [
-            'sn' => $sn++,
-            'desc' => "Mounting / Installation Service (" . ($item['mounting_type'] ?? 'Standard') . ") - " . $siteDetails,
-            'hsn' => '998739',
-            'size' => $item['width'] . "'&times;" . $item['height'] . "'",
-            'period' => 'One-time',
-            'amount' => floatval($item['mounting_amount'])
-        ];
-    }
-}
-
 // Tax
 $subtotal = 0;
-foreach ($invoiceLines as $line) {
-    $subtotal += $line['amount'];
+foreach ($items as $item) {
+    $subtotal += floatval($item['sale_amount']);
 }
 $isInterState = (strtolower(trim($b['client_state'] ?? '')) !== 'west bengal');
 $gst          = calculateGST($subtotal, $isInterState);
@@ -331,7 +325,7 @@ td:last-child {
     <!-- Header with Letterhead or Manual Info -->
     <div style="display: flex; justify-content: space-between; align-items: flex-start; padding: 10px 10px 2px;">
         <div style="flex: 1.4; text-align: left;">
-            <?php if ($company_letterhead && file_exists(__DIR__ . '/../../assets/images/' . $company_letterhead)): ?>
+            <?php if ($company_letterhead): ?>
                 <img src="<?php echo BASE_URL; ?>assets/images/<?php echo $company_letterhead; ?>"
                     style="max-height: 110px; width: auto; display: block; margin-bottom: 5px;">
             <?php else: ?>
@@ -444,6 +438,7 @@ td:last-child {
             <tr>
                 <th style="width:30px;">S.N.</th>
                 <th>LOCATION / DESCRIPTION</th>
+                <th style="width:75px;">TYPE</th>
                 <th style="width:65px;">HSN/SAC<br>Code</th>
                 <th style="width:60px;">SIZE</th>
                 <th style="width:100px;">PERIOD</th>
@@ -451,46 +446,77 @@ td:last-child {
             </tr>
         </thead>
         <tbody>
-            <?php foreach ($invoiceLines as $line): ?>
+            <?php foreach ($items as $idx => $item):
+                $sDate = (!empty($item['start_date']) && $item['start_date'] != '0000-00-00') ? $item['start_date'] : $b['start_date'];
+                $eDate = (!empty($item['end_date'])   && $item['end_date']   != '0000-00-00') ? $item['end_date']   : $b['end_date'];
+                $parts = [];
+                if (!empty(trim($item['city'])))       $parts[] = trim($item['city']);
+                if (!empty(trim($item['site_name'])))  $parts[] = trim($item['site_name']);
+                if (!empty(trim($item['location'])))   $parts[] = trim($item['location']);
+                if (!empty(trim($item['media_type']))) $parts[] = trim($item['media_type']);
+            ?>
             <tr>
-                <td><?php echo $line['sn']; ?></td>
+                <td><?php echo $item['sn']; ?></td>
                 <td style="text-align:left; padding-left:10px;">
-                    <strong><?php echo htmlspecialchars($line['desc']); ?></strong>
+                    <strong><?php echo htmlspecialchars(implode(', ', $parts)); ?></strong>
                 </td>
-                <td><?php echo htmlspecialchars($line['hsn']); ?></td>
-                <td><?php echo $line['size']; ?></td>
+                <td style="font-size:10px; font-weight:bold; color:#333; text-align:center;">
+                    <?php echo $item['invoice_type']; ?>
+                </td>
+                <td><?php echo htmlspecialchars($item['hsn_code'] ?: '998366'); ?></td>
+                <td>
+                    <?php echo $item['width']; ?>'&times;<?php echo $item['height']; ?>'
+                    <?php if (intval($item['unit'] ?? 1) > 1): ?>
+                        <div style="font-size:8px; color:#555; margin-top:2px;">(<?php echo intval($item['unit']); ?> Units)</div>
+                    <?php endif; ?>
+                </td>
                 <td style="font-size:9px; line-height:1.6;">
-                    <?php echo $line['period']; ?>
+                    <?php if ($item['invoice_type'] === 'RENTAL'): ?>
+                        <?php echo date('d.m.Y', strtotime($sDate)); ?> to<br>
+                        <?php echo date('d.m.Y', strtotime($eDate)); ?>
+                    <?php elseif ($item['invoice_type'] === 'PRINTING'): ?>
+                        <?php 
+                        $pDate = (!empty($item['print_start_date']) && $item['print_start_date'] != '0000-00-00') ? $item['print_start_date'] : $sDate;
+                        echo date('d.m.Y', strtotime($pDate)); 
+                        ?>
+                    <?php elseif ($item['invoice_type'] === 'MOUNTING'): ?>
+                        <?php 
+                        $mDate = (!empty($item['mount_start_date']) && $item['mount_start_date'] != '0000-00-00') ? $item['mount_start_date'] : $sDate;
+                        echo date('d.m.Y', strtotime($mDate)); 
+                        ?>
+                    <?php else: ?>
+                        <span style="color:#999;">-</span>
+                    <?php endif; ?>
                 </td>
                 <td style="text-align:right; padding-right:10px; font-weight:bold;">
-                    <?php echo number_format($line['amount'], 2); ?>
+                    <?php echo number_format($item['sale_amount'], 2); ?>
                 </td>
             </tr>
             <?php endforeach; ?>
 
             <!-- Total Before Tax -->
             <tr class="gst-row" style="font-weight: bold; border-top: 1.5px solid #000;">
-                <td colspan="5" style="text-align:right; padding-right:10px;">Total Before Tax</td>
+                <td colspan="6" style="text-align:right; padding-right:10px;">Total Before Tax</td>
                 <td style="text-align:right; padding-right:10px; font-weight:bold;"><?php echo number_format($subtotal, 2); ?></td>
             </tr>
 
             <!-- GST Breakdown -->
             <tr class="gst-row" style="font-weight: bold;">
-                <td colspan="5" style="text-align:right; padding-right:10px;">CGST (<?php echo $isInterState ? '0' : '9'; ?>%)</td>
+                <td colspan="6" style="text-align:right; padding-right:10px;">CGST (<?php echo $isInterState ? '0' : '9'; ?>%)</td>
                 <td style="text-align:right; padding-right:10px;"><?php echo number_format($gst['cgst'], 2); ?></td>
             </tr>
             <tr class="gst-row" style="font-weight: bold;">
-                <td colspan="5" style="text-align:right; padding-right:10px;">SGST (<?php echo $isInterState ? '0' : '9'; ?>%)</td>
+                <td colspan="6" style="text-align:right; padding-right:10px;">SGST (<?php echo $isInterState ? '0' : '9'; ?>%)</td>
                 <td style="text-align:right; padding-right:10px;"><?php echo number_format($gst['sgst'], 2); ?></td>
             </tr>
             <tr class="gst-row" style="font-weight: bold;">
-                <td colspan="5" style="text-align:right; padding-right:10px;">IGST (<?php echo $isInterState ? '18' : '0'; ?>%)</td>
+                <td colspan="6" style="text-align:right; padding-right:10px;">IGST (<?php echo $isInterState ? '18' : '0'; ?>%)</td>
                 <td style="text-align:right; padding-right:10px;"><?php echo number_format($gst['igst'], 2); ?></td>
             </tr>
 
             <!-- Grand Total -->
             <tr class="totals-row">
-                <td colspan="5" style="text-align:right; padding-right:10px; font-size:12px;">Grand Total</td>
+                <td colspan="6" style="text-align:right; padding-right:10px; font-size:12px;">Grand Total</td>
                 <td style="text-align:right; padding-right:10px; font-weight:bold; font-size:12px;"><?php echo number_format($grand_total, 2); ?></td>
             </tr>
         </tbody>
@@ -501,9 +527,9 @@ td:last-child {
         <?php
         // Group items by HSN code
         $hsnGroups = [];
-        foreach ($invoiceLines as $line) {
-            $hsn = $line['hsn'];
-            $hsnGroups[$hsn] = ($hsnGroups[$hsn] ?? 0) + $line['amount'];
+        foreach ($items as $item) {
+            $hsn = $item['hsn_code'] ?: '998366';
+            $hsnGroups[$hsn] = ($hsnGroups[$hsn] ?? 0) + floatval($item['sale_amount'] ?? 0);
         }
         ?>
         <table style="border:1px solid #000; margin-top: 10px;">

@@ -1,5 +1,6 @@
 <?php
 include_once __DIR__ . '/../config/db.php';
+require_once __DIR__ . '/../includes/ajax_auth.php';
 include_once __DIR__ . '/../includes/functions.php';
 
 if (session_status() === PHP_SESSION_NONE) {
@@ -10,7 +11,7 @@ $isAdmin = ($_SESSION['user_role'] ?? '') === 'admin';
 
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     $data = json_decode(file_get_contents('php://input'), true);
-    $proposalId = intval($data['proposal_id']);
+    $proposalId = intval($data['proposal_id'] ?? 0);
 
     if (!$proposalId) {
         echo json_encode(['success' => false, 'message' => 'Invalid Proposal ID']);
@@ -45,8 +46,9 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             $entityId = $stmtEntity->fetchColumn() ?: null;
         }
 
+        $userId = $_SESSION['user_id'] ?? null;
         // 2. Create Booking
-        $stmtBooking = $pdo->prepare("INSERT INTO bookings (proposal_id, booking_number, client_id, entity_id, campaign_name, billing_gstin, tax_type, start_date, end_date, total_amount, tax_amount, grand_total, status, approval_status) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)");
+        $stmtBooking = $pdo->prepare("INSERT INTO bookings (proposal_id, booking_number, client_id, entity_id, campaign_name, billing_gstin, tax_type, start_date, end_date, total_amount, tax_amount, grand_total, status, approval_status, created_by) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)");
         $stmtBooking->execute([
             $proposalId,
             $bookingNum,
@@ -61,7 +63,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             $proposal['tax_amount'],
             $proposal['grand_total'],
             $bookingStatus,
-            $approvalStatus
+            $approvalStatus,
+            $userId
         ]);
         $bookingId = $pdo->lastInsertId();
 
@@ -72,7 +75,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         $stmtItems->execute($itemIds);
         $items = $stmtItems->fetchAll();
 
-        $stmtBI = $pdo->prepare("INSERT INTO booking_items (booking_id, proposal_item_id, site_id, purchase_rate, sale_rate, start_date, end_date, days, purchase_amount, amount) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)");
+        $stmtBI = $pdo->prepare("INSERT INTO booking_items (booking_id, proposal_item_id, site_id, purchase_rate, sale_rate, start_date, end_date, days, purchase_amount, amount, selected_image, custom_site_name, custom_location) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)");
         $stmtOps = $pdo->prepare("INSERT INTO operations (booking_id, site_id, status) VALUES (?, ?, 'pending')");
         
         foreach ($items as $item) {
@@ -80,18 +83,28 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             $itemStartDate = (!empty($item['start_date']) && $item['start_date'] !== '0000-00-00') ? $item['start_date'] : $proposal['start_date'];
             $itemEndDate = (!empty($item['end_date']) && $item['end_date'] !== '0000-00-00') ? $item['end_date'] : $proposal['end_date'];
 
+            // Get owner type of the site
+            $stmtSiteOwner = $pdo->prepare("SELECT owner_type FROM sites WHERE id = ?");
+            $stmtSiteOwner->execute([$item['site_id']]);
+            $ownerType = $stmtSiteOwner->fetchColumn();
+            
+            $pRate = ($ownerType === 'HA') ? 0 : floatval($item['purchase_rate']);
+
             // Save snapshot to booking_items
             $stmtBI->execute([
                 $bookingId, 
                 $item['id'], 
                 $item['site_id'], 
-                $item['purchase_rate'],
+                $pRate,
                 $item['sale_rate'], 
                 $itemStartDate, 
                 $itemEndDate, 
                 $item['days'], 
                 0, // Set purchase_amount to 0 by default (user must confirm manually)
-                $item['amount']
+                $item['amount'],
+                $item['selected_image'],
+                $item['custom_site_name'] ?? null,
+                $item['custom_location'] ?? null
             ]);
             
             // Create operation task

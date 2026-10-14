@@ -14,7 +14,8 @@ $pendingInvoices  = $pdo->query("SELECT COUNT(*) FROM invoices WHERE approval_st
 $pendingClientPrintings = $pdo->query("SELECT COUNT(DISTINCT po_number) FROM client_printing_rates WHERE approval_status = 'pending_approval'")->fetchColumn();
 $pendingClientMountings = $pdo->query("SELECT COUNT(DISTINCT po_number) FROM client_mounting_rates WHERE approval_status = 'pending_approval'")->fetchColumn();
 $pendingPayments  = $pdo->query("SELECT COUNT(*) FROM payments WHERE approval_status = 'pending_approval'")->fetchColumn();
-$totalPending     = $pendingProposals + $pendingPOs + $pendingBookings + $pendingInvoices + $pendingClientPrintings + $pendingClientMountings + $pendingPayments;
+$pendingVendorInvoices = $pdo->query("SELECT COUNT(*) FROM purchase_orders WHERE vendor_invoice_approval_status = 'pending'")->fetchColumn();
+$totalPending     = $pendingProposals + $pendingPOs + $pendingBookings + $pendingInvoices + $pendingClientPrintings + $pendingClientMountings + $pendingPayments + $pendingVendorInvoices;
 
 // Current tab
 $tab = isset($_GET['tab']) ? clean($_GET['tab']) : 'proposals';
@@ -43,6 +44,20 @@ $pos = $pdo->query("
     LEFT JOIN users r ON ar.requested_by = r.id
     WHERE po.approval_status = 'pending_approval'
     ORDER BY po.po_date DESC
+")->fetchAll();
+
+// Fetch pending vendor invoices
+$vendorInvoices = $pdo->query("
+    SELECT po.*, v.name as vendor_name, 
+           COALESCE(r.name, r.full_name, u.name, u.full_name) as requested_by_name,
+           ar.created_at as requested_at
+    FROM purchase_orders po
+    LEFT JOIN partners v ON po.vendor_id = v.id
+    LEFT JOIN users u ON po.created_by = u.id
+    LEFT JOIN approval_requests ar ON ar.entity_type = 'vendor_invoice' AND ar.entity_id = po.id AND ar.status = 'pending'
+    LEFT JOIN users r ON ar.requested_by = r.id
+    WHERE po.vendor_invoice_approval_status = 'pending'
+    ORDER BY ar.created_at DESC
 ")->fetchAll();
 
 // Fetch pending bookings (Disabled)
@@ -219,6 +234,16 @@ $pendingPayments = count($payments);
             <div style="font-size: 1.75rem; font-weight: 800; color: <?php echo $pendingPayments > 0 ? '#ca8a04' : '#0f172a'; ?>;"><?php echo $pendingPayments; ?></div>
         </div>
     </div>
+
+    <div class="card" style="padding: 1.25rem; display: flex; align-items: center; gap: 1.25rem; border: none; border-radius: 16px; box-shadow: 0 4px 20px rgba(0,0,0,0.03); cursor: pointer; <?php echo $tab === 'vendor_invoices' ? 'border-left: 4px solid var(--primary);' : ''; ?>" onclick="window.location='?tab=vendor_invoices'">
+        <div style="background: #e0f2fe; color: #0284c7; width: 48px; height: 48px; border-radius: 12px; display: flex; align-items: center; justify-content: center; font-size: 1.3rem;">
+            <i class="fas fa-file-invoice"></i>
+        </div>
+        <div>
+            <h4 style="margin: 0; color: #64748b; font-size: 0.7rem; text-transform: uppercase; font-weight: 700; letter-spacing: 0.05em;">Vendor Invoices</h4>
+            <div style="font-size: 1.75rem; font-weight: 800; color: <?php echo $pendingVendorInvoices > 0 ? '#0284c7' : '#0f172a'; ?>;"><?php echo $pendingVendorInvoices; ?></div>
+        </div>
+    </div>
 </div>
 
 <!-- Main Card -->
@@ -234,6 +259,7 @@ $pendingPayments = count($payments);
             'client_printing' => ['Client Printing', 'fa-print', $pendingClientPrintings],
             'client_mounting' => ['Client Mounting', 'fa-hammer', $pendingClientMountings],
             'payments'  => ['Payments', 'fa-money-bill-wave', $pendingPayments],
+            'vendor_invoices' => ['Vendor Invoices', 'fa-file-invoice', $pendingVendorInvoices],
             'history'   => ['Recent Activity', 'fa-history', 0],
         ];
         foreach ($tabs as $key => $info):
@@ -470,8 +496,11 @@ $pendingPayments = count($payments);
                                     <strong>Date:</strong> <?php echo $inv['customer_po_date'] ? date('d M Y', strtotime($inv['customer_po_date'])) : 'N/A'; ?>
                                 <?php endif; ?>
                                 
-                                <?php if (!empty($inv['customer_po_file'])): ?>
-                                    <br><a href="<?php echo BASE_URL . $inv['customer_po_file']; ?>" target="_blank" style="color: #3b82f6; text-decoration: none; font-weight: bold; display: inline-flex; align-items: center; gap: 0.3rem; margin-top: 4px;">
+                                <?php 
+                                $attUrl = getFirstAttachmentUrl($inv['customer_po_file'] ?? '');
+                                if (!empty($attUrl)): 
+                                ?>
+                                    <br><a href="<?php echo htmlspecialchars($attUrl); ?>" target="_blank" style="color: #3b82f6; text-decoration: none; font-weight: bold; display: inline-flex; align-items: center; gap: 0.3rem; margin-top: 4px;">
                                         <i class="fas fa-paperclip"></i> View Document
                                     </a>
                                 <?php else: ?>
@@ -586,8 +615,11 @@ $pendingPayments = count($payments);
                         <div style="font-size: 0.75rem; font-weight: 800; color: #0f172a; margin-top: 2px;">Total: ₹<?php echo number_format($grandTotal, 2); ?></div>
                     </td>
                     <td>
-                        <?php if ($cp['customer_po_file']): ?>
-                            <a href="../../<?php echo htmlspecialchars($cp['customer_po_file']); ?>" target="_blank" style="display: inline-flex; align-items: center; gap: 5px; color: #0284c7; background: #f0f9ff; padding: 4px 10px; border-radius: 6px; font-size: 0.75rem; font-weight: 700; text-decoration: none;">
+                        <?php 
+                        $cpAttUrl = getFirstAttachmentUrl($cp['customer_po_file'] ?? '');
+                        if (!empty($cpAttUrl)): 
+                        ?>
+                            <a href="<?php echo htmlspecialchars($cpAttUrl); ?>" target="_blank" style="display: inline-flex; align-items: center; gap: 5px; color: #0284c7; background: #f0f9ff; padding: 4px 10px; border-radius: 6px; font-size: 0.75rem; font-weight: 700; text-decoration: none;">
                                 <i class="fas fa-file-pdf"></i> View Attachment
                             </a>
                         <?php else: ?>
@@ -681,8 +713,11 @@ $pendingPayments = count($payments);
                         <div style="font-size: 0.75rem; font-weight: 800; color: #0f172a; margin-top: 2px;">Total: ₹<?php echo number_format($grandTotal, 2); ?></div>
                     </td>
                     <td>
-                        <?php if ($cm['attachments']): ?>
-                            <a href="../../<?php echo htmlspecialchars($cm['attachments']); ?>" target="_blank" style="display: inline-flex; align-items: center; gap: 5px; color: #0284c7; background: #f0f9ff; padding: 4px 10px; border-radius: 6px; font-size: 0.75rem; font-weight: 700; text-decoration: none;">
+                        <?php 
+                        $cmAttUrl = getFirstAttachmentUrl($cm['attachments'] ?? '');
+                        if (!empty($cmAttUrl)): 
+                        ?>
+                            <a href="<?php echo htmlspecialchars($cmAttUrl); ?>" target="_blank" style="display: inline-flex; align-items: center; gap: 5px; color: #0284c7; background: #f0f9ff; padding: 4px 10px; border-radius: 6px; font-size: 0.75rem; font-weight: 700; text-decoration: none;">
                                 <i class="fas fa-file-pdf"></i> View Attachment
                             </a>
                         <?php else: ?>
@@ -789,6 +824,87 @@ $pendingPayments = count($payments);
                 <?php endforeach; ?>
                 <?php if (empty($payments)): ?>
                 <tr><td colspan="6" style="text-align: center; padding: 3rem; color: #94a3b8;"><i class="fas fa-check-circle" style="font-size: 2rem; display: block; margin-bottom: 0.75rem; color: #10b981;"></i>All payment requests have been reviewed!</td></tr>
+                <?php endif; ?>
+            </tbody>
+        </table>
+    </div>
+    <?php endif; ?>
+
+    <!-- ====== VENDOR INVOICES TAB ====== -->
+    <?php if ($tab === 'vendor_invoices'): ?>
+    <div style="overflow-x: auto;">
+        <table class="table matrix-table" style="border: 1px solid #e2e8f0; border-radius: 12px; overflow: hidden;">
+            <thead>
+                <tr>
+                    <th>PO Number</th>
+                    <th>Vendor</th>
+                    <th>Campaign / Brand</th>
+                    <th>Invoice Details</th>
+                    <th>Uploaded Invoice</th>
+                    <th>Requested By</th>
+                    <th style="width: 200px;">Action</th>
+                </tr>
+            </thead>
+            <tbody>
+                <?php foreach ($vendorInvoices as $vi): ?>
+                <tr id="row-vendor_invoice-<?php echo $vi['id']; ?>">
+                    <td style="font-weight: 700; color: var(--primary);">
+                        <a href="../financials/po_view.php?id=<?php echo $vi['id']; ?>" style="text-decoration: none; color: var(--primary);"><?php echo htmlspecialchars($vi['po_number']); ?></a>
+                    </td>
+                    <td><strong><?php echo htmlspecialchars(htmlspecialchars_decode($vi['vendor_name'] ?: 'Unknown')); ?></strong></td>
+                    <td>
+                        <?php 
+                        $camp_brand = [];
+                        if (!empty($vi['campaign_name'])) $camp_brand[] = trim($vi['campaign_name']);
+                        if (!empty($vi['brand_name'])) $camp_brand[] = trim($vi['brand_name']);
+                        $display_camp_brand = implode(' / ', $camp_brand);
+                        if (!empty($display_camp_brand)):
+                        ?>
+                            <div style="font-size: 0.75rem; color: #2563eb; font-weight: 700; background: #eff6ff; padding: 4px 8px; border-radius: 6px; display: inline-flex; align-items: center; gap: 4px;">
+                                <i class="fas fa-bullhorn"></i> <?php echo htmlspecialchars($display_camp_brand); ?>
+                            </div>
+                        <?php else: ?>
+                            <span style="color: #cbd5e1;">-</span>
+                        <?php endif; ?>
+                    </td>
+                    <td>
+                        <div style="font-weight: 800; color: #0f172a; font-size: 0.9rem;">No: <?php echo htmlspecialchars($vi['vendor_invoice_no']); ?></div>
+                        <div style="font-size: 0.75rem; color: #64748b; font-weight: 600; margin-top: 2px;">Date: <?php echo date('d M Y', strtotime($vi['vendor_invoice_date'])); ?></div>
+                        <div style="font-weight: 800; color: #059669; font-size: 0.9rem; margin-top: 4px;">Amt: ₹<?php echo number_format($vi['vendor_invoice_amount'], 2); ?></div>
+                    </td>
+                    <td>
+                        <?php 
+                        // Fetch first attachment link
+                        $stmtAtt = $pdo->prepare("SELECT filename FROM po_attachments WHERE po_id = ? LIMIT 1");
+                        $stmtAtt->execute([$vi['id']]);
+                        $filename = $stmtAtt->fetchColumn();
+                        if ($filename):
+                        ?>
+                            <a href="../../uploads/pos/<?php echo $filename; ?>" target="_blank" class="btn btn-secondary" style="padding: 6px 12px; font-size: 0.75rem; font-weight: 700; border-radius: 6px; text-decoration: none; display: inline-flex; align-items: center; gap: 6px; background: #f1f5f9; border: 1px solid #cbd5e1; color: #475569;">
+                                <i class="fas fa-file-pdf" style="color: #ef4444;"></i> View Scan
+                            </a>
+                        <?php else: ?>
+                            <span style="font-size: 0.75rem; color: #94a3b8; font-style: italic;">No Scan Uploaded</span>
+                        <?php endif; ?>
+                    </td>
+                    <td>
+                        <div style="display: flex; align-items: center; gap: 8px;">
+                            <div style="width: 28px; height: 28px; border-radius: 50%; background: #e2e8f0; display: flex; align-items: center; justify-content: center; font-size: 0.75rem; font-weight: 800; color: #475569;">
+                                <?php echo substr($vi['requested_by_name'] ?: '?', 0, 1); ?>
+                            </div>
+                            <span style="font-size: 0.85rem; font-weight: 600;"><?php echo htmlspecialchars($vi['requested_by_name'] ?: 'System'); ?></span>
+                        </div>
+                    </td>
+                    <td>
+                        <div style="display: flex; gap: 0.5rem;">
+                            <button class="btn btn-primary" onclick="approveEntity('vendor_invoice', <?php echo $vi['id']; ?>)" style="padding: 6px 12px; font-size: 0.8rem; background: #10b981; border: none;"><i class="fas fa-check"></i> Approve</button>
+                            <button class="btn btn-primary" onclick="rejectEntity('vendor_invoice', <?php echo $vi['id']; ?>)" style="padding: 6px 12px; font-size: 0.8rem; background: #ef4444; border: none;"><i class="fas fa-times"></i> Reject</button>
+                        </div>
+                    </td>
+                </tr>
+                <?php endforeach; ?>
+                <?php if (empty($vendorInvoices)): ?>
+                <tr><td colspan="7" style="text-align: center; padding: 3rem; color: #94a3b8;"><i class="fas fa-check-circle" style="font-size: 2rem; display: block; margin-bottom: 0.75rem; color: #10b981;"></i>All vendor invoice requests have been reviewed!</td></tr>
                 <?php endif; ?>
             </tbody>
         </table>
@@ -915,7 +1031,7 @@ function rejectEntity(entityType, entityId) {
 }
 
 function sendApproval(entityType, entityId, action, reason) {
-    fetch(BASE + 'ajax/approve_entity.php', {
+    fetch('../../ajax/approve_entity.php', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({

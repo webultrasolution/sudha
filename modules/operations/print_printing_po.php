@@ -1,6 +1,7 @@
 <?php
 include_once __DIR__ . '/../../config/db.php';
 include_once __DIR__ . '/../../includes/functions.php';
+checkAuth();
 
 date_default_timezone_set('Asia/Kolkata');
 
@@ -45,6 +46,15 @@ $rates = $stmtItems->fetchAll();
 $po_remark = $po['remarks'] ?? '';
 $po_number = $po['po_number'];
 $po_date = date('d-m-Y', strtotime($po['po_date']));
+
+$printing_date = '';
+if (!empty($rates[0]['start_date']) && $rates[0]['start_date'] !== '0000-00-00') {
+    $printing_date = date('d-m-Y', strtotime($rates[0]['start_date']));
+} elseif (!empty($po['po_date']) && $po['po_date'] !== '0000-00-00') {
+    $printing_date = date('d-m-Y', strtotime($po['po_date']));
+} else {
+    $printing_date = date('d-m-Y');
+}
 
 // Company Settings — uses active session entity
 $co                = resolveCompanyDetails();
@@ -178,6 +188,11 @@ $company_tan       = $co['tan'] ?? '';
                     <span class="info-label">Phone</span>
                     <span class="info-sep">:</span>
                     <span class="info-value"><?php echo $v['phone']; ?></span>
+                </div>
+                <div class="info-row">
+                    <span class="info-label">Printing Date</span>
+                    <span class="info-sep">:</span>
+                    <span class="info-value"><?php echo htmlspecialchars($printing_date); ?></span>
                 </div>
             </div>
         </div>

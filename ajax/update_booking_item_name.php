@@ -1,6 +1,7 @@
 <?php
 if (session_status() === PHP_SESSION_NONE) session_start();
 include_once __DIR__ . '/../config/db.php';
+require_once __DIR__ . '/../includes/ajax_auth.php';
 include_once __DIR__ . '/../includes/functions.php';
 
 header('Content-Type: application/json');

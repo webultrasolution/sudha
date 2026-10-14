@@ -7,9 +7,13 @@ requirePermission('vendors', 'view');
 
 // Handle Form Submissions
 // Sync Printing PO helper function
-function syncPrintingPO($pdo, $po_number, $vendor_id, $media_type, $campaign_name, $brand_name) {
+function syncPrintingPO($pdo, $po_number, $vendor_id, $media_type, $campaign_name, $brand_name, $printing_date = null, $entity_id = null) {
     if (session_status() === PHP_SESSION_NONE) {
         session_start();
+    }
+    
+    if (!$printing_date) {
+        $printing_date = date('Y-m-d');
     }
     
     // Fetch all sites of this PO from vendor_printing_rates
@@ -73,43 +77,53 @@ function syncPrintingPO($pdo, $po_number, $vendor_id, $media_type, $campaign_nam
         // Update PO
         $stmtPOUpdate = $pdo->prepare("
             UPDATE purchase_orders 
-            SET po_amount = ?, cgst_amount = ?, sgst_amount = ?, igst_amount = ?, total_amount = ?, status = ?, approval_status = ?, campaign_name = ?, brand_name = ?, vendor_id = ?
+            SET po_amount = ?, cgst_amount = ?, sgst_amount = ?, igst_amount = ?, total_amount = ?, status = ?, approval_status = ?, campaign_name = ?, brand_name = ?, vendor_id = ?, po_date = ?" . ($entity_id !== null ? ", entity_id = ?" : "") . "
             WHERE id = ?
         ");
-        $stmtPOUpdate->execute([
+        $updateParams = [
             $subtotal, $cgst, $sgst, $igst, $grandTotal,
             $poStatus, $approvalStatus,
             $campaign_name ?: 'Printing PO',
             $brand_name,
             $vendor_id,
-            $poId
-        ]);
+            $printing_date
+        ];
+        if ($entity_id !== null) {
+            $updateParams[] = $entity_id;
+        }
+        $updateParams[] = $poId;
+        $stmtPOUpdate->execute($updateParams);
     } else {
         // Insert PO
         $stmtPOInsert = $pdo->prepare("
-            INSERT INTO purchase_orders (vendor_id, employee_id, campaign_name, brand_name, po_number, po_date, po_amount, cgst_amount, sgst_amount, igst_amount, total_amount, status, approval_status, remarks, type) 
-            VALUES (?, ?, ?, ?, ?, CURDATE(), ?, ?, ?, ?, ?, ?, ?, ?, 'printing')
+            INSERT INTO purchase_orders (vendor_id, employee_id, campaign_name, brand_name, po_number, po_date, po_amount, cgst_amount, sgst_amount, igst_amount, total_amount, status, approval_status, remarks, type" . ($entity_id !== null ? ", entity_id" : "") . ") 
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'printing'" . ($entity_id !== null ? ", ?" : "") . ")
         ");
-        $stmtPOInsert->execute([
+        $insertParams = [
             $vendor_id,
             $_SESSION['user_id'] ?? 0,
             $campaign_name ?: 'Printing PO',
             $brand_name,
             $po_number,
+            $printing_date,
             $subtotal, $cgst, $sgst, $igst, $grandTotal,
             $poStatus, $approvalStatus,
             "Printing PO" . ($campaign_name ? " - " . $campaign_name : ""),
-        ]);
+        ];
+        if ($entity_id !== null) {
+            $insertParams[] = $entity_id;
+        }
+        $stmtPOInsert->execute($insertParams);
         $poId = $pdo->lastInsertId();
     }
 
     // Sync po_items (delete old and insert new)
     $pdo->prepare("DELETE FROM po_items WHERE po_id = ?")->execute([$poId]);
 
-    $stmtItem = $pdo->prepare("INSERT INTO po_items (po_id, site_id, start_date, end_date, days, monthly_rate, cost, description) VALUES (?, ?, CURDATE(), CURDATE(), 1, ?, ?, ?)");
+    $stmtItem = $pdo->prepare("INSERT INTO po_items (po_id, site_id, start_date, end_date, days, monthly_rate, cost, description) VALUES (?, ?, ?, ?, 1, ?, ?, ?)");
     foreach ($items as $item) {
         $desc = "Printing: $media_type - {$item['site_code']} {$item['site_name']} ({$item['sqft']} SQFT × ₹{$item['rate']}/sqft)";
-        $stmtItem->execute([$poId, $item['site_id'], $item['rate'], $item['cost'], $desc]);
+        $stmtItem->execute([$poId, $item['site_id'], $printing_date, $printing_date, $item['rate'], $item['cost'], $desc]);
     }
 
     // Update or insert approval request
@@ -143,10 +157,12 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action'])) {
     }
     if ($_POST['action'] === 'add' || $_POST['action'] === 'edit') {
         $vendor_id = intval($_POST['vendor_id']);
+        $entity_id = isset($_POST['entity_id']) && $_POST['entity_id'] !== '' ? intval($_POST['entity_id']) : ($_SESSION['active_entity_id'] ?? null);
         $media_type = clean($_POST['media_type']);
         $rate = floatval($_POST['rate_per_sqft']);
         $campaign_name = isset($_POST['campaign_name']) ? clean($_POST['campaign_name']) : null;
         $brand_name = isset($_POST['brand_name']) ? clean($_POST['brand_name']) : null;
+        $printing_date = isset($_POST['printing_date']) && $_POST['printing_date'] !== '' ? clean($_POST['printing_date']) : date('Y-m-d');
 
         if ($_POST['action'] === 'add') {
             requirePermission('vendors', 'add');
@@ -163,7 +179,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action'])) {
                 $insertStmt->execute([$vendor_id, $site_id, $media_type, $this_rate, $po_number, $campaign_name, $brand_name]);
             }
             
-            syncPrintingPO($pdo, $po_number, $vendor_id, $media_type, $campaign_name, $brand_name);
+            syncPrintingPO($pdo, $po_number, $vendor_id, $media_type, $campaign_name, $brand_name, $printing_date, $entity_id);
             
             header("Location: printing_rates.php?msg=added"); exit;
         } else {
@@ -229,10 +245,32 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action'])) {
             $syncStmt = $pdo->prepare("UPDATE vendor_printing_rates SET campaign_name = ?, brand_name = ? WHERE po_number = ?");
             $syncStmt->execute([$campaign_name, $brand_name, $po_number]);
             
-            syncPrintingPO($pdo, $po_number, $vendor_id, $media_type, $campaign_name, $brand_name);
+            syncPrintingPO($pdo, $po_number, $vendor_id, $media_type, $campaign_name, $brand_name, $printing_date, $entity_id);
             
             header("Location: printing_rates.php?msg=updated"); exit;
         }
+    } elseif ($_POST['action'] === 'update_printing_date') {
+        requirePermission('vendors', 'edit');
+        header('Content-Type: application/json');
+        
+        $po_number = $_POST['po_number'] ?? '';
+        $printing_date = $_POST['printing_date'] ?? '';
+        
+        if (empty($po_number) || empty($printing_date)) {
+            echo json_encode(['success' => false, 'message' => 'Missing parameters']);
+            exit;
+        }
+        
+        // Update purchase_orders po_date
+        $stmtPO = $pdo->prepare("UPDATE purchase_orders SET po_date = ? WHERE po_number = ?");
+        $stmtPO->execute([$printing_date, $po_number]);
+        
+        // Update po_items start_date and end_date
+        $stmtItems = $pdo->prepare("UPDATE po_items SET start_date = ?, end_date = ? WHERE po_id = (SELECT id FROM purchase_orders WHERE po_number = ? LIMIT 1)");
+        $stmtItems->execute([$printing_date, $printing_date, $po_number]);
+        
+        echo json_encode(['success' => true]);
+        exit;
     } elseif ($_POST['action'] === 'delete') {
         requirePermission('vendors', 'delete');
         header('Content-Type: application/json');
@@ -284,6 +322,7 @@ include_once __DIR__ . '/../../includes/header.php';
 
 $selectedVendorId = isset($_GET['vendor_id']) ? intval($_GET['vendor_id']) : 0;
 $campaignFilter = trim($_GET['campaign_name'] ?? '');
+$statusFilter = isset($_GET['status']) ? trim($_GET['status']) : '';
 
 $queryWhere = "WHERE 1=1";
 $params = [];
@@ -294,6 +333,15 @@ if ($selectedVendorId) {
 if ($campaignFilter !== '') {
     $queryWhere .= " AND r.campaign_name LIKE ?";
     $params[] = '%' . $campaignFilter . '%';
+}
+if ($statusFilter !== '') {
+    if ($statusFilter === 'approved') {
+        $queryWhere .= " AND po.approval_status = 'approved'";
+    } elseif ($statusFilter === 'pending_draft') {
+        $queryWhere .= " AND (po.approval_status IS NULL OR po.approval_status IN ('pending_approval', 'draft'))";
+    } elseif ($statusFilter === 'rejected') {
+        $queryWhere .= " AND po.approval_status = 'rejected'";
+    }
 }
 
 // Fetch Rates Grouped by PO Number
@@ -316,11 +364,20 @@ $ratesStmt = $pdo->prepare("
         MAX(r.campaign_name) as campaign_name,
         MAX(r.brand_name) as brand_name,
         MAX(po.approval_status) as approval_status,
-        MAX(po.id) as po_id
+        MAX(po.id) as po_id,
+        (SELECT MIN(start_date) FROM po_items WHERE po_id = po.id) as po_start_date,
+        (SELECT MAX(end_date) FROM po_items WHERE po_id = po.id) as po_end_date,
+        (SELECT MIN(start_date) FROM bookings WHERE campaign_name COLLATE utf8mb4_unicode_ci = r.campaign_name COLLATE utf8mb4_unicode_ci) as booking_start_date,
+        (SELECT MAX(end_date) FROM bookings WHERE campaign_name COLLATE utf8mb4_unicode_ci = r.campaign_name COLLATE utf8mb4_unicode_ci) as booking_end_date,
+        MAX(po.vendor_invoice_no) as vendor_invoice_no,
+        MAX(po.vendor_invoice_date) as vendor_invoice_date,
+        MAX(po.vendor_invoice_amount) as vendor_invoice_amount,
+        MAX(u.username) as creator_name
     FROM vendor_printing_rates r
     JOIN partners v ON r.vendor_id = v.id
     LEFT JOIN sites s ON r.site_id = s.id
     LEFT JOIN purchase_orders po ON r.po_number = po.po_number
+    LEFT JOIN users u ON COALESCE(r.created_by, po.created_by, po.employee_id) = u.id
     $queryWhere
     GROUP BY r.po_number, r.vendor_id, v.name, (CASE WHEN r.po_number IS NULL THEN r.id ELSE 0 END)
     ORDER BY r.id DESC
@@ -338,259 +395,443 @@ $mediaTypes = $pdo->query("SELECT DISTINCT type FROM sites WHERE type IS NOT NUL
 $illuminations = $pdo->query("SELECT DISTINCT light_type FROM sites WHERE light_type IS NOT NULL AND light_type != '' ORDER BY light_type")->fetchAll(PDO::FETCH_COLUMN);
 $sizes = $pdo->query("SELECT DISTINCT CONCAT(width, 'x', height) as size FROM sites WHERE width IS NOT NULL AND height IS NOT NULL AND width != '' AND height != '' ORDER BY width, height")->fetchAll(PDO::FETCH_COLUMN);
 ?>
-
-<div class="card">
-    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1.5rem;">
-        <h2 style="font-size: 1.25rem;">Printing PO</h2>
+<div class="card" style="box-shadow: 0 4px 12px rgba(0,0,0,0.03); border: 1px solid #e2e8f0; border-radius: 12px;">
+    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1.5rem; flex-wrap: wrap; gap: 1rem;">
+        <div>
+            <h2 style="font-size: 1.35rem; font-weight: 800; color: #0f172a; margin: 0; display: flex; align-items: center; gap: 8px;">
+                <i class="fas fa-print" style="color: #0d9488;"></i> Vendor Printing PO
+            </h2>
+            <p style="margin: 3px 0 0 0; font-size: 0.82rem; color: #64748b;">Manage vendor printing purchase orders, rates, and invoice attachments</p>
+        </div>
         <div style="display: flex; gap: 0.75rem;">
             <?php if (canAdd('vendors')): ?>
-            <a href="create_printing_po.php" class="btn btn-primary" style="display: inline-flex; align-items: center; gap: 6px; text-decoration: none;">
+            <a href="create_printing_po.php" class="btn btn-primary" style="display: inline-flex; align-items: center; gap: 6px; text-decoration: none; padding: 0.6rem 1.15rem; font-weight: 600; border-radius: 8px; box-shadow: 0 2px 6px rgba(13, 148, 136, 0.25);">
                 <i class="fas fa-plus"></i> Add New Printing PO 
             </a>
             <?php endif; ?>
         </div>
     </div>
 
-    <form method="get" action="printing_rates.php" style="display:flex; flex-wrap: wrap; gap:1rem; align-items:flex-end; margin-bottom:1.5rem;">
-        <div style="display:flex; flex-direction:column; gap:0.35rem;">
-            <label style="font-size:0.85rem; color:#475569; font-weight:600;">Vendor</label>
-            <select name="vendor_id" style="padding:0.75rem 0.95rem; border-radius:0.75rem; border:1px solid #d1d5db; min-width:220px;">
-                <option value="">All Vendors</option>
-                <?php foreach ($vendors as $vendor): ?>
-                    <option value="<?php echo $vendor['id']; ?>" <?php echo $selectedVendorId === intval($vendor['id']) ? 'selected' : ''; ?>><?php echo htmlspecialchars($vendor['name']); ?></option>
-                <?php endforeach; ?>
-            </select>
-        </div>
-        <div style="display:flex; flex-direction:column; gap:0.35rem; min-width:280px;">
-            <label style="font-size:0.85rem; color:#475569; font-weight:600;">Campaign Name</label>
-            <input type="text" name="campaign_name" value="<?php echo htmlspecialchars($campaignFilter); ?>" placeholder="Search campaign..." style="padding:0.75rem 0.95rem; border-radius:0.75rem; border:1px solid #d1d5db; min-width:280px;">
-        </div>
-        <div style="display:flex; gap:0.75rem;">
-            <button type="submit" class="btn btn-primary" style="padding:0.85rem 1.25rem;">Filter</button>
-            <a href="printing_rates.php" class="btn" style="background:#f8fafc; color:#475569; border:1px solid #cbd5e1; padding:0.85rem 1.25rem; text-decoration:none;">Reset</a>
-        </div>
-    </form>
+    <!-- Filter Toolbar -->
+    <div style="background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 10px; padding: 0.85rem 1.25rem; margin-bottom: 1.5rem;">
+        <form method="get" action="printing_rates.php" style="display: flex; align-items: flex-end; gap: 0.75rem; flex-wrap: nowrap; width: 100%;">
+            <div style="flex: 1; min-width: 160px;">
+                <label style="display: block; font-size: 0.72rem; font-weight: 700; color: #475569; text-transform: uppercase; letter-spacing: 0.03em; margin-bottom: 0.35rem; white-space: nowrap;">
+                    <i class="fas fa-truck text-slate-400" style="margin-right: 4px;"></i> Vendor
+                </label>
+                <select name="vendor_id" class="form-control" style="width: 100%; height: 38px; border-radius: 7px; border: 1px solid #cbd5e1; font-size: 0.85rem; padding: 0 0.75rem; background-color: #fff; box-sizing: border-box;">
+                    <option value="">All Vendors</option>
+                    <?php foreach ($vendors as $vendor): ?>
+                        <option value="<?php echo $vendor['id']; ?>" <?php echo $selectedVendorId === intval($vendor['id']) ? 'selected' : ''; ?>><?php echo htmlspecialchars($vendor['name']); ?></option>
+                    <?php endforeach; ?>
+                </select>
+            </div>
+            <div style="flex: 1.4; min-width: 180px;">
+                <label style="display: block; font-size: 0.72rem; font-weight: 700; color: #475569; text-transform: uppercase; letter-spacing: 0.03em; margin-bottom: 0.35rem; white-space: nowrap;">
+                    <i class="fas fa-bullhorn text-slate-400" style="margin-right: 4px;"></i> Campaign Name
+                </label>
+                <input type="text" name="campaign_name" value="<?php echo htmlspecialchars($campaignFilter); ?>" placeholder="Search campaign..." class="form-control" style="width: 100%; height: 38px; border-radius: 7px; border: 1px solid #cbd5e1; font-size: 0.85rem; padding: 0 0.75rem; background-color: #fff; box-sizing: border-box;">
+            </div>
+            <div style="flex: 0.9; min-width: 140px;">
+                <label style="display: block; font-size: 0.72rem; font-weight: 700; color: #475569; text-transform: uppercase; letter-spacing: 0.03em; margin-bottom: 0.35rem; white-space: nowrap;">
+                    <i class="fas fa-tag text-slate-400" style="margin-right: 4px;"></i> Status
+                </label>
+                <select name="status" class="form-control" style="width: 100%; height: 38px; border-radius: 7px; border: 1px solid #cbd5e1; font-size: 0.85rem; padding: 0 0.75rem; background-color: #fff; box-sizing: border-box;">
+                    <option value="">All Statuses</option>
+                    <option value="approved" <?php echo $statusFilter === 'approved' ? 'selected' : ''; ?>>Approved</option>
+                    <option value="pending_draft" <?php echo $statusFilter === 'pending_draft' ? 'selected' : ''; ?>>Pending / Draft</option>
+                    <option value="rejected" <?php echo $statusFilter === 'rejected' ? 'selected' : ''; ?>>Rejected</option>
+                </select>
+            </div>
+            <div style="display: flex; gap: 0.4rem; flex-shrink: 0;">
+                <button type="submit" class="btn btn-primary" style="height: 38px; padding: 0 1.15rem; border-radius: 7px; font-weight: 600; display: inline-flex; align-items: center; gap: 5px; box-shadow: 0 2px 4px rgba(13, 148, 136, 0.15); white-space: nowrap;">
+                    <i class="fas fa-filter"></i> Filter
+                </button>
+                <a href="printing_rates.php" class="btn" style="height: 38px; padding: 0 0.85rem; border-radius: 7px; font-weight: 600; display: inline-flex; align-items: center; gap: 5px; background: #fff; color: #64748b; border: 1px solid #cbd5e1; text-decoration: none; white-space: nowrap;">
+                    <i class="fas fa-undo"></i> Reset
+                </a>
+            </div>
+        </form>
+    </div>
 
-    <table class="table">
-        <thead>
-            <tr>
-                <th>PO Number</th>
-                <th>Vendor</th>
-                <th>Date</th>
-                <th>Amount</th>
-                <th>Status</th>
-                <th style="text-align: center; font-size: 0.75rem; text-transform: uppercase; letter-spacing: 0.05em; color: #475569;">Invoice Attachments</th>
-                <th>Actions</th>
-            </tr>
-        </thead>
-        <tbody>
-            <?php if (empty($rates)): ?>
+    <!-- Table -->
+    <div class="table-responsive" style="overflow-x: auto; border: 1px solid #e2e8f0; border-radius: 10px; background: #fff;">
+        <table class="table" style="margin-bottom: 0; width: 100%; border-collapse: collapse;">
+            <thead style="background: #f8fafc;">
                 <tr>
-                    <td colspan="7" style="text-align: center; color: var(--secondary); padding: 2rem;">No Vendor Printing POs found.</td>
+                    <th style="padding: 12px 14px; font-size: 0.75rem; font-weight: 700; color: #475569; text-transform: uppercase; letter-spacing: 0.05em; border-bottom: 2px solid #e2e8f0; white-space: nowrap;">PO Number</th>
+                    <th style="padding: 12px 14px; font-size: 0.75rem; font-weight: 700; color: #475569; text-transform: uppercase; letter-spacing: 0.05em; border-bottom: 2px solid #e2e8f0;">Vendor</th>
+                    <th style="padding: 12px 14px; font-size: 0.75rem; font-weight: 700; color: #475569; text-transform: uppercase; letter-spacing: 0.05em; border-bottom: 2px solid #e2e8f0; white-space: nowrap;">Printing Date</th>
+                    <th style="padding: 12px 14px; font-size: 0.75rem; font-weight: 700; color: #475569; text-transform: uppercase; letter-spacing: 0.05em; border-bottom: 2px solid #e2e8f0; white-space: nowrap;">PO Date</th>
+                    <th style="padding: 12px 14px; font-size: 0.75rem; font-weight: 700; color: #475569; text-transform: uppercase; letter-spacing: 0.05em; border-bottom: 2px solid #e2e8f0; white-space: nowrap;">Amount</th>
+                    <th style="padding: 12px 14px; font-size: 0.75rem; font-weight: 700; color: #475569; text-transform: uppercase; letter-spacing: 0.05em; border-bottom: 2px solid #e2e8f0; text-align: center; white-space: nowrap;">Status</th>
+                    <th style="padding: 12px 14px; font-size: 0.75rem; font-weight: 700; color: #475569; text-transform: uppercase; letter-spacing: 0.05em; border-bottom: 2px solid #e2e8f0; min-width: 250px;">Invoice & Attachments</th>
+                    <th style="padding: 12px 14px; font-size: 0.75rem; font-weight: 700; color: #475569; text-transform: uppercase; letter-spacing: 0.05em; border-bottom: 2px solid #e2e8f0; white-space: nowrap;">Created By</th>
+                    <th style="padding: 12px 14px; font-size: 0.75rem; font-weight: 700; color: #475569; text-transform: uppercase; letter-spacing: 0.05em; border-bottom: 2px solid #e2e8f0; text-align: center; white-space: nowrap;">Actions</th>
                 </tr>
-            <?php else: ?>
-                <?php foreach ($rates as $r): ?>
-                <?php 
-                    $ids = explode('||', $r['rate_ids']);
-                    
-                    // Re-calculate Total Amount
-                    $widths = explode('||', $r['widths']);
-                    $heights = explode('||', $r['heights']);
-                    $unitRates = explode('||', $r['rates']);
-                    
-                    $totalGroupAmount = 0;
-                    foreach($ids as $i => $id) {
-                        $sqft = floatval($widths[$i]) * floatval($heights[$i]);
-                        $totalGroupAmount += ($sqft * floatval($unitRates[$i]));
-                    }
-                    $gst = $totalGroupAmount * 0.18;
-                    $grandTotal = $totalGroupAmount + $gst;
-                ?>
-                <tr>
-                    <td>
-                        <?php if($r['po_number']): ?>
-                            <strong>#<?php echo $r['po_number']; ?></strong>
-                        <?php else: ?>
-                            <span style="color: #cbd5e1; font-weight: 400;">N/A</span>
-                        <?php endif; ?>
-                        <?php 
-                        $camp_brand = [];
-                        if (!empty($r['campaign_name'])) $camp_brand[] = trim($r['campaign_name']);
-                        if (!empty($r['brand_name'])) $camp_brand[] = trim($r['brand_name']);
-                        $display_camp_brand = implode(' / ', $camp_brand);
-                        if (!empty($display_camp_brand)): ?>
-                            <div style="font-size: 0.72rem; color: #2563eb; font-weight: 700; margin-top: 3px; display: inline-flex; align-items: center; gap: 4px; background: #eff6ff; padding: 2px 6px; border-radius: 4px;">
-                                <i class="fas fa-bullhorn" style="font-size: 0.65rem;"></i> <?php echo htmlspecialchars($display_camp_brand); ?>
+            </thead>
+            <tbody>
+                <?php if (empty($rates)): ?>
+                    <tr>
+                        <td colspan="9" style="text-align: center; color: #64748b; padding: 3rem 1rem;">
+                            <div style="font-size: 2rem; color: #cbd5e1; margin-bottom: 0.5rem;"><i class="fas fa-folder-open"></i></div>
+                            <div style="font-weight: 600; font-size: 0.95rem;">No Vendor Printing POs found</div>
+                            <div style="font-size: 0.8rem; color: #94a3b8; margin-top: 4px;">Try adjusting your filter options or add a new Printing PO.</div>
+                        </td>
+                    </tr>
+                <?php else: ?>
+                    <?php foreach ($rates as $r): ?>
+                    <?php 
+                        $ids = explode('||', $r['rate_ids']);
+                        
+                        // Re-calculate Total Amount
+                        $widths = explode('||', $r['widths']);
+                        $heights = explode('||', $r['heights']);
+                        $unitRates = explode('||', $r['rates']);
+                        
+                        $totalGroupAmount = 0;
+                        foreach($ids as $i => $id) {
+                            $sqft = floatval($widths[$i]) * floatval($heights[$i]);
+                            $totalGroupAmount += ($sqft * floatval($unitRates[$i]));
+                        }
+                        $gst = $totalGroupAmount * 0.18;
+                        $grandTotal = $totalGroupAmount + $gst;
+                    ?>
+                    <tr style="border-bottom: 1px solid #f1f5f9; transition: background 0.15s ease;">
+                        <td style="vertical-align: middle; padding: 12px 14px;">
+                            <div style="font-weight: 800; font-size: 0.9rem; color: #0f172a; letter-spacing: -0.01em;">
+                                <?php if($r['po_number']): ?>
+                                    #<?php echo htmlspecialchars($r['po_number']); ?>
+                                <?php else: ?>
+                                    <span style="color: #94a3b8; font-weight: 500;">N/A</span>
+                                <?php endif; ?>
                             </div>
-                        <?php endif; ?>
-                    </td>
-                    <td>
-                        <div style="font-weight: 700; color: #1e293b;"><?php echo htmlspecialchars($r['vendor_name']); ?></div>
-                    </td>
-                    <td>
-                        <?php echo date('d M Y', strtotime($r['created_at'])); ?>
-                    </td>
-                    <td>
-                        <div style="font-weight: 800; color: #059669;">₹<?php echo number_format($totalGroupAmount, 2); ?></div>
-                        <div style="font-size: 0.65rem; color: #94a3b8;">+GST: ₹<?php echo number_format($gst, 2); ?></div>
-                        <div style="font-size: 0.7rem; font-weight: 800; color: #0f172a;">Total: ₹<?php echo number_format($grandTotal, 2); ?></div>
-                    </td>
-                    <td>
-                        <?php if ($r['approval_status'] === 'pending_approval'): ?>
-                            <span style="background: #fff7ed; color: #c2410c; border: 1px solid #fed7aa; padding: 0.15rem 0.5rem; border-radius: 50px; font-size: 0.6rem; font-weight: 800; display: inline-flex; align-items: center; gap: 4px; animation: pulse-approval 2s infinite;" title="Pending Admin Approval">
-                                <i class="fas fa-clock"></i> Awaiting Approval
+                            <?php 
+                            $camp_brand = [];
+                            if (!empty($r['campaign_name'])) $camp_brand[] = trim($r['campaign_name']);
+                            if (!empty($r['brand_name'])) $camp_brand[] = trim($r['brand_name']);
+                            $display_camp_brand = implode(' / ', $camp_brand);
+                            if (!empty($display_camp_brand)): ?>
+                                <div style="font-size: 0.72rem; color: #2563eb; font-weight: 700; margin-top: 4px; display: inline-flex; align-items: center; gap: 4px; background: #eff6ff; border: 1px solid #dbeafe; padding: 2px 7px; border-radius: 4px; max-width: 220px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;" title="<?php echo htmlspecialchars($display_camp_brand); ?>">
+                                    <i class="fas fa-bullhorn" style="font-size: 0.65rem; flex-shrink: 0;"></i> <span><?php echo htmlspecialchars($display_camp_brand); ?></span>
+                                </div>
+                            <?php endif; ?>
+                        </td>
+                        <td style="vertical-align: middle; padding: 12px 14px;">
+                            <div style="font-weight: 700; color: #1e293b; font-size: 0.9rem;"><?php echo htmlspecialchars($r['vendor_name']); ?></div>
+                        </td>
+                        <?php $printDate = !empty($r['po_start_date']) ? $r['po_start_date'] : $r['created_at']; ?>
+                        <td style="vertical-align: middle; padding: 12px 14px; white-space: nowrap;">
+                            <?php if (!empty($printDate) && $printDate !== '0000-00-00'): ?>
+                                <button type="button" class="btn-date-pill" onclick="changePrintingDate('<?php echo htmlspecialchars($r['po_number'], ENT_QUOTES); ?>', '<?php echo date('Y-m-d', strtotime($printDate)); ?>')" title="Click to change Printing Date">
+                                    <i class="fas fa-print" style="color: #0284c7;"></i>
+                                    <span><?php echo date('d M Y', strtotime($printDate)); ?></span>
+                                    <i class="fas fa-pencil-alt" style="font-size: 0.65rem; opacity: 0.6;"></i>
+                                </button>
+                            <?php else: ?>
+                                <span style="color: #cbd5e1;">—</span>
+                            <?php endif; ?>
+                        </td>
+                        <td style="vertical-align: middle; padding: 12px 14px; white-space: nowrap; font-size: 0.82rem; color: #475569; font-weight: 500;">
+                            <i class="far fa-calendar-alt" style="color: #94a3b8; margin-right: 4px;"></i>
+                            <?php echo date('d M Y', strtotime($r['created_at'])); ?>
+                        </td>
+                        <td style="vertical-align: middle; padding: 12px 14px; white-space: nowrap;">
+                            <div style="font-weight: 800; color: #059669; font-size: 0.92rem;">₹<?php echo number_format($totalGroupAmount, 2); ?></div>
+                            <div style="font-size: 0.7rem; color: #64748b; margin-top: 1px;">+GST: ₹<?php echo number_format($gst, 2); ?></div>
+                            <div style="font-size: 0.75rem; font-weight: 800; color: #0f172a; margin-top: 1px;">Total: ₹<?php echo number_format($grandTotal, 2); ?></div>
+                        </td>
+                        <td style="vertical-align: middle; padding: 12px 14px; text-align: center; white-space: nowrap;">
+                            <?php if ($r['approval_status'] === 'pending_approval'): ?>
+                                <span class="status-badge status-pending" title="Pending Admin Approval">
+                                    <i class="fas fa-clock"></i> Awaiting Approval
+                                </span>
+                            <?php elseif ($r['approval_status'] === 'approved'): ?>
+                                <span class="status-badge status-approved">
+                                    <i class="fas fa-check-circle"></i> Approved
+                                </span>
+                            <?php elseif ($r['approval_status'] === 'rejected'): ?>
+                                <span class="status-badge status-rejected">
+                                    <i class="fas fa-times-circle"></i> Rejected
+                                </span>
+                            <?php else: ?>
+                                <span class="status-badge status-draft">
+                                    <i class="fas fa-file"></i> Draft
+                                </span>
+                            <?php endif; ?>
+                        </td>
+                        <td style="vertical-align: middle; padding: 10px 14px;">
+                            <div style="display: flex; flex-direction: column; gap: 6px; min-width: 240px;">
+                                <!-- Vendor Invoice Section -->
+                                <div style="background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 6px; padding: 5px 8px; display: flex; flex-direction: column; gap: 4px;">
+                                    <div style="display: flex; align-items: center; justify-content: space-between; gap: 6px;">
+                                        <div style="display: flex; align-items: center; gap: 6px;">
+                                            <span style="font-size: 0.68rem; font-weight: 800; color: #64748b; text-transform: uppercase; letter-spacing: 0.03em;">Vendor Inv</span>
+                                            <?php
+                                            if (!empty($r['attachments'])):
+                                                $atts = explode('||', $r['attachments']);
+                                                if (count($atts) > 0 && !empty($atts[0])): 
+                                                    $file = $atts[0];
+                                                    $ext = strtolower(pathinfo($file, PATHINFO_EXTENSION));
+                                                    $icon = 'fa-file';
+                                                    if (in_array($ext, ['jpg', 'jpeg', 'png'])) $icon = 'fa-file-image';
+                                                    if ($ext === 'pdf') $icon = 'fa-file-pdf';
+                                                    ?>
+                                                    <a href="../../uploads/pos/<?php echo rawurlencode($file); ?>" target="_blank"
+                                                        class="btn-file-preview" title="View Vendor Invoice (<?php echo htmlspecialchars($file); ?>)">
+                                                        <i class="fas <?php echo $icon; ?>" style="color: #0284c7;"></i> View
+                                                    </a>
+                                                    <?php
+                                                endif;
+                                            endif;
+                                            ?>
+                                        </div>
+                                        <?php if (canEdit('vendors') && $r['po_number']): ?>
+                                            <button type="button" class="btn-upload-pill" onclick="triggerUpload('<?php echo htmlspecialchars($r['po_number'], ENT_QUOTES); ?>')"
+                                                title="Upload / Edit Vendor Invoice">
+                                                <i class="fas fa-cloud-upload-alt"></i> <?php echo (!empty($r['vendor_invoice_no']) || !empty($r['attachments'])) ? 'Edit' : 'Upload'; ?>
+                                            </button>
+                                        <?php endif; ?>
+                                    </div>
+                                    
+                                    <?php if (!empty($r['vendor_invoice_no'])): ?>
+                                        <div style="display: flex; flex-wrap: wrap; gap: 4px 8px; font-size: 0.7rem; color: #475569; background: #fff; border: 1px solid #f1f5f9; padding: 3px 6px; border-radius: 4px; font-weight: 600;">
+                                            <span style="color: #0284c7;" title="Invoice Number"><i class="fas fa-file-invoice"></i> <?php echo htmlspecialchars($r['vendor_invoice_no']); ?></span>
+                                            <span style="color: #059669;" title="Invoice Amount"><i class="fas fa-rupee-sign"></i> <?php echo number_format($r['vendor_invoice_amount'] ?? 0, 2); ?></span>
+                                            <span style="color: #64748b;" title="Invoice Date"><i class="far fa-calendar"></i> <?php echo date('d M Y', strtotime($r['vendor_invoice_date'])); ?></span>
+                                        </div>
+                                    <?php endif; ?>
+                                </div>
+
+                                <!-- Tax Invoice Section -->
+                                <div style="background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 6px; padding: 5px 8px; display: flex; align-items: center; justify-content: space-between; gap: 6px;">
+                                    <div style="display: flex; align-items: center; gap: 6px;">
+                                        <span style="font-size: 0.68rem; font-weight: 800; color: #64748b; text-transform: uppercase; letter-spacing: 0.03em;">Tax Invoice</span>
+                                        <?php if (!empty($r['client_tax_order'])):
+                                            $file = $r['client_tax_order'];
+                                            $ext = strtolower(pathinfo($file, PATHINFO_EXTENSION));
+                                            $icon = 'fa-file';
+                                            if (in_array($ext, ['jpg', 'jpeg', 'png'])) $icon = 'fa-file-image';
+                                            if ($ext === 'pdf') $icon = 'fa-file-pdf';
+                                            ?>
+                                            <a href="../../uploads/pos/tax_orders/<?php echo rawurlencode($file); ?>"
+                                                target="_blank" class="btn-file-preview" style="background: #eef2ff; border-color: #c7d2fe; color: #4f46e5;"
+                                                title="View Tax Invoice (<?php echo htmlspecialchars($file); ?>)">
+                                                <i class="fas <?php echo $icon; ?>" style="color: #4f46e5;"></i> View
+                                            </a>
+                                        <?php endif; ?>
+                                    </div>
+                                    <?php if (canEdit('vendors') && $r['po_number']): ?>
+                                        <button type="button" class="btn-upload-pill"
+                                            style="background: #eef2ff; color: #4f46e5; border-color: #c7d2fe;"
+                                            onclick="triggerTaxOrderUpload('<?php echo htmlspecialchars($r['po_number'], ENT_QUOTES); ?>')" title="Upload Tax Invoice">
+                                            <i class="fas fa-cloud-upload-alt"></i> <?php echo !empty($r['client_tax_order']) ? 'Replace' : 'Upload'; ?>
+                                        </button>
+                                    <?php endif; ?>
+                                </div>
+                            </div>
+                        </td>
+                        <td style="vertical-align: middle; padding: 12px 14px; white-space: nowrap;">
+                            <span style="font-weight: 600; color: #475569; font-size: 0.8rem; background: #f8fafc; border: 1px solid #e2e8f0; padding: 4px 8px; border-radius: 6px; display: inline-flex; align-items: center; gap: 5px;">
+                                <i class="fas fa-user" style="color: #94a3b8; font-size: 0.75rem;"></i>
+                                <?php echo htmlspecialchars($r['creator_name'] ?: '—'); ?>
                             </span>
-                        <?php elseif ($r['approval_status'] === 'approved'): ?>
-                            <span style="background: #f0fdf4; color: #15803d; border: 1px solid #dcfce7; padding: 0.15rem 0.5rem; border-radius: 50px; font-size: 0.6rem; font-weight: 800; display: inline-flex; align-items: center; gap: 4px;">
-                                <i class="fas fa-check-circle"></i> Approved
-                            </span>
-                        <?php elseif ($r['approval_status'] === 'rejected'): ?>
-                            <span style="background: #fef2f2; color: #b91c1c; border: 1px solid #fecaca; padding: 0.15rem 0.5rem; border-radius: 50px; font-size: 0.6rem; font-weight: 800; display: inline-flex; align-items: center; gap: 4px;">
-                                <i class="fas fa-times-circle"></i> Rejected
-                            </span>
-                        <?php else: ?>
-                            <span style="background: #f1f5f9; color: #475569; border: 1px solid #cbd5e1; padding: 0.15rem 0.5rem; border-radius: 50px; font-size: 0.6rem; font-weight: 800; display: inline-flex; align-items: center; gap: 4px;">
-                                <i class="fas fa-file"></i> Draft
-                            </span>
-                        <?php endif; ?>
-                    </td>
-                    <td>
-                        <div style="display: flex; flex-direction: column; gap: 8px;">
-                            <!-- Invoice Attachments Section -->
-                            <div style="display: flex; align-items: center; flex-wrap: wrap; gap: 4px;">
-                                <span style="font-size: 0.65rem; font-weight: 800; color: #94a3b8; text-transform: uppercase; margin-right: 4px; width: 80px; text-align: right; display: inline-block;">Invoice:</span>
-                                <?php
-                                if (!empty($r['attachments'])):
-                                    $atts = explode('||', $r['attachments']);
-                                    if (count($atts) > 0): 
-                                        $file = $atts[0];
-                                        $ext = strtolower(pathinfo($file, PATHINFO_EXTENSION));
-                                        $icon = 'fa-file';
-                                        if (in_array($ext, ['jpg', 'jpeg', 'png'])) $icon = 'fa-file-image';
-                                        if ($ext === 'pdf') $icon = 'fa-file-pdf';
-                                        ?>
-                                        <a href="../../uploads/pos/<?php echo rawurlencode($file); ?>" target="_blank"
-                                            class="attachment-badge" title="View Attachment">
-                                            <i class="fas <?php echo $icon; ?>"></i>
-                                        </a>
-                                        <?php
-                                    endif;
-                                endif;
+                        </td>
+                        <td style="vertical-align: middle; padding: 12px 14px; text-align: center; white-space: nowrap;">
+                            <div style="display: inline-flex; align-items: center; gap: 4px; background: #f8fafc; border: 1px solid #e2e8f0; padding: 3px 4px; border-radius: 8px;">
+                                <?php 
+                                    $viewUrl = "view_vendor_printing_po.php?vendor_id=" . $r['vendor_id'];
+                                    if ($r['po_number']) {
+                                        $viewUrl .= "&po_number=" . urlencode($r['po_number']);
+                                    } else {
+                                        foreach($ids as $id) $viewUrl .= "&rate_ids[]=" . $id;
+                                    }
                                 ?>
-                                <?php if (canEdit('vendors') && $r['po_number']): ?>
-                                    <button class="btn-upload-row" onclick="triggerUpload('<?php echo htmlspecialchars($r['po_number'], ENT_QUOTES); ?>')"
-                                        title="Upload Invoice/Scan">
-                                        <i class="fas fa-cloud-upload-alt"></i> Upload
-                                    </button>
+                                <?php if (hasRole('admin') || $r['approval_status'] === 'approved'): ?>
+                                <a href="<?php echo $viewUrl; ?>" class="table-action-btn action-view" title="View Details">
+                                    <i class="fas fa-eye"></i>
+                                </a>
                                 <?php endif; ?>
-                            </div>
+                                
+                                <?php if (hasRole('admin') || ($r['approval_status'] !== 'approved')): ?>
+                                <?php 
+                                    $editUrl = "create_printing_po.php?action=edit&vendor_id=" . $r['vendor_id'];
+                                    if ($r['po_number']) {
+                                        $editUrl .= "&po_number=" . urlencode($r['po_number']);
+                                    } else {
+                                        foreach($ids as $id) $editUrl .= "&rate_ids[]=" . $id;
+                                    }
+                                ?>
+                                <a href="<?php echo $editUrl; ?>" class="table-action-btn action-edit" title="Edit PO">
+                                    <i class="fas fa-edit"></i>
+                                </a>
+                                <?php endif; ?>
+                                
+                                <?php if (!empty($r['po_number'])): ?>
+                                <a href="../operations/generate_printing_po.php?vendor_id=<?php echo $r['vendor_id']; ?>&preview=1&po_number=<?php echo urlencode($r['po_number']); ?>" target="_blank" class="table-action-btn action-pdf" title="Download / Print PDF PO">
+                                    <i class="fas fa-file-pdf"></i>
+                                </a>
+                                <?php endif; ?>
 
-                            <!-- Tax Invoice Section -->
-                            <div style="display: flex; align-items: center; flex-wrap: wrap; gap: 4px;">
-                                <span style="font-size: 0.65rem; font-weight: 800; color: #94a3b8; text-transform: uppercase; margin-right: 4px; width: 80px; text-align: right; display: inline-block;">Tax Invoice:</span>
-                                <?php if (!empty($r['client_tax_order'])):
-                                    $file = $r['client_tax_order'];
-                                    $ext = strtolower(pathinfo($file, PATHINFO_EXTENSION));
-                                    $icon = 'fa-file';
-                                    if (in_array($ext, ['jpg', 'jpeg', 'png'])) $icon = 'fa-file-image';
-                                    if ($ext === 'pdf') $icon = 'fa-file-pdf';
-                                    ?>
-                                    <a href="../../uploads/pos/tax_orders/<?php echo rawurlencode($file); ?>"
-                                        target="_blank" class="attachment-badge" style="background: #e0e7ff; color: #4f46e5;"
-                                        title="View Tax Invoice">
-                                        <i class="fas <?php echo $icon; ?>"></i>
-                                    </a>
-                                <?php endif; ?>
-                                <?php if (canEdit('vendors') && $r['po_number']): ?>
-                                    <button class="btn-upload-row"
-                                        style="background: #eef2ff; color: #4f46e5; border-color: #c7d2fe;"
-                                        onclick="triggerTaxOrderUpload('<?php echo htmlspecialchars($r['po_number'], ENT_QUOTES); ?>')" title="Upload Tax Invoice">
-                                        <i class="fas fa-cloud-upload-alt"></i> Upload
-                                    </button>
+                                <?php if (canDelete('vendors')): ?>
+                                <button type="button" class="table-action-btn action-delete" onclick="deleteRate('<?php echo htmlspecialchars($r['po_number'] ?? '', ENT_QUOTES); ?>', '<?php echo htmlspecialchars($r['rate_ids'], ENT_QUOTES); ?>')" title="Delete PO">
+                                    <i class="fas fa-trash-alt"></i>
+                                </button>
                                 <?php endif; ?>
                             </div>
-                        </div>
-                    </td>
-                    <td>
-                        <?php 
-                            $viewUrl = "view_vendor_printing_po.php?vendor_id=" . $r['vendor_id'];
-                            if ($r['po_number']) {
-                                $viewUrl .= "&po_number=" . urlencode($r['po_number']);
-                            } else {
-                                foreach($ids as $id) $viewUrl .= "&rate_ids[]=" . $id;
-                            }
-                        ?>
-                        <?php if (hasRole('admin') || $r['approval_status'] === 'approved'): ?>
-                        <a href="<?php echo $viewUrl; ?>" class="btn-icon" style="color: #0d9488;" title="View Details">
-                            <i class="fas fa-eye"></i>
-                        </a>
-                        <?php endif; ?>
-                        
-                        <?php if (hasRole('admin') || ($r['approval_status'] !== 'approved')): ?>
-                        <?php 
-                            $editUrl = "create_printing_po.php?action=edit&vendor_id=" . $r['vendor_id'];
-                            if ($r['po_number']) {
-                                $editUrl .= "&po_number=" . urlencode($r['po_number']);
-                            } else {
-                                foreach($ids as $id) $editUrl .= "&rate_ids[]=" . $id;
-                            }
-                        ?>
-                        <a href="<?php echo $editUrl; ?>" class="btn-icon" style="color: #0284c7;" title="Edit">
-                            <i class="fas fa-edit"></i>
-                        </a>
-                        <?php endif; ?>
-                        
-                        <?php if (canDelete('vendors')): ?>
-                        <button class="btn-icon btn-delete" onclick="deleteRate('<?php echo htmlspecialchars($r['po_number'] ?? '', ENT_QUOTES); ?>', '<?php echo htmlspecialchars($r['rate_ids'], ENT_QUOTES); ?>')" title="Delete">
-                            <i class="fas fa-trash"></i>
-                        </button>
-                        <?php endif; ?>
-                    </td>
-                </tr>
-                <?php endforeach; ?>
-            <?php endif; ?>
-        </tbody>
-    </table>
+                        </td>
+                    </tr>
+                    <?php endforeach; ?>
+                <?php endif; ?>
+            </tbody>
+        </table>
+    </div>
 </div>
 
 <input type="file" id="po-list-upload-input" style="display: none;" onchange="handlePOUpload(this)" accept=".pdf,.png,.jpg,.jpeg">
 
 <style>
-.btn-upload-row {
+/* Status Badges */
+.status-badge {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    padding: 3px 8px;
+    border-radius: 50px;
+    font-size: 0.68rem;
+    font-weight: 700;
+    white-space: nowrap;
+}
+.status-approved {
+    background: #f0fdf4;
+    color: #15803d;
+    border: 1px solid #bbf7d0;
+}
+.status-pending {
+    background: #fff7ed;
+    color: #c2410c;
+    border: 1px solid #fed7aa;
+    animation: pulse-approval 2s infinite;
+}
+.status-rejected {
+    background: #fef2f2;
+    color: #b91c1c;
+    border: 1px solid #fecaca;
+}
+.status-draft {
+    background: #f1f5f9;
+    color: #475569;
+    border: 1px solid #cbd5e1;
+}
+
+/* Printing Date Pill Button */
+.btn-date-pill {
+    display: inline-flex;
+    align-items: center;
+    gap: 5px;
+    background: #f0f9ff;
+    color: #0284c7;
+    border: 1px dashed #7dd3fc;
+    padding: 3px 8px;
+    border-radius: 6px;
+    font-size: 0.78rem;
+    font-weight: 700;
+    cursor: pointer;
+    transition: all 0.2s ease;
+}
+.btn-date-pill:hover {
+    background: #e0f2fe;
+    border-color: #0284c7;
+    transform: translateY(-1px);
+}
+
+/* Upload Pill Button */
+.btn-upload-pill {
     background: #f0fdf4;
     color: #166534;
-    border: 1px dashed #bbf7d0;
-    padding: 0.25rem 0.5rem;
-    border-radius: 6px;
-    font-size: 0.75rem;
+    border: 1px solid #bbf7d0;
+    padding: 2px 7px;
+    border-radius: 4px;
+    font-size: 0.68rem;
     font-weight: 700;
     cursor: pointer;
     display: inline-flex;
     align-items: center;
     gap: 4px;
     transition: all 0.2s;
+    text-decoration: none;
 }
-.btn-upload-row:hover {
+.btn-upload-pill:hover {
     background: #dcfce7;
     border-color: #86efac;
     transform: translateY(-1px);
 }
-.attachment-badge {
+
+/* File Preview Button */
+.btn-file-preview {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    background: #f0f9ff;
+    color: #0369a1;
+    border: 1px solid #bae6fd;
+    padding: 2px 7px;
+    border-radius: 4px;
+    font-size: 0.68rem;
+    font-weight: 700;
+    text-decoration: none;
+    transition: all 0.2s;
+}
+.btn-file-preview:hover {
+    background: #e0f2fe;
+    border-color: #7dd3fc;
+    color: #0284c7;
+}
+
+/* Table Action Buttons */
+.table-action-btn {
     display: inline-flex;
     align-items: center;
     justify-content: center;
-    width: 26px;
-    height: 26px;
+    width: 28px;
+    height: 28px;
     border-radius: 6px;
-    background: #f1f5f9;
-    color: #475569;
-    font-size: 0.85rem;
-    transition: all 0.2s;
+    font-size: 0.8rem;
+    background: #ffffff;
+    border: 1px solid #e2e8f0;
+    color: #64748b;
+    cursor: pointer;
+    transition: all 0.15s ease-in-out;
+    text-decoration: none;
 }
-.attachment-badge:hover {
-    background: #e2e8f0;
-    color: #0d9488;
+.table-action-btn:hover {
     transform: translateY(-1px);
+    box-shadow: 0 2px 4px rgba(0,0,0,0.06);
+}
+.table-action-btn.action-view:hover {
+    background: #f0fdfa;
+    border-color: #99f6e4;
+    color: #0d9488;
+}
+.table-action-btn.action-edit:hover {
+    background: #f0f9ff;
+    border-color: #bae6fd;
+    color: #0284c7;
+}
+.table-action-btn.action-pdf:hover {
+    background: #fff1f2;
+    border-color: #fecdd3;
+    color: #e11d48;
+}
+.table-action-btn.action-delete:hover {
+    background: #fef2f2;
+    border-color: #fecaca;
+    color: #dc2626;
+}
+
+@keyframes pulse-approval {
+    0%, 100% { opacity: 1; transform: scale(1); }
+    50% { opacity: 0.85; transform: scale(0.98); }
 }
 </style>
 
@@ -600,9 +841,98 @@ let activeUploadType = 'invoice';
 
 function triggerUpload(poNumber) {
     if (!poNumber) return Swal.fire('Error', 'Invalid PO number for attachment.', 'error');
-    activeUploadPoNumber = poNumber;
-    activeUploadType = 'invoice';
-    document.getElementById('po-list-upload-input').click();
+    
+    Swal.fire({
+        title: 'Upload Invoice Details',
+        html: `
+            <div style="text-align: left; display: flex; flex-direction: column; gap: 0.75rem;">
+                <div>
+                    <label style="font-weight: 700; font-size: 0.85rem; color: #475569;">Invoice Number</label>
+                    <input type="text" id="swal-inv-no" class="swal2-input" placeholder="e.g. INV-1234" style="margin: 0; width: 100%; box-sizing: border-box;">
+                </div>
+                <div>
+                    <label style="font-weight: 700; font-size: 0.85rem; color: #475569;">Invoice Amount (Base/Total)</label>
+                    <input type="number" id="swal-inv-amount" class="swal2-input" placeholder="e.g. 10220" style="margin: 0; width: 100%; box-sizing: border-box;">
+                </div>
+                <div>
+                    <label style="font-weight: 700; font-size: 0.85rem; color: #475569;">Invoice Date</label>
+                    <input type="date" id="swal-inv-date" class="swal2-input" style="margin: 0; width: 100%; box-sizing: border-box;">
+                </div>
+                <div>
+                    <label style="font-weight: 700; font-size: 0.85rem; color: #475569;">Select File</label>
+                    <input type="file" id="swal-inv-file" class="swal2-file" accept=".pdf,.png,.jpg,.jpeg" style="margin: 0; width: 100%; box-sizing: border-box; padding: 0.5rem 0;">
+                </div>
+            </div>
+        `,
+        focusConfirm: false,
+        showCancelButton: true,
+        confirmButtonText: 'Submit & Upload',
+        confirmButtonColor: '#0d9488',
+        preConfirm: () => {
+            const no = document.getElementById('swal-inv-no').value;
+            const amount = document.getElementById('swal-inv-amount').value;
+            const date = document.getElementById('swal-inv-date').value;
+            const fileInput = document.getElementById('swal-inv-file');
+            
+            if (!fileInput.files || fileInput.files.length === 0) {
+                Swal.showValidationMessage('Please select an invoice file');
+                return false;
+            }
+            if (!no) {
+                Swal.showValidationMessage('Please enter invoice number');
+                return false;
+            }
+            if (!amount) {
+                Swal.showValidationMessage('Please enter invoice amount');
+                return false;
+            }
+            if (!date) {
+                Swal.showValidationMessage('Please select invoice date');
+                return false;
+            }
+            
+            return {
+                no: no,
+                amount: amount,
+                date: date,
+                file: fileInput.files[0]
+            };
+        }
+    }).then((result) => {
+        if (result.isConfirmed) {
+            const data = result.value;
+            const formData = new FormData();
+            formData.append('po_number', poNumber);
+            formData.append('invoice_no', data.no);
+            formData.append('invoice_amount', data.amount);
+            formData.append('invoice_date', data.date);
+            formData.append('file', data.file);
+            
+            Swal.fire({
+                title: 'Uploading...',
+                didOpen: () => {
+                    Swal.showLoading();
+                }
+            });
+            
+            fetch('../../ajax/upload_printing_attachment.php', {
+                method: 'POST',
+                body: formData
+            })
+            .then(r => r.json())
+            .then(res => {
+                if (res.success) {
+                    Swal.fire('Uploaded!', 'Invoice uploaded and synced successfully.', 'success').then(() => location.reload());
+                } else {
+                    Swal.fire('Error', res.message || 'Upload failed.', 'error');
+                }
+            })
+            .catch(err => {
+                console.error(err);
+                Swal.fire('Error', 'Network error. Please try again.', 'error');
+            });
+        }
+    });
 }
 
 function triggerTaxOrderUpload(poNumber) {
@@ -613,7 +943,7 @@ function triggerTaxOrderUpload(poNumber) {
 }
 
 function handlePOUpload(input) {
-    if (!input.files || input.files.length === 0 || !activeUploadPoNumber) return;
+    if (!input.files || input.files.length === 0 || !activeUploadPoNumber || activeUploadType !== 'tax_order') return;
     
     const file = input.files[0];
     const formData = new FormData();
@@ -629,9 +959,7 @@ function handlePOUpload(input) {
         }
     });
 
-    const url = activeUploadType === 'tax_order' 
-        ? '../../ajax/upload_printing_tax_order.php' 
-        : '../../ajax/upload_printing_attachment.php';
+    const url = '../../ajax/upload_printing_tax_order.php';
 
     fetch(url, {
         method: 'POST',
@@ -661,10 +989,6 @@ function handlePOUpload(input) {
 // Check for parameters on load
 document.addEventListener('DOMContentLoaded', () => {
     const urlParams = new URLSearchParams(window.location.search);
-    if (urlParams.has('vendor_id')) {
-        const vId = urlParams.get('vendor_id');
-        window.location.href = `create_printing_po.php?vendor_id=${vId}`;
-    }
     
     // Show success message if present in URL
     if (urlParams.has('msg')) {
@@ -725,6 +1049,57 @@ function togglePODetails(groupId) {
             btn.innerHTML = `<i class="fas fa-chevron-down"></i> + ${count} more site(s)`;
         }
     }
+}
+function changePrintingDate(poNumber, currentDate) {
+    if (!poNumber) return Swal.fire('Error', 'Legacy rates without PO number cannot have printing date updated directly.', 'error');
+    
+    Swal.fire({
+        title: 'Change Printing Date',
+        html: `
+            <div style="text-align: left;">
+                <label style="font-weight: 700; font-size: 0.85rem; color: #475569; display: block; margin-bottom: 0.5rem;">Select Printing Date</label>
+                <input type="date" id="swal-print-date" class="swal2-input" value="${currentDate}" style="margin: 0; width: 100%; box-sizing: border-box;">
+            </div>
+        `,
+        showCancelButton: true,
+        confirmButtonText: 'Update Date',
+        confirmButtonColor: '#0d9488',
+        preConfirm: () => {
+            const date = document.getElementById('swal-print-date').value;
+            if (!date) {
+                Swal.showValidationMessage('Please select a date');
+                return false;
+            }
+            return date;
+        }
+    }).then((result) => {
+        if (result.isConfirmed) {
+            const newDate = result.value;
+            
+            Swal.fire({
+                title: 'Updating...',
+                didOpen: () => { Swal.showLoading(); }
+            });
+            
+            fetch('printing_rates.php', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+                body: `action=update_printing_date&po_number=${encodeURIComponent(poNumber)}&printing_date=${encodeURIComponent(newDate)}`
+            })
+            .then(r => r.json())
+            .then(res => {
+                if (res.success) {
+                    Swal.fire('Updated!', 'Printing date updated successfully.', 'success').then(() => location.reload());
+                } else {
+                    Swal.fire('Error', res.message || 'Update failed.', 'error');
+                }
+            })
+            .catch(err => {
+                console.error(err);
+                Swal.fire('Error', 'Network error. Please try again.', 'error');
+            });
+        }
+    });
 }
 </script>
 

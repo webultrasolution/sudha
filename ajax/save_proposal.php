@@ -1,5 +1,6 @@
 <?php
 include_once __DIR__ . '/../config/db.php';
+require_once __DIR__ . '/../includes/ajax_auth.php';
 include_once __DIR__ . '/../includes/functions.php';
 
 if (session_status() === PHP_SESSION_NONE) {
@@ -19,9 +20,10 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     try {
         $pdo->beginTransaction();
 
+        $printCost = floatval($data['printCost'] ?? 0);
+        $mountCost = floatval($data['mountCost'] ?? 0);
+
         // 1. Calculate Totals
-        $printCost = 0;
-        $mountCost = 0;
         $displayCost = 0;
         $totalSQFT = 0;
         $haMarkup = 0;
@@ -33,16 +35,19 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             $displayCost += $sRate;
             $totalSQFT += floatval($site['sqft']);
             
-            $printCost += floatval($site['printing_total'] ?? 0);
-            $mountCost += floatval($site['mounting_total'] ?? 0);
+            // Add per-site printing cost to overall printCost if not already summed
+            $pTotal = floatval($site['printing_total'] ?? 0);
+            $printCost += $pTotal;
 
             $markupVal = $sRate - $pRate;
             if ($site['owner'] === 'HA') $haMarkup += $markupVal;
             else $taMarkup += $markupVal;
         }
 
-        $subtotal = $displayCost + $printCost + $mountCost;
-        $gst = $subtotal * 0.18;
+        $taxType = $data['taxType'] ?? 'igst';
+        $totalMountCost = $totalSQFT * $mountCost;
+        $subtotal = $displayCost + $printCost + $totalMountCost;
+        $gst = ($taxType === 'no_tax') ? 0 : ($subtotal * 0.18);
         $grandTotal = $subtotal + $gst;
         
         $pricePerSqft = $totalSQFT > 0 ? $displayCost / $totalSQFT : 0;
@@ -55,7 +60,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         $proposalStatus   = 'sent';
         $approvalStatus   = 'approved';
 
-        $entityId = $_SESSION['active_entity_id'] ?? null;
+        $entityId = !empty($data['entityId']) ? intval($data['entityId']) : ($_SESSION['active_entity_id'] ?? null);
         if (!$entityId) {
             $stmtEntity = $pdo->query("SELECT id FROM entities LIMIT 1");
             $entityId = $stmtEntity->fetchColumn() ?: null;
@@ -103,7 +108,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         logActivity('generated a new proposal', 'proposals', $proposalId, "Proposal Number: $propNum");
 
         // 3. Insert Items
-        $stmtItem = $pdo->prepare("INSERT INTO proposal_items (proposal_id, site_id, sale_rate, purchase_rate, margin_pct, amount, selected_image, printing_vendor_id, printing_rate, printing_amount, mounting_vendor_id, mounting_rate, mounting_amount) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)");
+        $stmtItem = $pdo->prepare("INSERT INTO proposal_items (proposal_id, site_id, sale_rate, purchase_rate, margin_pct, amount, selected_image, printing_vendor_id, printing_rate, printing_amount) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)");
         foreach ($data['selectedSites'] as $site) {
             $pRate = floatval($site['purchaseRate']);
             $sRate = floatval($site['saleRate']);
@@ -116,13 +121,10 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 $pRate,
                 $margin,
                 $sRate,
-                $site['thumbnail'] ?? null,
-                !empty($site['printing_vendor_id']) ? intval($site['printing_vendor_id']) : null,
+                $site['selected_image'] ?? $site['thumbnail'] ?? null,
+                $site['printing_vendor_id'] ?? null,
                 $site['printing_rate'] ?? 0,
-                $site['printing_total'] ?? 0,
-                null, // mounting_vendor_id
-                $site['mounting_rate'] ?? 0,
-                $site['mounting_total'] ?? 0
+                $site['printing_total'] ?? 0
             ]);
         }
 

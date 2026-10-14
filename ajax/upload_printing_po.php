@@ -1,5 +1,6 @@
 <?php
 include_once __DIR__ . '/../config/db.php';
+require_once __DIR__ . '/../includes/ajax_auth.php';
 include_once __DIR__ . '/../includes/functions.php';
 
 header('Content-Type: application/json');
@@ -19,6 +20,21 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         $raw_email_date = clean($_POST['email_date'] ?? '');
         $email_date = !empty($raw_email_date) ? date('Y-m-d', strtotime(str_replace('/', '-', $raw_email_date))) : null;
         
+        // Validate before consuming an invoice sequence number, so failed requests leave no gaps
+        if (!$client_id) {
+            echo json_encode(['success' => false, 'message' => 'Invalid Client ID']);
+            exit;
+        }
+        if (!canView('clients')) {
+            echo json_encode(['success' => false, 'message' => 'You do not have permission to finalize client printing tax invoices.']);
+            exit;
+        }
+        $rate_ids = array_values(array_filter(array_map('intval', explode(',', $rate_ids_str))));
+        if (empty($po_number) && empty($rate_ids)) {
+            echo json_encode(['success' => false, 'message' => 'No items selected to update']);
+            exit;
+        }
+
         $custom_invoice_number = clean($_POST['custom_invoice_number'] ?? '');
         if (!empty($custom_invoice_number)) {
             $preview = getPreviewSequenceNumber($pdo, 'client_printing_po');
@@ -31,11 +47,6 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         
         $raw_custom_invoice_date = clean($_POST['custom_invoice_date'] ?? '');
         $custom_invoice_date = !empty($raw_custom_invoice_date) ? date('Y-m-d', strtotime(str_replace('/', '-', $raw_custom_invoice_date))) : date('Y-m-d');
-
-        if (!$client_id) {
-            echo json_encode(['success' => false, 'message' => 'Invalid Client ID']);
-            exit;
-        }
 
         $file_path = null;
         if (isset($_FILES['customer_po_file']) && $_FILES['customer_po_file']['error'] === UPLOAD_ERR_OK) {
@@ -54,13 +65,6 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             }
         }
 
-        if (session_status() === PHP_SESSION_NONE) {
-            session_start();
-        }
-        if (!canView('clients')) {
-            echo json_encode(['success' => false, 'message' => 'You do not have permission to finalize client printing tax invoices.']);
-            exit;
-        }
         $isAdmin = ($_SESSION['user_role'] ?? '') === 'admin';
         $approvalStatus = $isAdmin ? 'approved' : 'pending_approval';
         $isFinalInvoice = $isAdmin ? 1 : 0;
@@ -79,12 +83,6 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             $params[] = $po_number;
             $params[] = $client_id;
         } else {
-            $rate_ids = array_filter(array_map('intval', explode(',', $rate_ids_str)));
-            if (empty($rate_ids)) {
-                echo json_encode(['success' => false, 'message' => 'No items selected to update']);
-                exit;
-            }
-            
             $placeholders = implode(',', array_fill(0, count($rate_ids), '?'));
             $sql = "UPDATE client_printing_rates 
                     SET confirmation_type = ?, customer_po_no = ?, customer_po_date = ?, email_date = ?, custom_invoice_number = ?, custom_invoice_date = ?, " . $setStatus 

@@ -22,12 +22,22 @@ $vendor_id_get = isset($_GET['vendor_id']) ? intval($_GET['vendor_id']) : 0;
 
 $rateData = null;
 $selectedSitesData = [];
+$existing_printing_date = null;
 
 if ($action === 'edit') {
+    $po_entity_id = null;
     if ($po_number) {
         $stmt = $pdo->prepare("SELECT * FROM vendor_printing_rates WHERE po_number = ? AND vendor_id = ?");
         $stmt->execute([$po_number, $vendor_id_get]);
         $rows = $stmt->fetchAll();
+        
+        $stmtDate = $pdo->prepare("SELECT MIN(start_date) FROM po_items WHERE po_id = (SELECT id FROM purchase_orders WHERE po_number = ? LIMIT 1)");
+        $stmtDate->execute([$po_number]);
+        $existing_printing_date = $stmtDate->fetchColumn();
+
+        $stmtPO = $pdo->prepare("SELECT entity_id FROM purchase_orders WHERE po_number = ? LIMIT 1");
+        $stmtPO->execute([$po_number]);
+        $po_entity_id = $stmtPO->fetchColumn();
     } else if (!empty($rate_ids)) {
         $in = str_repeat('?,', count($rate_ids) - 1) . '?';
         $stmt = $pdo->prepare("SELECT * FROM vendor_printing_rates WHERE id IN ($in)");
@@ -42,6 +52,9 @@ if ($action === 'edit') {
     }
 
     $rateData = $rows[0];
+    if ($po_entity_id) {
+        $rateData['entity_id'] = $po_entity_id;
+    }
     foreach($rows as $r) {
         $selectedSitesData[$r['site_id']] = $r['rate_per_sqft'];
     }
@@ -69,6 +82,40 @@ $sizes = $pdo->query("SELECT DISTINCT CONCAT(width, 'x', height) as size FROM si
 
 include_once __DIR__ . '/../../includes/header.php';
 ?>
+<style>
+.po-site-table { width: 100%; border-collapse: collapse; }
+.po-site-table th { background: white; border-bottom: 2px solid #f1f5f9; }
+.po-site-table td { padding: 0.7rem 1rem; vertical-align: middle; border-bottom: 1px solid #f8fafc; }
+
+.site-row { transition: background 0.15s; cursor: default; }
+.site-row:hover { background: #f8fafc !important; }
+.site-row.selected { background: #f0fdfa !important; }
+
+.site-chk-input { width: 18px !important; height: 18px !important; accent-color: #0d9488; cursor: pointer; }
+
+.site-rate-input {
+    width: 100px; height: 30px; font-size: 0.85rem; font-weight: 800;
+    border-radius: 6px; border: 1.5px solid #e2e8f0; padding: 0 0.4rem;
+    color: #0d9488; text-align: right; background: #f8fafc;
+    transition: border-color 0.2s, background 0.2s;
+}
+.site-rate-input:focus { background: #fff; border-color: #0d9488; outline: none; }
+
+.btn-primary:hover { background: #0f766e !important; transform: translateY(-2px); box-shadow: 0 12px 20px -5px rgba(13, 148, 136, 0.4) !important; }
+
+.po-pg-btn {
+    min-width: 30px; height: 30px; border: 1px solid #e2e8f0; background: white;
+    border-radius: 7px; cursor: pointer; font-weight: 700; font-size: 0.78rem;
+    transition: all 0.2s; color: #475569; display: flex; align-items: center; justify-content: center; padding: 0 6px;
+}
+.po-pg-btn:hover:not(:disabled) { border-color: #0d9488; color: #0d9488; background: #f0fdfa; }
+.po-pg-btn.active { background: #0d9488; color: white; border-color: #0d9488; box-shadow: 0 3px 8px rgba(13,148,136,0.25); }
+.po-pg-btn:disabled { opacity: 0.35; cursor: not-allowed; }
+.po-pg-dots { color: #94a3b8; font-weight: 800; padding: 0 2px; font-size: 0.8rem; }
+</style>
+<?php
+
+?>
 
 <div style="margin-bottom: 1.5rem;">
     <a href="printing_rates.php" class="btn btn-secondary" style="background: white; border: 1px solid #cbd5e1; color: #475569; padding: 0.5rem 1rem; border-radius: 8px; font-weight: 600; text-decoration: none;">
@@ -92,7 +139,23 @@ include_once __DIR__ . '/../../includes/header.php';
 
         <input type="hidden" name="rate_per_sqft" id="f_rate" value="0">
             <!-- Full-Width Horizontal Header Config Panel -->
-            <div style="background: #f8fafc; padding: 1rem 2.5rem; border-bottom: 1px solid #e2e8f0; display: grid; grid-template-columns: 1fr 1fr 1fr 1fr; gap: 1.5rem; align-items: start;">
+            <div style="background: #f8fafc; padding: 1rem 2.5rem; border-bottom: 1px solid #e2e8f0; display: grid; grid-template-columns: 1.2fr 1fr 1.2fr 1fr 1fr 1.2fr; gap: 1.5rem; align-items: start;">
+                <!-- Column 0: Company / Entity -->
+                <div class="form-group" style="margin: 0;">
+                    <label style="font-weight: 800; color: #475569; font-size: 0.65rem; margin-bottom: 0.35rem; display: block; text-transform: uppercase; letter-spacing: 0.05em;">Company / Entity <span style="color:red;">*</span></label>
+                    <select name="entity_id" id="f_entity" required style="background: #fff; border: 1.5px solid #e2e8f0; border-radius: 8px; padding: 0.5rem 0.75rem; width: 100%; font-weight: 600; font-size: 0.85rem; height: 38px;">
+                        <option value="">Choose Company...</option>
+                        <?php 
+                        $allEntities = $pdo->query("SELECT id, name FROM entities")->fetchAll();
+                        foreach ($allEntities as $e): 
+                        ?>
+                            <option value="<?php echo $e['id']; ?>" <?php echo (($rateData && ($rateData['entity_id'] ?? '') == $e['id']) || ($_SESSION['active_entity_id'] ?? '') == $e['id']) ? 'selected' : ''; ?>>
+                                <?php echo htmlspecialchars($e['name']); ?>
+                            </option>
+                        <?php endforeach; ?>
+                    </select>
+                </div>
+
                 <!-- Column 1: Select Vendor -->
                 <div class="form-group" style="margin: 0;">
                     <label style="font-weight: 800; color: #475569; font-size: 0.65rem; margin-bottom: 0.35rem; display: block; text-transform: uppercase; letter-spacing: 0.05em;">1. Select Vendor</label>
@@ -129,6 +192,12 @@ include_once __DIR__ . '/../../includes/header.php';
                         <option value="One Way Vision" <?php echo ($rateData && ($rateData['media_type'] === 'One Way Vision' || $rateData['media_type'] === 'OWV')) ? 'selected' : ''; ?>>OWV</option>
                         <option value="Canvas" <?php echo ($rateData && $rateData['media_type'] === 'Canvas') ? 'selected' : ''; ?>>Canvas</option>
                     </select>
+                </div>
+
+                <!-- Column 5: Printing Date -->
+                <div class="form-group" style="margin: 0;">
+                    <label style="font-weight: 800; color: #475569; font-size: 0.65rem; margin-bottom: 0.35rem; display: block; text-transform: uppercase; letter-spacing: 0.05em;">5. Printing Date</label>
+                    <input type="date" name="printing_date" id="f_printing_date" value="<?php echo htmlspecialchars($existing_printing_date ?: date('Y-m-d')); ?>" style="background: #fff; border: 1.5px solid #e2e8f0; border-radius: 8px; padding: 0.5rem 0.75rem; width: 100%; font-weight: 600; font-size: 0.85rem; height: 38px; box-sizing: border-box;">
                 </div>
             </div>
 
@@ -345,37 +414,7 @@ include_once __DIR__ . '/../../includes/header.php';
     </div>
 </div>
 
-<style>
-.po-site-table { width: 100%; border-collapse: collapse; }
-.po-site-table th { background: white; border-bottom: 2px solid #f1f5f9; }
-.po-site-table td { padding: 0.7rem 1rem; vertical-align: middle; border-bottom: 1px solid #f8fafc; }
 
-.site-row { transition: background 0.15s; cursor: default; }
-.site-row:hover { background: #f8fafc !important; }
-.site-row.selected { background: #f0fdfa !important; }
-
-.site-chk-input { width: 18px !important; height: 18px !important; accent-color: #0d9488; cursor: pointer; }
-
-.site-rate-input {
-    width: 100px; height: 30px; font-size: 0.85rem; font-weight: 800;
-    border-radius: 6px; border: 1.5px solid #e2e8f0; padding: 0 0.4rem;
-    color: #0d9488; text-align: right; background: #f8fafc;
-    transition: border-color 0.2s, background 0.2s;
-}
-.site-rate-input:focus { background: #fff; border-color: #0d9488; outline: none; }
-
-.btn-primary:hover { background: #0f766e !important; transform: translateY(-2px); box-shadow: 0 12px 20px -5px rgba(13, 148, 136, 0.4) !important; }
-
-.po-pg-btn {
-    min-width: 30px; height: 30px; border: 1px solid #e2e8f0; background: white;
-    border-radius: 7px; cursor: pointer; font-weight: 700; font-size: 0.78rem;
-    transition: all 0.2s; color: #475569; display: flex; align-items: center; justify-content: center; padding: 0 6px;
-}
-.po-pg-btn:hover:not(:disabled) { border-color: #0d9488; color: #0d9488; background: #f0fdfa; }
-.po-pg-btn.active { background: #0d9488; color: white; border-color: #0d9488; box-shadow: 0 3px 8px rgba(13,148,136,0.25); }
-.po-pg-btn:disabled { opacity: 0.35; cursor: not-allowed; }
-.po-pg-dots { color: #94a3b8; font-weight: 800; padding: 0 2px; font-size: 0.8rem; }
-</style>
 
 <script>
 const sitesData = <?php echo json_encode($sites); ?>;
@@ -985,6 +1024,53 @@ function updateBucketUI() {
 }
 
 document.addEventListener('DOMContentLoaded', () => {
+    const urlParams = new URLSearchParams(window.location.search);
+    const isEditMode = <?php echo json_encode($action === 'edit'); ?>;
+    if (!isEditMode && !urlParams.has('entity_id')) {
+        Swal.fire({
+            title: 'Select Company / Entity',
+            html: `
+                <select id="swal_entity_id" class="swal2-select" style="display: flex; width: 80%; margin: 10px auto; font-family: inherit; font-size: 0.9rem; font-weight: 600; padding: 0.5rem; border-radius: 8px;">
+                    <option value="">-- Choose Company --</option>
+                    <?php
+                    $allEntities = $pdo->query("SELECT id, name FROM entities")->fetchAll();
+                    foreach ($allEntities as $e) {
+                        echo '<option value="' . $e['id'] . '">' . htmlspecialchars($e['name']) . '</option>';
+                    }
+                    ?>
+                </select>
+            `,
+            icon: 'question',
+            allowOutsideClick: false,
+            allowEscapeKey: false,
+            showCancelButton: true,
+            cancelButtonText: 'Cancel',
+            cancelButtonColor: '#64748b',
+            showCloseButton: true,
+            confirmButtonText: 'Proceed',
+            confirmButtonColor: '#0d9488',
+            preConfirm: () => {
+                const entityId = document.getElementById('swal_entity_id').value;
+                if (!entityId) {
+                    Swal.showValidationMessage('Please select a company');
+                    return false;
+                }
+                return entityId;
+            }
+        }).then((result) => {
+            if (result.isConfirmed) {
+                const selectedEntity = result.value;
+                const params = new URLSearchParams(window.location.search);
+                params.set('entity_id', selectedEntity);
+                params.set('set_entity', selectedEntity);
+                window.location.search = params.toString();
+            } else {
+                window.location.href = 'printing_rates.php';
+            }
+        });
+        return;
+    }
+
     resetFilters();
 
     if (isEditMode && initialRateData) {

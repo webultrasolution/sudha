@@ -1,51 +1,90 @@
 <?php
 if (session_status() === PHP_SESSION_NONE) session_start();
 include_once __DIR__ . '/../config/db.php';
+require_once __DIR__ . '/../includes/ajax_auth.php';
 include_once __DIR__ . '/../includes/functions.php';
+include_once __DIR__ . '/../includes/upload_validator.php';
 
 header('Content-Type: application/json');
 
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
-    if (!canEdit('bookings') && !canAdd('financials')) {
-        echo json_encode(['success' => false, 'message' => 'Access Denied: You do not have permission to confirm bookings or generate invoices.']);
-        exit;
-    }
-    $booking_id = intval($_POST['booking_id'] ?? 0);
-    $type = clean($_POST['confirmation_type'] ?? 'po');
-    $po_no = clean($_POST['customer_po_no'] ?? '');
-    $po_date = clean($_POST['customer_po_date'] ?? '');
-    $email_date = clean($_POST['email_date'] ?? '');
-    $billing_gstin = clean($_POST['billing_gstin'] ?? '');
-    $invoice_type = clean($_POST['invoice_type'] ?? 'tax');
-    if (!in_array($invoice_type, ['tax', 'ro'])) {
-        $invoice_type = 'tax';
-    }
-    
-    if (!$booking_id) {
-        echo json_encode(['success' => false, 'message' => 'Invalid Booking ID']);
-        exit;
-    }
-
-    $file_path = null;
-    if (isset($_FILES['customer_po_file']) && $_FILES['customer_po_file']['error'] === UPLOAD_ERR_OK) {
-        $upload_dir = __DIR__ . '/../uploads/customer_pos/';
-        if (!is_dir($upload_dir)) {
-            mkdir($upload_dir, 0777, true);
+    try {
+        if (!canEdit('bookings') && !canAdd('financials')) {
+            http_response_code(403);
+            echo json_encode(['success' => false, 'message' => 'Access Denied: You do not have permission to confirm bookings or generate invoices.']);
+            exit;
         }
-        
-        $extension = pathinfo($_FILES['customer_po_file']['name'], PATHINFO_EXTENSION);
-        $prefix = ($type === 'email') ? 'EMAIL_' : 'PO_';
-        $filename = $prefix . $booking_id . '_' . time() . '.' . $extension;
-        $target = $upload_dir . $filename;
-        
-        if (move_uploaded_file($_FILES['customer_po_file']['tmp_name'], $target)) {
-            $file_path = 'uploads/customer_pos/' . $filename;
-        }
-    }
 
-    $sql = "UPDATE bookings SET confirmation_type = ?, customer_po_no = ?, customer_po_date = ?, email_date = ?" . ($file_path ? ", customer_po_file = ?" : "");
+        $booking_id = intval($_POST['booking_id'] ?? 0);
+        $type = clean($_POST['confirmation_type'] ?? 'po');
+        $po_no = clean($_POST['customer_po_no'] ?? '');
+        $po_date = clean($_POST['customer_po_date'] ?? '');
+        $email_date = clean($_POST['email_date'] ?? '');
+        $billing_gstin = clean($_POST['billing_gstin'] ?? '');
+        $invoice_type = clean($_POST['invoice_type'] ?? 'tax');
+
+        if (!in_array($invoice_type, ['tax', 'ro'])) {
+            $invoice_type = 'tax';
+        }
+
+        if (!$booking_id) {
+            http_response_code(400);
+            echo json_encode(['success' => false, 'message' => 'Invalid Booking ID']);
+            exit;
+        }
+
+        $uploadedPaths = [];
+        $fileKey = isset($_FILES['customer_po_file']) ? 'customer_po_file' : (isset($_FILES['customer_po_files']) ? 'customer_po_files' : null);
+
+        if ($fileKey && !empty($_FILES[$fileKey]['name'])) {
+            $upload_dir = __DIR__ . '/../uploads/customer_pos/';
+            UploadValidator::ensureUploadDir($upload_dir);
+            $prefix = ($type === 'email') ? 'EMAIL_' : 'PO_';
+
+            $names = is_array($_FILES[$fileKey]['name']) ? $_FILES[$fileKey]['name'] : [$_FILES[$fileKey]['name']];
+            $tmpNames = is_array($_FILES[$fileKey]['tmp_name']) ? $_FILES[$fileKey]['tmp_name'] : [$_FILES[$fileKey]['tmp_name']];
+            $sizes = is_array($_FILES[$fileKey]['size']) ? $_FILES[$fileKey]['size'] : [$_FILES[$fileKey]['size']];
+            $errors = is_array($_FILES[$fileKey]['error']) ? $_FILES[$fileKey]['error'] : [$_FILES[$fileKey]['error']];
+
+            for ($i = 0; $i < count($names); $i++) {
+                if ($errors[$i] !== UPLOAD_ERR_OK || empty($tmpNames[$i])) {
+                    continue;
+                }
+
+                $singleFile = [
+                    'name'     => $names[$i],
+                    'tmp_name' => $tmpNames[$i],
+                    'size'     => $sizes[$i],
+                    'error'    => $errors[$i]
+                ];
+
+                $ext = UploadValidator::validate($singleFile);
+                $safeFilename = $prefix . $booking_id . '_' . time() . '_' . $i . '.' . $ext;
+                $target = $upload_dir . $safeFilename;
+
+                if (move_uploaded_file($tmpNames[$i], $target)) {
+                    $uploadedPaths[] = 'uploads/customer_pos/' . $safeFilename;
+                } else {
+                    throw new Exception('Failed to save file: ' . htmlspecialchars($names[$i]));
+                }
+            }
+        }
+
+        // Fetch current attachments to merge
+        $stmtCurr = $pdo->prepare("SELECT customer_po_file FROM bookings WHERE id = ?");
+        $stmtCurr->execute([$booking_id]);
+        $currentPoFile = $stmtCurr->fetchColumn();
+        $existingPaths = getAttachmentUrls($currentPoFile);
+
+        $mergedPaths = array_values(array_unique(array_merge($existingPaths, $uploadedPaths)));
+        $file_path = null;
+        if (!empty($uploadedPaths)) {
+            $file_path = count($mergedPaths) > 1 ? json_encode($mergedPaths) : ($mergedPaths[0] ?? null);
+        }
+
+    $sql = "UPDATE bookings SET confirmation_type = ?, customer_po_no = ?, customer_po_date = ?, email_date = ?" . ($file_path !== null ? ", customer_po_file = ?" : "");
     $params = [$type, $po_no ?: null, $po_date ?: null, $email_date ?: null];
-    if ($file_path) $params[] = $file_path;
+    if ($file_path !== null) $params[] = $file_path;
     
     if (!empty($billing_gstin)) {
         $sql .= ", billing_gstin = ?";
@@ -116,8 +155,18 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             }
         } else {
             $approvalStatus = $existing['approval_status'];
-            if ($approvalStatus !== 'approved') {
-                $approvalStatus = $isAdmin ? 'approved' : 'pending_approval';
+            if ($isAdmin || $approvalStatus !== 'approved') {
+                if ($isAdmin) {
+                    $approvalStatus = 'approved';
+                }
+                
+                $entityId = $_SESSION['active_entity_id'] ?? null;
+                $custom_invoice_number = clean($_POST['custom_invoice_number'] ?? '');
+                $custom_invoice_date = clean($_POST['custom_invoice_date'] ?? date('Y-m-d'));
+                
+                if (!empty($custom_invoice_number) && $invoice_type === 'tax') {
+                    syncSequenceNextValue($pdo, 'invoice', $custom_invoice_number, $entityId);
+                }
                 
                 // Fetch booking totals to update the invoice
                 $stmtBooking = $pdo->prepare("SELECT total_amount, tax_amount, grand_total, tax_type FROM bookings WHERE id = ?");
@@ -138,9 +187,6 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                     $igst = $tax_amount;
                 }
                 
-                $custom_invoice_number = clean($_POST['custom_invoice_number'] ?? '');
-                $custom_invoice_date = clean($_POST['custom_invoice_date'] ?? date('Y-m-d'));
-                
                 // Update existing invoice
                 if (!empty($custom_invoice_number)) {
                     $stmtUpdate = $pdo->prepare("UPDATE invoices SET invoice_number = ?, sub_total = ?, cgst = ?, sgst = ?, igst = ?, total_amount = ?, approval_status = ?, invoice_date = ? WHERE id = ?");
@@ -150,7 +196,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                     $stmtUpdate->execute([$bookingData['total_amount'], $cgst, $sgst, $igst, $bookingData['grand_total'], $approvalStatus, $custom_invoice_date, $existing['id']]);
                 }
                 
-                if (!$isAdmin) {
+                if (!$isAdmin && $approvalStatus !== 'approved') {
                     $userId = $_SESSION['user_id'] ?? 0;
                     
                     // Check if an approval request already exists
@@ -169,11 +215,15 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                     }
                 }
             }
+            syncBookingInvoiceFinancials($pdo, $booking_id);
         }
         
         echo json_encode(['success' => true, 'approval_status' => $approvalStatus, 'is_admin' => $isAdmin]);
     } else {
         echo json_encode(['success' => false, 'message' => 'Database Update Failed']);
+    }
+    } catch (Exception $e) {
+        echo json_encode(['success' => false, 'message' => $e->getMessage()]);
     }
 }
 ?>

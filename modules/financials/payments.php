@@ -70,6 +70,8 @@ $stmt = $pdo->prepare("
            cpr.po_number as inv_num_print,
            po.po_number as po_num_std,
            vpr.po_number as po_num_print,
+           po.vendor_invoice_no as po_inv_num_std,
+           vpr.vendor_invoice_no as po_inv_num_print,
            prop.proposal_number as prop_num,
            COALESCE(p.rejection_reason, ar.remarks) as rejection_reason
     FROM payments p 
@@ -78,7 +80,7 @@ $stmt = $pdo->prepare("
     LEFT JOIN client_printing_rates cpr ON (p.type = 'receivable' AND p.invoice_id = cpr.id)
     LEFT JOIN purchase_orders po ON (p.type = 'payable' AND p.proposal_id = po.id)
     LEFT JOIN vendor_printing_rates vpr ON (p.type = 'payable' AND p.proposal_id = vpr.id)
-    LEFT JOIN proposals prop ON (p.proposal_id = prop.id)
+    LEFT JOIN proposals prop ON (p.type = 'receivable' AND p.proposal_id = prop.id)
     LEFT JOIN approval_requests ar ON (ar.entity_type = 'payment' AND ar.entity_id = p.id)
     $whereClause
     ORDER BY p.id DESC
@@ -199,7 +201,13 @@ $partners = $pdo->query("SELECT id, name FROM partners ORDER BY name ASC")->fetc
                         $isLinked = true;
                     }
                 } else {
-                    if (!empty($p['po_num_std'])) {
+                    if (!empty($p['po_inv_num_std'])) {
+                        $ref = $p['po_inv_num_std'];
+                        $isLinked = true;
+                    } elseif (!empty($p['po_inv_num_print'])) {
+                        $ref = $p['po_inv_num_print'];
+                        $isLinked = true;
+                    } elseif (!empty($p['po_num_std'])) {
                         $ref = $p['po_num_std'];
                         $isLinked = true;
                     } elseif (!empty($p['po_num_print'])) {

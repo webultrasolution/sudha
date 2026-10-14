@@ -1,5 +1,6 @@
 <?php
 include_once __DIR__ . '/../config/db.php';
+require_once __DIR__ . '/../includes/ajax_auth.php';
 header('Content-Type: application/json');
 
 $id = isset($_GET['id']) ? intval($_GET['id']) : 0;

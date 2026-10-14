@@ -1,5 +1,6 @@
 <?php
 include_once __DIR__ . '/../config/db.php';
+require_once __DIR__ . '/../includes/ajax_auth.php';
 include_once __DIR__ . '/../includes/functions.php';
 
 if (session_status() === PHP_SESSION_NONE) {
@@ -10,8 +11,12 @@ $isAdmin = ($_SESSION['user_role'] ?? '') === 'admin';
 
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     $data = json_decode(file_get_contents('php://input'), true);
-    $bookingId = intval($data['booking_id']);
-    $type = clean($data['type']);
+    $bookingId = intval($data['booking_id'] ?? 0);
+    $type = clean($data['type'] ?? '');
+    if (!$bookingId) {
+        echo json_encode(['success' => false, 'message' => 'Invalid Booking ID']);
+        exit;
+    }
     $entityId = !empty($data['entity_id']) ? intval($data['entity_id']) : null;
 
     try {
@@ -61,8 +66,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         $invoice_date = !empty($data['date']) ? $data['date'] : date('Y-m-d');
 
         $stmtInv = $pdo->prepare("
-            INSERT INTO invoices (invoice_number, booking_id, entity_id, invoice_date, type, sub_total, cgst, sgst, igst, total_amount, payment_status, approval_status) 
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'unpaid', ?)
+            INSERT INTO invoices (invoice_number, booking_id, entity_id, invoice_date, type, sub_total, cgst, sgst, igst, total_amount, payment_status, approval_status, created_by) 
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'unpaid', ?, ?)
         ");
         
         $tax_amount = floatval($fin['tax_amount'] ?? 0);
@@ -90,7 +95,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             $sgst,
             $igst,
             $fin['grand_total'],
-            $approvalStatus
+            $approvalStatus,
+            $_SESSION['user_id'] ?? null
         ]);
 
         $invoiceId = $pdo->lastInsertId();

@@ -1,5 +1,6 @@
 <?php
 include_once __DIR__ . '/../config/db.php';
+require_once __DIR__ . '/../includes/ajax_auth.php';
 include_once __DIR__ . '/../includes/functions.php';
 
 if (session_status() === PHP_SESSION_NONE) {
@@ -130,8 +131,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
         // 2. Insert into invoices (using entity_id, remarks, billing_gstin, approval_status)
         $stmtInv = $pdo->prepare("
-            INSERT INTO invoices (booking_id, entity_id, invoice_number, invoice_date, sub_total, cgst, sgst, igst, total_amount, payment_status, approval_status, type, remarks, billing_gstin) 
-            VALUES (0, ?, ?, CURDATE(), ?, ?, ?, ?, ?, 'unpaid', ?, 'printing', ?, ?)
+            INSERT INTO invoices (booking_id, entity_id, invoice_number, invoice_date, sub_total, cgst, sgst, igst, total_amount, payment_status, approval_status, type, remarks, billing_gstin, created_by) 
+            VALUES (0, ?, ?, CURDATE(), ?, ?, ?, ?, ?, 'unpaid', ?, 'printing', ?, ?, ?)
         ");
         $stmtInv->execute([
             $client_id, 
@@ -143,7 +144,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             $grandTotal,
             $approvalStatus,
             $remarks,
-            $billing_gstin
+            $billing_gstin,
+            $_SESSION['user_id'] ?? null
         ]);
         $invoiceId = $pdo->lastInsertId();
 

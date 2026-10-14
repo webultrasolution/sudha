@@ -9,7 +9,8 @@ requirePermission('financials', 'view');
 
 include_once __DIR__ . '/../../includes/header.php';
 
-$type = isset($_GET['type']) ? $_GET['type'] : 'client';
+$type = (($_GET['type'] ?? '') === 'vendor') ? 'vendor' : 'client';
+$activeEntityId = $_SESSION['active_entity_id'] ?? null;
 
 // Fetch Partners based on type
 $stmt = $pdo->prepare("SELECT id, name, city, gstin, contact_person, phone, email FROM partners WHERE type = ? ORDER BY name ASC");
@@ -50,36 +51,68 @@ $partners = $stmt->fetchAll();
         <tbody>
             <?php foreach ($partners as $p): 
                 if ($type == 'client') {
-                    // Total Billed to Client (Invoices + Printing POs)
-                    $stmtBilled = $pdo->prepare("
-                        SELECT 
-                            (SELECT COALESCE(SUM(i.total_amount), 0) FROM invoices i JOIN bookings b ON i.booking_id = b.id WHERE b.client_id = ? AND i.approval_status = 'approved')
-                            +
-                            (SELECT COALESCE(SUM(r.rate_per_sqft * COALESCE(s.width, 0) * COALESCE(s.height, 0) * 1.18), 0) FROM client_printing_rates r LEFT JOIN sites s ON r.site_id = s.id WHERE r.client_id = ? AND r.is_final_invoice = 1 AND r.approval_status = 'approved')
-                            +
-                            (SELECT COALESCE(SUM(m.rate_per_sqft * COALESCE(s.width, 0) * COALESCE(s.height, 0) * 1.18), 0) FROM client_mounting_rates m LEFT JOIN sites s ON m.site_id = s.id WHERE m.client_id = ? AND m.is_final_invoice = 1 AND m.approval_status = 'approved')
-                    ");
-                    $stmtBilled->execute([$p['id'], $p['id'], $p['id']]);
+                    if ($activeEntityId) {
+                        // Total Billed to Client (Invoices + Printing POs)
+                        $stmtBilled = $pdo->prepare("
+                            SELECT 
+                                (SELECT COALESCE(SUM(i.total_amount), 0) FROM invoices i JOIN bookings b ON i.booking_id = b.id WHERE b.client_id = ? AND i.approval_status = 'approved' AND i.entity_id = ?)
+                                +
+                                (SELECT COALESCE(SUM(r.rate_per_sqft * COALESCE(s.width, 0) * COALESCE(s.height, 0) * 1.18), 0) FROM client_printing_rates r LEFT JOIN sites s ON r.site_id = s.id LEFT JOIN bookings b ON r.booking_id = b.id WHERE r.client_id = ? AND r.is_final_invoice = 1 AND r.approval_status = 'approved' AND b.entity_id = ?)
+                                +
+                                (SELECT COALESCE(SUM(m.rate_per_sqft * COALESCE(s.width, 0) * COALESCE(s.height, 0) * 1.18), 0) FROM client_mounting_rates m LEFT JOIN sites s ON m.site_id = s.id LEFT JOIN bookings b ON m.booking_id = b.id WHERE m.client_id = ? AND m.is_final_invoice = 1 AND m.approval_status = 'approved' AND b.entity_id = ?)
+                        ");
+                        $stmtBilled->execute([$p['id'], $activeEntityId, $p['id'], $activeEntityId, $p['id'], $activeEntityId]);
+                        
+                        // Total Paid by Client (Receivables)
+                        $stmtPaid = $pdo->prepare("SELECT SUM(amount) FROM payments WHERE partner_id = ? AND type = 'receivable' AND (approval_status = 'approved' OR approval_status IS NULL OR approval_status = '') AND entity_id = ?");
+                        $stmtPaid->execute([$p['id'], $activeEntityId]);
+                    } else {
+                        // Total Billed to Client (Invoices + Printing POs)
+                        $stmtBilled = $pdo->prepare("
+                            SELECT 
+                                (SELECT COALESCE(SUM(i.total_amount), 0) FROM invoices i JOIN bookings b ON i.booking_id = b.id WHERE b.client_id = ? AND i.approval_status = 'approved')
+                                +
+                                (SELECT COALESCE(SUM(r.rate_per_sqft * COALESCE(s.width, 0) * COALESCE(s.height, 0) * 1.18), 0) FROM client_printing_rates r LEFT JOIN sites s ON r.site_id = s.id WHERE r.client_id = ? AND r.is_final_invoice = 1 AND r.approval_status = 'approved')
+                                +
+                                (SELECT COALESCE(SUM(m.rate_per_sqft * COALESCE(s.width, 0) * COALESCE(s.height, 0) * 1.18), 0) FROM client_mounting_rates m LEFT JOIN sites s ON m.site_id = s.id WHERE m.client_id = ? AND m.is_final_invoice = 1 AND m.approval_status = 'approved')
+                        ");
+                        $stmtBilled->execute([$p['id'], $p['id'], $p['id']]);
+                        
+                        // Total Paid by Client (Receivables)
+                        $stmtPaid = $pdo->prepare("SELECT SUM(amount) FROM payments WHERE partner_id = ? AND type = 'receivable' AND (approval_status = 'approved' OR approval_status IS NULL OR approval_status = '')");
+                        $stmtPaid->execute([$p['id']]);
+                    }
                     $totalBilled = $stmtBilled->fetchColumn() ?: 0;
-
-                    // Total Paid by Client (Receivables)
-                    $stmtPaid = $pdo->prepare("SELECT SUM(amount) FROM payments WHERE partner_id = ? AND type = 'receivable' AND (approval_status = 'approved' OR approval_status IS NULL OR approval_status = '')");
-                    $stmtPaid->execute([$p['id']]);
                     $totalPaid = $stmtPaid->fetchColumn() ?: 0;
                 } else {
-                    // Total Billed by Vendor (Purchase Orders and Printing POs) — use fallback calc if total_amount is null/0
-                    $stmtBilled = $pdo->prepare("
-                        SELECT 
-                            (SELECT COALESCE(SUM(COALESCE(NULLIF(total_amount, 0), po_amount + COALESCE(cgst_amount,0) + COALESCE(sgst_amount,0) + COALESCE(igst_amount,0))), 0) FROM purchase_orders WHERE vendor_id = ? AND approval_status = 'approved')
-                            +
-                            (SELECT COALESCE(SUM(r.rate_per_sqft * COALESCE(s.width, 0) * COALESCE(s.height, 0)), 0) FROM vendor_printing_rates r LEFT JOIN sites s ON r.site_id = s.id WHERE r.vendor_id = ?)
-                    ");
-                    $stmtBilled->execute([$p['id'], $p['id']]);
+                    if ($activeEntityId) {
+                        // Total Billed by Vendor (Purchase Orders and Printing POs)
+                        $stmtBilled = $pdo->prepare("
+                            SELECT 
+                                (SELECT COALESCE(SUM(COALESCE(NULLIF(total_amount, 0), po_amount + COALESCE(cgst_amount,0) + COALESCE(sgst_amount,0) + COALESCE(igst_amount,0))), 0) FROM purchase_orders WHERE vendor_id = ? AND type != 'printing' AND approval_status = 'approved' AND vendor_invoice_approval_status = 'approved' AND entity_id = ?)
+                                +
+                                (SELECT COALESCE(SUM(r.rate_per_sqft * COALESCE(s.width, 0) * COALESCE(s.height, 0)), 0) FROM vendor_printing_rates r LEFT JOIN sites s ON r.site_id = s.id WHERE r.vendor_id = ? AND r.po_number IN (SELECT po_number FROM purchase_orders WHERE type = 'printing' AND approval_status = 'approved' AND entity_id = ?))
+                        ");
+                        $stmtBilled->execute([$p['id'], $activeEntityId, $p['id'], $activeEntityId]);
+                        
+                        // Total Paid to Vendor (Payables)
+                        $stmtPaid = $pdo->prepare("SELECT SUM(amount) FROM payments WHERE partner_id = ? AND type = 'payable' AND (approval_status = 'approved' OR approval_status IS NULL OR approval_status = '') AND entity_id = ?");
+                        $stmtPaid->execute([$p['id'], $activeEntityId]);
+                    } else {
+                        // Total Billed by Vendor (Purchase Orders and Printing POs)
+                        $stmtBilled = $pdo->prepare("
+                            SELECT 
+                                (SELECT COALESCE(SUM(COALESCE(NULLIF(total_amount, 0), po_amount + COALESCE(cgst_amount,0) + COALESCE(sgst_amount,0) + COALESCE(igst_amount,0))), 0) FROM purchase_orders WHERE vendor_id = ? AND type != 'printing' AND approval_status = 'approved' AND vendor_invoice_approval_status = 'approved')
+                                +
+                                (SELECT COALESCE(SUM(r.rate_per_sqft * COALESCE(s.width, 0) * COALESCE(s.height, 0)), 0) FROM vendor_printing_rates r LEFT JOIN sites s ON r.site_id = s.id WHERE r.vendor_id = ? AND (r.po_number IS NULL OR r.po_number IN (SELECT po_number FROM purchase_orders WHERE type = 'printing' AND approval_status = 'approved')))
+                        ");
+                        $stmtBilled->execute([$p['id'], $p['id']]);
+                        
+                        // Total Paid to Vendor (Payables)
+                        $stmtPaid = $pdo->prepare("SELECT SUM(amount) FROM payments WHERE partner_id = ? AND type = 'payable' AND (approval_status = 'approved' OR approval_status IS NULL OR approval_status = '')");
+                        $stmtPaid->execute([$p['id']]);
+                    }
                     $totalBilled = $stmtBilled->fetchColumn() ?: 0;
-
-                    // Total Paid to Vendor (Payables)
-                    $stmtPaid = $pdo->prepare("SELECT SUM(amount) FROM payments WHERE partner_id = ? AND type = 'payable' AND (approval_status = 'approved' OR approval_status IS NULL OR approval_status = '')");
-                    $stmtPaid->execute([$p['id']]);
                     $totalPaid = $stmtPaid->fetchColumn() ?: 0;
                 }
 
@@ -111,9 +144,14 @@ $partners = $stmt->fetchAll();
                 </td>
                 <td style="padding: 1rem; color: #64748b; font-weight: 500;"><?php echo $p['city']; ?></td>
                 <td style="padding: 1rem; text-align: right; font-weight: 600; color: #475569;"><?php echo formatCurrency($totalBilled); ?></td>
-                <td style="padding: 1rem; text-align: right; font-weight: 600; color: #10b981;"><?php echo formatCurrency($totalPaid); ?></td>
-                <td style="padding: 1rem; text-align: right; font-weight: 800; color: <?php echo $balance > 0 ? '#e11d48' : '#059669'; ?>;">
-                    <?php echo formatCurrency(abs($balance)); ?> <?php echo $balance > 0 ? ($type == 'client' ? 'DUE' : 'PAYABLE') : 'ADV'; ?>
+                <td style="padding: 1rem; text-align: right; font-weight: 800; color: <?php echo abs($balance) < 0.01 ? '#64748b' : ($balance > 0 ? '#e11d48' : '#059669'); ?>;">
+                    <?php if (abs($balance) < 0.01): ?>
+                        ₹0.00
+                    <?php elseif ($balance > 0): ?>
+                        <?php echo formatCurrency($balance); ?> <?php echo ($type == 'client' ? 'DUE' : 'PAYABLE'); ?>
+                    <?php else: ?>
+                        <?php echo formatCurrency(abs($balance)); ?> ADV
+                    <?php endif; ?>
                 </td>
                 <td style="padding: 1rem; text-align: right;">
                     <a href="partner_ledger.php?partner_id=<?php echo $p['id']; ?>" class="btn-sm" style="text-decoration: none; background: #0f172a; color: white; padding: 0.5rem 1rem; border-radius: 8px; font-size: 0.7rem; font-weight: 700;">

@@ -109,12 +109,13 @@ if (hasRole('admin')) {
 
     $pendingProposals = $pdo->query("SELECT COUNT(*) FROM proposals WHERE approval_status = 'pending_approval' $entityCondProp")->fetchColumn();
     $pendingPOs       = $pdo->query("SELECT COUNT(*) FROM purchase_orders WHERE approval_status = 'pending_approval' $entityCondPO")->fetchColumn();
+    $pendingVendorInvoices = $pdo->query("SELECT COUNT(*) FROM purchase_orders WHERE vendor_invoice_approval_status = 'pending' $entityCondPO")->fetchColumn();
     $pendingBookings  = $pdo->query("SELECT COUNT(*) FROM bookings WHERE approval_status = 'pending_approval' $entityCondBook")->fetchColumn();
     $pendingInvoices  = $pdo->query("SELECT COUNT(*) FROM invoices WHERE approval_status = 'pending_approval' $entityCondInv")->fetchColumn();
     $pendingClientPrintings = $pdo->query("SELECT COUNT(DISTINCT po_number) FROM client_printing_rates WHERE approval_status = 'pending_approval'")->fetchColumn();
     $pendingClientMountings = $pdo->query("SELECT COUNT(DISTINCT po_number) FROM client_mounting_rates WHERE approval_status = 'pending_approval'")->fetchColumn();
     $pendingPayments  = $pdo->query("SELECT COUNT(*) FROM payments WHERE approval_status = 'pending_approval' $entityCondPay")->fetchColumn();
-    $pendingCount     = $pendingProposals + $pendingPOs + $pendingBookings + $pendingInvoices + $pendingClientPrintings + $pendingClientMountings + $pendingPayments;
+    $pendingCount     = $pendingProposals + $pendingPOs + $pendingVendorInvoices + $pendingBookings + $pendingInvoices + $pendingClientPrintings + $pendingClientMountings + $pendingPayments;
 
     $pendingFeed = $pdo->query("
         SELECT CONVERT('Proposal' USING utf8mb4) COLLATE utf8mb4_general_ci as type, CONVERT(p.proposal_number USING utf8mb4) COLLATE utf8mb4_general_ci as ref_no, p.created_at, p.total_amount as amount, CONVERT('proposals' USING utf8mb4) COLLATE utf8mb4_general_ci as tab, CONVERT(e.name USING utf8mb4) COLLATE utf8mb4_general_ci as entity_name
@@ -122,6 +123,9 @@ if (hasRole('admin')) {
         UNION ALL
         SELECT CONVERT('PO' USING utf8mb4) COLLATE utf8mb4_general_ci as type, CONVERT(po.po_number USING utf8mb4) COLLATE utf8mb4_general_ci as ref_no, po.po_date as created_at, po.total_amount as amount, CONVERT('pos' USING utf8mb4) COLLATE utf8mb4_general_ci as tab, CONVERT(e.name USING utf8mb4) COLLATE utf8mb4_general_ci as entity_name
         FROM purchase_orders po LEFT JOIN entities e ON po.entity_id = e.id WHERE po.approval_status = 'pending_approval' $entityCondPOAlias
+        UNION ALL
+        SELECT CONVERT('Vendor Invoice' USING utf8mb4) COLLATE utf8mb4_general_ci as type, CONVERT(po.po_number USING utf8mb4) COLLATE utf8mb4_general_ci as ref_no, po.created_at, COALESCE(po.vendor_invoice_amount, po.total_amount) as amount, CONVERT('pos' USING utf8mb4) COLLATE utf8mb4_general_ci as tab, CONVERT(e.name USING utf8mb4) COLLATE utf8mb4_general_ci as entity_name
+        FROM purchase_orders po LEFT JOIN entities e ON po.entity_id = e.id WHERE po.vendor_invoice_approval_status = 'pending' $entityCondPOAlias
         UNION ALL
         SELECT CONVERT('Booking' USING utf8mb4) COLLATE utf8mb4_general_ci as type, CONVERT(COALESCE(b.booking_number, CONCAT('BK-', b.id)) USING utf8mb4) COLLATE utf8mb4_general_ci as ref_no, b.created_at, 0 as amount, CONVERT('bookings' USING utf8mb4) COLLATE utf8mb4_general_ci as tab, CONVERT(e.name USING utf8mb4) COLLATE utf8mb4_general_ci as entity_name
         FROM bookings b LEFT JOIN entities e ON b.entity_id = e.id WHERE b.approval_status = 'pending_approval' $entityCondBookAlias
@@ -333,35 +337,78 @@ if ($canViewFinancials) {
     $dateCondPaymentWithAlias = str_replace('payment_date', 'pay.payment_date', $dateCondPayment);
     $dateCondPOWithAlias = str_replace('po_date', 'po.po_date', $dateCondPO);
 
-    $clientReceivables = $pdo->query("
-        SELECT p.name, 
-               COALESCE(SUM(i.total_amount), 0) as total_invoiced,
-               COALESCE(SUM(pay.amount), 0) as total_paid,
-               (COALESCE(SUM(i.total_amount), 0) - COALESCE(SUM(pay.amount), 0)) as balance_due
-         FROM partners p
-         LEFT JOIN bookings b ON b.client_id = p.id " . ($activeEntityId ? "AND b.entity_id = $activeEntityId" : "") . "
-         LEFT JOIN invoices i ON i.booking_id = b.id AND i.approval_status = 'approved' AND $dateCondInvoiceWithAlias " . ($activeEntityId ? "AND i.entity_id = $activeEntityId" : "") . "
-         LEFT JOIN payments pay ON pay.invoice_id = i.id AND pay.approval_status = 'approved' AND pay.type = 'receivable' AND $dateCondPaymentWithAlias " . ($activeEntityId ? "AND pay.entity_id = $activeEntityId" : "") . "
-         WHERE p.type = 'client'
-         GROUP BY p.id, p.name
-         HAVING balance_due > 0
-         ORDER BY balance_due DESC LIMIT 5
-     ")->fetchAll();
+    // Client Receivables List (Top 5 Outstanding Dues)
+    $entityCondInvAlias = $activeEntityId ? " AND i.entity_id = $activeEntityId" : "";
+    $entityCondPayAlias = $activeEntityId ? " AND pay.entity_id = $activeEntityId" : "";
+    $entityCondPOAlias  = $activeEntityId ? " AND po.entity_id = $activeEntityId" : "";
 
-     // Vendor Payables List (Top 5)
-     $vendorPayables = $pdo->query("
-         SELECT p.name, 
-                COALESCE(SUM(po.total_amount), 0) as total_po,
-                COALESCE(SUM(pay.amount), 0) as total_paid,
-                (COALESCE(SUM(po.total_amount), 0) - COALESCE(SUM(pay.amount), 0)) as balance_payable
-         FROM partners p
-         LEFT JOIN purchase_orders po ON po.vendor_id = p.id AND po.approval_status = 'approved' AND $dateCondPOWithAlias " . ($activeEntityId ? "AND po.entity_id = $activeEntityId" : "") . "
-         LEFT JOIN payments pay ON pay.proposal_id = po.id AND pay.approval_status = 'approved' AND pay.type = 'payable' AND $dateCondPaymentWithAlias " . ($activeEntityId ? "AND pay.entity_id = $activeEntityId" : "") . "
-         WHERE p.type = 'vendor'
-         GROUP BY p.id, p.name
-         HAVING balance_payable > 0
-         ORDER BY balance_payable DESC LIMIT 5
-     ")->fetchAll();
+    $clientReceivablesRaw = $pdo->query("
+        SELECT p.id, p.name,
+            COALESCE((
+                SELECT SUM(i.total_amount) 
+                FROM invoices i 
+                JOIN bookings b ON i.booking_id = b.id
+                WHERE b.client_id = p.id 
+                  AND i.type = 'tax' AND i.approval_status = 'approved'
+                  $entityCondInvAlias
+            ), 0) as total_invoiced,
+            COALESCE((
+                SELECT SUM(pay.amount) 
+                FROM payments pay 
+                WHERE pay.partner_id = p.id 
+                  AND pay.type = 'receivable' AND pay.approval_status = 'approved'
+                  $entityCondPayAlias
+            ), 0) as total_paid
+        FROM partners p
+        WHERE p.type = 'client'
+        HAVING (total_invoiced - total_paid) > 0
+        ORDER BY (total_invoiced - total_paid) DESC
+        LIMIT 5
+    ")->fetchAll();
+
+    $clientReceivables = [];
+    foreach ($clientReceivablesRaw as $cr) {
+        $clientReceivables[] = [
+            'name' => $cr['name'],
+            'total_invoiced' => (float)$cr['total_invoiced'],
+            'total_paid' => (float)$cr['total_paid'],
+            'balance_due' => (float)$cr['total_invoiced'] - (float)$cr['total_paid']
+        ];
+    }
+
+    // Vendor Payables List (Top 5 Outstanding Payables)
+    $vendorPayablesRaw = $pdo->query("
+        SELECT p.id, p.name,
+            COALESCE((
+                SELECT SUM(po.total_amount) 
+                FROM purchase_orders po 
+                WHERE po.vendor_id = p.id 
+                  AND po.approval_status = 'approved'
+                  $entityCondPOAlias
+            ), 0) as total_po,
+            COALESCE((
+                SELECT SUM(pay.amount) 
+                FROM payments pay 
+                WHERE pay.partner_id = p.id 
+                  AND pay.type = 'payable' AND pay.approval_status = 'approved'
+                  $entityCondPayAlias
+            ), 0) as total_paid
+        FROM partners p
+        WHERE p.type = 'vendor'
+        HAVING (total_po - total_paid) > 0
+        ORDER BY (total_po - total_paid) DESC
+        LIMIT 5
+    ")->fetchAll();
+
+    $vendorPayables = [];
+    foreach ($vendorPayablesRaw as $vp) {
+        $vendorPayables[] = [
+            'name' => $vp['name'],
+            'total_po' => (float)$vp['total_po'],
+            'total_paid' => (float)$vp['total_paid'],
+            'balance_payable' => (float)$vp['total_po'] - (float)$vp['total_paid']
+        ];
+    }
 }
 
 $upcomingMountings = [];
@@ -369,22 +416,20 @@ $expiringCampaigns = [];
 if ($canViewBookings) {
     // Campaign Operations Radar
     $upcomingMountings = $pdo->query("
-        SELECT b.id, b.start_date, p.proposal_number, pr.name as client_name,
+        SELECT b.id, b.start_date, b.booking_number, pr.name as client_name,
                DATEDIFF(b.start_date, CURRENT_DATE()) as days_until
         FROM bookings b
-        JOIN proposals p ON b.proposal_id = p.id
-        JOIN partners pr ON p.client_id = pr.id
+        JOIN partners pr ON b.client_id = pr.id
         WHERE b.status IN ('pending', 'mounting') AND b.start_date >= CURRENT_DATE()
         ORDER BY b.start_date ASC
         LIMIT 5
     ")->fetchAll();
 
     $expiringCampaigns = $pdo->query("
-        SELECT b.id, b.end_date, p.proposal_number, pr.name as client_name,
+        SELECT b.id, b.end_date, b.booking_number, pr.name as client_name,
                DATEDIFF(b.end_date, CURRENT_DATE()) as days_left
         FROM bookings b
-        JOIN proposals p ON b.proposal_id = p.id
-        JOIN partners pr ON p.client_id = pr.id
+        JOIN partners pr ON b.client_id = pr.id
         WHERE b.status = 'active' AND b.end_date >= CURRENT_DATE()
         ORDER BY b.end_date ASC
         LIMIT 5
@@ -441,17 +486,19 @@ if ($canViewBookings) {
     <div class="metrics-grid">
         <!-- Backlog widget for Admin -->
         <?php if (hasRole('admin')): ?>
-        <a href="modules/admin/approvals.php" class="metric-card g-orange-red" style="text-decoration: none;">
+        <a href="modules/admin/approvals.php" class="metric-card g-orange-red" id="db-pending-link" style="text-decoration: none;">
             <div class="m-content">
                 <i class="fas fa-tasks"></i>
                 <div class="m-data">
                     <span>Pending Approvals</span>
-                    <h3><?php echo $pendingCount; ?> Items</h3>
+                    <h3 id="db-pending-count"><?php echo $pendingCount; ?> Items</h3>
                 </div>
             </div>
-            <?php if ($pendingCount > 0): ?>
-                <div class="m-mini-badge" style="background: #ef4444; border: 1px solid white;">Action Required</div>
-            <?php endif; ?>
+            <div id="db-pending-badge-container">
+                <?php if ($pendingCount > 0): ?>
+                    <div class="m-mini-badge" style="background: #ef4444; border: 1px solid white;">Action Required</div>
+                <?php endif; ?>
+            </div>
         </a>
         <?php endif; ?>
 
@@ -572,7 +619,10 @@ if ($canViewBookings) {
         <!-- Vendor Payables (In Short) -->
         <div class="table-box">
             <div class="box-header" style="display: flex; justify-content: space-between; align-items: center;">
-                <h4>Vendor Payables (In Short)</h4>
+                <div>
+                    <h4 style="margin: 0;">Vendor Payables (In Short)</h4>
+                    <span style="font-size: 0.65rem; color: #64748b; font-weight: 600;">Committed Liabilities (Approved POs)</span>
+                </div>
                 <span style="font-size: 0.65rem; background: #fef3c7; color: #b45309; padding: 2px 8px; border-radius: 50px; font-weight: 700;">Top Payable</span>
             </div>
             <table class="modern-table">
@@ -604,7 +654,10 @@ if ($canViewBookings) {
         <!-- Vendor Site Profitability % (In Short) -->
         <div class="table-box">
             <div class="box-header" style="display: flex; justify-content: space-between; align-items: center;">
-                <h4>Vendor Site Profitability (In Short)</h4>
+                <div>
+                    <h4 style="margin: 0;">Vendor Site Profitability (In Short)</h4>
+                    <span style="font-size: 0.65rem; color: #64748b; font-weight: 600;">Settled Margins (Approved Vendor Invoices)</span>
+                </div>
                 <span style="font-size: 0.65rem; background: #ecfdf5; color: #047857; padding: 2px 8px; border-radius: 50px; font-weight: 700;">Top Margins</span>
             </div>
             <table class="modern-table">
@@ -618,36 +671,40 @@ if ($canViewBookings) {
                 </thead>
                 <tbody>
                     <?php
-                    $dateCondInvoiceWithAlias = str_replace(
-                        ['created_at', 'invoice_date'], 
-                        ['i.created_at', 'i.invoice_date'], 
-                        $dateCondInvoice
-                    );
-                    $activeEntityId = $_SESSION['active_entity_id'] ?? null;
-                    $entityCondInv = $activeEntityId ? " AND i.entity_id = $activeEntityId" : "";
+                    $entityCondBookAlias = $activeEntityId ? " AND b.entity_id = $activeEntityId" : "";
+                    $dateCondBookWithAlias = str_replace(['created_at', 'invoice_date'], ['b.created_at', 'b.created_at'], $dateCondInvoice);
                     
                     $vendorProfitability = $pdo->query("
                         SELECT 
                             p.name as vendor_name,
-                            SUM(bi.amount) as total_revenue,
-                            SUM(bi.amount - (bi.purchase_amount + bi.printing_amount)) as total_profit,
-                            (SUM(bi.amount - (bi.purchase_amount + bi.printing_amount)) / SUM(bi.amount)) * 100 as profit_margin
+                            COALESCE(SUM(bi.amount), 0) as total_revenue,
+                            COALESCE(SUM(bi.amount - (COALESCE(bi.purchase_amount, 0) + COALESCE(bi.printing_amount, 0) + COALESCE(bi.mounting_amount, 0))), 0) as total_profit,
+                            CASE 
+                                WHEN SUM(bi.amount) > 0 THEN (SUM(bi.amount - (COALESCE(bi.purchase_amount, 0) + COALESCE(bi.printing_amount, 0) + COALESCE(bi.mounting_amount, 0))) / SUM(bi.amount)) * 100 
+                                ELSE 0 
+                            END as profit_margin
                         FROM partners p
                         JOIN sites s ON s.vendor_id = p.id
                         JOIN booking_items bi ON bi.site_id = s.id
-                        JOIN invoices i ON i.booking_id = bi.booking_id
+                        JOIN bookings b ON bi.booking_id = b.id
+                        JOIN purchase_orders po ON po.campaign_id = b.id 
+                                               AND po.vendor_id = p.id 
+                                               AND po.approval_status = 'approved' 
+                                               AND po.vendor_invoice_approval_status = 'approved'
+                                               AND po.vendor_invoice_no IS NOT NULL 
+                                               AND po.vendor_invoice_no != ''
                         WHERE p.type = 'vendor' 
-                          AND i.type = 'tax' 
-                          AND i.approval_status = 'approved'
-                          $entityCondInv
-                          AND $dateCondInvoiceWithAlias
+                          AND b.status != 'cancelled'
+                          $entityCondBookAlias
+                          AND $dateCondBookWithAlias
                         GROUP BY p.id, p.name
+                        HAVING total_revenue > 0
                         ORDER BY total_profit DESC
                         LIMIT 5
                     ")->fetchAll();
                     
                     if (empty($vendorProfitability)): ?>
-                        <tr><td colspan="4" style="text-align: center; color: #94a3b8; padding: 20px;">No vendor site bookings recorded.</td></tr>
+                        <tr><td colspan="4" style="text-align: center; color: #94a3b8; padding: 20px;">No invoiced vendor site bookings recorded.</td></tr>
                     <?php else: ?>
                         <?php foreach($vendorProfitability as $vp): 
                             $margin = (float)$vp['profit_margin'];
@@ -746,7 +803,7 @@ if ($canViewBookings) {
                             <div style="display: flex; justify-content: space-between; align-items: center; background: #f8fafc; padding: 8px; border-radius: 8px;">
                                 <div style="font-size: 0.7rem; color: #1e293b;">
                                     <strong><?php echo htmlspecialchars(htmlspecialchars_decode($um['client_name']), ENT_QUOTES, 'UTF-8'); ?></strong> 
-                                    <span style="color: #64748b;">(<?php echo $um['proposal_number']; ?>)</span>
+                                    <span style="color: #64748b;">(<?php echo $um['booking_number']; ?>)</span>
                                 </div>
                                 <span style="font-size: 0.65rem; background: #ecfdf5; color: #047857; padding: 2px 8px; border-radius: 40px; font-weight: 700;">
                                     <?php echo $um['days_until'] == 0 ? 'Starts Today' : 'In ' . $um['days_until'] . ' days'; ?>
@@ -768,7 +825,7 @@ if ($canViewBookings) {
                             <div style="display: flex; justify-content: space-between; align-items: center; background: #f8fafc; padding: 8px; border-radius: 8px;">
                                 <div style="font-size: 0.7rem; color: #1e293b;">
                                     <strong><?php echo htmlspecialchars(htmlspecialchars_decode($ec['client_name']), ENT_QUOTES, 'UTF-8'); ?></strong> 
-                                    <span style="color: #64748b;">(<?php echo $ec['proposal_number']; ?>)</span>
+                                    <span style="color: #64748b;">(<?php echo $ec['booking_number']; ?>)</span>
                                 </div>
                                 <span style="font-size: 0.65rem; background: #fef2f2; color: #b91c1c; padding: 2px 8px; border-radius: 40px; font-weight: 700;">
                                     <?php echo $ec['days_left'] == 0 ? 'Ends Today' : 'Ends in ' . $ec['days_left'] . ' days'; ?>
@@ -796,13 +853,16 @@ if ($canViewBookings) {
             <h5><i class="fas fa-medal" style="color: #ca8a04;"></i> Top 10 Clients</h5>
             <div style="max-height: 250px; overflow-y: auto; padding-right: 5px;">
                 <?php
-                $topClients = $pdo->query("
-                    SELECT p.name, SUM(pr.grand_total) as total_spend 
-                    FROM partners p JOIN proposals pr ON p.id = pr.client_id 
-                    WHERE p.type='client' AND pr.status='confirmed'
-                    GROUP BY p.id, p.name ORDER BY total_spend DESC LIMIT 10
-                ")->fetchAll();
-                $rank = 1;
+                 $topClients = $pdo->query("
+                    SELECT p.name, SUM(b.grand_total) as total_spend 
+                    FROM partners p 
+                    JOIN bookings b ON p.id = b.client_id 
+                    WHERE p.type='client' AND b.status != 'cancelled'
+                    GROUP BY p.id, p.name 
+                    ORDER BY total_spend DESC 
+                    LIMIT 10
+                 ")->fetchAll();
+                 $rank = 1;
                 foreach($topClients as $c): ?>
                 <div class="client-mini" style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 8px; border-bottom: 1px solid #f8fafc; padding-bottom: 6px;">
                     <div style="display: flex; align-items: center; gap: 8px;">

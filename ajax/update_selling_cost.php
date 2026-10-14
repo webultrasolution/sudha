@@ -1,5 +1,6 @@
 <?php
 include_once __DIR__ . '/../config/db.php';
+require_once __DIR__ . '/../includes/ajax_auth.php';
 include_once __DIR__ . '/../includes/functions.php';
 if (session_status() === PHP_SESSION_NONE) session_start();
 
@@ -14,38 +15,38 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         exit;
     }
 
+    // Always fetch bookingId first
+    $stmtFetch = $pdo->prepare("SELECT booking_id FROM booking_items WHERE id = ?");
+    $stmtFetch->execute([$item_id]);
+    $bookingId = intval($stmtFetch->fetchColumn());
+
+    // Check if invoice exists and user is not admin
+    $isAdmin = ($_SESSION['user_role'] ?? '') === 'admin';
+    if (!$isAdmin && $bookingId) {
+        $stmtInvCheck = $pdo->prepare("SELECT id FROM invoices WHERE booking_id = ? AND type = 'tax' AND approval_status != 'rejected' LIMIT 1");
+        $stmtInvCheck->execute([$bookingId]);
+        if ($stmtInvCheck->fetch()) {
+            echo json_encode(['success' => false, 'message' => 'Editing is locked as a Tax Invoice has already been generated. Only Admin can modify financials.']);
+            exit;
+        }
+    }
+
     try {
         $pdo->beginTransaction();
 
-        // 1. Update booking_items
-        $stmt = $pdo->prepare("UPDATE booking_items SET amount = ? WHERE id = ?");
-        $stmt->execute([$selling_cost, $item_id]);
+        // Fetch unit
+        $stmtFetchUnit = $pdo->prepare("SELECT unit FROM booking_items WHERE id = ?");
+        $stmtFetchUnit->execute([$item_id]);
+        $u = max(1, intval($stmtFetchUnit->fetchColumn() ?: 1));
+        $calculatedSaleRate = round($selling_cost / $u, 2);
 
-        // 2. Fetch the booking_id for this item
-        $stmtFetch = $pdo->prepare("SELECT booking_id FROM booking_items WHERE id = ?");
-        $stmtFetch->execute([$item_id]);
-        $bookingId = intval($stmtFetch->fetchColumn());
+        // 1. Update booking_items (both amount and sale_rate)
+        $stmt = $pdo->prepare("UPDATE booking_items SET amount = ?, sale_rate = ? WHERE id = ?");
+        $stmt->execute([$selling_cost, $calculatedSaleRate, $item_id]);
 
+        // 2. Automatically sync booking totals and any linked Tax Invoice
         if ($bookingId) {
-            // 3. Recalculate Booking Totals
-            $stmtSums = $pdo->prepare("SELECT SUM(amount) as subtotal FROM booking_items WHERE booking_id = ?");
-            $stmtSums->execute([$bookingId]);
-            $newSubtotal = floatval($stmtSums->fetchColumn() ?: 0);
-
-            // Fetch the booking's tax type
-            $stmtTaxType = $pdo->prepare("SELECT tax_type FROM bookings WHERE id = ?");
-            $stmtTaxType->execute([$bookingId]);
-            $tax_type = $stmtTaxType->fetchColumn() ?: 'igst';
-
-            $tax = 0;
-            if ($tax_type !== 'none') {
-                $tax = $newSubtotal * 0.18;
-            }
-            $grand = $newSubtotal + $tax;
-
-            // 4. Update the bookings table
-            $stmtUpdate = $pdo->prepare("UPDATE bookings SET total_amount = ?, tax_amount = ?, grand_total = ? WHERE id = ?");
-            $stmtUpdate->execute([$newSubtotal, $tax, $grand, $bookingId]);
+            syncBookingInvoiceFinancials($pdo, $bookingId);
         }
 
         $pdo->commit();

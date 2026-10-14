@@ -1,5 +1,6 @@
 <?php
 include_once __DIR__ . '/../config/db.php';
+require_once __DIR__ . '/../includes/ajax_auth.php';
 include_once __DIR__ . '/../includes/functions.php';
 include_once __DIR__ . '/../includes/trash_helper.php';
 if (session_status() === PHP_SESSION_NONE) session_start();
@@ -39,34 +40,15 @@ try {
     }
 
     // Recalculate proposal totals
-    $stmtSums = $pdo->prepare("SELECT SUM(amount) as subtotal FROM proposal_items WHERE proposal_id = ?");
-    $stmtSums->execute([$proposalId]);
-    $sums = $stmtSums->fetch();
-    $newSubtotal = $sums['subtotal'] ?: 0;
-    
-    // Get existing proposal to keep discount pct
-    $stmtP = $pdo->prepare("SELECT discounting_pct, printing_cost, mounting_cost FROM proposals WHERE id = ?");
-    $stmtP->execute([$proposalId]);
-    $p = $stmtP->fetch();
-    
-    $discountVal = $newSubtotal * ($p['discounting_pct'] / 100);
-    $taxable = $newSubtotal - $discountVal + $p['printing_cost'] + $p['mounting_cost'];
-    $tax = $taxable * 0.18;
-    $grand = $taxable + $tax;
+    recalculateProposalTotals($pdo, $proposalId);
 
-    // Recalculate proposal start and end dates from its remaining items
-    $stmtMinMax = $pdo->prepare("SELECT MIN(start_date) as min_start, MAX(end_date) as max_end FROM proposal_items WHERE proposal_id = ?");
-    $stmtMinMax->execute([$proposalId]);
-    $minMax = $stmtMinMax->fetch();
-    $newStart = $minMax['min_start'] ?: null;
-    $newEnd = $minMax['max_end'] ?: null;
-    $newDays = null;
-    if (!empty($newStart) && !empty($newEnd)) {
-        $newDays = max(1, ceil((strtotime($newEnd) - strtotime($newStart)) / 86400) + 1);
+    $isAdmin = ($_SESSION['user_role'] ?? '') === 'admin';
+    if (!$isAdmin) {
+        $stmt = $pdo->prepare("SELECT proposal_number FROM proposals WHERE id = ?");
+        $stmt->execute([$proposalId]);
+        $propRef = $stmt->fetchColumn();
+        revertToPendingOnEdit($pdo, 'proposals', $proposalId, 'proposal', $propRef, $_SESSION['user_id'] ?? 0);
     }
-
-    $stmtUpdate = $pdo->prepare("UPDATE proposals SET total_amount = ?, tax_amount = ?, grand_total = ?, start_date = ?, end_date = ?, total_days = ? WHERE id = ?");
-    $stmtUpdate->execute([$newSubtotal, $tax, $grand, $newStart, $newEnd, $newDays, $proposalId]);
 
     echo json_encode(['success' => true]);
 } catch (PDOException $e) {

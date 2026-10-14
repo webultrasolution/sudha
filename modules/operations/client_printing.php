@@ -49,7 +49,7 @@ if ($client_id > 0) {
 
 // Check if we are in preview mode (form submitted)
 $preview = isset($_GET['preview']) && $_GET['preview'] === '1' && $client_id > 0;
-$selected_rate_ids = isset($_GET['rate_ids']) ? array_map('intval', $_GET['rate_ids']) : [];
+$selected_rate_ids = isset($_GET['rate_ids']) ? array_map('intval', is_array($_GET['rate_ids']) ? $_GET['rate_ids'] : explode(',', $_GET['rate_ids'])) : [];
 $po_remark = $_GET['remark'] ?? '';
 
 // If preview mode, filter only selected rates

@@ -99,6 +99,50 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action'])) {
             echo json_encode(['success' => false, 'message' => 'This user cannot be deleted because they are referenced in other records (such as bookings or activity logs). You can deactivate their account instead.']);
             exit;
         }
+    } elseif ($_POST['action'] === 'takeover') {
+        header('Content-Type: application/json');
+        try {
+            $fromUserId = intval($_POST['from_user_id']);
+            $toUserId = intval($_POST['to_user_id']);
+            
+            if (!$fromUserId || !$toUserId) {
+                echo json_encode(['success' => false, 'message' => 'Invalid user selection.']);
+                exit;
+            }
+            
+            $pdo->beginTransaction();
+            
+            // Reassign proposals, bookings, invoices, purchase_orders
+            $stmtP = $pdo->prepare("UPDATE proposals SET created_by = ? WHERE created_by = ?");
+            $stmtP->execute([$toUserId, $fromUserId]);
+            $countP = $stmtP->rowCount();
+            
+            $stmtB = $pdo->prepare("UPDATE bookings SET created_by = ? WHERE created_by = ?");
+            $stmtB->execute([$toUserId, $fromUserId]);
+            $countB = $stmtB->rowCount();
+            
+            $stmtI = $pdo->prepare("UPDATE invoices SET created_by = ? WHERE created_by = ?");
+            $stmtI->execute([$toUserId, $fromUserId]);
+            $countI = $stmtI->rowCount();
+            
+            $stmtPO = $pdo->prepare("UPDATE purchase_orders SET created_by = ? WHERE created_by = ?");
+            $stmtPO->execute([$toUserId, $fromUserId]);
+            $countPO = $stmtPO->rowCount();
+            
+            logActivity('reassigned user records', 'users', $fromUserId, "Transferred $countP proposals, $countB bookings, $countI invoices, and $countPO POs from User #$fromUserId to User #$toUserId.");
+            
+            $pdo->commit();
+            
+            echo json_encode([
+                'success' => true,
+                'message' => "Successfully reassigned $countP proposal(s), $countB booking(s), $countI invoice(s), and $countPO purchase order(s) to the selected account."
+            ]);
+            exit;
+        } catch (Exception $e) {
+            if ($pdo->inTransaction()) $pdo->rollBack();
+            echo json_encode(['success' => false, 'message' => $e->getMessage()]);
+            exit;
+        }
     }
 }
 
@@ -151,7 +195,37 @@ $users = $pdo->query("SELECT * FROM users ORDER BY name ASC")->fetchAll();
                         <?php echo strtoupper($u['status']); ?>
                     </span>
                 </td>
-                <td style="text-align: right;">
+<style>
+.btn-reassign-action {
+    display: inline-flex;
+    align-items: center;
+    gap: 5px;
+    padding: 0.35rem 0.65rem;
+    background: #fffbebfb;
+    border: 1px solid #fde68a;
+    color: #d97706;
+    border-radius: 8px;
+    font-size: 0.75rem;
+    font-weight: 700;
+    cursor: pointer;
+    transition: all 0.2s ease;
+    margin-right: 6px;
+    vertical-align: middle;
+    line-height: 1;
+}
+.btn-reassign-action:hover {
+    background: #fef3c7;
+    border-color: #f59e0b;
+    color: #b45309;
+    transform: translateY(-1px);
+    box-shadow: 0 2px 6px rgba(217,119,6,0.15);
+}
+</style>
+
+                <td style="text-align: right; white-space: nowrap;">
+                    <?php if (($_SESSION['user_role'] ?? '') === 'admin' && $u['status'] === 'inactive' && $u['role'] !== 'admin'): ?>
+                    <button class="btn-reassign-action" onclick="takeoverUserRecords(<?php echo $u['id']; ?>, '<?php echo htmlspecialchars(addslashes($u['name'])); ?>')" title="Takeover / Reassign All Work Data"><i class="fas fa-user-shield"></i> Reassign</button>
+                    <?php endif; ?>
                     <?php if (canEdit('users')): ?>
                     <button class="btn-icon" onclick='editUser(<?php echo htmlspecialchars(json_encode($u), ENT_QUOTES, "UTF-8"); ?>)' style="color: var(--primary);"><i class="fas fa-edit"></i></button>
                     <?php endif; ?>
@@ -270,6 +344,72 @@ function deleteUser(id) {
                 }
             })).catch(err => {
                 Swal.fire('Error', 'Something went wrong: ' + err.message, 'error');
+            });
+        }
+    });
+}
+
+function takeoverUserRecords(fromUserId, fromUserName) {
+    const activeUsers = <?php 
+        $activeUserList = $pdo->query("SELECT id, name, username, role FROM users WHERE status = 'active' ORDER BY name ASC")->fetchAll(PDO::FETCH_ASSOC);
+        echo json_encode($activeUserList);
+    ?>;
+    
+    let optionsHtml = '';
+    activeUsers.forEach(u => {
+        if (u.id != fromUserId) {
+            optionsHtml += `<option value="${u.id}">${u.name} (${u.role.toUpperCase()})</option>`;
+        }
+    });
+
+    if (!optionsHtml) {
+        return Swal.fire('Notice', 'No other active user accounts found to transfer data to.', 'info');
+    }
+
+    Swal.fire({
+        title: '<div style="font-size: 1.4rem; font-weight: 800; color: #0f172a;"><i class="fas fa-user-shield" style="color: #d97706; margin-right: 6px;"></i> Reassign & Takeover Data</div>',
+        html: `
+            <p style="color: #475569; font-size: 0.85rem; margin-bottom: 1.25rem;">
+                Reassign all Proposals, Bookings, Invoices, and Purchase Orders created by <strong>${fromUserName}</strong> to another active account:
+            </p>
+            <div style="text-align: left; margin-bottom: 1rem;">
+                <label style="display: block; font-size: 0.7rem; font-weight: 800; color: #94a3b8; text-transform: uppercase; margin-bottom: 0.4rem;">Select Target Active Account</label>
+                <select id="target_user_id" style="width: 100%; padding: 0.75rem; border: 1.5px solid #cbd5e1; border-radius: 10px; font-size: 0.9rem; font-weight: 600; background: #f8fafc; outline: none;">
+                    ${optionsHtml}
+                </select>
+            </div>
+        `,
+        showCancelButton: true,
+        confirmButtonText: 'Reassign & Transfer Data',
+        cancelButtonText: 'Cancel',
+        confirmButtonColor: '#d97706',
+        cancelButtonColor: '#64748b'
+    }).then((result) => {
+        if (result.isConfirmed) {
+            const targetId = document.getElementById('target_user_id').value;
+            if (!targetId) return;
+            
+            const formData = new FormData();
+            formData.append('action', 'takeover');
+            formData.append('from_user_id', fromUserId);
+            formData.append('to_user_id', targetId);
+            
+            fetch('index.php', {
+                method: 'POST',
+                body: formData
+            })
+            .then(r => r.json())
+            .then(res => {
+                if (res.success) {
+                    Swal.fire('Transferred!', res.message, 'success').then(() => {
+                        window.location.reload();
+                    });
+                } else {
+                    Swal.fire('Error', res.message || 'Failed to reassign records.', 'error');
+                }
+            })
+            .catch(err => {
+                Swal.fire('Error', 'Network error. Please try again.', 'error');
             });
         }
     });

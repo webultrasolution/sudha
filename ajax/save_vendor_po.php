@@ -1,5 +1,6 @@
 <?php
 include_once __DIR__ . '/../config/db.php';
+require_once __DIR__ . '/../includes/ajax_auth.php';
 include_once __DIR__ . '/../includes/functions.php';
 
 if (session_status() === PHP_SESSION_NONE) {
@@ -62,18 +63,25 @@ try {
     // Generate PO Number
     $po_number = 'VPO-' . date('Ymd') . '-' . rand(100, 999);
 
-    // Admin approves instantly; non-admin goes to queue
     $poStatus       = $isAdmin ? 'approved' : 'pending';
     $approvalStatus = $isAdmin ? 'approved' : 'pending_approval';
+
+    // Get entity_id from POST payload or active session
+    $entityId = !empty($data['entity_id']) ? intval($data['entity_id']) : ($_SESSION['active_entity_id'] ?? null);
+    if (!$entityId) {
+        $stmtEntity = $pdo->query("SELECT id FROM entities LIMIT 1");
+        $entityId = $stmtEntity->fetchColumn() ?: null;
+    }
 
     // Insert PO
     $stmtPO = $pdo->prepare("
         INSERT INTO purchase_orders 
-        (vendor_id, employee_id, campaign_name, po_number, po_date, po_amount, cgst_amount, sgst_amount, igst_amount, total_amount, status, approval_status, remarks) 
-        VALUES (?, ?, ?, ?, CURDATE(), ?, ?, ?, ?, ?, ?, ?, ?)
+        (vendor_id, entity_id, employee_id, campaign_name, po_number, po_date, po_amount, cgst_amount, sgst_amount, igst_amount, total_amount, status, approval_status, remarks, type, created_by) 
+        VALUES (?, ?, ?, ?, ?, CURDATE(), ?, ?, ?, ?, ?, ?, ?, ?, 'direct', ?)
     ");
     $stmtPO->execute([
         $vendor_id,
+        $entityId,
         $_SESSION['user_id'] ?? 0,
         $campaign_name,
         $po_number,
@@ -84,7 +92,8 @@ try {
         $grand_total,
         $poStatus,
         $approvalStatus,
-        $remarks
+        $remarks,
+        $_SESSION['user_id'] ?? null
     ]);
     $po_id = $pdo->lastInsertId();
 

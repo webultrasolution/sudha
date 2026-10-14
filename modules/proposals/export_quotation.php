@@ -1,6 +1,7 @@
 <?php
 include_once __DIR__ . '/../../config/db.php';
 include_once __DIR__ . '/../../includes/functions.php';
+checkAuth();
 
 $id = isset($_GET['id']) ? intval($_GET['id']) : 0;
 
@@ -22,10 +23,11 @@ if (!$proposal) {
 
 // Fetch Items for the table
 $items = $pdo->prepare("
-    SELECT pi.*, s.name as site_name, s.site_code, s.location, s.city as site_city, s.type as site_type, s.width, s.height, s.light_type
+    SELECT pi.*, COALESCE(pi.custom_site_name, s.name) as site_name, s.site_code, COALESCE(pi.custom_location, s.location) as location, s.city as site_city, s.type as site_type, s.width, s.height, s.light_type
     FROM proposal_items pi
     JOIN sites s ON pi.site_id = s.id
     WHERE pi.proposal_id = ?
+    ORDER BY pi.sort_order ASC, pi.id ASC
 ");
 $items->execute([$id]);
 $items = $items->fetchAll();
@@ -191,7 +193,7 @@ $items = $items->fetchAll();
 
     <?php
     $company = resolveCompanyDetails();
-    $logoUrl = (!empty($company['logo']) && file_exists(__DIR__ . '/../../assets/images/' . $company['logo'])) ? BASE_URL . 'assets/images/' . $company['logo'] : BASE_URL . 'assets/img/LOGO.png';
+    $logoUrl = !empty($company['logo']) ? BASE_URL . 'assets/images/' . $company['logo'] : BASE_URL . 'assets/img/LOGO.png';
     ?>
     <!-- Cover Page Info -->
     <div class="header">
@@ -238,18 +240,6 @@ $items = $items->fetchAll();
                 <div style="font-weight: 900; font-size: 24px; color: var(--dark);">
                     <?php echo $proposal['campaign_name']; ?></div>
             </div>
-            <div style="text-align: right;">
-                <span
-                    style="font-size: 11px; color: var(--slate); text-transform: uppercase; font-weight: 800; letter-spacing: 1px;">Duration</span>
-                <div style="font-weight: 700; font-size: 18px;">
-                    <?php 
-                    if (!empty($proposal['start_date']) && $proposal['start_date'] !== '0000-00-00' && !empty($proposal['end_date']) && $proposal['end_date'] !== '0000-00-00') {
-                        echo date('d M Y', strtotime($proposal['start_date'])) . ' - ' . date('d M Y', strtotime($proposal['end_date']));
-                    } else {
-                        echo 'N/A';
-                    }
-                    ?></div>
-            </div>
         </div>
     </div>
 
@@ -260,7 +250,8 @@ $items = $items->fetchAll();
                 <th>Asset Details</th>
                 <th>Location / City</th>
                 <th>Size</th>
-                <th>Days</th>
+                <th>Start Date</th>
+                <th>End Date</th>
                 <th style="text-align: right;">Total (INR)</th>
             </tr>
         </thead>
@@ -282,7 +273,26 @@ $items = $items->fetchAll();
                     </td>
                     <td style="font-weight: 600;"><?php echo (int) $item['width']; ?>' x <?php echo (int) $item['height']; ?>'
                     </td>
-                    <td style="font-weight: 600;"><?php echo $item['days']; ?></td>
+                    <td style="font-size: 12px; color: var(--slate);">
+                        <?php 
+                        $sDate = (!empty($item['start_date']) && $item['start_date'] != '0000-00-00') ? $item['start_date'] : $proposal['start_date'];
+                        if (!empty($sDate) && $sDate !== '0000-00-00') {
+                            echo date('d M Y', strtotime($sDate));
+                        } else {
+                            echo '-';
+                        }
+                        ?>
+                    </td>
+                    <td style="font-size: 12px; color: var(--slate);">
+                        <?php 
+                        $eDate = (!empty($item['end_date']) && $item['end_date'] != '0000-00-00') ? $item['end_date'] : $proposal['end_date'];
+                        if (!empty($eDate) && $eDate !== '0000-00-00') {
+                            echo date('d M Y', strtotime($eDate));
+                        } else {
+                            echo '-';
+                        }
+                        ?>
+                    </td>
                     <td style="text-align: right; font-weight: 800; color: var(--dark);">
                         ₹<?php echo number_format($item['amount'], 2); ?></td>
                 </tr>

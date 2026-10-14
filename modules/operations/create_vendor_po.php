@@ -9,8 +9,9 @@ $clients = $pdo->query("SELECT id, name, city, contact_person FROM partners WHER
 $vendors = $pdo->query("SELECT id, name FROM partners WHERE type = 'vendor' ORDER BY name ASC")->fetchAll();
 
 $cities = $pdo->query("SELECT DISTINCT city FROM sites WHERE city IS NOT NULL AND city != '' ORDER BY city")->fetchAll(PDO::FETCH_COLUMN);
-$locations = $pdo->query("SELECT DISTINCT location FROM sites WHERE location IS NOT NULL AND location != '' ORDER BY location")->fetchAll(PDO::FETCH_COLUMN);
 $states = $pdo->query("SELECT DISTINCT state FROM sites WHERE state IS NOT NULL AND state != '' ORDER BY state")->fetchAll(PDO::FETCH_COLUMN);
+$districts = $pdo->query("SELECT DISTINCT district FROM sites WHERE district IS NOT NULL AND district != '' ORDER BY district")->fetchAll(PDO::FETCH_COLUMN);
+$locations = $pdo->query("SELECT DISTINCT location FROM sites WHERE location IS NOT NULL AND location != '' ORDER BY location")->fetchAll(PDO::FETCH_COLUMN);
 $mediaTypes = $pdo->query("SELECT DISTINCT type FROM sites WHERE type IS NOT NULL AND type != '' ORDER BY type")->fetchAll(PDO::FETCH_COLUMN);
 $illuminations = $pdo->query("SELECT DISTINCT light_type FROM sites WHERE light_type IS NOT NULL AND light_type != '' ORDER BY light_type")->fetchAll(PDO::FETCH_COLUMN);
 $sizes = $pdo->query("SELECT DISTINCT CONCAT(width, 'x', height) as size FROM sites WHERE width IS NOT NULL AND height IS NOT NULL AND width != '' AND height != '' ORDER BY width, height")->fetchAll(PDO::FETCH_COLUMN);
@@ -152,7 +153,7 @@ $printingRates = $pdo->query("SELECT * FROM vendor_printing_rates")->fetchAll(PD
                 </div>
             </div>
 
-            <div style="display: grid; grid-template-columns: 2.5fr 1fr 1fr 1fr 1fr 1fr 1fr; gap: 0.75rem; align-items: flex-end;">
+            <div style="display: grid; grid-template-columns: 2.5fr 1fr 1fr 1fr 1fr 1fr 1fr 1fr; gap: 0.75rem; align-items: flex-end;">
                 <div class="form-group" style="margin-bottom: 0;">
                     <label style="font-size: 0.55rem; font-weight: 900; color: #94a3b8; text-transform: uppercase; margin-bottom: 0.4rem; display: block;">Search Site / Code / Area</label>
                     <input type="text" id="site-search" class="p-input" placeholder="Search by Site Name, Code, Location, City, State..." oninput="fetchSites(1)" style="height: 38px; font-size: 0.85rem; background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 8px;">
@@ -162,6 +163,13 @@ $printingRates = $pdo->query("SELECT * FROM vendor_printing_rates")->fetchAll(PD
                     <select id="media_type" class="p-input" onchange="fetchSites(1)" style="height: 38px; font-size: 0.85rem; background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 8px;">
                         <option value="">All</option>
                         <?php foreach($mediaTypes as $mt): ?> <option value="<?php echo $mt; ?>"><?php echo $mt; ?></option> <?php endforeach; ?>
+                    </select>
+                </div>
+                <div class="form-group" style="margin-bottom: 0;">
+                    <label style="font-size: 0.55rem; font-weight: 900; color: #94a3b8; text-transform: uppercase; margin-bottom: 0.4rem; display: block;">District</label>
+                    <select id="filter-district" class="p-input" onchange="fetchSites(1)" style="height: 38px; font-size: 0.85rem; background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 8px;">
+                        <option value="">All</option>
+                        <?php foreach($districts as $d): ?> <option value="<?php echo htmlspecialchars($d); ?>"><?php echo htmlspecialchars($d); ?></option> <?php endforeach; ?>
                     </select>
                 </div>
                 <div class="form-group" style="margin-bottom: 0;">
@@ -461,6 +469,7 @@ function fetchSites(page = 1) {
 
     const q = document.getElementById('site-search').value;
     const media = document.getElementById('media_type').value;
+    const district = document.getElementById('filter-district') ? document.getElementById('filter-district').value : '';
     const state = document.getElementById('filter-state').value;
     const city = document.getElementById('filter-city').value;
     const locationFilter = document.getElementById('filter-location') ? document.getElementById('filter-location').value : '';
@@ -476,7 +485,7 @@ function fetchSites(page = 1) {
         vendorGroup.style.display = (ownership === 'TA') ? 'block' : 'none';
     }
 
-    const url = `../../ajax/fetch_sites.php?page=${page}&limit=${pageSize}&q=${encodeURIComponent(q)}&media=${encodeURIComponent(media)}&state=${encodeURIComponent(state)}&city=${encodeURIComponent(city)}&location=${encodeURIComponent(locationFilter)}&availability=${availability}&ownership=${ownership}&vendor=${vendor}&size=${encodeURIComponent(size)}&light=${encodeURIComponent(light)}`;
+    const url = `../../ajax/fetch_sites.php?page=${page}&limit=${pageSize}&q=${encodeURIComponent(q)}&media=${encodeURIComponent(media)}&district=${encodeURIComponent(district)}&state=${encodeURIComponent(state)}&city=${encodeURIComponent(city)}&location=${encodeURIComponent(locationFilter)}&availability=${availability}&ownership=${ownership}&vendor=${vendor}&size=${encodeURIComponent(size)}&light=${encodeURIComponent(light)}`;
 
     fetch(url)
     .then(r => r.json())

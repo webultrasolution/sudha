@@ -90,7 +90,7 @@ $users = $users->fetchAll();
     window.onload = () => {
         Swal.fire({
             title: 'Success!',
-            text: '<?php echo $_GET['msg']; ?>',
+            text: <?php echo json_encode((string)$_GET['msg'], JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APOS | JSON_HEX_QUOT); ?>,
             icon: 'success',
             confirmButtonColor: '#1CADA9'
         });

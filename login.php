@@ -9,27 +9,44 @@ if (isset($_SESSION['user_id'])) {
 }
 
 $error = '';
+$success = '';
+
 if (isset($_GET['error']) && $_GET['error'] === 'inactive') {
     $error = 'Your account has been deactivated. Please contact the administrator.';
 }
+if (isset($_GET['reset']) && $_GET['reset'] === 'success') {
+    $success = 'Password has been reset successfully! Please sign in with your new password.';
+}
 
 if ($_SERVER['REQUEST_METHOD'] == 'POST') {
-    $username = clean($_POST['username']);
-    $password = $_POST['password'];
+    $username = clean($_POST['username'] ?? '');
+    $password = $_POST['password'] ?? '';
 
     $stmt = $pdo->prepare("SELECT * FROM users WHERE username = ?");
     $stmt->execute([$username]);
     $user = $stmt->fetch();
 
-    if ($user && password_verify($password, $user['password'])) {
+    if ($user) {
         if (($user['status'] ?? 'active') === 'inactive') {
             $error = 'Your account has been deactivated. Please contact the administrator.';
-        } else {
+        } else if (password_verify($password, $user['password'])) {
+            session_regenerate_id(true); // new session ID on login (prevents session fixation)
             $_SESSION['user_id'] = $user['id'];
             $_SESSION['user_name'] = $user['name'];
             $_SESSION['user_role'] = $user['role'];
+            
+            if (isset($_POST['remember_me'])) {
+                setcookie('remember_username', $username, time() + (86400 * 30), "/"); // 30 days
+            } else {
+                if (isset($_COOKIE['remember_username'])) {
+                    setcookie('remember_username', '', time() - 3600, "/");
+                }
+            }
+            
             header("Location: dashboard.php");
             exit;
+        } else {
+            $error = 'Invalid username or password';
         }
     } else {
         $error = 'Invalid username or password';
@@ -42,7 +59,7 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Login | Suudha Creative & Advertising CRM</title>
-    <link rel="stylesheet" href="assets/css/style.css">
+    <link rel="stylesheet" href="<?php echo BASE_URL; ?>assets/css/style.css">
     <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@400;500;600;700;800&family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
     
@@ -290,12 +307,19 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
                 <span><?php echo htmlspecialchars($error); ?></span>
             </div>
         <?php endif; ?>
+        
+        <?php if ($success): ?>
+            <div class="alert-success" style="background-color: rgba(34, 197, 94, 0.08); border: 1.5px solid rgba(34, 197, 94, 0.2); color: #22c55e; padding: 0.85rem 1rem; border-radius: 10px; font-size: 0.85rem; font-weight: 500; display: flex; align-items: center; gap: 0.65rem; margin-bottom: 1.5rem; animation: slideIn 0.3s ease;">
+                <i class="fas fa-circle-check"></i>
+                <span><?php echo htmlspecialchars($success); ?></span>
+            </div>
+        <?php endif; ?>
 
         <form method="POST" class="login-form">
             <div class="form-group">
                 <label class="form-label">Username</label>
                 <div class="input-group">
-                    <input type="text" name="username" class="form-control" placeholder="Enter username" required autofocus>
+                    <input type="text" name="username" class="form-control" placeholder="Enter username" value="<?php echo htmlspecialchars($_COOKIE['remember_username'] ?? ''); ?>" required autofocus>
                     <i class="fas fa-user"></i>
                 </div>
             </div>
@@ -305,12 +329,20 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
                     <label class="form-label" style="margin-bottom: 0;">Password</label>
                     <a href="forgot_password.php" style="font-size: 0.8rem; color: var(--primary); text-decoration: none; font-weight: 600; font-family: 'Outfit', sans-serif;">Forgot Password?</a>
                 </div>
-                <div class="input-group">
-                    <input type="password" name="password" class="form-control" placeholder="••••••••" required>
+                <div class="input-group" style="position: relative;">
+                    <input type="password" name="password" id="password" class="form-control" placeholder="••••••••" required style="padding-right: 2.5rem;">
                     <i class="fas fa-lock"></i>
+                    <i class="far fa-eye" id="togglePassword" style="position: absolute; right: 1rem; left: auto; cursor: pointer; color: #94a3b8; z-index: 10;" onclick="togglePasswordVisibility()"></i>
                 </div>
             </div>
 
+            <div class="form-group" style="display: flex; align-items: center; justify-content: space-between; margin-top: 1rem; margin-bottom: 1rem;">
+                <label style="display: flex; align-items: center; gap: 0.5rem; font-size: 0.85rem; color: var(--text-muted); cursor: pointer; font-weight: 500; margin: 0; user-select: none;">
+                    <input type="checkbox" name="remember_me" style="width: 16px; height: 16px; accent-color: var(--primary);" <?php echo isset($_COOKIE['remember_username']) ? 'checked' : ''; ?>>
+                    Remember Me
+                </label>
+            </div>
+ 
             <button type="submit" class="login-btn">
                 <span>Sign In to CRM</span>
                 <i class="fas fa-arrow-right-long"></i>
@@ -325,5 +357,21 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
             &copy; <?php echo date('Y'); ?> Suudha Creative. CRM Workspace v2.5
         </div>
     </div>
+
+    <script>
+    function togglePasswordVisibility() {
+        const passwordInput = document.getElementById('password');
+        const toggleIcon = document.getElementById('togglePassword');
+        if (passwordInput.type === 'password') {
+            passwordInput.type = 'text';
+            toggleIcon.classList.remove('fa-eye');
+            toggleIcon.classList.add('fa-eye-slash');
+        } else {
+            passwordInput.type = 'password';
+            toggleIcon.classList.remove('fa-eye-slash');
+            toggleIcon.classList.add('fa-eye');
+        }
+    }
+    </script>
 </body>
 </html>

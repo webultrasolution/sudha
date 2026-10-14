@@ -5,6 +5,7 @@
  * Supports: proposal, purchase_order, booking, invoice
  */
 include_once __DIR__ . '/../config/db.php';
+require_once __DIR__ . '/../includes/ajax_auth.php';
 include_once __DIR__ . '/../includes/functions.php';
 
 if (session_status() === PHP_SESSION_NONE) session_start();
@@ -37,7 +38,7 @@ if (!$entityId && $entityType === 'client_printing') {
     exit;
 }
 
-if (!in_array($action, ['approve', 'reject']) || !in_array($entityType, ['proposal', 'purchase_order', 'booking', 'invoice', 'client_printing', 'client_mounting', 'payment'])) {
+if (!in_array($action, ['approve', 'reject']) || !in_array($entityType, ['proposal', 'purchase_order', 'booking', 'invoice', 'client_printing', 'client_mounting', 'payment', 'vendor_invoice'])) {
     echo json_encode(['success' => false, 'message' => 'Invalid parameters.']);
     exit;
 }
@@ -67,6 +68,16 @@ try {
             $ref = $pdo->query("SELECT po_number FROM purchase_orders WHERE id = $entityId")->fetchColumn();
             break;
 
+        case 'vendor_invoice':
+            if ($action === 'approve') {
+                $stmt = $pdo->prepare("UPDATE purchase_orders SET vendor_invoice_approval_status = ?, approval_status = 'approved', status = 'approved', approved_by = ?, approved_at = NOW(), rejection_reason = ? WHERE id = ?");
+            } else {
+                $stmt = $pdo->prepare("UPDATE purchase_orders SET vendor_invoice_approval_status = ?, approved_by = ?, approved_at = NOW(), rejection_reason = ? WHERE id = ?");
+            }
+            $stmt->execute([$newApprovalStatus, $adminId, $reason ?: null, $entityId]);
+            $ref = $pdo->query("SELECT po_number FROM purchase_orders WHERE id = $entityId")->fetchColumn();
+            break;
+
         case 'booking':
             // When approved: set booking status to 'active'
             // When rejected: set booking status to 'cancelled'
@@ -93,7 +104,9 @@ try {
             $stmt->execute([$newApprovalStatus, $poNumber]);
             $ref = $poNumber;
             // Get the actual first ID to update approval_requests
-            $rateId = $pdo->query("SELECT id FROM client_printing_rates WHERE po_number = '$poNumber' LIMIT 1")->fetchColumn();
+            $stmtRate = $pdo->prepare("SELECT id FROM client_printing_rates WHERE po_number = ? LIMIT 1");
+            $stmtRate->execute([$poNumber]);
+            $rateId = $stmtRate->fetchColumn();
             $entityId = $rateId; 
             break;
 
@@ -108,7 +121,9 @@ try {
             $stmt->execute([$newApprovalStatus, $poNumber]);
             $ref = $poNumber;
             // Get the actual first ID to update approval_requests
-            $rateId = $pdo->query("SELECT id FROM client_mounting_rates WHERE po_number = '$poNumber' LIMIT 1")->fetchColumn();
+            $stmtRate = $pdo->prepare("SELECT id FROM client_mounting_rates WHERE po_number = ? LIMIT 1");
+            $stmtRate->execute([$poNumber]);
+            $rateId = $stmtRate->fetchColumn();
             $entityId = $rateId; 
             break;
 

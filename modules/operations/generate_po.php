@@ -4,6 +4,7 @@ error_reporting(E_ALL & ~E_DEPRECATED & ~E_USER_DEPRECATED);
 
 include_once __DIR__ . '/../../config/db.php';
 include_once __DIR__ . '/../../includes/functions.php';
+checkAuth();
 
 // Prevent timezone warnings
 date_default_timezone_set('Asia/Kolkata');
@@ -173,15 +174,17 @@ if ($mode === 'direct') {
             FROM booking_items bi
             JOIN sites s ON bi.site_id = s.id
             WHERE bi.booking_id = ? AND s.vendor_id = ?
+            ORDER BY bi.sort_order ASC, bi.id ASC
         ";
         $itemParams = [$booking_id, $vendor_id];
     } else {
         $itemSql = "
-            SELECT pi.*, s.name as site_name, s.site_code, s.location, s.city, s.width, s.height, s.light_type, s.hsn_code, s.vendor_gst, s.type as media_type,
+            SELECT pi.*, COALESCE(pi.custom_site_name, s.name) as site_name, s.site_code, COALESCE(pi.custom_location, s.location) as location, s.city, s.width, s.height, s.light_type, s.hsn_code, s.vendor_gst, s.type as media_type,
                 pi.purchase_rate as purchase_amount, ? as start_date, ? as end_date
             FROM proposal_items pi
             JOIN sites s ON pi.site_id = s.id
             WHERE pi.proposal_id = ? AND s.vendor_id = ?
+            ORDER BY pi.sort_order ASC, pi.id ASC
         ";
         $itemParams = [$b['start_date'], $b['end_date'], $proposal_id, $vendor_id];
     }
@@ -201,7 +204,7 @@ $items = $stmtItems->fetchAll();
 $po_id = !empty($b['id']) ? $b['id'] : 0;
 $po_ref = ($po_id > 0) ? str_pad((string) $po_id, 3, '0', STR_PAD_LEFT) : ($b['proposal_number'] ?? 'DPO-' . date('His'));
 $ref_date = $b['po_date'] ?? $b['start_date'] ?? date('Y-m-d');
-$po_number = "PO/" . date('y', strtotime($ref_date)) . "-" . date('y', strtotime($ref_date . ' +1 year')) . "/" . $po_ref;
+$po_number = !empty($b['po_number']) ? $b['po_number'] : ("PO/" . date('y', strtotime($ref_date)) . "-" . date('y', strtotime($ref_date . ' +1 year')) . "/" . $po_ref);
 $po_date = date('d-M-Y', strtotime($ref_date));
 
 // Setup Company / Entity Details
@@ -511,7 +514,7 @@ function getStateName($gstin)
         <!-- Header / Letterhead -->
         <div style="display: flex; justify-content: space-between; align-items: flex-start; padding: 10px 10px 2px;">
             <div style="flex: 1.4; text-align: left;">
-                <?php if (!empty($co['letterhead']) && file_exists(__DIR__ . '/../../assets/images/' . $co['letterhead'])): ?>
+                <?php if (!empty($co['letterhead'])): ?>
                     <img src="<?php echo BASE_URL; ?>assets/images/<?php echo $co['letterhead']; ?>"
                         style="max-height: 110px; width: auto; display: block; margin-bottom: 5px;">
                 <?php else: ?>

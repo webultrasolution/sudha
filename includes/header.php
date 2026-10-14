@@ -1,6 +1,7 @@
 <?php
 include_once __DIR__ . '/../config/db.php';
 include_once __DIR__ . '/functions.php';
+include_once __DIR__ . '/csrf.php';
 checkAuth();
 $activeEntity = getActiveEntity();
 ?>
@@ -19,7 +20,7 @@ $activeEntity = getActiveEntity();
     <meta name="apple-mobile-web-app-title" content="Sudha CRM">
     <link rel="apple-touch-icon" href="<?php echo BASE_URL; ?>assets/images/logo.png">
 
-    <link rel="stylesheet" href="<?php echo BASE_URL; ?>assets/css/style.css">
+    <link rel="stylesheet" href="<?php echo BASE_URL; ?>assets/css/style.css?v=<?php echo filemtime(__DIR__ . '/../assets/css/style.css'); ?>">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -34,13 +35,44 @@ $activeEntity = getActiveEntity();
                     .catch(err => console.log('PWA Service Worker registration failed:', err));
             });
         }
+
+        // CSRF Token for AJAX requests
+        const csrfToken = '<?php echo CsrfToken::getToken(); ?>';
+        window.BASE_URL = '<?php echo BASE_URL; ?>';
+        window.IS_ADMIN = <?php echo (hasRole('admin') || ($_SESSION['user_role'] ?? '') === 'admin') ? 'true' : 'false'; ?>;
     </script>
-</head>
-<body>
+    <script src="<?php echo BASE_URL; ?>assets/js/attachments_manager.js?v=<?php echo file_exists(__DIR__ . '/../assets/js/attachments_manager.js') ? filemtime(__DIR__ . '/../assets/js/attachments_manager.js') : time(); ?>"></script>
+    <script>
+
+        // Add CSRF token to all fetch requests
+        const originalFetch = window.fetch;
+        window.fetch = function(...args) {
+            const options = args[1] || {};
+            if (!options.headers) options.headers = {};
+
+            if (options.method && ['POST', 'PUT', 'DELETE', 'PATCH'].includes(options.method.toUpperCase())) {
+                options.headers['X-CSRF-Token'] = csrfToken;
+            }
+
+            return originalFetch.apply(this, [args[0], options]);
+        };
+
+        // Add CSRF token to jQuery AJAX if jQuery is loaded
+        if (typeof jQuery !== 'undefined') {
+            jQuery(function() {
+                jQuery.ajaxSetup({
+                    beforeSend: function(xhr) {
+                        xhr.setRequestHeader('X-CSRF-Token', csrfToken);
+                    }
+                });
+            });
+        }
+    </script>
+<body class="<?php echo (isset($hideSidebar) && $hideSidebar) ? 'no-sidebar' : ''; ?>">
     <?php if (!isset($hideSidebar) || !$hideSidebar): ?>
     <div class="sidebar">
         <div class="sidebar-brand" style="margin-bottom: 1.5rem; padding: 0 0.5rem; margin-top: -0.5rem; display: flex; align-items: center; justify-content: space-between; gap: 0.5rem; width: 100%;">
-            <?php if ($activeEntity && $activeEntity['logo'] && file_exists(__DIR__ . '/../assets/images/' . $activeEntity['logo'])): ?>
+            <?php if ($activeEntity && $activeEntity['logo']): ?>
                 <img src="<?php echo BASE_URL; ?>assets/images/<?php echo $activeEntity['logo']; ?>" alt="<?php echo htmlspecialchars($activeEntity['name']); ?>" class="sidebar-logo" style="max-width: 100px; max-height: 45px; margin: 0;">
             <?php else: ?>
                 <img src="<?php echo BASE_URL; ?>assets/img/LOGO.png" alt="Sudha Creative" class="sidebar-logo" style="max-width: 100px; max-height: 45px; margin: 0;">
@@ -84,12 +116,12 @@ $activeEntity = getActiveEntity();
             <?php endif; ?>
 
             <!-- Operations & Sales Submenu -->
-            <?php if (canView('proposals') || canView('bookings') || canView('vendors_printing_po') || canView('client_printing_invoice') || canView('client_mounting_invoice')): ?>
+            <?php if (canView('proposals') || canView('bookings') || canView('vendors_printing_po') || canView('client_printing_invoice') || canView('client_mounting_invoice') || canView('fabrication')): ?>
             <li class="nav-item has-submenu">
-                <a href="#" class="nav-link submenu-toggle <?php echo in_array($activePage, ['proposals', 'bookings', 'printing_rates', 'client_printing', 'client_printing_rates', 'mounting']) ? 'active submenu-open' : ''; ?>">
+                <a href="#" class="nav-link submenu-toggle <?php echo in_array($activePage, ['proposals', 'bookings', 'printing_rates', 'client_printing', 'client_printing_rates', 'mounting', 'fabrication']) ? 'active submenu-open' : ''; ?>">
                     <i class="fas fa-briefcase"></i> <span>Operations & Sales</span> <i class="fas fa-chevron-down toggle-icon" style="margin-left: auto; font-size: 0.8rem;"></i>
                 </a>
-                <ul class="submenu" style="<?php echo in_array($activePage, ['proposals', 'bookings', 'direct_booking', 'printing_rates', 'client_printing', 'client_printing_rates', 'mounting']) ? 'display: block;' : 'display: none;'; ?>">
+                <ul class="submenu" style="<?php echo in_array($activePage, ['proposals', 'bookings', 'direct_booking', 'printing_rates', 'client_printing', 'client_printing_rates', 'mounting', 'fabrication']) ? 'display: block;' : 'display: none;'; ?>">
                     <?php if (canView('proposals')): ?>
                     <li><a href="<?php echo BASE_URL; ?>modules/proposals/proposals.php" class="<?php echo $activePage == 'proposals' ? 'active-sub' : ''; ?>"><i class="fas fa-file-contract"></i> Sales / Proposals</a></li>
                     <?php endif; ?>
@@ -104,6 +136,9 @@ $activeEntity = getActiveEntity();
                     <?php endif; ?>
                     <?php if (canView('client_mounting_invoice')): ?>
                     <li><a href="<?php echo BASE_URL; ?>modules/operations/mounting.php" class="<?php echo $activePage == 'mounting' ? 'active-sub' : ''; ?>"><i class="fas fa-tools"></i> Client Mounting Invoice</a></li>
+                    <?php endif; ?>
+                    <?php if (canView('fabrication')): ?>
+                    <li><a href="<?php echo BASE_URL; ?>modules/operations/fabrication.php" class="<?php echo $activePage == 'fabrication' ? 'active-sub' : ''; ?>"><i class="fas fa-hammer"></i> Fabrication</a></li>
                     <?php endif; ?>
                 </ul>
             </li>
@@ -131,6 +166,22 @@ $activeEntity = getActiveEntity();
                 </ul>
             </li>
             <?php endif; ?>
+
+            <!-- Accounting (Double-Entry) Submenu (Hidden per user request) -->
+            <?php /* if (canView('accounting') && strpos($_SERVER['HTTP_HOST'] ?? '', 'sudhacreative.tech') !== false): ?>
+            <li class="nav-item has-submenu">
+                <a href="#" class="nav-link submenu-toggle <?php echo $activePage == 'accounting' ? 'active submenu-open' : ''; ?>">
+                    <i class="fas fa-calculator"></i> <span>Accounting</span> <i class="fas fa-chevron-down toggle-icon" style="margin-left: auto; font-size: 0.8rem;"></i>
+                </a>
+                <ul class="submenu" style="<?php echo $activePage == 'accounting' ? 'display: block;' : 'display: none;'; ?>">
+                    <li><a href="<?php echo BASE_URL; ?>modules/accounting/ledger.php" class="<?php echo ($activePage == 'accounting' && strpos($_SERVER['REQUEST_URI'], 'ledger.php') !== false) ? 'active-sub' : ''; ?>"><i class="fas fa-book-open"></i> General Ledger</a></li>
+                    <li><a href="<?php echo BASE_URL; ?>modules/accounting/day_book.php" class="<?php echo ($activePage == 'accounting' && strpos($_SERVER['REQUEST_URI'], 'day_book.php') !== false) ? 'active-sub' : ''; ?>"><i class="fas fa-list-alt"></i> Day Book</a></li>
+                    <li><a href="<?php echo BASE_URL; ?>modules/accounting/trial_balance.php" class="<?php echo ($activePage == 'accounting' && strpos($_SERVER['REQUEST_URI'], 'trial_balance.php') !== false) ? 'active-sub' : ''; ?>"><i class="fas fa-balance-scale"></i> Trial Balance</a></li>
+                    <li><a href="<?php echo BASE_URL; ?>modules/accounting/coa_manage.php" class="<?php echo ($activePage == 'accounting' && strpos($_SERVER['REQUEST_URI'], 'coa_manage.php') !== false) ? 'active-sub' : ''; ?>"><i class="fas fa-sitemap"></i> Setup CoA</a></li>
+                    <li><a href="<?php echo BASE_URL; ?>modules/accounting/opening_balances.php" class="<?php echo ($activePage == 'accounting' && strpos($_SERVER['REQUEST_URI'], 'opening_balances.php') !== false) ? 'active-sub' : ''; ?>"><i class="fas fa-history"></i> Opening Balances</a></li>
+                </ul>
+            </li>
+            <?php endif; */ ?>
             
             <!-- Tools & Insights Submenu -->
             <?php if (canView('reports') || canView('trash') || canView('approval_queue') || canView('admin_settings') || canView('multi_content') || canView('users') || canView('role_permissions') || canView('system_activity_logs')): ?>
@@ -139,8 +190,9 @@ $activeEntity = getActiveEntity();
                     <i class="fas fa-chart-line"></i> <span>Tools & Insights</span> <i class="fas fa-chevron-down toggle-icon" style="margin-left: auto; font-size: 0.8rem;"></i>
                 </a>
                 <ul class="submenu" style="<?php echo in_array($activePage, ['reports', 'resources', 'photofactory', 'entities', 'settings', 'approvals', 'trash', 'users', 'activity_logs']) ? 'display: block;' : 'display: none;'; ?>">
-                    <?php if (canView('reports')): ?>
-                    <li><a href="<?php echo BASE_URL; ?>modules/reports/reports.php" class="<?php echo $activePage == 'reports' ? 'active-sub' : ''; ?>"><i class="fas fa-chart-pie"></i> Reports</a></li>
+                    <?php if (canView('reports') && strpos($_SERVER['HTTP_HOST'] ?? '', 'sudhacreative.tech') !== false): ?>
+                    <li><a href="<?php echo BASE_URL; ?>modules/reports/index.php" class="<?php echo ($activePage == 'reports' && strpos($_SERVER['REQUEST_URI'], 'revenue.php') === false) ? 'active-sub' : ''; ?>"><i class="fas fa-chart-pie"></i> Dashboard</a></li>
+                    <li><a href="<?php echo BASE_URL; ?>modules/reports/revenue.php" class="<?php echo ($activePage == 'reports' && strpos($_SERVER['REQUEST_URI'], 'revenue.php') !== false) ? 'active-sub' : ''; ?>"><i class="fas fa-wallet"></i> Revenue Report</a></li>
                     <?php endif; ?>
                     <?php if (canView('trash')): ?>
                         <li><a href="<?php echo BASE_URL; ?>modules/admin/trash.php" class="<?php echo $activePage == 'trash' ? 'active-sub' : ''; ?>"><i class="fas fa-trash-alt"></i> Trash</a></li>
@@ -227,8 +279,7 @@ $activeEntity = getActiveEntity();
         </script>
     </div>
     <?php endif; ?>
-    
-    <div class="main-content" style="<?php echo (isset($hideSidebar) && $hideSidebar) ? 'margin-left: 0; padding: 1.5rem;' : ''; ?>">
+    <div class="main-content <?php echo (isset($hideSidebar) && $hideSidebar) ? 'no-sidebar' : ''; ?>" style="<?php echo (isset($hideSidebar) && $hideSidebar) ? 'margin-left: 0 !important; width: 100% !important; max-width: 100% !important; padding: 1.5rem 2rem;' : ''; ?>">
         <div class="header" style="position: sticky; top: 0; z-index: 900; background: rgba(255,255,255,0.8); backdrop-filter: blur(10px); padding: 1rem 1.5rem;">
             <div style="display: flex; align-items: center; gap: 1rem;">
                 <?php if (!isset($hideSidebar) || !$hideSidebar): ?>
@@ -236,19 +287,120 @@ $activeEntity = getActiveEntity();
                     <i class="fas fa-bars"></i>
                 </button>
                 <?php endif; ?>
-                <a href="javascript:history.back()" class="btn btn-secondary" style="border: none; background: #e2e8f0; border-radius: 8px; width: 40px; height: 40px; display: flex; align-items: center; justify-content: center; color: #475569; text-decoration: none;" title="Go Back">
+                <?php
+                // Smart fallback URL calculation
+                $smartBackUrl = $backUrl ?? '';
+                if (empty($smartBackUrl)) {
+                    if (!empty($_GET['return_url'])) {
+                        $smartBackUrl = $_GET['return_url'];
+                    } elseif (!empty($_SERVER['HTTP_REFERER']) && strpos($_SERVER['HTTP_REFERER'], 'view_invoice_redirect.php') === false && strpos($_SERVER['HTTP_REFERER'], 'login.php') === false) {
+                        $smartBackUrl = $_SERVER['HTTP_REFERER'];
+                    } else {
+                        switch ($activePage ?? '') {
+                            case 'pos':
+                                $smartBackUrl = BASE_URL . 'modules/financials/purchase_orders.php';
+                                break;
+                            case 'invoices':
+                                $smartBackUrl = BASE_URL . 'modules/financials/invoices.php';
+                                break;
+                            case 'ledger':
+                                $smartBackUrl = BASE_URL . 'modules/financials/ledgers.php';
+                                break;
+                            case 'bookings':
+                            case 'direct_booking':
+                                $smartBackUrl = BASE_URL . 'modules/operations/bookings.php';
+                                break;
+                            case 'proposals':
+                                $smartBackUrl = BASE_URL . 'modules/proposals/proposals.php';
+                                break;
+                            case 'sites':
+                                $smartBackUrl = BASE_URL . 'modules/inventory/sites.php';
+                                break;
+                            case 'clients':
+                                $smartBackUrl = BASE_URL . 'modules/partners/clients.php';
+                                break;
+                            case 'vendors':
+                                $smartBackUrl = BASE_URL . 'modules/partners/vendors.php';
+                                break;
+                            case 'printing_rates':
+                                $smartBackUrl = BASE_URL . 'modules/partners/printing_rates.php';
+                                break;
+                            case 'client_printing_rates':
+                                $smartBackUrl = BASE_URL . 'modules/partners/client_printing_rates.php';
+                                break;
+                            case 'mounting':
+                                $smartBackUrl = BASE_URL . 'modules/operations/mounting.php';
+                                break;
+                            case 'fabrication':
+                                $smartBackUrl = BASE_URL . 'modules/operations/fabrication.php';
+                                break;
+                            case 'approvals':
+                                $smartBackUrl = BASE_URL . 'modules/admin/approvals.php';
+                                break;
+                            case 'users':
+                                $smartBackUrl = BASE_URL . 'modules/users/index.php';
+                                break;
+                            case 'entities':
+                                $smartBackUrl = BASE_URL . 'modules/admin/entities.php';
+                                break;
+                            case 'settings':
+                                $smartBackUrl = BASE_URL . 'modules/admin/settings.php';
+                                break;
+                            default:
+                                $smartBackUrl = BASE_URL . 'dashboard.php';
+                                break;
+                        }
+                    }
+                }
+                ?>
+                <a href="<?php echo htmlspecialchars($smartBackUrl); ?>" onclick="smartNavigateBack(event, '<?php echo addslashes($smartBackUrl); ?>')" class="btn btn-secondary" style="border: none; background: #e2e8f0; border-radius: 8px; width: 40px; height: 40px; display: flex; align-items: center; justify-content: center; color: #475569; text-decoration: none; cursor: pointer;" title="Go Back">
                     <i class="fas fa-arrow-left"></i>
                 </a>
+                <script>
+                function smartNavigateBack(event, fallbackUrl) {
+                    if (event) event.preventDefault();
+                    
+                    // 1. Check explicit return_url in query parameter
+                    const urlParams = new URLSearchParams(window.location.search);
+                    const explicitReturn = urlParams.get('return_url');
+                    if (explicitReturn) {
+                        window.location.href = explicitReturn;
+                        return;
+                    }
+
+                    // 2. Check valid document.referrer
+                    const referrer = document.referrer;
+                    if (referrer && referrer.indexOf(window.location.host) !== -1 && referrer !== window.location.href) {
+                        if (referrer.indexOf('view_invoice_redirect.php') === -1 && referrer.indexOf('login.php') === -1) {
+                            window.location.href = referrer;
+                            return;
+                        }
+                    }
+
+                    // 3. Check browser history
+                    if (window.history.length > 1 && (!referrer || referrer.indexOf('view_invoice_redirect.php') === -1)) {
+                        window.history.back();
+                        return;
+                    }
+
+                    // 4. Fallback URL
+                    if (fallbackUrl && fallbackUrl !== 'javascript:history.back()') {
+                        window.location.href = fallbackUrl;
+                    } else {
+                        window.location.href = '<?php echo BASE_URL; ?>dashboard.php';
+                    }
+                }
+                </script>
                 <h1 style="font-size: 1.25rem; font-weight: 800; color: #0f172a; margin: 0;"><?php echo isset($pageTitle) ? $pageTitle : 'Dashboard'; ?></h1>
             </div>
-            <div class="user-info hide-mobile" style="display: flex; align-items: center; gap: 1.5rem;">
+            <div class="user-info hide-mobile" style="display: flex; align-items: center; gap: 0.6rem; padding: 0.25rem 0.6rem;">
                 <!-- Content Switcher -->
                 <?php
                 $allEntities = $pdo->query("SELECT id, name FROM entities")->fetchAll();
                 if (count($allEntities) > 1):
                 ?>
                 <div class="entity-switcher" style="position: relative;">
-                    <select onchange="const urlParams = new URLSearchParams(window.location.search); urlParams.set('set_entity', this.value); window.location.search = urlParams.toString();" style="background: #f1f5f9; border: 1px solid #e2e8f0; padding: 0.4rem 1rem; border-radius: 8px; font-size: 0.8rem; font-weight: 700; color: #475569; cursor: pointer;">
+                    <select onchange="const urlParams = new URLSearchParams(window.location.search); urlParams.set('set_entity', this.value); window.location.search = urlParams.toString();" style="background: #f1f5f9; border: 1px solid #e2e8f0; padding: 0.35rem 0.65rem; border-radius: 8px; font-size: 0.78rem; font-weight: 700; color: #475569; cursor: pointer; font-family: inherit;">
                         <?php foreach ($allEntities as $e): ?>
                             <option value="<?php echo $e['id']; ?>" <?php echo ($_SESSION['active_entity_id'] ?? '') == $e['id'] ? 'selected' : ''; ?>>
                                 <?php echo htmlspecialchars($e['name']); ?>
@@ -260,7 +412,7 @@ $activeEntity = getActiveEntity();
 
                 <!-- Financial Year Switcher -->
                 <div class="fy-switcher" style="position: relative;">
-                    <select onchange="const urlParams = new URLSearchParams(window.location.search); urlParams.set('set_fy', this.value); window.location.search = urlParams.toString();" style="background: #f1f5f9; border: 1px solid #e2e8f0; padding: 0.4rem 1rem; border-radius: 8px; font-size: 0.8rem; font-weight: 700; color: #475569; cursor: pointer;">
+                    <select onchange="const urlParams = new URLSearchParams(window.location.search); urlParams.set('set_fy', this.value); window.location.search = urlParams.toString();" style="background: #f1f5f9; border: 1px solid #e2e8f0; padding: 0.35rem 0.65rem; border-radius: 8px; font-size: 0.78rem; font-weight: 700; color: #475569; cursor: pointer; font-family: inherit;">
                         <?php 
                         $fyOptions = ['25-26', '26-27', '27-28'];
                         $currentSessionFY = $_SESSION['active_financial_year'] ?? '26-27';
@@ -273,10 +425,10 @@ $activeEntity = getActiveEntity();
                     </select>
                 </div>
                 <div class="profile-dropdown" style="position: relative; display: inline-block;">
-                    <button class="profile-btn" style="background: none; border: none; font-weight: 600; color: #475569; display: flex; align-items: center; gap: 0.5rem; cursor: pointer; padding: 0.5rem; border-radius: 8px; transition: background 0.2s; font-family: inherit; font-size: 1rem;">
-                        <i class="fas fa-user-circle" style="font-size: 1.25rem; color: var(--primary);"></i>
+                    <button class="profile-btn" style="background: none; border: none; font-weight: 600; color: #475569; display: flex; align-items: center; gap: 0.4rem; cursor: pointer; padding: 0.35rem 0.5rem; border-radius: 8px; transition: background 0.2s; font-family: inherit; font-size: 0.85rem;">
+                        <i class="fas fa-user-circle" style="font-size: 1.15rem; color: var(--primary);"></i>
                         <span>Welcome, <?php echo htmlspecialchars($_SESSION['user_name'] ?? 'Guest', ENT_QUOTES, 'UTF-8'); ?></span>
-                        <i class="fas fa-chevron-down" style="font-size: 0.75rem; opacity: 0.7;"></i>
+                        <i class="fas fa-chevron-down" style="font-size: 0.7rem; opacity: 0.7;"></i>
                     </button>
                     <div class="profile-dropdown-content" style="display: none; position: absolute; right: 0; background-color: #ffffff; min-width: 200px; box-shadow: 0px 8px 24px rgba(0,0,0,0.12); border: 1px solid #cbd5e1; border-radius: 8px; z-index: 1000; margin-top: 8px; overflow: hidden;">
                         <a href="<?php echo BASE_URL; ?>modules/users/profile.php" style="color: #334155; padding: 12px 16px; text-decoration: none; display: block; font-size: 0.9rem; font-weight: 500; transition: background 0.2s; text-align: left;" onmouseover="this.style.background='#f1f5f9'" onmouseout="this.style.background='none'">

@@ -10,15 +10,21 @@ if (empty($ref)) {
     die("Invalid reference number.");
 }
 
+$returnUrl = $_GET['from'] ?? $_GET['return_url'] ?? $_SERVER['HTTP_REFERER'] ?? '';
+$returnQuery = '';
+if (!empty($returnUrl) && strpos($returnUrl, 'view_invoice_redirect.php') === false && strpos($returnUrl, 'login.php') === false) {
+    $returnQuery = '&return_url=' . urlencode($returnUrl);
+}
+
 // 1. Search in invoices
 $stmt = $pdo->prepare("SELECT id, booking_id, type FROM invoices WHERE invoice_number = ?");
 $stmt->execute([$ref]);
 $inv = $stmt->fetch();
 if ($inv) {
     if ($inv['type'] === 'printing') {
-        header("Location: ../operations/print_client_printing.php?invoice_id=" . $inv['id']);
+        header("Location: ../operations/print_client_printing.php?invoice_id=" . $inv['id'] . $returnQuery);
     } else {
-        $redirectUrl = "../operations/" . ($inv['type'] === 'ro' ? 'generate_ro_invoice.php' : 'generate_invoice.php') . "?booking_id=" . $inv['booking_id'];
+        $redirectUrl = "../operations/" . ($inv['type'] === 'ro' ? 'generate_ro_invoice.php' : 'generate_invoice.php') . "?booking_id=" . $inv['booking_id'] . $returnQuery;
         header("Location: $redirectUrl");
     }
     exit;
@@ -29,7 +35,7 @@ $stmt = $pdo->prepare("SELECT vendor_id FROM vendor_printing_rates WHERE po_numb
 $stmt->execute([$ref]);
 $vendor_id = $stmt->fetchColumn();
 if ($vendor_id) {
-    header("Location: ../partners/view_vendor_printing_po.php?vendor_id=$vendor_id&po_number=" . urlencode($ref));
+    header("Location: ../partners/view_vendor_printing_po.php?vendor_id=$vendor_id&po_number=" . urlencode($ref) . $returnQuery);
     exit;
 }
 
@@ -39,9 +45,9 @@ $stmt->execute([$ref]);
 $po = $stmt->fetch();
 if ($po) {
     if ($po['type'] === 'printing') {
-        header("Location: ../operations/generate_printing_po.php?po_id=" . $po['id']);
+        header("Location: ../operations/generate_printing_po.php?po_id=" . $po['id'] . $returnQuery);
     } else {
-        header("Location: ../financials/po_view.php?id=" . $po['id']);
+        header("Location: ../financials/po_view.php?id=" . $po['id'] . $returnQuery);
     }
     exit;
 }
@@ -51,7 +57,7 @@ $stmt = $pdo->prepare("SELECT client_id FROM client_mounting_rates WHERE po_numb
 $stmt->execute([$ref]);
 $client_id = $stmt->fetchColumn();
 if ($client_id) {
-    header("Location: ../operations/view_mounting_invoice.php?client_id=$client_id&po_number=" . urlencode($ref));
+    header("Location: ../operations/view_mounting_invoice.php?client_id=$client_id&po_number=" . urlencode($ref) . $returnQuery);
     exit;
 }
 
@@ -60,7 +66,7 @@ $stmt = $pdo->prepare("SELECT client_id FROM client_printing_rates WHERE po_numb
 $stmt->execute([$ref]);
 $client_id = $stmt->fetchColumn();
 if ($client_id) {
-    header("Location: ../partners/view_client_printing_po.php?client_id=$client_id&po_number=" . urlencode($ref));
+    header("Location: ../partners/view_client_printing_po.php?client_id=$client_id&po_number=" . urlencode($ref) . $returnQuery);
     exit;
 }
 

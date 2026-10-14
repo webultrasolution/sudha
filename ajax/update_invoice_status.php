@@ -1,5 +1,6 @@
 <?php
 include_once __DIR__ . '/../config/db.php';
+require_once __DIR__ . '/../includes/ajax_auth.php';
 include_once __DIR__ . '/../includes/functions.php';
 
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
@@ -8,8 +9,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         exit;
     }
     $data = json_decode(file_get_contents('php://input'), true);
-    $invoiceId = intval($data['invoice_id']);
-    $status = clean($data['status']);
+    $invoiceId = intval($data['invoice_id'] ?? 0);
+    $status = clean($data['status'] ?? '');
 
     if (!$invoiceId) {
         echo json_encode(['success' => false, 'message' => 'Invalid Invoice ID']);

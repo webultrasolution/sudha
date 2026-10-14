@@ -182,7 +182,7 @@ include_once __DIR__ . '/../../includes/header.php';
                 <input type="date" name="to_date" value="<?php echo htmlspecialchars($to_date); ?>" style="border: none; background: transparent; padding: 0.25rem; font-size: 0.75rem; font-weight: 600; outline: none; color: #475569;">
             </div>
             <button type="submit" class="btn btn-primary" style="padding: 0.35rem 0.75rem; border-radius: 6px; font-weight: 700; font-size: 0.8rem;"><i class="fas fa-filter"></i> Apply</button>
-            <a href="site_financials.php?id=<?php echo $id; ?>&from_date=<?php echo $from_date; ?>&to_date=<?php echo $to_date; ?>&export=csv" class="btn" style="background: #10b981; color: white; border: none; padding: 0.35rem 0.75rem; border-radius: 6px; font-weight: 700; text-decoration: none; font-size: 0.8rem;"><i class="fas fa-file-csv"></i> Export CSV</a>
+            <a href="site_financials.php?id=<?php echo $id; ?>&from_date=<?php echo urlencode($from_date); ?>&to_date=<?php echo urlencode($to_date); ?>&export=csv" class="btn" style="background: #10b981; color: white; border: none; padding: 0.35rem 0.75rem; border-radius: 6px; font-weight: 700; text-decoration: none; font-size: 0.8rem;"><i class="fas fa-file-csv"></i> Export CSV</a>
         </form>
     </div>
 

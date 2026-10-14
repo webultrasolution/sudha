@@ -26,7 +26,7 @@ $rates = $stmtR->fetchAll();
 
 // Check if we are in preview mode (form submitted)
 $preview = isset($_GET['preview']) && $_GET['preview'] === '1';
-$selected_rate_ids = isset($_GET['rate_ids']) ? array_map('intval', $_GET['rate_ids']) : [];
+$selected_rate_ids = isset($_GET['rate_ids']) ? array_map('intval', is_array($_GET['rate_ids']) ? $_GET['rate_ids'] : explode(',', $_GET['rate_ids'])) : [];
 $po_remark = $_GET['remark'] ?? '';
 $po_number_filter = $_GET['po_number'] ?? '';
 
@@ -64,6 +64,25 @@ if (!empty($po_number_filter)) {
     $po_number = $po_number_filter;
 }
 $po_date = date('d-m-Y');
+
+$printing_date = '';
+if (!empty($po_number_filter)) {
+    $stmtDate = $pdo->prepare("SELECT MIN(start_date) FROM po_items WHERE po_id = (SELECT id FROM purchase_orders WHERE po_number = ? LIMIT 1)");
+    $stmtDate->execute([$po_number_filter]);
+    $dbPrintDate = $stmtDate->fetchColumn();
+    if (!empty($dbPrintDate) && $dbPrintDate !== '0000-00-00') {
+        $printing_date = date('d-m-Y', strtotime($dbPrintDate));
+    }
+}
+if (empty($printing_date) && !empty($rates[0]['start_date']) && $rates[0]['start_date'] !== '0000-00-00') {
+    $printing_date = date('d-m-Y', strtotime($rates[0]['start_date']));
+}
+if (empty($printing_date) && !empty($rates[0]['created_at']) && $rates[0]['created_at'] !== '0000-00-00 00:00:00') {
+    $printing_date = date('d-m-Y', strtotime($rates[0]['created_at']));
+}
+if (empty($printing_date)) {
+    $printing_date = $po_date;
+}
 
 // ============================
 // SELECTION FORM (Not Preview)
@@ -415,6 +434,11 @@ if (!empty($po_number_filter)) {
                     <span class="info-label">Phone</span>
                     <span class="info-sep">:</span>
                     <span class="info-value"><?php echo $v['phone']; ?></span>
+                </div>
+                <div class="info-row">
+                    <span class="info-label">Printing Date</span>
+                    <span class="info-sep">:</span>
+                    <span class="info-value"><?php echo htmlspecialchars($printing_date); ?></span>
                 </div>
             </div>
         </div>

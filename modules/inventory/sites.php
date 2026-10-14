@@ -161,6 +161,10 @@ if (!empty($_GET['vendor_id'])) {
     $where .= " AND s.vendor_id = ?";
     $params[] = $_GET['vendor_id'];
 }
+if (!empty($_GET['district'])) {
+    $where .= " AND s.district = ?";
+    $params[] = $_GET['district'];
+}
 if (!empty($_GET['state'])) {
     $where .= " AND s.state = ?";
     $params[] = $_GET['state'];
@@ -192,6 +196,7 @@ if (!empty($_GET['size'])) {
 
 // Query unique values for filters
 $states = $pdo->query("SELECT DISTINCT state FROM sites WHERE state IS NOT NULL AND state != '' ORDER BY state")->fetchAll(PDO::FETCH_COLUMN);
+$districts = $pdo->query("SELECT DISTINCT district FROM sites WHERE district IS NOT NULL AND district != '' ORDER BY district")->fetchAll(PDO::FETCH_COLUMN);
 $cities = $pdo->query("SELECT DISTINCT city FROM sites WHERE city IS NOT NULL AND city != '' ORDER BY city")->fetchAll(PDO::FETCH_COLUMN);
 $locations = $pdo->query("SELECT DISTINCT location FROM sites WHERE location IS NOT NULL AND location != '' ORDER BY location")->fetchAll(PDO::FETCH_COLUMN);
 $light_types = $pdo->query("SELECT DISTINCT light_type FROM sites WHERE light_type IS NOT NULL AND light_type != '' ORDER BY light_type")->fetchAll(PDO::FETCH_COLUMN);
@@ -212,7 +217,8 @@ foreach ($all_media_types as $mtype) {
 }
 
 // Fetch Sites
-$stmt = $pdo->prepare("SELECT s.*, p.name as vendor_name,
+$stmt = $pdo->prepare("SELECT s.*, p.name as vendor_name, p.email as vendor_email,
+    (SELECT filename FROM site_images WHERE site_id = s.id ORDER BY id DESC LIMIT 1) as thumbnail_photo,
     (SELECT b.campaign_name FROM booking_items bi JOIN bookings b ON bi.booking_id = b.id WHERE bi.site_id = s.id AND CURDATE() BETWEEN b.start_date AND b.end_date LIMIT 1) as current_campaign,
     (SELECT c.name FROM booking_items bi JOIN bookings b ON bi.booking_id = b.id JOIN partners c ON b.client_id = c.id WHERE bi.site_id = s.id AND CURDATE() BETWEEN b.start_date AND b.end_date LIMIT 1) as current_client,
     (SELECT b.end_date FROM booking_items bi JOIN bookings b ON bi.booking_id = b.id WHERE bi.site_id = s.id AND CURDATE() BETWEEN b.start_date AND b.end_date LIMIT 1) as current_end_date
@@ -234,7 +240,10 @@ $vendors = $pdo->query("SELECT id, name FROM partners WHERE type = 'vendor' ORDE
 </div>
 
 <div class="card">
-    <div style="display: flex; justify-content: flex-end; gap: 1rem; margin-bottom: 1rem;">
+    <div style="display: flex; justify-content: flex-end; gap: 1rem; margin-bottom: 1rem; flex-wrap: wrap;">
+        <button type="button" class="btn" onclick="sendSelectedSitesViaEmail()" style="background: white; border: 1px solid #ea4335; color: #ea4335; padding: 0.6rem 1.15rem; border-radius: 8px; font-weight: 700; font-size: 0.85rem; cursor: pointer; display: inline-flex; align-items: center; gap: 0.45rem; box-shadow: 0 1px 3px rgba(234,67,53,0.12); transition: all 0.2s;" onmouseover="this.style.background='#ea4335'; this.style.color='white';" onmouseout="this.style.background='white'; this.style.color='#ea4335';" title="Send stamped photos directly to vendor via SMTP Email">
+            <i class="fas fa-paper-plane" style="color: inherit;"></i> Send via Email (SMTP)
+        </button>
         <?php if (canAdd('inventory')): ?>
             <?php if (hasRole('admin')): ?>
             <a href="../admin/media_types.php" class="btn btn-secondary" style="background: #f8fafc; color: #475569; border: 1px solid #cbd5e1; text-decoration: none;">
@@ -310,7 +319,7 @@ $vendors = $pdo->query("SELECT id, name FROM partners WHERE type = 'vendor' ORDE
             </div>
         </div>
 
-        <div style="display: grid; grid-template-columns: 2fr 1fr 1fr 1fr 1fr 1fr 1fr; gap: 0.75rem;">
+        <div style="display: grid; grid-template-columns: 2fr 1fr 1fr 1fr 1fr 1fr 1fr 1fr; gap: 0.75rem;">
             <div class="search-group" style="position: relative;">
                 <i class="fas fa-search"
                     style="position: absolute; left: 12px; top: 50%; transform: translateY(-50%); color: #94a3b8; cursor: pointer;"
@@ -328,6 +337,15 @@ $vendors = $pdo->query("SELECT id, name FROM partners WHERE type = 'vendor' ORDE
                 <?php foreach ($media_types as $m): ?>
                     <option value="<?php echo htmlspecialchars($m); ?>" <?php echo $mediaFilter === $m ? 'selected' : ''; ?>>
                         <?php echo htmlspecialchars($m); ?></option>
+                <?php endforeach; ?>
+            </select>
+
+            <select id="filter-district"
+                style="width: 100%; padding: 0.5rem; border: 1px solid #cbd5e1; border-radius: 6px; font-size: 0.85rem; font-weight: 600; color: #0f172a;"
+                onchange="doSearch()">
+                <option value="">All Districts</option>
+                <?php foreach ($districts as $d): ?>
+                    <option value="<?php echo htmlspecialchars($d); ?>" <?php echo ($_GET['district'] ?? '') === $d ? 'selected' : ''; ?>><?php echo htmlspecialchars($d); ?></option>
                 <?php endforeach; ?>
             </select>
 
@@ -382,7 +400,9 @@ $vendors = $pdo->query("SELECT id, name FROM partners WHERE type = 'vendor' ORDE
         <table class="table responsive-table">
             <thead>
                 <tr>
-                    <th style="width: 40px;">#</th>
+                    <th style="width: 45px; text-align: center;">
+                        <input type="checkbox" id="selectAllSites" onchange="toggleSelectAllSites(this)" style="cursor: pointer; width: 18px; height: 18px; accent-color: var(--primary);" title="Select All">
+                    </th>
                     <th>Preview</th>
                     <th>City / Code</th>
                     <th>Asset Details</th>
@@ -397,23 +417,42 @@ $vendors = $pdo->query("SELECT id, name FROM partners WHERE type = 'vendor' ORDE
                 <?php $sn = 1;
                 foreach ($sites as $s): ?>
                     <tr>
-                        <td data-label="#"><?php echo $sn++; ?></td>
+                        <td data-label="Select" style="text-align: center; vertical-align: middle;">
+                            <div style="display: flex; flex-direction: column; align-items: center; gap: 4px;">
+                                <input type="checkbox" class="site-select-chk" value="<?php echo $s['id']; ?>"
+                                    data-site='<?php echo htmlspecialchars(json_encode([
+                                        'id' => $s['id'],
+                                        'site_code' => $s['site_code'],
+                                        'city' => $s['city'],
+                                        'area' => $s['area'] ?? '',
+                                        'name' => $s['name'],
+                                        'location' => $s['location'],
+                                        'type' => $s['type'],
+                                        'light_type' => $s['light_type'],
+                                        'owner_type' => $s['owner_type'],
+                                        'vendor_id' => $s['vendor_id'] ?? '',
+                                        'vendor_name' => $s['vendor_name'] ?? '',
+                                        'vendor_email' => $s['vendor_email'] ?? '',
+                                        'width' => $s['width'],
+                                        'height' => $s['height'],
+                                        'sqft' => $s['sqft'],
+                                        'card_rate' => $s['card_rate'],
+                                        'photo' => !empty($s['thumbnail_photo']) ? $s['thumbnail_photo'] : ''
+                                    ]), ENT_QUOTES, 'UTF-8'); ?>'
+                                    onchange="updateSelectionBar()" style="cursor: pointer; width: 18px; height: 18px; accent-color: var(--primary);">
+                                <span style="font-size: 0.7rem; color: #94a3b8; font-weight: 700;"><?php echo $sn++; ?></span>
+                            </div>
+                        </td>
                         <td data-label="Preview">
-                            <?php
-                            $imgs = $pdo->prepare("SELECT filename FROM site_images WHERE site_id = ? LIMIT 1");
-                            $imgs->execute([$s['id']]);
-                            $img = $imgs->fetch();
-                            if ($img):
-                                ?>
-                                <img src="../../uploads/sites/<?php echo $img['filename']; ?>"
+                            <?php if (!empty($s['thumbnail_photo'])): ?>
+                                <img src="../../uploads/sites/<?php echo htmlspecialchars($s['thumbnail_photo']); ?>"
                                     style="width: 100px; height: 65px; object-fit: cover; border-radius: 8px; cursor: pointer; border: 1px solid #e2e8f0; box-shadow: 0 2px 4px rgba(0,0,0,0.1);"
-                                    onclick="viewPhotos(<?php echo $s['id']; ?>, '<?php echo $s['light_type']; ?>')">
+                                    onclick="viewPhotos(<?php echo $s['id']; ?>, '<?php echo addslashes($s['light_type']); ?>')">
                             <?php else: ?>
                                 <div
                                     style="width: 100px; height: 65px; background: #f8fafc; border: 1px dashed #cbd5e1; border-radius: 8px; display: flex; flex-direction: column; align-items: center; justify-content: center; color: #94a3b8;">
                                     <i class="fas fa-image" style="font-size: 1.2rem; margin-bottom: 2px;"></i>
-                                    <span style="font-size: 0.6rem; font-weight: 700; text-transform: uppercase;">No
-                                        Photo</span>
+                                    <span style="font-size: 0.6rem; font-weight: 700; text-transform: uppercase;">No Photo</span>
                                 </div>
                             <?php endif; ?>
                         </td>
@@ -677,13 +716,171 @@ $vendors = $pdo->query("SELECT id, name FROM partners WHERE type = 'vendor' ORDE
 
 <!-- Custom Lightbox -->
 <div id="lbOverlay" class="lb-overlay">
-    <span class="lb-close" onclick="closeLightbox()">&times;</span>
+    <div style="position: absolute; top: 30px; right: 40px; display: flex; align-items: center; gap: 1.2rem; z-index: 3002;">
+        <button id="lb-download-top" onclick="downloadMasterLightboxImage(); event.stopPropagation();" style="background: rgba(255,255,255,0.18); color: white; border: 1px solid rgba(255,255,255,0.35); padding: 8px 18px; border-radius: 8px; font-weight: 800; font-size: 0.85rem; cursor: pointer; display: inline-flex; align-items: center; gap: 0.5rem; backdrop-filter: blur(8px); transition: all 0.2s;" onmouseover="this.style.background='var(--primary)'; this.style.borderColor='var(--primary)'" onmouseout="this.style.background='rgba(255,255,255,0.18)'; this.style.borderColor='rgba(255,255,255,0.35)'">
+            <i class="fas fa-download"></i> Download Full Size (JPEG)
+        </button>
+        <span onclick="closeLightbox()" style="font-size: 2.5rem; cursor: pointer; color: white; opacity: 0.7; line-height: 1; transition: all 0.2s;" onmouseover="this.style.opacity=1" onmouseout="this.style.opacity=0.7">&times;</span>
+    </div>
     <button class="lb-nav lb-prev" onclick="lbPrev()"><i class="fas fa-chevron-left"></i></button>
     <button class="lb-nav lb-next" onclick="lbNext()"><i class="fas fa-chevron-right"></i></button>
     <div class="lb-content">
         <div id="lbSlider" class="lb-slider"></div>
     </div>
-    <div id="lbCounter" class="lb-counter">1 / 1</div>
+    <div style="position: absolute; bottom: 30px; display: flex; align-items: center; gap: 1.2rem; z-index: 3002;">
+        <div id="lbCounter" class="lb-counter" style="position: static; bottom: auto;">1 / 1</div>
+        <button id="lb-download-bottom" onclick="downloadMasterLightboxImage(); event.stopPropagation();" style="background: rgba(15, 23, 42, 0.85); color: white; border: 1px solid rgba(255,255,255,0.25); padding: 8px 18px; border-radius: 8px; font-weight: 800; font-size: 0.85rem; cursor: pointer; display: flex; align-items: center; gap: 0.5rem; transition: all 0.2s;" onmouseover="this.style.background='var(--primary)'; this.style.borderColor='var(--primary)'" onmouseout="this.style.background='rgba(15, 23, 42, 0.85)'; this.style.borderColor='rgba(255,255,255,0.25)'">
+            <i class="fas fa-download"></i> Download Full Size (JPEG)
+        </button>
+    </div>
+</div>
+
+<!-- Floating Selection Bar -->
+<div id="selectionFloatingBar" style="display: none; position: fixed; bottom: 25px; left: 50%; transform: translateX(-50%); background: #0f172a; color: white; padding: 0.75rem 1.5rem; border-radius: 50px; box-shadow: 0 10px 30px rgba(0,0,0,0.35); z-index: 2000; align-items: center; gap: 1rem; border: 1px solid rgba(255,255,255,0.15); backdrop-filter: blur(10px); animation: fadeInUp 0.3s ease;">
+    <div style="display: flex; align-items: center; gap: 0.5rem; font-weight: 700; font-size: 0.9rem;">
+        <span id="selectedCountBadge" style="background: var(--primary); color: white; width: 26px; height: 26px; border-radius: 50%; display: inline-flex; align-items: center; justify-content: center; font-size: 0.8rem; font-weight: 800;">0</span>
+        <span>Sites Selected</span>
+    </div>
+    
+    <div style="height: 24px; width: 1px; background: rgba(255,255,255,0.2);"></div>
+    
+    <button type="button" onclick="sendSelectedSitesViaEmail()" style="background: #ea4335; color: white; border: none; padding: 0.5rem 1.15rem; border-radius: 30px; font-weight: 800; font-size: 0.85rem; cursor: pointer; display: inline-flex; align-items: center; gap: 0.45rem; transition: all 0.2s; box-shadow: 0 4px 12px rgba(234,67,53,0.35);" onmouseover="this.style.background='#d93025'; this.style.transform='scale(1.03)';" onmouseout="this.style.background='#ea4335'; this.style.transform='scale(1)';" title="Send stamped photos to vendor via SMTP">
+        <i class="fas fa-paper-plane"></i> Send via SMTP
+    </button>
+
+    <button type="button" onclick="downloadSelectedPhotosZip(true)" style="background: #0284c7; color: white; border: none; padding: 0.5rem 1.15rem; border-radius: 30px; font-weight: 800; font-size: 0.85rem; cursor: pointer; display: inline-flex; align-items: center; gap: 0.45rem; transition: all 0.2s; box-shadow: 0 4px 12px rgba(2,132,199,0.35);" onmouseover="this.style.background='#0369a1'; this.style.transform='scale(1.03)';" onmouseout="this.style.background='#0284c7'; this.style.transform='scale(1)';">
+        <i class="fas fa-id-card"></i> Download Stamped JPEGs (ZIP)
+    </button>
+
+    <button type="button" onclick="openWhatsAppShareModal()" style="background: #25D366; color: white; border: none; padding: 0.5rem 1.2rem; border-radius: 30px; font-weight: 700; font-size: 0.85rem; cursor: pointer; display: inline-flex; align-items: center; gap: 0.5rem; transition: transform 0.2s; box-shadow: 0 4px 12px rgba(37,211,102,0.3);" onmouseover="this.style.transform='scale(1.05)'" onmouseout="this.style.transform='scale(1)'">
+        <i class="fab fa-whatsapp" style="font-size: 1.1rem;"></i> Share via WhatsApp
+    </button>
+    
+    <button type="button" onclick="quickCopyFormattedDetails()" style="background: rgba(255,255,255,0.15); color: white; border: 1px solid rgba(255,255,255,0.25); padding: 0.5rem 1rem; border-radius: 30px; font-weight: 600; font-size: 0.85rem; cursor: pointer; display: inline-flex; align-items: center; gap: 0.4rem; transition: background 0.2s;" onmouseover="this.style.background='rgba(255,255,255,0.25)'" onmouseout="this.style.background='rgba(255,255,255,0.15)'">
+        <i class="fas fa-copy"></i> Copy Text
+    </button>
+    
+    <button type="button" onclick="clearSiteSelection()" style="background: none; border: none; color: #94a3b8; cursor: pointer; font-size: 0.85rem; font-weight: 600; padding: 0 0.25rem;" onmouseover="this.style.color='white'" onmouseout="this.style.color='#94a3b8'" title="Deselect All">
+        <i class="fas fa-times"></i>
+    </button>
+</div>
+
+<!-- WhatsApp Share Modal -->
+<div id="whatsappShareModal" class="modal">
+    <div class="modal-content" style="max-width: 880px; border-radius: 16px; padding: 1.75rem;">
+        <div class="modal-header" style="display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid #e2e8f0; padding-bottom: 1rem; margin-bottom: 1.25rem;">
+            <div style="display: flex; align-items: center; gap: 0.75rem;">
+                <div style="width: 42px; height: 42px; background: #dcfce7; color: #15803d; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 1.4rem;">
+                    <i class="fab fa-whatsapp"></i>
+                </div>
+                <div>
+                    <h2 style="font-size: 1.25rem; font-weight: 800; color: #0f172a; margin: 0;">Share Sites via WhatsApp</h2>
+                    <small style="color: #64748b;">Share selected advertising assets with photo, city name, asset details, and size</small>
+                </div>
+            </div>
+            <span class="close" onclick="closeWhatsAppModal()" style="font-size: 1.75rem; cursor: pointer; color: #94a3b8;">&times;</span>
+        </div>
+
+        <!-- 2 Clear Sharing Methods Banner -->
+        <div style="background: #f0fdf4; border: 1px solid #86efac; border-radius: 12px; padding: 0.85rem 1rem; margin-bottom: 1.25rem;">
+            <div style="font-weight: 800; font-size: 0.88rem; color: #166534; margin-bottom: 0.4rem; display: flex; align-items: center; gap: 0.4rem;">
+                <i class="fas fa-lightbulb" style="color: #eab308;"></i> 2 Recommended Ways to Send Each Photo with its Info:
+            </div>
+            <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 0.75rem; font-size: 0.8rem; color: #1e293b; line-height: 1.4;">
+                <div style="background: #ffffff; border: 1px solid #bbf7d0; border-radius: 8px; padding: 0.65rem;">
+                    <strong style="color: #0369a1; display: flex; align-items: center; gap: 0.35rem; margin-bottom: 2px;">
+                        <i class="fas fa-id-card"></i> Option 1: Info-Stamped Photo (Zero Typing)
+                    </strong>
+                    Click <span style="background:#e0f2fe;color:#0369a1;padding:1px 5px;border-radius:4px;font-weight:700;">🖼️ Info-Stamped JPEG</span> on each asset & press <kbd style="background:#f1f5f9;border:1px solid #cbd5e1;padding:1px 5px;border-radius:4px;font-weight:700;">Ctrl+V</kbd> in WhatsApp. City, Size & Rate are permanently stamped right on the photo!
+                </div>
+                <div style="background: #ffffff; border: 1px solid #bbf7d0; border-radius: 8px; padding: 0.65rem;">
+                    <strong style="color: #15803d; display: flex; align-items: center; gap: 0.35rem; margin-bottom: 2px;">
+                        <i class="fas fa-comment-dots"></i> Option 2: WhatsApp Individual Captions
+                    </strong>
+                    When attaching multiple photos in WhatsApp Web, click each photo thumbnail at the bottom, click <span style="background:#dcfce7;color:#15803d;padding:1px 5px;border-radius:4px;font-weight:700;">📝 Copy Caption</span> here, and press <kbd style="background:#f1f5f9;border:1px solid #cbd5e1;padding:1px 5px;border-radius:4px;font-weight:700;">Ctrl+V</kbd> into <em>"Add a caption..."</em>!
+                </div>
+            </div>
+        </div>
+
+        <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 1.25rem; margin-bottom: 1.25rem;">
+            <div>
+                <label style="display: block; font-weight: 700; font-size: 0.85rem; color: #334155; margin-bottom: 0.4rem;">
+                    Recipient WhatsApp Number (Optional):
+                </label>
+                <div style="position: relative;">
+                    <input type="text" id="waRecipientPhone" placeholder="e.g. 9876543210 (Leave blank for any chat)" class="p-input" style="width: 100%; padding-left: 2.25rem; font-size: 0.9rem;" oninput="generateWhatsAppMessage()">
+                    <i class="fab fa-whatsapp" style="position: absolute; left: 0.75rem; top: 50%; transform: translateY(-50%); color: #22c55e;"></i>
+                </div>
+                <small style="color: #64748b; font-size: 0.75rem; margin-top: 4px; display: block;">
+                    Leave empty to select any contact or group inside WhatsApp.
+                </small>
+            </div>
+
+            <div style="background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 10px; padding: 0.85rem;">
+                <label style="display: block; font-weight: 700; font-size: 0.85rem; color: #334155; margin-bottom: 0.5rem;">
+                    Message Details Options:
+                </label>
+                <div style="display: flex; flex-direction: column; gap: 0.4rem; font-size: 0.85rem;">
+                    <label style="display: flex; align-items: center; gap: 0.5rem; cursor: pointer; color: #334155;">
+                        <input type="checkbox" id="waIncludePricing" onchange="refreshWhatsAppModalData()" checked style="cursor: pointer; accent-color: var(--primary);">
+                        Include Card Rate / Rate Card Price
+                    </label>
+                    <label style="display: flex; align-items: center; gap: 0.5rem; cursor: pointer; color: #334155;">
+                        <input type="checkbox" id="waIncludePhotoLinks" onchange="refreshWhatsAppModalData()" style="cursor: pointer; accent-color: var(--primary);">
+                        Include Direct Photo URLs in Text Message
+                    </label>
+                </div>
+            </div>
+        </div>
+
+        <!-- Selected Sites Cards List -->
+        <div style="margin-bottom: 1.25rem;">
+            <label style="display: flex; justify-content: space-between; align-items: center; font-weight: 700; font-size: 0.85rem; color: #334155; margin-bottom: 0.5rem;">
+                <span>Selected Media Assets (<span id="waModalCount">0</span>):</span>
+                <span style="font-size: 0.75rem; color: #64748b;">Send each site individually or copy captions/photos</span>
+            </label>
+            <div id="waSelectedCardsList" style="max-height: 280px; overflow-y: auto; border: 1px solid #e2e8f0; border-radius: 10px; padding: 0.75rem; background: #ffffff; display: flex; flex-direction: column; gap: 0.75rem;">
+                <!-- Dynamically Populated -->
+            </div>
+        </div>
+
+        <!-- Formatted WhatsApp Message Preview -->
+        <div style="margin-bottom: 1.5rem;">
+            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 0.4rem;">
+                <label style="font-weight: 700; font-size: 0.85rem; color: #334155; margin: 0;">
+                    Complete WhatsApp Proposal Summary Preview:
+                </label>
+                <button type="button" onclick="copyWhatsAppMessageText()" style="background: #f1f5f9; border: 1px solid #cbd5e1; color: #334155; padding: 3px 10px; border-radius: 6px; font-size: 0.75rem; font-weight: 700; cursor: pointer; display: inline-flex; align-items: center; gap: 0.3rem;">
+                    <i class="fas fa-copy"></i> Copy Full Summary
+                </button>
+            </div>
+            <textarea id="waMessagePreview" rows="4" readonly style="width: 100%; border: 1px solid #cbd5e1; border-radius: 8px; padding: 0.75rem; font-family: monospace; font-size: 0.82rem; background: #f8fafc; color: #0f172a; resize: vertical; line-height: 1.4; box-sizing: border-box;"></textarea>
+        </div>
+
+        <!-- Action Buttons -->
+        <div style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 0.75rem; border-top: 1px solid #e2e8f0; padding-top: 1.25rem;">
+            <div style="display: flex; gap: 0.5rem; flex-wrap: wrap;">
+                <button type="button" onclick="downloadSelectedPhotosZip(true)" class="btn btn-secondary" style="background: #e0f2fe; color: #0369a1; border: 1px solid #bae6fd; font-weight: 700; font-size: 0.82rem;" title="Download all photos with details stamped on them">
+                    <i class="fas fa-id-card"></i> Download Info-Stamped JPEGs (ZIP)
+                </button>
+                <button type="button" onclick="downloadSelectedPhotosZip(false)" class="btn btn-secondary" style="background: #f1f5f9; color: #334155; border: 1px solid #cbd5e1; font-weight: 600; font-size: 0.82rem;" title="Download original raw photos">
+                    <i class="fas fa-file-archive"></i> Download Raw Photos (ZIP)
+                </button>
+            </div>
+
+            <div style="display: flex; gap: 0.75rem; flex-wrap: wrap;">
+                <button type="button" id="btnWebShareFiles" onclick="shareWithImagesWebShare()" class="btn" style="display: none; background: #0284c7; color: white; font-weight: 700; font-size: 0.88rem; padding: 0.6rem 1.15rem; border-radius: 8px; border: none; cursor: pointer; align-items: center; gap: 0.4rem; box-shadow: 0 4px 12px rgba(2,132,199,0.3);">
+                    <i class="fas fa-share-alt"></i> Share Stamped JPEGs (WhatsApp / OS)
+                </button>
+                <button type="button" onclick="openWhatsAppDesktopApp()" class="btn" style="background: #128C7E; color: white; font-weight: 700; font-size: 0.88rem; padding: 0.6rem 1.15rem; border-radius: 8px; border: none; cursor: pointer; display: flex; align-items: center; gap: 0.4rem;">
+                    <i class="fab fa-whatsapp"></i> WhatsApp App
+                </button>
+                <button type="button" onclick="openWhatsAppWeb()" class="btn btn-primary" style="background: #25D366; border-color: #25D366; color: white; font-weight: 800; font-size: 0.88rem; padding: 0.6rem 1.35rem; border-radius: 8px; display: flex; align-items: center; gap: 0.4rem; box-shadow: 0 4px 12px rgba(37,211,102,0.3);">
+                    <i class="fab fa-whatsapp" style="font-size: 1.05rem;"></i> Open WhatsApp Web
+                </button>
+            </div>
+        </div>
+    </div>
 </div>
 
 <style>
@@ -779,6 +976,23 @@ $vendors = $pdo->query("SELECT id, name FROM partners WHERE type = 'vendor' ORDE
         height: 100%;
         background: rgba(0, 0, 0, 0.5);
         overflow-y: auto;
+    }
+
+    #whatsappShareModal.modal {
+        z-index: 4000;
+        background: rgba(15, 23, 42, 0.75);
+        backdrop-filter: blur(6px);
+        padding: 30px 15px;
+        box-sizing: border-box;
+    }
+
+    #whatsappShareModal .modal-content {
+        margin: 0 auto;
+        max-width: 880px;
+        max-height: 90vh;
+        overflow-y: auto;
+        border-radius: 16px;
+        box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.4);
     }
 
     .modal-content {
@@ -1015,13 +1229,14 @@ $vendors = $pdo->query("SELECT id, name FROM partners WHERE type = 'vendor' ORDE
         const vendor_id = document.getElementById('filter-vendor').value;
         const availability = document.querySelector('input[name="availability"]:checked')?.value || 'all';
         const media = document.getElementById('filter-media').value;
+        const district = document.getElementById('filter-district') ? document.getElementById('filter-district').value : '';
         const state = document.getElementById('filter-state').value;
         const city = document.getElementById('filter-city').value;
         const locationFilter = document.getElementById('filter-location') ? document.getElementById('filter-location').value : '';
         const light = document.getElementById('filter-light').value;
         const size = document.getElementById('filter-size').value;
 
-        window.location.href = `?search=${encodeURIComponent(s)}&owner=${encodeURIComponent(owner)}&vendor_id=${encodeURIComponent(vendor_id)}&availability=${encodeURIComponent(availability)}&media=${encodeURIComponent(media)}&state=${encodeURIComponent(state)}&city=${encodeURIComponent(city)}&location=${encodeURIComponent(locationFilter)}&light=${encodeURIComponent(light)}&size=${encodeURIComponent(size)}`;
+        window.location.href = `?search=${encodeURIComponent(s)}&owner=${encodeURIComponent(owner)}&vendor_id=${encodeURIComponent(vendor_id)}&availability=${encodeURIComponent(availability)}&media=${encodeURIComponent(media)}&district=${encodeURIComponent(district)}&state=${encodeURIComponent(state)}&city=${encodeURIComponent(city)}&location=${encodeURIComponent(locationFilter)}&light=${encodeURIComponent(light)}&size=${encodeURIComponent(size)}`;
     }
 
     // Auto-search on type with debounce
@@ -1151,6 +1366,50 @@ $vendors = $pdo->query("SELECT id, name FROM partners WHERE type = 'vendor' ORDE
         if (currentLbIndex < lbImages.length - 1) {
             currentLbIndex++;
             updateLightbox();
+        }
+    }
+
+    async function downloadMasterLightboxImage() {
+        if (!lbImages || !lbImages[currentLbIndex]) return;
+        const imgObj = lbImages[currentLbIndex];
+        const imgSrc = imgObj.src || ('../../uploads/sites/' + imgObj.filename);
+        
+        try {
+            const topBtn = document.getElementById('lb-download-top');
+            const botBtn = document.getElementById('lb-download-bottom');
+            const origTop = topBtn ? topBtn.innerHTML : '';
+            const origBot = botBtn ? botBtn.innerHTML : '';
+            if (topBtn) topBtn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Downloading...';
+            if (botBtn) botBtn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Downloading...';
+
+            const response = await fetch(imgSrc);
+            if (!response.ok) throw new Error('Network error');
+            const blob = await response.blob();
+            const blobUrl = window.URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = blobUrl;
+            
+            let rawName = (imgObj.filename || imgSrc.split('/').pop()).split('?')[0];
+            let baseName = rawName.replace(/\.[^/.]+$/, "");
+            a.download = baseName + '.jpg';
+            
+            document.body.appendChild(a);
+            a.click();
+            document.body.removeChild(a);
+            window.URL.revokeObjectURL(blobUrl);
+
+            if (topBtn) topBtn.innerHTML = origTop;
+            if (botBtn) botBtn.innerHTML = origBot;
+        } catch (e) {
+            const a = document.createElement('a');
+            a.href = imgSrc;
+            let rawName = (imgObj.filename || imgSrc.split('/').pop()).split('?')[0];
+            let baseName = rawName.replace(/\.[^/.]+$/, "");
+            a.download = baseName + '.jpg';
+            a.target = '_blank';
+            document.body.appendChild(a);
+            a.click();
+            document.body.removeChild(a);
         }
     }
 
@@ -1354,6 +1613,718 @@ $vendors = $pdo->query("SELECT id, name FROM partners WHERE type = 'vendor' ORDE
             Swal.fire('Error', decodeURIComponent(urlParams.get('error')), 'error');
         }
     });
+
+    // --- Multi-Site Selection & WhatsApp Sharing Logic ---
+    function toggleSelectAllSites(masterCheckbox) {
+        const checkboxes = document.querySelectorAll('.site-select-chk');
+        checkboxes.forEach(chk => {
+            chk.checked = masterCheckbox.checked;
+        });
+        updateSelectionBar();
+    }
+
+    function updateSelectionBar() {
+        const selected = getSelectedSitesData();
+        const bar = document.getElementById('selectionFloatingBar');
+        const badge = document.getElementById('selectedCountBadge');
+        const masterChk = document.getElementById('selectAllSites');
+        const totalChk = document.querySelectorAll('.site-select-chk').length;
+        
+        if (badge) badge.innerText = selected.length;
+        if (masterChk) {
+            masterChk.checked = totalChk > 0 && selected.length === totalChk;
+            masterChk.indeterminate = selected.length > 0 && selected.length < totalChk;
+        }
+        
+        if (bar) {
+            bar.style.display = selected.length > 0 ? 'flex' : 'none';
+        }
+    }
+
+    function clearSiteSelection() {
+        document.querySelectorAll('.site-select-chk').forEach(chk => chk.checked = false);
+        const masterChk = document.getElementById('selectAllSites');
+        if (masterChk) {
+            masterChk.checked = false;
+            masterChk.indeterminate = false;
+        }
+        updateSelectionBar();
+    }
+
+    function getSelectedSitesData() {
+        const checkboxes = document.querySelectorAll('.site-select-chk:checked');
+        const list = [];
+        checkboxes.forEach(chk => {
+            try {
+                const data = JSON.parse(chk.getAttribute('data-site'));
+                if (data) list.push(data);
+            } catch (e) {
+                console.error('Failed to parse site data', e);
+            }
+        });
+        return list;
+    }
+
+    async function sendSelectedSitesViaEmail() {
+        const selected = getSelectedSitesData();
+        if (!selected.length) {
+            Swal.fire({
+                icon: 'info',
+                title: 'No Sites Selected',
+                text: 'Please select at least one site from the table checkbox first.',
+                confirmButtonColor: '#0d9488'
+            });
+            return;
+        }
+
+        const validSites = selected.filter(s => s.photo);
+        if (validSites.length === 0) {
+            Swal.fire('No Photos', 'Selected sites do not have photos to send.', 'warning');
+            return;
+        }
+
+        // Fetch Vendor Emails from selected sites
+        const vendorEmails = [...new Set(validSites.map(s => (s.vendor_email || '').trim()).filter(Boolean))];
+        const initialEmail = vendorEmails.join(', ');
+
+        const totalAmtVal = validSites.reduce((sum, s) => sum + (Number(s.card_rate) || 0), 0);
+        const amountText = totalAmtVal > 0 ? Number(totalAmtVal).toLocaleString('en-IN') : '{{Amount}}';
+
+        const defaultSubject = `Site Photos - ${validSites.length === 1 ? (validSites[0].city + ' - ' + validSites[0].site_code) : (validSites.length + ' Sites Selection')}`;
+
+        const defaultTemplateText = `Dear Sir/Madam,
+
+Please be informed that the attached site has been booked for the period from {{Start Date}} to {{End Date}} at a rate of ₹${amountText}.
+
+Please find the booking details and stamped photos attached for your reference.
+
+Thank you.
+
+Regards,
+
+Sudha Creative`;
+
+        const { value: formValues } = await Swal.fire({
+            title: '<div style="display:flex;align-items:center;justify-content:center;gap:0.5rem;color:#ea4335;"><i class="fas fa-paper-plane"></i> Send Stamped Photos via Email</div>',
+            html: `
+                <div style="text-align: left; font-size: 0.9rem; margin-top: 0.75rem;">
+                    <div style="margin-bottom: 0.85rem;">
+                        <label style="font-weight: 700; color: #1e293b; display: block; margin-bottom: 0.35rem; font-size: 0.85rem;">Recipient Email Address (Vendor) <span style="color:#ef4444;">*</span></label>
+                        <input id="smtp_inv_recipient_email" type="text" value="${initialEmail}" placeholder="vendor@example.com" style="width: 100%; box-sizing: border-box; font-size: 0.9rem; padding: 0.55rem 0.75rem; border-radius: 8px; border: 1px solid #cbd5e1; outline: none;">
+                    </div>
+                    <div style="margin-bottom: 0.85rem;">
+                        <label style="font-weight: 700; color: #1e293b; display: block; margin-bottom: 0.35rem; font-size: 0.85rem;">Email Subject</label>
+                        <input id="smtp_inv_subject" type="text" value="${defaultSubject}" style="width: 100%; box-sizing: border-box; font-size: 0.9rem; padding: 0.55rem 0.75rem; border-radius: 8px; border: 1px solid #cbd5e1; outline: none;">
+                    </div>
+                    <div style="margin-bottom: 0.85rem;">
+                        <label style="font-weight: 700; color: #1e293b; display: block; margin-bottom: 0.35rem; font-size: 0.85rem;">Message Body</label>
+                        <textarea id="smtp_inv_message" style="width: 100%; box-sizing: border-box; height: 145px; font-size: 0.86rem; padding: 0.6rem 0.75rem; border-radius: 8px; border: 1px solid #cbd5e1; outline: none; resize: vertical; line-height: 1.45; font-family: inherit;">${defaultTemplateText}</textarea>
+                    </div>
+                    <div style="background: #f0fdf4; border: 1px solid #bbf7d0; border-radius: 8px; padding: 10px 14px; font-size: 0.83rem; color: #166534; display: flex; align-items: center; gap: 0.5rem;">
+                        <i class="fas fa-paperclip" style="color: #16a34a; font-size: 1rem;"></i>
+                        <span><b>${validSites.length} Stamped Photo Card(s)</b> will be attached directly.</span>
+                    </div>
+                </div>
+            `,
+            focusConfirm: false,
+            showCancelButton: true,
+            confirmButtonText: '<i class="fas fa-paper-plane"></i> Send Email (SMTP)',
+            confirmButtonColor: '#0d9488',
+            cancelButtonText: '<i class="fab fa-google"></i> Open in Gmail Web',
+            cancelButtonColor: '#ea4335',
+            showCloseButton: true,
+            preConfirm: () => {
+                const emailVal = document.getElementById('smtp_inv_recipient_email').value.trim();
+                const subjectVal = document.getElementById('smtp_inv_subject').value.trim();
+                const msgVal = document.getElementById('smtp_inv_message').value.trim();
+                if (!emailVal) {
+                    Swal.showValidationMessage('Please enter a valid recipient email address.');
+                    return false;
+                }
+                return { email: emailVal, subject: subjectVal, message: msgVal };
+            }
+        });
+
+        if (formValues) {
+            Swal.fire({
+                title: 'Sending Stamped Photos...',
+                html: `Generating stamped JPEG cards and sending via SMTP to <b>${formValues.email}</b>...`,
+                allowOutsideClick: false,
+                didOpen: () => { Swal.showLoading(); }
+            });
+
+            try {
+                const formData = new FormData();
+                formData.append('site_ids', validSites.map(s => s.id).join(','));
+                formData.append('email', formValues.email);
+                formData.append('subject', formValues.subject);
+                formData.append('message', formValues.message);
+
+                const resp = await fetch('../../ajax/send_inventory_stamped_email.php', {
+                    method: 'POST',
+                    body: formData
+                });
+                const rawText = await resp.text();
+                let res;
+                try {
+                    res = JSON.parse(rawText);
+                } catch(jsonErr) {
+                    const cleanError = rawText.replace(/<[^>]*>?/gm, ' ').replace(/\s+/g, ' ').trim();
+                    throw new Error(cleanError || 'Invalid response from server.');
+                }
+
+                if (res.success) {
+                    Swal.fire({
+                        icon: 'success',
+                        title: 'Email Sent Successfully!',
+                        html: `<b>${res.message || 'Email sent successfully!'}</b><br><br><span style="color:#64748b;font-size:0.85rem;">Sender: sudhacreativemalda@gmail.com</span>`,
+                        confirmButtonColor: '#0d9488'
+                    });
+                } else {
+                    Swal.fire({
+                        icon: 'error',
+                        title: 'Sending Failed',
+                        text: res.message || 'Could not send email via SMTP server.'
+                    });
+                }
+            } catch (err) {
+                Swal.fire('SMTP Error', err.message || 'Network error occurred while communicating with SMTP server.', 'error');
+            }
+        } else if (Swal.getDismissReason() === Swal.DismissReason.cancel) {
+            // Compose in Gmail Web fallback
+            const emailInput = document.getElementById('smtp_inv_recipient_email')?.value.trim() || initialEmail;
+            const subjectInput = document.getElementById('smtp_inv_subject')?.value.trim() || defaultSubject;
+            const msgInput = document.getElementById('smtp_inv_message')?.value.trim() || defaultTemplateText;
+            const gmailUrl = `https://mail.google.com/mail/?view=cm&fs=1&to=${encodeURIComponent(emailInput)}&su=${encodeURIComponent(subjectInput)}&body=${encodeURIComponent(msgInput)}`;
+            window.open(gmailUrl, '_blank');
+        }
+    }
+
+    function openWhatsAppShareModal() {
+        const selected = getSelectedSitesData();
+        if (!selected.length) {
+            Swal.fire('Info', 'Please select at least one site from the list.', 'info');
+            return;
+        }
+        
+        document.getElementById('waModalCount').innerText = selected.length;
+        
+        // Check if Web Share API with files is supported
+        const webShareBtn = document.getElementById('btnWebShareFiles');
+        const topWebShareBtn = document.getElementById('btnTopWebShare');
+        if (navigator.canShare) {
+            if (webShareBtn) webShareBtn.style.display = 'inline-flex';
+            if (topWebShareBtn) topWebShareBtn.style.display = 'inline-flex';
+        }
+        
+        refreshWhatsAppModalData();
+        const bar = document.getElementById('selectionFloatingBar');
+        if (bar) bar.style.display = 'none';
+        document.getElementById('whatsappShareModal').style.display = 'block';
+    }
+
+    function refreshWhatsAppModalData() {
+        const selected = getSelectedSitesData();
+        if (!selected.length) return;
+        
+        const includePricing = document.getElementById('waIncludePricing') ? document.getElementById('waIncludePricing').checked : true;
+        const cardsContainer = document.getElementById('waSelectedCardsList');
+        if (cardsContainer) {
+            cardsContainer.innerHTML = selected.map((s, idx) => {
+                const captionText = generateSingleSiteCaption(s, idx, includePricing);
+                return `
+                <div style="background: #ffffff; border: 1px solid #e2e8f0; border-radius: 12px; padding: 0.85rem; box-shadow: 0 2px 5px rgba(0,0,0,0.03); display: flex; flex-direction: column; gap: 0.6rem;">
+                    <div style="display: flex; align-items: flex-start; justify-content: space-between; gap: 1rem; flex-wrap: wrap;">
+                        <div style="display: flex; align-items: center; gap: 0.85rem; flex: 1; min-width: 260px;">
+                            <div style="width: 85px; height: 58px; border-radius: 8px; overflow: hidden; background: #000; flex-shrink: 0; border: 1px solid #cbd5e1; position: relative;">
+                                ${s.photo ? `<img src="../../uploads/sites/${s.photo}" style="width: 100%; height: 100%; object-fit: cover;">` : `<div style="width: 100%; height: 100%; display: flex; align-items: center; justify-content: center; background: #f1f5f9; color: #94a3b8; font-size: 0.6rem; font-weight: 700;">NO PHOTO</div>`}
+                                <span style="position: absolute; top: 2px; left: 2px; background: rgba(15,23,42,0.8); color: white; padding: 1px 5px; border-radius: 4px; font-size: 0.65rem; font-weight: 800;">#${idx + 1}</span>
+                            </div>
+                            <div style="flex: 1; min-width: 0;">
+                                <div style="font-weight: 800; font-size: 0.95rem; color: #0f172a; display: flex; align-items: center; gap: 0.4rem;">
+                                    ${s.city} <span style="font-family: monospace; background: #f1f5f9; padding: 1px 6px; border-radius: 4px; font-size: 0.75rem; color: #475569; border: 1px solid #e2e8f0;">${s.site_code}</span>
+                                </div>
+                                <div style="font-size: 0.8rem; color: #475569; font-weight: 600; margin-top: 1px;">
+                                    ${s.name} ${s.location ? '• ' + s.location : ''}
+                                </div>
+                                <div style="font-size: 0.75rem; color: #64748b; margin-top: 2px;">
+                                    <span style="font-weight: 700; color: #0f172a;">${s.width}' x ${s.height}'</span> (${Number(s.sqft).toLocaleString()} SQFT) • <span class="media-badge ${s.type ? s.type.toLowerCase() : ''}" style="font-size: 0.65rem; padding: 1px 4px;">${s.type}</span> • ${s.light_type}
+                                    ${includePricing && s.card_rate && Number(s.card_rate) > 0 ? ` • <strong style="color: #16a34a;">₹${Number(s.card_rate).toLocaleString()}/mo</strong>` : ''}
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Individual Quick Action Buttons -->
+                        <div style="display: flex; align-items: center; gap: 0.35rem; flex-wrap: wrap;">
+                            ${s.photo ? `
+                                <button type="button" onclick="copyStampedImageToClipboard(${idx})" class="btn" style="background: #0284c7; color: white; border: none; padding: 6px 12px; border-radius: 6px; font-size: 0.8rem; font-weight: 800; display: inline-flex; align-items: center; gap: 0.35rem; cursor: pointer; box-shadow: 0 2px 6px rgba(2,132,199,0.35);" title="Copy photo with info details stamped on it">
+                                    <i class="fas fa-id-card"></i> 🖼️ Copy Stamped JPEG
+                                </button>
+                                <button type="button" onclick="downloadSingleSitePhoto('${s.photo}', '${s.site_code}', '${s.city}', ${s.id})" class="btn" style="background: #e0f2fe; color: #0369a1; border: 1px solid #bae6fd; padding: 6px 10px; border-radius: 6px; font-size: 0.78rem; font-weight: 700; display: inline-flex; align-items: center; gap: 0.3rem; cursor: pointer;" title="Download Stamped JPEG photo file">
+                                    <i class="fas fa-download"></i> Download Stamped JPEG
+                                </button>
+                            ` : ''}
+                            <button type="button" onclick="sendSingleSiteToWhatsApp(${idx})" class="btn" style="background: #25D366; color: white; border: none; padding: 6px 11px; border-radius: 6px; font-size: 0.78rem; font-weight: 800; display: inline-flex; align-items: center; gap: 0.3rem; cursor: pointer; box-shadow: 0 2px 6px rgba(37,211,102,0.3);" title="Send this single site directly to WhatsApp">
+                                <i class="fab fa-whatsapp"></i> Send on WA
+                            </button>
+                            <button type="button" onclick="copySingleSiteDetails(${idx})" class="btn" style="background: #f0fdf4; color: #166534; border: 1px solid #86efac; padding: 6px 11px; border-radius: 6px; font-size: 0.78rem; font-weight: 700; display: inline-flex; align-items: center; gap: 0.3rem; cursor: pointer;" title="Copy this specific image's caption text for WhatsApp">
+                                <i class="fas fa-comment-dots"></i> Copy Caption
+                            </button>
+                        </div>
+                    </div>
+
+                    <!-- Live Caption Preview Snippet for this Image -->
+                    <div style="background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 6px; padding: 0.5rem 0.75rem; font-family: monospace; font-size: 0.78rem; color: #334155; white-space: pre-line; line-height: 1.35;">
+${captionText}
+                    </div>
+                </div>
+                `;
+            }).join('');
+        }
+        generateWhatsAppMessage();
+    }
+
+    function closeWhatsAppModal() {
+        document.getElementById('whatsappShareModal').style.display = 'none';
+        updateSelectionBar();
+    }
+
+    function generateSingleSiteCaption(s, idx, includePricing = true) {
+        let lines = [];
+        lines.push(`📍 *${idx + 1}. ${s.city.toUpperCase()}* (${s.site_code})`);
+        if (s.area) {
+            lines.push(`*Area/Zone:* ${s.area}`);
+        }
+        lines.push(`🏢 *Asset Details:* ${s.name}`);
+        if (s.location) {
+            lines.push(`📌 *Location Landmark:* ${s.location}`);
+        }
+        lines.push(`📐 *Size:* ${s.width}' x ${s.height}' (${Number(s.sqft).toLocaleString()} SQFT)`);
+        lines.push(`💡 *Media Type:* ${s.type} • ${s.light_type} • ${s.owner_type || 'TA'}`);
+        if (includePricing && s.card_rate && Number(s.card_rate) > 0) {
+            lines.push(`💰 *Rate:* ₹${Number(s.card_rate).toLocaleString()}/month`);
+        }
+        return lines.join('\n');
+    }
+
+    function generateWhatsAppMessage() {
+        const selected = getSelectedSitesData();
+        if (!selected.length) return '';
+        
+        const includePricing = document.getElementById('waIncludePricing') ? document.getElementById('waIncludePricing').checked : true;
+        const includePhotoLinks = document.getElementById('waIncludePhotoLinks') ? document.getElementById('waIncludePhotoLinks').checked : false;
+        
+        const origin = window.location.origin;
+        let lines = [];
+        
+        lines.push(`🚀 *MEDIA INVENTORY PROPOSAL / SITE DETAILS*`);
+        lines.push(`━━━━━━━━━━━━━━━━━━━━━━━`);
+        lines.push(``);
+        
+        selected.forEach((s, idx) => {
+            lines.push(generateSingleSiteCaption(s, idx, includePricing));
+            
+            if (includePhotoLinks && s.photo) {
+                const photoUrl = `${origin}/uploads/sites/${s.photo}`;
+                lines.push(`🖼️ *Site Photo:* ${photoUrl}`);
+            }
+            
+            lines.push(``);
+            lines.push(`───────────────────────`);
+            lines.push(``);
+        });
+        
+        lines.push(`Sudha Creative & Advertising | sudhacreative.com`);
+        
+        const msg = lines.join('\n');
+        const previewEl = document.getElementById('waMessagePreview');
+        if (previewEl) previewEl.value = msg;
+        return msg;
+    }
+
+    async function copySiteImageToClipboard(photoFilename, siteCode, city) {
+        if (!photoFilename) return;
+        const imgUrl = `${window.location.origin}/uploads/sites/${photoFilename}`;
+        
+        try {
+            const promiseOfBlob = new Promise(async (resolve, reject) => {
+                try {
+                    const resp = await fetch(imgUrl);
+                    if (!resp.ok) throw new Error('Image fetch error');
+                    const blob = await resp.blob();
+                    
+                    const img = new Image();
+                    img.crossOrigin = 'anonymous';
+                    const objectUrl = URL.createObjectURL(blob);
+                    img.src = objectUrl;
+                    
+                    await new Promise((res, rej) => {
+                        img.onload = res;
+                        img.onerror = rej;
+                    });
+                    
+                    const canvas = document.createElement('canvas');
+                    canvas.width = img.naturalWidth;
+                    canvas.height = img.naturalHeight;
+                    const ctx = canvas.getContext('2d');
+                    ctx.drawImage(img, 0, 0);
+                    URL.revokeObjectURL(objectUrl);
+                    
+                    canvas.toBlob((pngBlob) => {
+                        if (pngBlob) resolve(pngBlob);
+                        else reject(new Error('Canvas toBlob failed'));
+                    }, 'image/png');
+                } catch (err) {
+                    reject(err);
+                }
+            });
+
+            if (typeof ClipboardItem !== 'undefined' && navigator.clipboard && navigator.clipboard.write) {
+                const item = new ClipboardItem({ 'image/png': promiseOfBlob });
+                await navigator.clipboard.write([item]);
+                
+                Swal.fire({
+                    icon: 'success',
+                    title: 'Photo Copied!',
+                    html: `Photo for <strong>${siteCode} (${city})</strong> copied to clipboard.<br><br>👉 Go to WhatsApp Web chat and press <kbd style="background:#e2e8f0;border:1px solid #cbd5e1;padding:3px 8px;border-radius:6px;font-weight:800;font-size:1rem;color:#0f172a;">Ctrl + V</kbd> to paste the image directly!`,
+                    showCancelButton: true,
+                    confirmButtonText: '<i class="fab fa-whatsapp"></i> Open WhatsApp Web',
+                    cancelButtonText: 'Done',
+                    confirmButtonColor: '#25D366'
+                }).then((res) => {
+                    if (res.isConfirmed) {
+                        window.open('https://web.whatsapp.com', '_blank');
+                    }
+                });
+            } else {
+                throw new Error('Clipboard API not supported');
+            }
+        } catch (e) {
+            console.warn('Clipboard error, downloading photo:', e);
+            downloadSingleSitePhoto(photoFilename, siteCode, city);
+            Swal.fire({
+                icon: 'info',
+                title: 'Photo Downloaded',
+                html: `Photo <strong>${siteCode}</strong> has been downloaded to your computer.<br>👉 Drag and drop it into WhatsApp!`
+            });
+        }
+    }
+
+    async function copyStampedImageToClipboard(idx) {
+        const selected = getSelectedSitesData();
+        if (!selected[idx]) return;
+        const s = selected[idx];
+        if (!s.photo) {
+            Swal.fire('No Photo', 'This site does not have a photo.', 'info');
+            return;
+        }
+        
+        try {
+            const promiseOfBlob = new Promise(async (resolve, reject) => {
+                try {
+                    const imgUrl = `${window.location.origin}/uploads/sites/${s.photo}`;
+                    const resp = await fetch(imgUrl);
+                    if (!resp.ok) throw new Error('Could not load image');
+                    const blob = await resp.blob();
+                    
+                    const img = new Image();
+                    img.crossOrigin = 'anonymous';
+                    const objectUrl = URL.createObjectURL(blob);
+                    img.src = objectUrl;
+                    
+                    await new Promise((res, rej) => {
+                        img.onload = res;
+                        img.onerror = rej;
+                    });
+                    
+                    const srcW = img.naturalWidth || 1200;
+                    const srcH = img.naturalHeight || 800;
+                    const targetW = Math.max(1200, srcW);
+                    const scale = targetW / srcW;
+                    const targetH = Math.round(srcH * scale);
+                    const footerH = Math.max(165, Math.round(targetW * 0.145));
+                    
+                    const canvas = document.createElement('canvas');
+                    canvas.width = targetW;
+                    canvas.height = targetH + footerH;
+                    const ctx = canvas.getContext('2d');
+                    
+                    // Background
+                    ctx.fillStyle = '#0b1220';
+                    ctx.fillRect(0, 0, targetW, targetH + footerH);
+                    
+                    // Draw photo
+                    ctx.drawImage(img, 0, 0, targetW, targetH);
+                    URL.revokeObjectURL(objectUrl);
+                    
+                    // Top Accent Divider Bar (Sky blue with Amber corner)
+                    ctx.fillStyle = '#0ea5e9';
+                    ctx.fillRect(0, targetH, targetW, 6);
+                    ctx.fillStyle = '#f59e0b';
+                    ctx.fillRect(0, targetH, Math.round(targetW * 0.18), 6);
+                    
+                    // Banner background
+                    ctx.fillStyle = '#0b1220';
+                    ctx.fillRect(0, targetH + 6, targetW, footerH - 6);
+                    
+                    const padX = Math.round(targetW * 0.035);
+                    const startY = targetH + Math.round(targetW * 0.018);
+                    
+                    // --- LINE 1: CITY NAME (Very Big, Bold, Crisp White) ---
+                    const cityText = (s.city || 'CITY').toUpperCase();
+                    ctx.fillStyle = '#ffffff';
+                    ctx.font = `bold ${Math.round(targetW * 0.027)}px sans-serif`;
+                    ctx.textAlign = 'left';
+                    ctx.textBaseline = 'middle';
+                    ctx.fillText(cityText, padX, startY + Math.round(targetW * 0.022));
+                    
+                    // --- LINE 2: LOCATION / ASSET (Thana More - Big & Clean) ---
+                    const row2Y = startY + Math.round(targetW * 0.062);
+                    ctx.font = `bold ${Math.round(targetW * 0.021)}px sans-serif`;
+                    ctx.fillStyle = '#cbd5e1';
+                    
+                    const nameStr = (s.name || '').trim();
+                    const locStr = (s.location || '').trim();
+                    let locVal = nameStr || locStr || 'Main Location';
+                    if (locVal.length > 65) locVal = locVal.substring(0, 62) + '...';
+                    ctx.fillText(locVal, padX, row2Y);
+                    
+                    // --- LINE 3: SIZE (Size: 20' x 18' - Vibrant Lime Green) ---
+                    const row3Y = startY + Math.round(targetW * 0.104);
+                    ctx.font = `bold ${Math.round(targetW * 0.022)}px sans-serif`;
+                    ctx.fillStyle = '#cbd5e1';
+                    ctx.fillText('Size: ', padX, row3Y);
+                    const sizeLabelMetrics = ctx.measureText('Size: ');
+                    
+                    const sizeVal = `${s.width}' x ${s.height}'`;
+                    ctx.fillStyle = '#4ade80';
+                    ctx.fillText(sizeVal, padX + sizeLabelMetrics.width, row3Y);
+                    
+                    canvas.toBlob((pngBlob) => {
+                        if (pngBlob) resolve(pngBlob);
+                        else reject(new Error('Canvas toBlob failed'));
+                    }, 'image/png');
+                } catch (err) {
+                    reject(err);
+                }
+            });
+
+            if (typeof ClipboardItem !== 'undefined' && navigator.clipboard && navigator.clipboard.write) {
+                const item = new ClipboardItem({ 'image/png': promiseOfBlob });
+                await navigator.clipboard.write([item]);
+                
+                Swal.fire({
+                    icon: 'success',
+                    title: 'Photo Copied!',
+                    html: `Stamped photo for <strong>${s.site_code} (${s.city})</strong> with all details is copied to clipboard.<br><br>👉 Go to WhatsApp Web chat and press <kbd style="background:#e2e8f0;border:1px solid #cbd5e1;padding:3px 8px;border-radius:6px;font-weight:800;font-size:1rem;color:#0f172a;">Ctrl + V</kbd> to paste!`,
+                    showCancelButton: true,
+                    confirmButtonText: '<i class="fab fa-whatsapp"></i> Open WhatsApp Web',
+                    cancelButtonText: 'Done',
+                    confirmButtonColor: '#25D366'
+                }).then((res) => {
+                    if (res.isConfirmed) {
+                        window.open('https://web.whatsapp.com', '_blank');
+                    }
+                });
+            } else {
+                throw new Error('Clipboard API not supported');
+            }
+        } catch (e) {
+            console.warn('Clipboard error, downloading stamped photo:', e);
+            downloadSingleSitePhoto(s.photo, s.site_code, s.city);
+            Swal.fire({
+                icon: 'info',
+                title: 'Photo Downloaded',
+                html: `Photo <strong>${s.site_code}</strong> has been downloaded to your computer.<br>👉 Drag and drop it into WhatsApp!`
+            });
+        }
+    }
+
+    function downloadSingleSitePhoto(photoFilename, siteCode, city, siteId = 0) {
+        if (siteId) {
+            window.location.href = `../../ajax/get_site_card_jpeg.php?id=${siteId}&download=1`;
+            return;
+        }
+        if (!photoFilename) return;
+        const imgUrl = `${window.location.origin}/uploads/sites/${photoFilename}`;
+        const a = document.createElement('a');
+        a.href = imgUrl;
+        const ext = photoFilename.split('.').pop() || 'jpg';
+        a.download = `${siteCode}_${city}.${ext}`;
+        a.target = '_blank';
+        document.body.appendChild(a);
+        a.click();
+        document.body.removeChild(a);
+    }
+
+    function copySingleSiteDetails(idx) {
+        const selected = getSelectedSitesData();
+        if (!selected[idx]) return;
+        const s = selected[idx];
+        const includePricing = document.getElementById('waIncludePricing') ? document.getElementById('waIncludePricing').checked : true;
+        
+        const txt = generateSingleSiteCaption(s, idx, includePricing);
+        navigator.clipboard.writeText(txt).then(() => {
+            Swal.fire({
+                icon: 'success',
+                title: 'Caption Copied!',
+                html: `Caption for <strong>${s.site_code} (${s.city})</strong> copied.<br><br>👉 In WhatsApp, click <strong>"Add a caption..."</strong> under this photo and press <kbd style="background:#e2e8f0;border:1px solid #cbd5e1;padding:2px 6px;border-radius:4px;font-weight:bold;">Ctrl+V</kbd>!`,
+                timer: 2200,
+                showConfirmButton: false
+            });
+        });
+    }
+
+    function openWhatsAppWeb() {
+        const msg = generateWhatsAppMessage();
+        if (!msg) {
+            Swal.fire('Warning', 'Please select at least one site.', 'warning');
+            return;
+        }
+        
+        let phone = document.getElementById('waRecipientPhone') ? document.getElementById('waRecipientPhone').value.trim().replace(/[^0-9]/g, '') : '';
+        let waUrl = '';
+        if (phone) {
+            if (phone.length === 10) phone = '91' + phone;
+            waUrl = `https://web.whatsapp.com/send?phone=${phone}&text=${encodeURIComponent(msg)}`;
+        } else {
+            waUrl = `https://web.whatsapp.com/send?text=${encodeURIComponent(msg)}`;
+        }
+        window.open(waUrl, '_blank');
+    }
+
+    function openWhatsAppDesktopApp() {
+        const msg = generateWhatsAppMessage();
+        if (!msg) {
+            Swal.fire('Warning', 'Please select at least one site.', 'warning');
+            return;
+        }
+        
+        let phone = document.getElementById('waRecipientPhone') ? document.getElementById('waRecipientPhone').value.trim().replace(/[^0-9]/g, '') : '';
+        let waUrl = '';
+        if (phone) {
+            if (phone.length === 10) phone = '91' + phone;
+            waUrl = `https://api.whatsapp.com/send?phone=${phone}&text=${encodeURIComponent(msg)}`;
+        } else {
+            waUrl = `https://api.whatsapp.com/send?text=${encodeURIComponent(msg)}`;
+        }
+        window.open(waUrl, '_blank');
+    }
+
+    async function shareWithImagesWebShare() {
+        const selected = getSelectedSitesData();
+        if (!selected.length) return;
+        
+        const includePricing = document.getElementById('waIncludePricing') ? document.getElementById('waIncludePricing').checked : true;
+        const msg = generateWhatsAppMessage();
+        const btn = document.getElementById('btnWebShareFiles');
+        const origHtml = btn ? btn.innerHTML : '';
+        if (btn) btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Generating Stamped JPEGs...';
+        
+        try {
+            const filesArray = [];
+            for (const s of selected) {
+                if (s.photo) {
+                    const imgUrl = `../../ajax/get_site_card_jpeg.php?id=${s.id}&price=${includePricing ? 1 : 0}`;
+                    try {
+                        const resp = await fetch(imgUrl);
+                        if (resp.ok) {
+                            const blob = await resp.blob();
+                            const filename = `${s.site_code}_${s.city}_Info.jpg`;
+                            const file = new File([blob], filename, { type: 'image/jpeg' });
+                            filesArray.push(file);
+                        }
+                    } catch(err) {
+                        console.warn('Could not fetch stamped image for web share:', s.photo, err);
+                    }
+                }
+            }
+            
+            if (filesArray.length > 0 && navigator.canShare && navigator.canShare({ files: filesArray })) {
+                await navigator.share({
+                    files: filesArray
+                });
+            } else if (navigator.share) {
+                await navigator.share({
+                    text: msg
+                });
+            } else {
+                openWhatsAppWeb();
+            }
+        } catch(e) {
+            if (e.name !== 'AbortError') {
+                console.error('Web share error:', e);
+                openWhatsAppWeb();
+            }
+        } finally {
+            if (btn) btn.innerHTML = origHtml;
+        }
+    }
+
+    function sendSingleSiteToWhatsApp(idx) {
+        const selected = getSelectedSitesData();
+        if (!selected[idx]) return;
+        const s = selected[idx];
+        const includePricing = document.getElementById('waIncludePricing') ? document.getElementById('waIncludePricing').checked : true;
+        
+        let caption = generateSingleSiteCaption(s, idx, includePricing);
+        if (s.photo) {
+            caption += `\n🖼️ *Photo:* ${window.location.origin}/uploads/sites/${s.photo}`;
+        }
+        
+        let phone = document.getElementById('waRecipientPhone') ? document.getElementById('waRecipientPhone').value.trim().replace(/[^0-9]/g, '') : '';
+        let waUrl = '';
+        if (phone) {
+            if (phone.length === 10) phone = '91' + phone;
+            waUrl = `https://web.whatsapp.com/send?phone=${phone}&text=${encodeURIComponent(caption)}`;
+        } else {
+            waUrl = `https://web.whatsapp.com/send?text=${encodeURIComponent(caption)}`;
+        }
+        window.open(waUrl, '_blank');
+    }
+
+    function downloadSelectedPhotosZip(isStamped = false) {
+        const selected = getSelectedSitesData();
+        if (!selected.length) {
+            Swal.fire('Warning', 'Please select at least one site.', 'warning');
+            return;
+        }
+        const ids = selected.map(s => s.id).join(',');
+        const includePricing = document.getElementById('waIncludePricing') ? (document.getElementById('waIncludePricing').checked ? 1 : 0) : 1;
+        const stampedParam = isStamped ? `&stamped=1&price=${includePricing}` : '';
+        window.location.href = `../../ajax/download_sites_zip.php?ids=${ids}${stampedParam}`;
+    }
+
+    function copyWhatsAppMessageText() {
+        const msg = generateWhatsAppMessage();
+        if (!msg) return;
+        navigator.clipboard.writeText(msg).then(() => {
+            Swal.fire({
+                icon: 'success',
+                title: 'Copied!',
+                text: 'Formatted WhatsApp message copied to clipboard.',
+                timer: 1500,
+                showConfirmButton: false
+            });
+        });
+    }
+
+    function quickCopyFormattedDetails() {
+        const msg = generateWhatsAppMessage();
+        if (!msg) {
+            Swal.fire('Warning', 'Please select at least one site.', 'warning');
+            return;
+        }
+        navigator.clipboard.writeText(msg).then(() => {
+            Swal.fire({
+                icon: 'success',
+                title: 'Copied to Clipboard!',
+                text: 'Site details and image links copied. You can now paste directly into WhatsApp.',
+                timer: 2000,
+                showConfirmButton: false
+            });
+        });
+    }
 </script>
 
 <?php include_once __DIR__ . '/../../includes/footer.php'; ?>

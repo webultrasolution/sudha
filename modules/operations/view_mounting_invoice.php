@@ -125,8 +125,9 @@ if (!empty($billing_gst)) {
 }
 $isInterState = (strtolower(trim($clientState)) !== 'west bengal' && substr($client_gstin, 0, 2) !== '19');
 
-// Company settings — uses active session entity
-$co                 = resolveCompanyDetails();
+// Company settings — entity priority: invoice entity → active session entity → settings
+$entityIdToResolve  = !empty($first['entity_id']) ? $first['entity_id'] : ($_SESSION['active_entity_id'] ?? null);
+$co                 = resolveCompanyDetails($entityIdToResolve);
 $company_name       = $co['name'];
 $company_gstin      = $co['gstin'];
 $company_pan        = $co['pan'];
@@ -511,11 +512,14 @@ $igst_pct = $isInterState ? 18 : 0;
         </div>
 
         <div class="footer">
-            <div class="footer-left">
-                <div style="font-weight: bold; text-decoration: underline; margin-bottom: 5px;">Bank Details:</div>
-                <p style="margin: 2px 0;">Bank Name: <strong><?php echo getSetting('bank_name', 'Your Bank Name'); ?></strong></p>
-                <p style="margin: 2px 0;">Account No: <strong><?php echo getSetting('bank_account', 'XXXX-XXXX-XXXX'); ?></strong></p>
-                <p style="margin: 2px 0;">IFSC Code: <strong><?php echo getSetting('bank_ifsc', 'XXXX0000000'); ?></strong></p>
+            <div class="footer-left" style="padding: 6px 10px;">
+                <div style="font-weight: bold; text-decoration: underline; margin-bottom: 3px;">Bank Details:</div>
+                <div style="line-height: 1.2; font-size: 9.5px;">
+                    <?php
+                    $bank = $company_bank_details ?: "A/C Name: {$company_name}\nBank: STATE BANK OF INDIA\nA/C No: 1234567890123\nIFSC: SBIN0000123";
+                    echo nl2br(htmlspecialchars(strtoupper($bank)));
+                    ?>
+                </div>
             </div>
             <div class="footer-right">
                 <div>For <strong><?php echo htmlspecialchars($company_name); ?></strong></div>

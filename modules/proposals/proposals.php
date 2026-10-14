@@ -79,7 +79,19 @@ $params[] = $offset;
 $proposals->execute($params);
 $proposals = $proposals->fetchAll();
 
-$clients = $pdo->query("SELECT id, name FROM partners WHERE type = 'client' ORDER BY name ASC")->fetchAll();
+if ($activeEntityId) {
+    $clients = $pdo->prepare("
+        SELECT DISTINCT c.id, c.name 
+        FROM partners c
+        JOIN proposals p ON p.client_id = c.id
+        WHERE c.type = 'client' AND p.entity_id = ?
+        ORDER BY c.name ASC
+    ");
+    $clients->execute([$activeEntityId]);
+    $clients = $clients->fetchAll();
+} else {
+    $clients = $pdo->query("SELECT id, name FROM partners WHERE type = 'client' ORDER BY name ASC")->fetchAll();
+}
 ?>
 
 <div class="card">
@@ -196,6 +208,7 @@ $clients = $pdo->query("SELECT id, name FROM partners WHERE type = 'client' ORDE
                                     <div style="font-size: 0.6rem; font-weight: 800; color: #94a3b8; padding: 0.5rem 0.8rem; text-transform: uppercase; letter-spacing: 0.05em;">Client Documents</div>
                                     <a href="export_pdf.php?id=<?php echo $p['id']; ?>" target="_blank"><i class="fas fa-file-pdf" style="color: #ef4444;"></i> Visual Media Plan (PDF)</a>
                                     <a href="export_excel.php?id=<?php echo $p['id']; ?>"><i class="fas fa-file-excel" style="color: #10b981;"></i> Excel Rate Sheet</a>
+                                    <a href="javascript:void(0)" onclick="openProposalInGSheet(<?php echo $p['id']; ?>)"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg" style="vertical-align: -2px; margin-right: 4px;"><path d="M19 3H5C3.9 3 3 3.9 3 5V19C3 20.1 3.9 21 5 21H19C20.1 21 21 20.1 21 19V5C21 3.9 20.1 3 19 3Z" fill="#0F9D58"/><path d="M7 7H17V9H7V7ZM7 11H17V13H7V11ZM7 15H14V17H7V15Z" fill="white"/></svg> Open in GSheet</a>
                                     <a href="export_ppt.php?id=<?php echo $p['id']; ?>" target="_blank"><i class="fas fa-file-powerpoint" style="color: #f97316;"></i> PPT Deck / Presentation</a>
                                     <!-- <a href="javascript:void(0)" onclick="generateProforma(<?php echo $p['id']; ?>)"><i class="fas fa-file-invoice" style="color: #6366f1;"></i> Proforma Invoice (PI)</a> -->
                                     <div style="height: 1px; background: #f1f5f9; margin: 0.25rem 0;"></div>
@@ -305,6 +318,96 @@ function copyPublicLink(url) {
     }).catch(err => {
         console.error('Failed to copy: ', err);
     });
+}
+
+async function openProposalInGSheet(proposalId) {
+    Swal.fire({
+        title: 'Preparing Google Sheet...',
+        text: 'Generating formatted Media Plan & Rate Sheet...',
+        allowOutsideClick: false,
+        didOpen: () => {
+            Swal.showLoading();
+        }
+    });
+
+    try {
+        const response = await fetch('export_sheet.php?id=' + proposalId);
+        const data = await response.json();
+        
+        if (!data.success) {
+            throw new Error(data.message || 'Failed to generate Google Sheet data');
+        }
+
+        // Copy formatted HTML table & TSV to clipboard
+        let copied = false;
+        try {
+            if (navigator.clipboard && window.ClipboardItem) {
+                const blobHtml = new Blob([data.html], { type: 'text/html' });
+                const blobText = new Blob([data.tsv], { type: 'text/plain' });
+                await navigator.clipboard.write([
+                    new ClipboardItem({
+                        'text/html': blobHtml,
+                        'text/plain': blobText
+                    })
+                ]);
+                copied = true;
+            } else if (navigator.clipboard) {
+                await navigator.clipboard.writeText(data.tsv);
+                copied = true;
+            }
+        } catch (clipErr) {
+            const ta = document.createElement('textarea');
+            ta.value = data.tsv;
+            document.body.appendChild(ta);
+            ta.select();
+            document.execCommand('copy');
+            document.body.removeChild(ta);
+            copied = true;
+        }
+
+        // Open Google Sheets in new tab
+        const gsheetWin = window.open('https://sheets.new', '_blank');
+
+        Swal.fire({
+            icon: 'success',
+            title: '<div style="font-size: 1.25rem; font-weight: 800; color: #0f172a; display: flex; align-items: center; justify-content: center; gap: 8px;"><svg width="22" height="22" viewBox="0 0 24 24" fill="none"><path d="M19 3H5C3.9 3 3 3.9 3 5V19C3 20.1 3.9 21 5 21H19C20.1 21 21 20.1 21 19V5C21 3.9 20.1 3 19 3Z" fill="#0F9D58"/><path d="M7 7H17V9H7V7ZM7 11H17V13H7V11ZM7 15H14V17H7V15Z" fill="white"/></svg> Google Sheets Ready!</div>',
+            html: `
+                <div style="text-align: left; font-size: 0.9rem; color: #334155; line-height: 1.5; padding: 5px 10px;">
+                    <div style="background: #ecfdf5; border: 1px solid #a7f3d0; border-radius: 8px; padding: 12px; margin-bottom: 12px; color: #065f46;">
+                        <strong style="font-size: 0.95rem; display: block; margin-bottom: 4px;"><i class="fas fa-check-circle"></i> Media Rate Sheet Copied to Clipboard!</strong>
+                        New Google Sheet has opened in a new tab.
+                    </div>
+                    <div style="font-weight: 700; color: #0f172a; margin-bottom: 6px;">Next Step in Google Sheets:</div>
+                    <ol style="margin-left: 20px; color: #475569; font-size: 0.88rem;">
+                        <li style="margin-bottom: 4px;">Click inside <strong>Cell A1</strong> in the new Google Sheet tab.</li>
+                        <li>Press <kbd style="background: #e2e8f0; border: 1px solid #cbd5e1; padding: 2px 6px; border-radius: 4px; font-weight: 800; color: #0f172a;">Ctrl + V</kbd> (or <kbd style="background: #e2e8f0; border: 1px solid #cbd5e1; padding: 2px 6px; border-radius: 4px; font-weight: 800; color: #0f172a;">Cmd + V</kbd> on Mac).</li>
+                    </ol>
+                    <div style="font-size: 0.8rem; color: #64748b; margin-top: 10px; font-style: italic;">
+                        All colors, headers, sites, and amounts will paste instantly into Google Sheets.
+                    </div>
+                </div>
+            `,
+            showConfirmButton: true,
+            confirmButtonText: '<i class="fas fa-external-link-alt"></i> Go to Google Sheet',
+            confirmButtonColor: '#0f9d58',
+            showCancelButton: true,
+            cancelButtonText: 'Done',
+            cancelButtonColor: '#64748b'
+        }).then((result) => {
+            if (result.isConfirmed) {
+                if (gsheetWin) {
+                    gsheetWin.focus();
+                }
+            }
+        });
+
+    } catch (err) {
+        Swal.fire({
+            icon: 'error',
+            title: 'Export Failed',
+            text: err.message || 'Could not copy data for Google Sheets'
+        });
+    }
 }
 
 /*

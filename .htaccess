@@ -1,3 +1,19 @@
 RewriteEngine On
+RewriteCond %{HTTP_HOST} !^(localhost|127\.0\.0\.1)(:[0-9]+)?$ [NC]
 RewriteCond %{HTTPS} off
 RewriteRule ^(.*)$ https://%{HTTP_HOST}%{REQUEST_URI} [L,R=301]
+
+# No directory listings (uploads/, backup/, etc.)
+Options -Indexes
+
+# Never serve DB dumps, logs, backups, deploy scripts or VCS metadata
+<FilesMatch "\.(sql|log|bak|orig|ps1|gz|tar|zip)$|_(log|debug)[^/]*\.txt$|^\.">
+    Require all denied
+</FilesMatch>
+RewriteRule (^|/)\.git(/|$) - [F,L]
+
+# One-off debug / migration scripts and scratch folders are not part of the app
+RewriteRule ^(scratch|backup)(/|$) - [F,L]
+RewriteRule ^(test[0-9]*|test_[a-z_]+|inspect_[a-z0-9_]+|check_[a-z_]+|remote_[a-z_]+|live_[a-z_]+|scratch_[a-z_]+|tmp_[a-z_]+|dump_[a-z0-9_]+|replace[0-9]*|mig|fix_db|col_check|find_links|read_log|view_errors|opcache_clear|alter_live_db|add_entity_cols|setup_database|run_update_db|update_approved_rates|migrate_phone_column)\.php$ - [F,L]
+RewriteRule ^modules/admin/(setup|temp_schema[0-9]*)\.php$ - [F,L]
+RewriteRule ^modules/operations/(inspect_[a-z_]+|test_zip|opcache_clear)\.php$ - [F,L]

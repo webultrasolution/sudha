@@ -1,5 +1,6 @@
 <?php
 include_once __DIR__ . '/../config/db.php';
+require_once __DIR__ . '/../includes/ajax_auth.php';
 include_once __DIR__ . '/../includes/functions.php';
 
 if (session_status() === PHP_SESSION_NONE) {
@@ -28,7 +29,7 @@ try {
     $pdo->beginTransaction();
 
     // 1. Fetch booking details
-    $stmtB = $pdo->prepare("SELECT campaign_name, client_id, start_date, end_date FROM bookings WHERE id = ?");
+    $stmtB = $pdo->prepare("SELECT campaign_name, client_id, start_date, end_date, entity_id FROM bookings WHERE id = ?");
     $stmtB->execute([$booking_id]);
     $booking = $stmtB->fetch();
     
@@ -43,16 +44,26 @@ try {
 
     // 3. Fetch all sites for this vendor on this booking
     $stmtItems = $pdo->prepare("
-        SELECT bi.site_id, bi.start_date, bi.end_date, bi.days, bi.purchase_amount
+        SELECT bi.site_id, bi.start_date, bi.end_date, bi.days, bi.purchase_amount, bi.amount, bi.client_print_rate, bi.client_mount_rate
         FROM booking_items bi
         JOIN sites s ON bi.site_id = s.id
         WHERE bi.booking_id = ? AND s.vendor_id = ?
     ");
     $stmtItems->execute([$booking_id, $vendor_id]);
-    $items = $stmtItems->fetchAll();
+    $rawItems = $stmtItems->fetchAll();
+
+    $items = [];
+    foreach ($rawItems as $it) {
+        $hasPrint = floatval($it['client_print_rate'] ?? 0) > 0;
+        $hasMount = floatval($it['client_mount_rate'] ?? 0) > 0;
+        $isRental = floatval($it['amount'] ?? 0) > 0 || (!$hasPrint && !$hasMount);
+        if ($isRental) {
+            $items[] = $it;
+        }
+    }
 
     if (empty($items)) {
-        throw new Exception("No sites found for this vendor on this booking.");
+        throw new Exception("No rental sites found for this vendor on this booking. Vendor PO is only applicable for site rental.");
     }
 
     // 4. Calculate Totals
@@ -61,19 +72,28 @@ try {
         $subtotal += floatval($item['purchase_amount'] ?? 0);
     }
     
-    // Check if vendor has GSTIN in database
-    $stmtGst = $pdo->prepare("SELECT gstin FROM partners WHERE id = ?");
+    // Check if vendor has GSTIN and state in database
+    $stmtGst = $pdo->prepare("SELECT gstin, state FROM partners WHERE id = ?");
     $stmtGst->execute([$vendor_id]);
-    $db_vendor_gst = trim($stmtGst->fetchColumn() ?: '');
+    $vendorRow = $stmtGst->fetch(PDO::FETCH_ASSOC);
+    $db_vendor_gst = trim($vendorRow['gstin'] ?? '');
+    $vendor_state = trim($vendorRow['state'] ?? '');
     $vendor_has_gst = vendorHasGST($db_vendor_gst);
 
-    $cgst = 0;
-    $sgst = 0;
+    $cgst = 0; $sgst = 0; $igst = 0;
     if ($vendor_has_gst) {
-        $cgst = $subtotal * 0.09;
-        $sgst = $subtotal * 0.09;
+        $isVendorInterstate = (strcasecmp($vendor_state, 'West Bengal') !== 0 && substr($db_vendor_gst, 0, 2) !== '19');
+        if ($isVendorInterstate) {
+            $igst = $subtotal * 0.18;
+        } else {
+            $cgst = $subtotal * 0.09;
+            $sgst = $subtotal * 0.09;
+        }
     }
-    $grandTotal = $subtotal + $cgst + $sgst;
+    $grandTotal = $subtotal + $cgst + $sgst + $igst;
+
+    // Entity ID from request, booking, or session
+    $entityId = !empty($data['entity_id']) ? intval($data['entity_id']) : ($booking['entity_id'] ?? ($_SESSION['active_entity_id'] ?? null));
 
     // Admin approves instantly; non-admin goes to queue
     $poStatus       = $isAdmin ? 'approved' : 'pending';
@@ -83,23 +103,33 @@ try {
         $poId = $existingPoId;
         $stmtPOUpdate = $pdo->prepare("
             UPDATE purchase_orders 
-            SET po_amount = ?, cgst_amount = ?, sgst_amount = ?, total_amount = ?, status = ?, approval_status = ?
+            SET po_amount = ?, cgst_amount = ?, sgst_amount = ?, igst_amount = ?, total_amount = ?, status = ?, approval_status = ?, entity_id = COALESCE(?, entity_id)
             WHERE id = ?
         ");
         $stmtPOUpdate->execute([
             $subtotal,
             $cgst,
             $sgst,
+            $igst,
             $grandTotal,
             $poStatus,
             $approvalStatus,
+            $entityId,
             $poId
         ]);
         
         // Delete old items to replace them
         $pdo->prepare("DELETE FROM po_items WHERE po_id = ?")->execute([$poId]);
-        
-        $poNum = $pdo->query("SELECT po_number FROM purchase_orders WHERE id = $poId")->fetchColumn();
+
+        $stmt = $pdo->prepare("SELECT po_number FROM purchase_orders WHERE id = ?");
+        $stmt->execute([$poId]);
+        $poNum = $stmt->fetchColumn();
+        if (empty($poNum) || stripos($poNum, 'BPO/') === 0) {
+            $ref_date = date('Y-m-d');
+            $fy_str = date('y', strtotime($ref_date)) . '-' . date('y', strtotime($ref_date . ' +1 year'));
+            $poNum = "PO/" . $fy_str . "/" . str_pad((string)$poId, 3, '0', STR_PAD_LEFT);
+            $pdo->prepare("UPDATE purchase_orders SET po_number = ? WHERE id = ?")->execute([$poNum, $poId]);
+        }
 
         // Create/Refresh approval request for non-admin on edit/re-save
         if (!$isAdmin) {
@@ -109,31 +139,36 @@ try {
             $stmtAR->execute([$poId, $poNum, $_SESSION['user_id'] ?? 0]);
         }
     } else {
-        // 5. Generate PO Number
-        $poNum = generateSequenceNumber($pdo, 'vendor_booking_po');
-
-        // 6. Insert PO
+        // 5. Insert PO
         $stmtPO = $pdo->prepare("
             INSERT INTO purchase_orders 
-            (campaign_id, vendor_id, customer_id, employee_id, campaign_name, po_number, po_date, po_amount, cgst_amount, sgst_amount, total_amount, status, approval_status, type) 
-            VALUES (?, ?, ?, ?, ?, ?, CURDATE(), ?, ?, ?, ?, ?, ?, 'system')
+            (campaign_id, vendor_id, customer_id, employee_id, entity_id, campaign_name, po_number, po_date, po_amount, cgst_amount, sgst_amount, igst_amount, total_amount, status, approval_status, type, created_by) 
+            VALUES (?, ?, ?, ?, ?, ?, '', CURDATE(), ?, ?, ?, ?, ?, ?, ?, 'system', ?)
         ");
         $stmtPO->execute([
             $booking_id,
             $vendor_id,
             $booking['client_id'],
             $_SESSION['user_id'] ?? 0,
+            $entityId,
             $booking['campaign_name'],
-            $poNum,
             $subtotal,
             $cgst,
             $sgst,
+            $igst,
             $grandTotal,
             $poStatus,
-            $approvalStatus
+            $approvalStatus,
+            $_SESSION['user_id'] ?? null
         ]);
         
         $poId = $pdo->lastInsertId();
+
+        // 6. Generate PO Number matching PDF format (e.g. PO/26-27/116)
+        $ref_date = date('Y-m-d');
+        $fy_str = date('y', strtotime($ref_date)) . '-' . date('y', strtotime($ref_date . ' +1 year'));
+        $poNum = "PO/" . $fy_str . "/" . str_pad((string)$poId, 3, '0', STR_PAD_LEFT);
+        $pdo->prepare("UPDATE purchase_orders SET po_number = ? WHERE id = ?")->execute([$poNum, $poId]);
 
         // Create approval request for non-admin
         if (!$isAdmin) {

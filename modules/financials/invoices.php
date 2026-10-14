@@ -79,34 +79,50 @@ if ($campaignFilter !== '') {
     $params[] = '%' . $campaignFilter . '%';
 }
 
-// Period filtering
+// Period overlap filtering (based on campaign start_date / end_date)
+$periodStart = null;
+$periodEnd = null;
+
 if ($periodFilter === 'today') {
-    $where .= " AND DATE(i.created_at) = CURDATE()";
+    $periodStart = date('Y-m-d');
+    $periodEnd = date('Y-m-d');
 } elseif ($periodFilter === 'this_month') {
-    $where .= " AND i.created_at >= DATE_SUB(CURDATE(), INTERVAL DAYOFMONTH(CURDATE())-1 DAY)";
+    $periodStart = date('Y-m-01');
+    $periodEnd = date('Y-m-t');
 } elseif ($periodFilter === 'last_month') {
-    $where .= " AND i.created_at >= DATE_SUB(DATE_SUB(CURDATE(), INTERVAL DAYOFMONTH(CURDATE())-1 DAY), INTERVAL 1 MONTH) 
-                AND i.created_at < DATE_SUB(CURDATE(), INTERVAL DAYOFMONTH(CURDATE())-1 DAY)";
+    $periodStart = date('Y-m-01', strtotime('last month'));
+    $periodEnd = date('Y-m-t', strtotime('last month'));
 } elseif ($periodFilter === 'this_quarter') {
-    $where .= " AND QUARTER(i.created_at) = QUARTER(CURDATE()) AND YEAR(i.created_at) = YEAR(CURDATE())";
+    $current_month = date('m');
+    $current_year = date('Y');
+    if ($current_month >= 1 && $current_month <= 3) {
+        $periodStart = "$current_year-01-01"; $periodEnd = "$current_year-03-31";
+    } elseif ($current_month >= 4 && $current_month <= 6) {
+        $periodStart = "$current_year-04-01"; $periodEnd = "$current_year-06-30";
+    } elseif ($current_month >= 7 && $current_month <= 9) {
+        $periodStart = "$current_year-07-01"; $periodEnd = "$current_year-09-30";
+    } else {
+        $periodStart = "$current_year-10-01"; $periodEnd = "$current_year-12-31";
+    }
 } elseif ($periodFilter === 'this_year') {
-    // Financial year starts April 1st
     $currentYear = intval(date('Y'));
     $currentMonth = intval(date('n'));
     if ($currentMonth >= 4) {
-        $fyStart = "$currentYear-04-01";
-        $fyEnd = ($currentYear + 1) . "-03-31";
+        $periodStart = "$currentYear-04-01";
+        $periodEnd = ($currentYear + 1) . "-03-31";
     } else {
-        $fyStart = ($currentYear - 1) . "-04-01";
-        $fyEnd = "$currentYear-03-31";
+        $periodStart = ($currentYear - 1) . "-04-01";
+        $periodEnd = "$currentYear-03-31";
     }
-    $where .= " AND i.created_at >= ? AND i.created_at <= ?";
-    $params[] = $fyStart . ' 00:00:00';
-    $params[] = $fyEnd . ' 23:59:59';
 } elseif ($periodFilter === 'custom' && !empty($fromDate) && !empty($toDate)) {
-    $where .= " AND i.created_at >= ? AND i.created_at <= ?";
-    $params[] = $fromDate . ' 00:00:00';
-    $params[] = $toDate . ' 23:59:59';
+    $periodStart = $fromDate;
+    $periodEnd = $toDate;
+}
+
+if ($periodStart && $periodEnd) {
+    $where .= " AND COALESCE(i.invoice_date, DATE(i.created_at)) >= ? AND COALESCE(i.invoice_date, DATE(i.created_at)) <= ?";
+    $params[] = $periodStart;
+    $params[] = $periodEnd;
 }
 
 $totalInvoicesQuery = $pdo->prepare("
@@ -120,7 +136,8 @@ $totalInvoices = $totalInvoicesQuery->fetchColumn();
 $totalPages = ceil($totalInvoices / $limit);
 
 $invoices = $pdo->prepare("
-    SELECT i.*, b.id as booking_id, b.booking_number, b.campaign_name, b.brand_name, c.name as client_name, e.name as entity_name,
+    SELECT i.*, b.id as booking_id, b.booking_number, b.campaign_name, b.brand_name, b.customer_po_file, c.name as client_name, e.name as entity_name,
+           b.start_date, b.end_date,
            (SELECT COALESCE(SUM(p.amount), 0) FROM payments p WHERE p.invoice_id = i.id AND p.approval_status = 'approved') as paid_amount
     FROM invoices i
     JOIN bookings b ON i.booking_id = b.id
@@ -141,11 +158,19 @@ $clients = $pdo->query("SELECT id, name FROM partners WHERE type = 'client' ORDE
 ?>
 
 <div class="card">
-    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1.5rem;">
-        <h2 style="font-size: 1.25rem;"><i class="fas fa-file-invoice-dollar"></i> Tax Invoices & Receivables</h2>
-        <?php if (hasRole('admin')): ?>
-        <a href="../admin/trash.php" class="btn btn-warning" style="background: #fef3c7; color: #92400e; border: 1px solid #fcd34d; text-decoration: none;">Trash</a>
-        <?php endif; ?>
+    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1.5rem; flex-wrap: wrap; gap: 10px;">
+        <h2 style="font-size: 1.25rem; margin: 0;"><i class="fas fa-file-invoice-dollar"></i> Tax Invoices & Receivables <span style="font-size: 0.9rem; color: #64748b; font-weight: 500; margin-left: 0.5rem;">(<?php echo $totalInvoices; ?> found)</span></h2>
+        <div style="display: flex; gap: 0.5rem; align-items: center; flex-wrap: wrap;">
+            <button onclick="downloadBulkInvoices('zip')" class="btn" style="background: #ecfdf5; color: #047857; border: 1px solid #a7f3d0; font-weight: 700; cursor: pointer; display: flex; align-items: center; gap: 0.5rem; padding: 0.5rem 1rem; border-radius: 6px; font-size: 0.9rem; transition: all 0.2s;" onmouseover="this.style.background='#d1fae5';" onmouseout="this.style.background='#ecfdf5';">
+                <i class="fas fa-file-archive"></i> ZIP Invoices
+            </button>
+            <button onclick="downloadBulkInvoices('merge')" class="btn" style="background: #eff6ff; color: #1d4ed8; border: 1px solid #bfdbfe; font-weight: 700; cursor: pointer; display: flex; align-items: center; gap: 0.5rem; padding: 0.5rem 1rem; border-radius: 6px; font-size: 0.9rem; transition: all 0.2s;" onmouseover="this.style.background='#dbeafe';" onmouseout="this.style.background='#eff6ff';">
+                <i class="fas fa-file-pdf"></i> Merged PDF
+            </button>
+            <?php if (hasRole('admin')): ?>
+            <a href="../admin/trash.php" class="btn btn-warning" style="background: #fef3c7; color: #92400e; border: 1px solid #fcd34d; text-decoration: none; padding: 0.5rem 1rem; border-radius: 6px; font-weight: 700; display: inline-flex; align-items: center; gap: 0.5rem; font-size: 0.9rem;">Trash</a>
+            <?php endif; ?>
+        </div>
     </div>
 
     <form method="get" action="invoices.php" style="display:flex; flex-wrap: wrap; gap:1rem; align-items:flex-end; margin-bottom:1.5rem; background: #f8fafc; padding: 1.25rem; border-radius: 12px; border: 1px solid #e2e8f0; box-sizing: border-box; width: 100%;">
@@ -207,6 +232,7 @@ $clients = $pdo->query("SELECT id, name FROM partners WHERE type = 'client' ORDE
             <tr>
                 <th style="width: 120px;">Invoice #</th>
                 <th>Client / Booking</th>
+                <th>Period</th>
                 <th>Campaign / Brand</th>
                 <th>Amount</th>
                 <th>Status</th>
@@ -240,6 +266,15 @@ $clients = $pdo->query("SELECT id, name FROM partners WHERE type = 'client' ORDE
                     <td>
                         <div style="font-weight: 600; color: #334155;"><?php echo $i['client_name']; ?></div>
                         <div style="font-size: 0.7rem; color: #94a3b8;">Booking: <?php echo htmlspecialchars(!empty($i['booking_number']) ? $i['booking_number'] : '#BK-' . str_pad($i['booking_id'], 4, '0', STR_PAD_LEFT)); ?></div>
+                    </td>
+                    <td style="font-size: 0.875rem; white-space: nowrap; vertical-align: middle;">
+                        <?php 
+                        if (!empty($i['start_date']) && $i['start_date'] !== '0000-00-00' && !empty($i['end_date']) && $i['end_date'] !== '0000-00-00') {
+                            echo '<span style="font-weight: 600; color: #475569;"><i class="fas fa-calendar-alt" style="color: #94a3b8; margin-right: 4px;"></i>' . date('d M', strtotime($i['start_date'])) . ' - ' . date('d M Y', strtotime($i['end_date'])) . '</span>';
+                        } else {
+                            echo '<span style="color: #cbd5e1;">N/A</span>';
+                        }
+                        ?>
                     </td>
                     <td>
                         <div style="font-weight: 700; color: #1e293b;"><?php echo htmlspecialchars($i['campaign_name'] ?? ''); ?></div>
@@ -280,8 +315,35 @@ $clients = $pdo->query("SELECT id, name FROM partners WHERE type = 'client' ORDE
                             <?php endif; ?>
                         </div>
                     </td>
-                    <td style="text-align: center; width: 100px; white-space: nowrap;">
+                    <td style="text-align: center; width: 120px; white-space: nowrap;">
                         <div style="display: inline-flex; gap: 6px; align-items: center; justify-content: center;">
+                            <?php 
+                            $attFiles = getAttachmentUrls($i['customer_po_file'] ?? '');
+                            $bookingId = intval($i['booking_id'] ?? 0);
+                            $invNumSafe = htmlspecialchars($i['invoice_number'] ?? '', ENT_QUOTES, 'UTF-8');
+                            $jsonFiles = !empty($attFiles) ? htmlspecialchars(json_encode($attFiles), ENT_QUOTES, 'UTF-8') : '[]';
+
+                            if (!empty($attFiles)): 
+                                if (count($attFiles) > 1 || hasRole('admin')): ?>
+                                    <button type="button" onclick="showInvoiceAttachments(<?php echo $jsonFiles; ?>, '<?php echo $invNumSafe; ?>', <?php echo $bookingId; ?>)" class="btn-icon" title="View <?php echo count($attFiles); ?> Attachment(s)<?php echo hasRole('admin') ? ' / Manage' : ''; ?>" style="margin: 0; background: #eff6ff; color: #2563eb; border: 1px solid #bfdbfe; display: inline-flex; align-items: center; justify-content: center; width: 32px; height: 32px; border-radius: 8px; cursor: pointer; position: relative;">
+                                        <i class="fas fa-paperclip"></i>
+                                        <?php if (count($attFiles) > 1): ?>
+                                            <span style="position: absolute; top: -4px; right: -4px; background: #2563eb; color: white; font-size: 0.6rem; font-weight: 800; border-radius: 9999px; min-width: 15px; height: 15px; display: flex; align-items: center; justify-content: center; padding: 0 2px;"><?php echo count($attFiles); ?></span>
+                                        <?php endif; ?>
+                                    </button>
+                                <?php else: 
+                                    $firstAtt = $attFiles[0];
+                                    $fullAttUrl = (strpos($firstAtt, 'http') === 0) ? $firstAtt : (BASE_URL . $firstAtt);
+                                ?>
+                                    <a href="<?php echo htmlspecialchars($fullAttUrl); ?>" target="_blank" class="btn-icon" title="View Customer PO / Attachment" style="margin: 0; background: #eff6ff; color: #2563eb; border: 1px solid #bfdbfe; display: inline-flex; align-items: center; justify-content: center; width: 32px; height: 32px; border-radius: 8px; text-decoration: none;"><i class="fas fa-paperclip"></i></a>
+                                <?php endif; ?>
+                            <?php else: ?>
+                                <?php if (hasRole('admin')): ?>
+                                    <button type="button" onclick="openAttachmentsModal(<?php echo $bookingId; ?>)" class="btn-icon" title="Add Attachments (Admin)" style="margin: 0; color: #94a3b8; background: #f8fafc; border: 1px dashed #cbd5e1; cursor: pointer; display: inline-flex; align-items: center; justify-content: center; width: 32px; height: 32px; border-radius: 8px;"><i class="fas fa-paperclip"></i></button>
+                                <?php else: ?>
+                                    <span class="btn-icon" title="No Attachment Uploaded" style="margin: 0; color: #cbd5e1; background: #f8fafc; border: 1px solid #e2e8f0; cursor: not-allowed; display: inline-flex; align-items: center; justify-content: center; width: 32px; height: 32px; border-radius: 8px;"><i class="fas fa-paperclip"></i></span>
+                                <?php endif; ?>
+                            <?php endif; ?>
                             <?php if ($i['approval_status'] !== 'rejected'): ?>
                                 <a href="../operations/<?php echo $i['type'] === 'ro' ? 'generate_ro_invoice.php' : 'generate_invoice.php'; ?>?booking_id=<?php echo $i['booking_id']; ?>" target="_blank" class="btn-icon btn-view" title="View & Print" style="margin: 0;"><i class="fas fa-file-invoice"></i></a>
                             <?php else: ?>
@@ -338,6 +400,267 @@ function deleteInvoice(id) {
             });
         }
     });
+}
+</script>
+
+<!-- External libraries for bulk PDF / ZIP generation -->
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+
+<!-- Hidden iframe for rendering invoice pages in isolation -->
+<iframe id="invoice-pdf-iframe" style="position: fixed; left: -9999px; top: 0; width: 794px; height: 1200px; border: none; opacity: 0; pointer-events: none; z-index: -1;"></iframe>
+
+<script>
+function getJsPdfConstructor() {
+    if (window.jspdf && window.jspdf.jsPDF) return window.jspdf.jsPDF;
+    if (window.jsPDF) return window.jsPDF;
+    if (typeof jsPDF !== 'undefined') return jsPDF;
+    throw new Error('jsPDF library could not be initialized');
+}
+
+async function renderInvoiceToCanvas(htmlContent) {
+    const iframe = document.getElementById('invoice-pdf-iframe');
+    const iframeDoc = iframe.contentWindow.document;
+
+    iframeDoc.open();
+    iframeDoc.write(htmlContent);
+    iframeDoc.close();
+
+    // Inject high-precision styling override to guarantee perfect 1-page A4 proportion
+    const styleElem = iframeDoc.createElement('style');
+    styleElem.innerHTML = `
+        * { box-sizing: border-box !important; }
+        html, body {
+            margin: 0 !important;
+            padding: 0 !important;
+            background: #ffffff !important;
+            font-family: Arial, sans-serif !important;
+            width: 794px !important;
+        }
+        .btn-print { display: none !important; }
+        .invoice-wrapper {
+            width: 794px !important;
+            max-width: 794px !important;
+            min-height: auto !important;
+            height: auto !important;
+            margin: 0 auto !important;
+            padding: 6mm 10mm 4mm !important;
+            box-shadow: none !important;
+            border: none !important;
+            box-sizing: border-box !important;
+            background: #ffffff !important;
+            display: block !important;
+            page-break-after: avoid !important;
+            break-after: avoid !important;
+        }
+        .avoid-break {
+            margin-top: 8px !important;
+            page-break-inside: avoid !important;
+            break-inside: avoid !important;
+        }
+        table { width: 100% !important; border-collapse: collapse !important; }
+        img { max-width: 100% !important; }
+    `;
+    iframeDoc.head.appendChild(styleElem);
+
+    // Remove any interactive print buttons
+    iframeDoc.querySelectorAll('.btn-print').forEach(btn => btn.remove());
+
+    // Wait for all images inside iframe to be fully loaded
+    const images = Array.from(iframeDoc.images);
+    if (images.length > 0) {
+        await Promise.all(images.map(img => {
+            if (img.complete && img.naturalHeight !== 0) return Promise.resolve();
+            return new Promise(resolve => {
+                img.onload = resolve;
+                img.onerror = resolve;
+                setTimeout(resolve, 2000);
+            });
+        }));
+    }
+
+    // Brief stabilization pause for web fonts & DOM layout
+    await new Promise(resolve => setTimeout(resolve, 250));
+
+    const targetElem = iframeDoc.querySelector('.invoice-wrapper') || iframeDoc.body;
+
+    // Render using html2canvas at 2x scale for sharp text and graphics
+    return await html2canvas(targetElem, {
+        scale: 2,
+        useCORS: true,
+        logging: false,
+        backgroundColor: '#ffffff',
+        width: 794,
+        windowWidth: 794
+    });
+}
+
+function addCanvasToPdf(pdf, canvas, isFirstPage) {
+    const pageWidth = 210;  // mm (A4)
+    const pageHeight = 297; // mm (A4)
+
+    const canvasWidth = canvas.width;
+    const canvasHeight = canvas.height;
+    const canvasRatio = canvasWidth / canvasHeight;
+
+    let finalWidth = pageWidth;
+    let finalHeight = pageWidth / canvasRatio;
+    let x = 0;
+    let y = 0;
+
+    // Strict 1-page fit constraint: scale down only if height exceeds 297mm
+    if (finalHeight > pageHeight) {
+        finalHeight = pageHeight;
+        finalWidth = pageHeight * canvasRatio;
+        x = (pageWidth - finalWidth) / 2; // Center horizontally
+        y = 0;
+    } else {
+        // Standard top-aligned invoice
+        x = 0;
+        y = 0;
+    }
+
+    if (!isFirstPage) {
+        pdf.addPage('a4', 'portrait');
+    }
+
+    const imgData = canvas.toDataURL('image/jpeg', 0.96);
+    pdf.addImage(imgData, 'JPEG', x, y, finalWidth, finalHeight, undefined, 'FAST');
+}
+
+async function downloadBulkInvoices(mode) {
+    const urlParams = new URLSearchParams(window.location.search);
+    
+    // Show fetching dialog
+    Swal.fire({
+        title: 'Checking invoices...',
+        text: 'Please wait...',
+        allowOutsideClick: false,
+        didOpen: () => { Swal.showLoading(); }
+    });
+
+    try {
+        const response = await fetch(`../../ajax/get_filtered_invoices.php?${urlParams.toString()}`);
+        const data = await response.json();
+        
+        if (!data.success) {
+            Swal.fire('Error', data.message || 'Failed to fetch invoices', 'error');
+            return;
+        }
+        
+        const invoices = data.invoices;
+        if (invoices.length === 0) {
+            Swal.fire('No Invoices', 'No invoices found matching the current filters.', 'info');
+            return;
+        }
+        
+        let progressHtml = `
+            <div style="text-align: left; margin-top: 10px;">
+                <div style="font-weight: 600; margin-bottom: 8px;" id="bulk-progress-text">Preparing...</div>
+                <div style="width: 100%; background: #e2e8f0; height: 10px; border-radius: 5px; overflow: hidden;">
+                    <div id="bulk-progress-bar" style="width: 0%; background: #3b82f6; height: 100%; transition: width 0.2s;"></div>
+                </div>
+            </div>
+        `;
+        
+        Swal.fire({
+            title: mode === 'zip' ? 'Generating ZIP Archive...' : 'Generating Merged PDF...',
+            html: progressHtml,
+            showConfirmButton: false,
+            allowOutsideClick: false,
+            allowEscapeKey: false,
+            didOpen: () => {
+                Swal.showLoading();
+            }
+        });
+
+        const updateProgress = (text, percent) => {
+            const textEl = document.getElementById('bulk-progress-text');
+            const barEl = document.getElementById('bulk-progress-bar');
+            if (textEl) textEl.textContent = text;
+            if (barEl) barEl.style.width = `${percent}%`;
+        };
+
+        if (mode === 'zip') {
+            const zip = new JSZip();
+            
+            for (let idx = 0; idx < invoices.length; idx++) {
+                const inv = invoices[idx];
+                const pct = Math.round((idx / invoices.length) * 90);
+                updateProgress(`Generating ${inv.invoice_number} (${idx + 1}/${invoices.length})...`, pct);
+                
+                const pageUrl = `../operations/${inv.type === 'ro' ? 'generate_ro_invoice.php' : 'generate_invoice.php'}?booking_id=${inv.booking_id}`;
+                const pageResp = await fetch(pageUrl);
+                const htmlContent = await pageResp.text();
+                
+                const pdfBlob = await renderHtmlToPdfBlob(htmlContent, inv.invoice_number);
+                const safeName = inv.invoice_number.replace(/\//g, '_') + '.pdf';
+                zip.file(safeName, pdfBlob);
+            }
+            
+            updateProgress('Building ZIP archive...', 95);
+            const content = await zip.generateAsync({ type: 'blob' });
+            
+            const link = document.createElement('a');
+            link.href = URL.createObjectURL(content);
+            link.download = `invoices_${new Date().toISOString().slice(0,10)}.zip`;
+            document.body.appendChild(link);
+            link.click();
+            document.body.removeChild(link);
+            
+            Swal.close();
+            Swal.fire('Success', 'ZIP archive downloaded successfully!', 'success');
+            
+        } else {
+            const JsPDF = getJsPdfConstructor();
+            const pdf = new JsPDF({
+                orientation: 'portrait',
+                unit: 'mm',
+                format: 'a4',
+                compress: true
+            });
+            
+            for (let idx = 0; idx < invoices.length; idx++) {
+                const inv = invoices[idx];
+                const pct = Math.round(((idx + 1) / invoices.length) * 92);
+                updateProgress(`Rendering ${inv.invoice_number} (${idx + 1}/${invoices.length})...`, pct);
+                
+                const pageUrl = `../operations/${inv.type === 'ro' ? 'generate_ro_invoice.php' : 'generate_invoice.php'}?booking_id=${inv.booking_id}`;
+                const pageResp = await fetch(pageUrl);
+                const htmlContent = await pageResp.text();
+                
+                const canvas = await renderInvoiceToCanvas(htmlContent);
+                addCanvasToPdf(pdf, canvas, idx === 0);
+            }
+            
+            updateProgress('Finalizing Merged PDF...', 98);
+            await new Promise(resolve => setTimeout(resolve, 200));
+
+            pdf.save(`merged_invoices_${new Date().toISOString().slice(0,10)}.pdf`);
+            
+            Swal.close();
+            Swal.fire('Success', 'Merged PDF downloaded successfully!', 'success');
+        }
+    } catch (err) {
+        console.error(err);
+        Swal.fire('Failed', 'Failed to generate files: ' + err.message, 'error');
+    }
+}
+
+async function renderHtmlToPdfBlob(htmlContent, filename) {
+    const JsPDF = getJsPdfConstructor();
+    const pdf = new JsPDF({
+        orientation: 'portrait',
+        unit: 'mm',
+        format: 'a4',
+        compress: true
+    });
+
+    const canvas = await renderInvoiceToCanvas(htmlContent);
+    addCanvasToPdf(pdf, canvas, true);
+
+    return pdf.output('blob');
 }
 </script>
 

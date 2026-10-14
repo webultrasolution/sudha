@@ -1,21 +1,32 @@
 <?php
 include_once __DIR__ . '/../config/db.php';
+require_once __DIR__ . '/../includes/ajax_auth.php';
 include_once __DIR__ . '/../includes/functions.php';
 if (session_status() === PHP_SESSION_NONE) session_start();
 
 header('Content-Type: application/json');
 
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
-    $id = intval($_POST['id']);
-    $field = $_POST['field'];
-    $value = $_POST['value'];
+    $id = intval($_POST['id'] ?? 0);
+    $field = $_POST['field'] ?? '';
+    $value = $_POST['value'] ?? '';
 
     $success = false;
 
     if ($field === 'sale_rate') {
         $rateVal = floatval($value);
-        $stmt = $pdo->prepare("UPDATE proposal_items SET sale_rate = ?, amount = sale_rate * COALESCE(days, 30) / 30 WHERE id = ?");
+        $stmt = $pdo->prepare("UPDATE proposal_items SET sale_rate = ?, amount = sale_rate * COALESCE(unit, 1) WHERE id = ?");
         $stmt->execute([$rateVal, $id]);
+        $success = true;
+    } elseif ($field === 'unit') {
+        $unitVal = max(1, intval($value));
+        $stmt = $pdo->prepare("UPDATE proposal_items SET unit = ?, amount = sale_rate * ? WHERE id = ?");
+        $stmt->execute([$unitVal, $unitVal, $id]);
+        $success = true;
+    } elseif ($field === 'amount') {
+        $amountVal = floatval($value);
+        $stmt = $pdo->prepare("UPDATE proposal_items SET amount = ? WHERE id = ?");
+        $stmt->execute([$amountVal, $id]);
         $success = true;
     } elseif ($field === 'start_date') {
         $dateVal = clean($value);
@@ -34,8 +45,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 $endDate = date('Y-m-d', strtotime($dateVal . " + " . ($days - 1) . " days"));
             }
             
-            $stmt = $pdo->prepare("UPDATE proposal_items SET start_date = ?, end_date = ?, days = ?, amount = sale_rate * ? / 30 WHERE id = ?");
-            $stmt->execute([$dateVal, $endDate, $days, $days, $id]);
+            $stmt = $pdo->prepare("UPDATE proposal_items SET start_date = ?, end_date = ?, days = ? WHERE id = ?");
+            $stmt->execute([$dateVal, $endDate, $days, $id]);
         } else {
             $stmt = $pdo->prepare("UPDATE proposal_items SET start_date = NULL, end_date = NULL WHERE id = ?");
             $stmt->execute([$id]);
@@ -58,8 +69,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 $startDate = date('Y-m-d', strtotime($dateVal . " - " . ($days - 1) . " days"));
             }
             
-            $stmt = $pdo->prepare("UPDATE proposal_items SET start_date = ?, end_date = ?, days = ?, amount = sale_rate * ? / 30 WHERE id = ?");
-            $stmt->execute([$startDate, $dateVal, $days, $days, $id]);
+            $stmt = $pdo->prepare("UPDATE proposal_items SET start_date = ?, end_date = ?, days = ? WHERE id = ?");
+            $stmt->execute([$startDate, $dateVal, $days, $id]);
         } else {
             $stmt = $pdo->prepare("UPDATE proposal_items SET end_date = NULL WHERE id = ?");
             $stmt->execute([$id]);
@@ -74,39 +85,31 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         
         if (!empty($startDate)) {
             $endDate = date('Y-m-d', strtotime($startDate . " + " . ($daysVal - 1) . " days"));
-            $stmt = $pdo->prepare("UPDATE proposal_items SET days = ?, end_date = ?, amount = sale_rate * ? / 30 WHERE id = ?");
-            $stmt->execute([$daysVal, $endDate, $daysVal, $id]);
+            $stmt = $pdo->prepare("UPDATE proposal_items SET days = ?, end_date = ? WHERE id = ?");
+            $stmt->execute([$daysVal, $endDate, $id]);
         } else {
-            $stmt = $pdo->prepare("UPDATE proposal_items SET days = ?, amount = sale_rate * ? / 30 WHERE id = ?");
-            $stmt->execute([$daysVal, $daysVal, $id]);
+            $stmt = $pdo->prepare("UPDATE proposal_items SET days = ? WHERE id = ?");
+            $stmt->execute([$daysVal, $id]);
         }
         $success = true;
     }
 
     if ($success) {
-        // Fetch proposal_id
-        $propId = $pdo->query("SELECT proposal_id FROM proposal_items WHERE id = $id")->fetchColumn();
-        
-        // Recalculate proposal total
-        $newTotal = $pdo->query("SELECT SUM(amount) FROM proposal_items WHERE proposal_id = $propId")->fetchColumn();
-        $tax = $newTotal * 0.18;
-        
-        $p = $pdo->query("SELECT printing_cost, mounting_cost, discounting_pct FROM proposals WHERE id = $propId")->fetch();
-        $base = $newTotal - ($newTotal * ($p['discounting_pct'] / 100));
-        $newGrand = $base + $tax + $p['printing_cost'] + $p['mounting_cost'];
-        
-        // Recalculate proposal start and end dates from its items
-        $minMax = $pdo->query("SELECT MIN(start_date) as min_start, MAX(end_date) as max_end FROM proposal_items WHERE proposal_id = $propId")->fetch();
-        $newStart = $minMax['min_start'] ?: null;
-        $newEnd = $minMax['max_end'] ?: null;
-        $newDays = null;
-        if (!empty($newStart) && !empty($newEnd)) {
-            $newDays = max(1, ceil((strtotime($newEnd) - strtotime($newStart)) / 86400) + 1);
+        // Fetch proposal_id - use parameterized query
+        $stmt = $pdo->prepare("SELECT proposal_id FROM proposal_items WHERE id = ?");
+        $stmt->execute([$id]);
+        $propId = $stmt->fetchColumn();
+
+        recalculateProposalTotals($pdo, $propId);
+
+        $isAdmin = ($_SESSION['user_role'] ?? '') === 'admin';
+        if (!$isAdmin) {
+            $stmt = $pdo->prepare("SELECT proposal_number FROM proposals WHERE id = ?");
+            $stmt->execute([$propId]);
+            $propRef = $stmt->fetchColumn();
+            revertToPendingOnEdit($pdo, 'proposals', $propId, 'proposal', $propRef, $_SESSION['user_id'] ?? 0);
         }
-        
-        $pdo->prepare("UPDATE proposals SET total_amount = ?, tax_amount = ?, grand_total = ?, start_date = ?, end_date = ?, total_days = ? WHERE id = ?")
-            ->execute([$newTotal, $tax, $newGrand, $newStart, $newEnd, $newDays, $propId]);
-            
+
         echo json_encode(['success' => true]);
     } else {
         echo json_encode(['success' => false, 'message' => 'Field not supported']);

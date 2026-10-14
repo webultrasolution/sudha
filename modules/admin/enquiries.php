@@ -1,6 +1,7 @@
 <?php
 include_once __DIR__ . '/../../config/db.php';
 include_once __DIR__ . '/../../includes/functions.php';
+include_once __DIR__ . '/../../includes/trash_helper.php';
 
 checkAuth();
 requireRole('admin');
@@ -15,50 +16,87 @@ try {
     error_log("Failed to self-heal schema for contact_leads status: " . $e->getMessage());
 }
 
-$activePage = 'enquiries';
-$pageTitle = 'Enquiries / Leads';
-
-$message = '';
-$error = '';
-
-// Handle Status Update
+// Handle AJAX / POST Actions
 if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action'])) {
+    $isAjax = (!empty($_SERVER['HTTP_X_REQUESTED_WITH']) && strtolower($_SERVER['HTTP_X_REQUESTED_WITH']) === 'xmlhttprequest') || (isset($_SERVER['HTTP_ACCEPT']) && strpos($_SERVER['HTTP_ACCEPT'], 'application/json') !== false) || isset($_POST['ajax']);
+
+    // Handle Delete
+    if ($_POST['action'] === 'delete_lead' && hasRole('admin')) {
+        $leadId = intval($_POST['lead_id']);
+        try {
+            if ($leadId <= 0) {
+                throw new Exception("Invalid Lead ID.");
+            }
+            if (function_exists('move_row_to_trash')) {
+                move_row_to_trash($pdo, 'contact_leads', 'id', $leadId, $_SESSION['user_id'] ?? null, 'Website enquiry deleted');
+            } else {
+                $stmt = $pdo->prepare("DELETE FROM contact_leads WHERE id = ?");
+                $stmt->execute([$leadId]);
+            }
+            logActivity('delete_enquiry', 'contact_leads', $leadId, "Deleted enquiry ID: $leadId");
+            
+            if ($isAjax || isset($_POST['ajax'])) {
+                header('Content-Type: application/json');
+                echo json_encode(['success' => true, 'message' => 'Enquiry deleted successfully!']);
+                exit;
+            }
+            $_SESSION['flash_msg'] = "Enquiry deleted permanently!";
+            header("Location: enquiries.php" . (isset($_GET['filter']) ? '?filter=' . urlencode($_GET['filter']) : ''));
+            exit;
+        } catch (Exception $e) {
+            if ($isAjax || isset($_POST['ajax'])) {
+                header('Content-Type: application/json');
+                echo json_encode(['success' => false, 'message' => $e->getMessage()]);
+                exit;
+            }
+            $error = "Failed to delete lead: " . $e->getMessage();
+        }
+    }
+
+    // Handle Status Update
     if ($_POST['action'] === 'update_status') {
         $leadId = intval($_POST['lead_id']);
         $newStatus = clean($_POST['status'] ?? '');
         
         $validStatuses = ['pending', 'contacted', 'closed'];
-        if (in_array($newStatus, $validStatuses)) {
+        if (in_array($newStatus, $validStatuses) && $leadId > 0) {
             try {
                 $stmt = $pdo->prepare("UPDATE contact_leads SET status = ? WHERE id = ?");
                 $stmt->execute([$newStatus, $leadId]);
                 logActivity('update_enquiry_status', 'contact_leads', $leadId, "Status updated to " . ucwords($newStatus));
+
+                if ($isAjax || isset($_POST['ajax'])) {
+                    header('Content-Type: application/json');
+                    echo json_encode(['success' => true, 'message' => 'Status updated successfully!']);
+                    exit;
+                }
                 $_SESSION['flash_msg'] = "Enquiry status updated successfully!";
                 header("Location: enquiries.php" . (isset($_GET['filter']) ? '?filter=' . urlencode($_GET['filter']) : ''));
                 exit;
             } catch (Exception $e) {
+                if ($isAjax || isset($_POST['ajax'])) {
+                    header('Content-Type: application/json');
+                    echo json_encode(['success' => false, 'message' => $e->getMessage()]);
+                    exit;
+                }
                 $error = "Failed to update status: " . $e->getMessage();
             }
         } else {
+            if ($isAjax || isset($_POST['ajax'])) {
+                header('Content-Type: application/json');
+                echo json_encode(['success' => false, 'message' => 'Invalid status specified.']);
+                exit;
+            }
             $error = "Invalid status specified.";
         }
     }
-    
-    // Handle Delete
-    if ($_POST['action'] === 'delete_lead' && hasRole('admin')) {
-        $leadId = intval($_POST['lead_id']);
-        try {
-            $stmt = $pdo->prepare("DELETE FROM contact_leads WHERE id = ?");
-            $stmt->execute([$leadId]);
-            logActivity('delete_enquiry', 'contact_leads', $leadId, "Deleted enquiry ID: $leadId");
-            $_SESSION['flash_msg'] = "Enquiry deleted permanently!";
-            header("Location: enquiries.php" . (isset($_GET['filter']) ? '?filter=' . urlencode($_GET['filter']) : ''));
-            exit;
-        } catch (Exception $e) {
-            $error = "Failed to delete lead: " . $e->getMessage();
-        }
-    }
 }
+
+$activePage = 'enquiries';
+$pageTitle = 'Enquiries / Leads';
+
+$message = '';
+$error = '';
 
 // Retrieve flash message if exists
 if (isset($_SESSION['flash_msg'])) {
@@ -100,6 +138,12 @@ $totalPages = ceil($filteredCount / $limit);
 $stmtLeads = $pdo->prepare($selectSql);
 $stmtLeads->execute($params);
 $leads = $stmtLeads->fetchAll(PDO::FETCH_ASSOC);
+
+// Build safe JSON map for JS modal
+$leadsMap = [];
+foreach ($leads as $l) {
+    $leadsMap[$l['id']] = $l;
+}
 
 include_once __DIR__ . '/../../includes/header.php';
 ?>
@@ -232,14 +276,14 @@ include_once __DIR__ . '/../../includes/header.php';
                                     </form>
                                 </td>
                                 
-                                <td style="padding: 1.25rem 1rem; vertical-align: middle; text-align: center;">
-                                    <div style="display: inline-flex; gap: 0.5rem;">
-                                        <button class="btn-action-view" onclick="viewLeadDetails(<?php echo htmlspecialchars(json_encode($lead)); ?>)" title="View Full Message">
+                                <td style="padding: 1.25rem 1rem; vertical-align: middle; text-align: center; white-space: nowrap;">
+                                    <div style="display: inline-flex; gap: 0.5rem; align-items: center; justify-content: center;">
+                                        <button type="button" class="btn-action-view" onclick="viewLeadDetails(<?php echo $lead['id']; ?>)" title="View Full Message">
                                             <i class="fas fa-eye"></i> View
                                         </button>
                                         
                                         <?php if (hasRole('admin')): ?>
-                                            <button class="btn-action-delete" onclick="deleteLead(<?php echo $lead['id']; ?>)" title="Delete Lead">
+                                            <button type="button" class="btn-action-delete" onclick="deleteLead(<?php echo $lead['id']; ?>)" title="Delete Lead">
                                                 <i class="fas fa-trash-alt"></i>
                                             </button>
                                         <?php endif; ?>
@@ -261,59 +305,70 @@ include_once __DIR__ . '/../../includes/header.php';
     </div>
 </div>
 
-<!-- Hidden Delete Form -->
-<form id="deleteForm" method="POST" style="display: none;">
-    <input type="hidden" name="action" value="delete_lead">
-    <input type="hidden" name="lead_id" id="deleteLeadId" value="">
-</form>
-
 <script>
+// Data map containing all current page leads safely encoded
+const leadsMap = <?php echo json_encode($leadsMap, JSON_HEX_TAG | JSON_HEX_APOS | JSON_HEX_QUOT | JSON_HEX_AMP); ?>;
+
+function escapeHtml(str) {
+    if (!str) return '';
+    return String(str)
+        .replace(/&/g, "&amp;")
+        .replace(/</g, "&lt;")
+        .replace(/>/g, "&gt;")
+        .replace(/"/g, "&quot;")
+        .replace(/'/g, "&#039;");
+}
+
 // SweetAlert details pop-up
-function viewLeadDetails(lead) {
+function viewLeadDetails(leadId) {
+    const lead = leadsMap[leadId];
+    if (!lead) {
+        Swal.fire('Error', 'Lead details could not be found.', 'error');
+        return;
+    }
+
     let dateObj = new Date(lead.created_at);
-    let dateStr = dateObj.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric', hour: '2-digit', minute: '2-digit' });
+    let dateStr = !isNaN(dateObj.getTime()) 
+        ? dateObj.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric', hour: '2-digit', minute: '2-digit' })
+        : lead.created_at;
+
+    let phoneHtml = lead.phone ? `<strong>Phone:</strong> <div><a href="tel:${escapeHtml(lead.phone)}" style="color: #0d9488; font-weight: 600; text-decoration: none;"><i class="fas fa-phone-alt"></i> ${escapeHtml(lead.phone)}</a></div>` : '';
 
     Swal.fire({
-        title: '<div style="font-family: \'Outfit\', sans-serif; font-weight: 800; border-bottom: 2px solid #f1f5f9; padding-bottom: 0.75rem; text-align: left; font-size: 1.4rem; color: #0f172a;"><i class="fas fa-envelope-open" style="color: #7b161c; margin-right: 8px;"></i> Enquiry Details</div>',
+        title: '<div style="font-family: \'Outfit\', sans-serif; font-weight: 800; border-bottom: 2px solid #f1f5f9; padding-bottom: 0.75rem; text-align: left; font-size: 1.3rem; color: #0f172a;"><i class="fas fa-envelope-open" style="color: #0d9488; margin-right: 8px;"></i> Enquiry Details</div>',
         html: `
-            <div style="text-align: left; font-family: 'Inter', sans-serif; font-size: 0.95rem; line-height: 1.6; color: #334155; margin-top: 1rem;">
+            <div style="text-align: left; font-family: 'Outfit', sans-serif; font-size: 0.95rem; line-height: 1.6; color: #334155; margin-top: 1rem;">
                 <div style="display: grid; grid-template-columns: 80px 1fr; gap: 0.5rem; margin-bottom: 1.25rem; background: #f8fafc; padding: 1rem; border-radius: 12px; border: 1px solid #e2e8f0;">
-                    <strong>Name:</strong> <div>\${escapeHtml(lead.name)}</div>
-                    <strong>Email:</strong> <div><a href="mailto:\${lead.email}" style="color: #7b161c; font-weight: 600; text-decoration: none;">\${escapeHtml(lead.email)}</a></div>
-                    \${lead.phone ? `<strong>Phone:</strong> <div><a href="tel:\${lead.phone}" style="color: #7b161c; font-weight: 600; text-decoration: none;">\${escapeHtml(lead.phone)}</a></div>` : ''}
-                    <strong>Date:</strong> <div>\${dateStr}</div>
-                    <strong>Status:</strong> <div style="text-transform: capitalize;">\${lead.status}</div>
+                    <strong>Name:</strong> <div style="font-weight: 700; color: #0f172a;">${escapeHtml(lead.name)}</div>
+                    <strong>Email:</strong> <div><a href="mailto:${escapeHtml(lead.email)}" style="color: #0d9488; font-weight: 600; text-decoration: none;"><i class="fas fa-envelope"></i> ${escapeHtml(lead.email)}</a></div>
+                    ${phoneHtml}
+                    <strong>Date:</strong> <div>${dateStr}</div>
+                    <strong>Status:</strong> <div style="text-transform: capitalize; font-weight: 700; color: #0d9488;">${escapeHtml(lead.status || 'pending')}</div>
                 </div>
                 
-                <div style="margin-bottom: 0.5rem; font-weight: 800; color: #0f172a;">Subject:</div>
-                <div style="background: #f1f5f9; padding: 0.75rem 1rem; border-radius: 8px; font-weight: 600; margin-bottom: 1.25rem;">
-                    \${escapeHtml(lead.subject || '(No Subject)')}
+                <div style="margin-bottom: 0.35rem; font-weight: 800; color: #0f172a; font-size: 0.85rem; text-transform: uppercase; letter-spacing: 0.5px;">Subject:</div>
+                <div style="background: #f1f5f9; padding: 0.75rem 1rem; border-radius: 8px; font-weight: 600; margin-bottom: 1.25rem; color: #1e293b;">
+                    ${escapeHtml(lead.subject || '(No Subject)')}
                 </div>
                 
-                <div style="margin-bottom: 0.5rem; font-weight: 800; color: #0f172a;">Message:</div>
-                <div style="background: #f8fafc; padding: 1.25rem; border-radius: 12px; border: 1px solid #e2e8f0; max-height: 250px; overflow-y: auto; white-space: pre-wrap; font-style: italic;">
-                    \${escapeHtml(lead.message)}
+                <div style="margin-bottom: 0.35rem; font-weight: 800; color: #0f172a; font-size: 0.85rem; text-transform: uppercase; letter-spacing: 0.5px;">Message:</div>
+                <div style="background: #f8fafc; padding: 1.25rem; border-radius: 12px; border: 1px solid #e2e8f0; max-height: 250px; overflow-y: auto; white-space: pre-wrap; font-style: normal; color: #334155; line-height: 1.6;">
+                    ${escapeHtml(lead.message || '(No message content)')}
                 </div>
             </div>
         `,
         width: '600px',
-        confirmButtonColor: '#7b161c',
+        confirmButtonColor: '#0d9488',
         confirmButtonText: 'Close Window',
-        customClass: {
-            popup: 'lead-details-modal'
-        }
+        showCloseButton: true
     });
 }
 
-function escapeHtml(str) {
-    if (!str) return '';
-    return str.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;").replace(/'/g, "&#039;");
-}
-
+// Delete Enquiry via AJAX with SweetAlert Confirmation
 function deleteLead(id) {
     Swal.fire({
         title: 'Delete Enquiry?',
-        text: 'This enquiry will be permanently removed from the records. This action cannot be undone.',
+        text: 'This enquiry will be permanently removed from the records. Are you sure?',
         icon: 'warning',
         showCancelButton: true,
         confirmButtonColor: '#ef4444',
@@ -322,8 +377,42 @@ function deleteLead(id) {
         cancelButtonText: 'Cancel'
     }).then((result) => {
         if (result.isConfirmed) {
-            document.getElementById('deleteLeadId').value = id;
-            document.getElementById('deleteForm').submit();
+            Swal.fire({
+                title: 'Deleting...',
+                allowOutsideClick: false,
+                didOpen: () => { Swal.showLoading(); }
+            });
+
+            const formData = new FormData();
+            formData.append('action', 'delete_lead');
+            formData.append('lead_id', id);
+            formData.append('ajax', '1');
+
+            fetch('enquiries.php', {
+                method: 'POST',
+                body: formData,
+                headers: { 'X-Requested-With': 'XMLHttpRequest' }
+            })
+            .then(r => r.json())
+            .then(res => {
+                if (res.success) {
+                    Swal.fire({
+                        icon: 'success',
+                        title: 'Deleted!',
+                        text: 'Enquiry has been removed successfully.',
+                        timer: 1500,
+                        showConfirmButton: false
+                    }).then(() => {
+                        location.reload();
+                    });
+                } else {
+                    Swal.fire('Error', res.message || 'Failed to delete lead.', 'error');
+                }
+            })
+            .catch(err => {
+                console.error(err);
+                Swal.fire('Error', 'Network or server error while deleting.', 'error');
+            });
         }
     });
 }
@@ -446,7 +535,7 @@ function deleteLead(id) {
 }
 .btn-action-view:hover {
     background: #f1f5f9;
-    color: #0f172a;
+    color: #0d9488;
     border-color: #cbd5e1;
 }
 .btn-action-delete {
@@ -462,6 +551,7 @@ function deleteLead(id) {
 .btn-action-delete:hover {
     background: #fee2e2;
     border-color: #fca5a5;
+    transform: scale(1.05);
 }
 
 /* Hover effects */

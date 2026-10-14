@@ -17,62 +17,72 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
     if (empty($email) || !filter_var($email, FILTER_VALIDATE_EMAIL)) {
         $error = 'Please enter a valid email address.';
     } else {
-        $stmt = $pdo->prepare("SELECT * FROM users WHERE email = ? AND status = 'active'");
+        // Query user (both active and inactive)
+        $stmt = $pdo->prepare("SELECT * FROM users WHERE email = ?");
         $stmt->execute([$email]);
         $user = $stmt->fetch();
 
         if ($user) {
-            // Generate random temporary password
-            $tempPassword = bin2hex(random_bytes(4)); // 8 characters
-            $hashedPassword = password_hash($tempPassword, PASSWORD_DEFAULT);
-
-            // Update user in DB
-            $updateStmt = $pdo->prepare("UPDATE users SET password = ? WHERE id = ?");
-            $updateStmt->execute([$hashedPassword, $user['id']]);
-
-            // Email body
-            $subject = 'CRM Password Reset Request - Suudha Creative';
-            $message = "
-            <html>
-            <head>
-                <title>Password Reset Request</title>
-                <style>
-                    body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; color: #334155; line-height: 1.6; }
-                    .container { max-width: 600px; margin: 0 auto; padding: 20px; border: 1px solid #e2e8f0; border-radius: 12px; }
-                    .header { text-align: center; margin-bottom: 20px; }
-                    .header img { max-width: 150px; border-radius: 4px; }
-                    .temp-pass { background-color: #f1f5f9; padding: 12px; border-radius: 8px; font-family: monospace; font-size: 1.25rem; font-weight: bold; text-align: center; color: #7b161c; border: 1px dashed #cbd5e1; margin: 20px 0; letter-spacing: 2px; }
-                    .footer { font-size: 0.8rem; color: #64748b; margin-top: 30px; border-top: 1px solid #e2e8f0; padding-top: 15px; text-align: center; }
-                </style>
-            </head>
-            <body>
-                <div class='container'>
-                    <div class='header'>
-                        <h2>Suudha Creative & Advertising</h2>
-                        <p style='color: #64748b; margin: 0;'>OOH Management CRM Portal</p>
-                    </div>
-                    <p>Dear <strong>" . htmlspecialchars($user['name'] ?: $user['username']) . "</strong>,</p>
-                    <p>We received a request to reset your password for the Suudha Creative CRM Portal.</p>
-                    <p>We have generated a temporary password for your account:</p>
-                    <div class='temp-pass'>" . htmlspecialchars($tempPassword) . "</div>
-                    <p>Please log in using this temporary password and your username: <strong>" . htmlspecialchars($user['username']) . "</strong>.</p>
-                    <p style='color: #ef4444; font-weight: 600;'>Important: For security reasons, please change your password immediately after logging in by visiting the Profile page.</p>
-                    <p>If you did not request this password reset, please secure your account or contact the administrator.</p>
-                    <div class='footer'>
-                        &copy; " . date('Y') . " Suudha Creative. All rights reserved.
-                    </div>
-                </div>
-            </body>
-            </html>
-            ";
-
-            if (sendSystemEmail($email, $subject, $message)) {
-                $success = 'A temporary password has been sent to your registered email address. Please check your spam/junk folder if you do not receive it shortly.';
+            if (($user['status'] ?? 'active') === 'inactive') {
+                $error = 'Your account has been deactivated. Please contact the administrator.';
             } else {
-                $error = 'Failed to send reset email. Please contact the system administrator.';
+                // Generate secure reset token
+                $token = bin2hex(random_bytes(32));
+                $expiry = date('Y-m-d H:i:s', strtotime('+1 hour'));
+
+                // Update user in DB
+                $updateStmt = $pdo->prepare("UPDATE users SET reset_token = ?, reset_token_expiry = ? WHERE id = ?");
+                $updateStmt->execute([$token, $expiry, $user['id']]);
+
+                $resetLink = BASE_URL . "reset_password.php?token=" . $token;
+
+                // Email body template
+                $subject = 'CRM Password Reset Request - Suudha Creative';
+                $message = "
+                <html>
+                <head>
+                    <title>Password Reset Request</title>
+                    <style>
+                        body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; color: #334155; line-height: 1.6; }
+                        .container { max-width: 600px; margin: 0 auto; padding: 25px; border: 1px solid #e2e8f0; border-radius: 12px; }
+                        .header { text-align: center; margin-bottom: 25px; }
+                        .header img { max-width: 150px; border-radius: 4px; }
+                        .btn-container { text-align: center; margin: 30px 0; }
+                        .btn-reset { background-color: #7b161c; color: #ffffff !important; padding: 12px 30px; text-decoration: none; border-radius: 8px; font-weight: bold; display: inline-block; box-shadow: 0 4px 6px rgba(123, 22, 28, 0.15); }
+                        .footer { font-size: 0.8rem; color: #64748b; margin-top: 30px; border-top: 1px solid #e2e8f0; padding-top: 15px; text-align: center; }
+                    </style>
+                </head>
+                <body>
+                    <div class='container'>
+                        <div class='header'>
+                            <h2>Suudha Creative & Advertising</h2>
+                            <p style='color: #64748b; margin: 0;'>OOH Management CRM Portal</p>
+                        </div>
+                        <p>Dear <strong>" . htmlspecialchars($user['name'] ?: $user['username']) . "</strong>,</p>
+                        <p>We received a request to reset your password for the Suudha Creative CRM Portal.</p>
+                        <p>Please click the button below to create a new password:</p>
+                        <div class='btn-container'>
+                            <a class='btn-reset' href='" . htmlspecialchars($resetLink) . "'>Reset Password</a>
+                        </div>
+                        <p style='font-size: 0.85rem; color: #64748b;'>This link is valid for 1 hour. If the button doesn't work, copy and paste this URL into your browser:</p>
+                        <p style='font-size: 0.85rem; word-break: break-all;'><a href='" . htmlspecialchars($resetLink) . "'>" . htmlspecialchars($resetLink) . "</a></p>
+                        <p>If you did not request this password reset, you can safely ignore this email.</p>
+                        <div class='footer'>
+                            &copy; " . date('Y') . " Suudha Creative. All rights reserved.
+                        </div>
+                    </div>
+                </body>
+                </html>
+                ";
+
+                if (sendSystemEmail($email, $subject, $message)) {
+                    $success = 'A password reset link has been sent to your registered email address. Please check your inbox and spam folder.';
+                } else {
+                    $error = 'Failed to send reset email. Please contact the system administrator.';
+                }
             }
         } else {
-            $error = 'No active user account found with that email address.';
+            $error = 'User not available';
         }
     }
 }
@@ -83,7 +93,7 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Reset Password | Suudha Creative & Advertising CRM</title>
-    <link rel="stylesheet" href="assets/css/style.css">
+    <link rel="stylesheet" href="<?php echo BASE_URL; ?>assets/css/style.css">
     <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@400;500;600;700;800&family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
     

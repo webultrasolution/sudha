@@ -30,6 +30,7 @@ $modules = [
     'vendors_printing_po'     => ['name' => 'Vendors Printing PO', 'icon' => 'fa-print', 'desc' => 'Manage POs issued to printing vendors.'],
     'client_printing_invoice' => ['name' => 'Client Printing Invoice', 'icon' => 'fa-file-invoice', 'desc' => 'Create & view printing invoices raised to clients.'],
     'client_mounting_invoice' => ['name' => 'Client Mounting Invoice', 'icon' => 'fa-tools', 'desc' => 'Create & view mounting invoices raised to clients.'],
+    'fabrication'             => ['name' => 'Fabrication Module', 'icon' => 'fa-hammer', 'desc' => 'Manage custom fabrication work orders, rates, and client billing.'],
     
     // Financials
     'financials'              => ['name' => 'Financials Module', 'icon' => 'fa-wallet', 'desc' => 'Master access to ledger and payments area.'],

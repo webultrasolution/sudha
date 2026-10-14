@@ -1,11 +1,12 @@
 <?php
 include_once __DIR__ . '/../config/db.php';
+require_once __DIR__ . '/../includes/ajax_auth.php';
 include_once __DIR__ . '/../includes/functions.php';
 
 header('Content-Type: application/json');
 
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
-    $po_number = $_POST['po_number'];
+    $po_number = $_POST['po_number'] ?? '';
     
     if (isset($_FILES['file']) && $_FILES['file']['error'] === UPLOAD_ERR_OK) {
         $uploadDir = __DIR__ . '/../uploads/pos/';

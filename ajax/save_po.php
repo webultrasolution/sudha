@@ -1,5 +1,6 @@
 <?php
 include_once __DIR__ . '/../config/db.php';
+require_once __DIR__ . '/../includes/ajax_auth.php';
 include_once __DIR__ . '/../includes/functions.php';
 
 if (session_status() === PHP_SESSION_NONE) {
@@ -47,14 +48,13 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         // Generate PO Number
         $poNum = 'PO-' . date('Ymd') . '-' . rand(100, 999);
 
-        // Admin approves instantly; non-admin goes to queue
         $poStatus       = $isAdmin ? 'approved' : 'pending';
         $approvalStatus = $isAdmin ? 'approved' : 'pending_approval';
 
         // 2. Insert PO
         $stmt = $pdo->prepare("
-            INSERT INTO purchase_orders (campaign_id, vendor_id, entity_id, employee_id, po_number, po_date, po_amount, cgst_amount, sgst_amount, igst_amount, total_amount, status, approval_status, type) 
-            VALUES (?, ?, ?, ?, ?, CURDATE(), ?, ?, ?, ?, ?, ?, ?, 'system')
+            INSERT INTO purchase_orders (campaign_id, vendor_id, entity_id, employee_id, po_number, po_date, po_amount, cgst_amount, sgst_amount, igst_amount, total_amount, status, approval_status, type, created_by) 
+            VALUES (?, ?, ?, ?, ?, CURDATE(), ?, ?, ?, ?, ?, ?, ?, 'system', ?)
         ");
         $stmt->execute([
             $data['campaignId'],
@@ -68,7 +68,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             $igst,
             $grandTotal,
             $poStatus,
-            $approvalStatus
+            $approvalStatus,
+            $_SESSION['user_id']
         ]);
         
         $poId = $pdo->lastInsertId();

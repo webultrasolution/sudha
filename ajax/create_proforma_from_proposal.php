@@ -1,5 +1,6 @@
 <?php
 include_once __DIR__ . '/../config/db.php';
+require_once __DIR__ . '/../includes/ajax_auth.php';
 include_once __DIR__ . '/../includes/functions.php';
 
 if (session_status() === PHP_SESSION_NONE) {
@@ -48,9 +49,10 @@ try {
             $entityId = $stmtEntity->fetchColumn() ?: null;
         }
 
+        $userId = $_SESSION['user_id'] ?? null;
         $stmtBooking = $pdo->prepare("
-            INSERT INTO bookings (proposal_id, booking_number, client_id, entity_id, billing_gstin, tax_type, start_date, end_date, total_amount, tax_amount, grand_total, status) 
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'active')
+            INSERT INTO bookings (proposal_id, booking_number, client_id, entity_id, billing_gstin, tax_type, start_date, end_date, total_amount, tax_amount, grand_total, status, created_by) 
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'active', ?)
         ");
         $stmtBooking->execute([
             $proposalId,
@@ -63,7 +65,8 @@ try {
             $proposal['end_date'],
             $proposal['total_amount'],
             $proposal['tax_amount'],
-            $proposal['grand_total']
+            $proposal['grand_total'],
+            $userId
         ]);
         $bookingId = $pdo->lastInsertId();
 
@@ -73,8 +76,8 @@ try {
         $items = $stmtItems->fetchAll();
 
         $stmtBI = $pdo->prepare("
-            INSERT INTO booking_items (booking_id, proposal_item_id, site_id, purchase_rate, sale_rate, start_date, end_date, days, purchase_amount, amount) 
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            INSERT INTO booking_items (booking_id, proposal_item_id, site_id, purchase_rate, sale_rate, start_date, end_date, days, purchase_amount, amount, selected_image, custom_site_name, custom_location) 
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
         ");
         $stmtOps = $pdo->prepare("INSERT INTO operations (booking_id, site_id, status) VALUES (?, ?, 'pending')");
 
@@ -92,7 +95,10 @@ try {
                 $itemEndDate,
                 $item['days'],
                 0,
-                $item['amount']
+                $item['amount'],
+                $item['selected_image'],
+                $item['custom_site_name'] ?? null,
+                $item['custom_location'] ?? null
             ]);
 
             $stmtOps->execute([$bookingId, $item['site_id']]);

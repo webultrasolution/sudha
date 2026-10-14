@@ -1,6 +1,7 @@
 <?php
 include_once __DIR__ . '/../../config/db.php';
 include_once __DIR__ . '/../../includes/functions.php';
+checkAuth();
 
 $id = isset($_GET['id']) ? intval($_GET['id']) : 0;
 
@@ -22,22 +23,23 @@ if (!$proposal) {
 
 // Fetch Items for the table
 $items = $pdo->prepare("
-    SELECT pi.*, s.name as site_name, s.site_code, s.location, s.city as site_city, s.type as site_type, s.width, s.height, s.light_type
+    SELECT pi.*, COALESCE(pi.custom_site_name, s.name) as site_name, s.site_code, COALESCE(pi.custom_location, s.location) as location, s.city as site_city, s.type as site_type, s.width, s.height, s.light_type
     FROM proposal_items pi
     JOIN sites s ON pi.site_id = s.id
     WHERE pi.proposal_id = ?
+    ORDER BY pi.sort_order ASC, pi.id ASC
 ");
 $items->execute([$id]);
 $items = $items->fetchAll();
 
 // Fetch All Images for the visual plan (One per site)
 $images_stmt = $pdo->prepare("
-    SELECT pi.*, s.site_code, s.location, s.city as site_city, s.type as site_type, s.width, s.height, s.light_type,
+    SELECT pi.*, s.site_code, COALESCE(pi.custom_location, s.location) as location, s.city as site_city, s.type as site_type, s.width, s.height, s.light_type,
     COALESCE(pi.selected_image, (SELECT filename FROM site_images WHERE site_id = s.id LIMIT 1)) as image
     FROM proposal_items pi
     JOIN sites s ON pi.site_id = s.id
     WHERE pi.proposal_id = ?
-    ORDER BY pi.id ASC
+    ORDER BY pi.sort_order ASC, pi.id ASC
 ");
 $images_stmt->execute([$id]);
 $visual_data = $images_stmt->fetchAll();
@@ -202,9 +204,6 @@ $visual_data = $images_stmt->fetchAll();
             background: #f8fafc;
             border: 1px solid #e2e8f0;
             border-radius: 12px;
-            display: flex;
-            align-items: center;
-            justify-content: center;
             overflow: hidden;
             box-shadow: 0 4px 12px rgba(0, 0, 0, 0.05);
         }
@@ -213,6 +212,9 @@ $visual_data = $images_stmt->fetchAll();
             max-width: 100%;
             max-height: 100%;
             object-fit: contain;
+        }
+        .image-box {
+            text-align: center;
         }
 
         .caption-box {
@@ -266,7 +268,7 @@ $visual_data = $images_stmt->fetchAll();
 
     <?php
     $company = resolveCompanyDetails();
-    $logoUrl = (!empty($company['logo']) && file_exists(__DIR__ . '/../../assets/images/' . $company['logo'])) ? BASE_URL . 'assets/images/' . $company['logo'] : BASE_URL . 'assets/img/LOGO.png';
+    $logoUrl = !empty($company['logo']) ? BASE_URL . 'assets/images/' . $company['logo'] : BASE_URL . 'assets/img/LOGO.png';
     ?>
     <!-- Cover Page Info -->
     <div class="header">
@@ -313,18 +315,6 @@ $visual_data = $images_stmt->fetchAll();
                 <div style="font-weight: 900; font-size: 24px; color: var(--dark);">
                     <?php echo $proposal['campaign_name']; ?></div>
             </div>
-            <div style="text-align: right;">
-                <span
-                    style="font-size: 11px; color: var(--slate); text-transform: uppercase; font-weight: 800; letter-spacing: 1px;">Duration</span>
-                <div style="font-weight: 700; font-size: 18px;">
-                    <?php 
-                    if (!empty($proposal['start_date']) && $proposal['start_date'] !== '0000-00-00' && !empty($proposal['end_date']) && $proposal['end_date'] !== '0000-00-00') {
-                        echo date('d M Y', strtotime($proposal['start_date'])) . ' - ' . date('d M Y', strtotime($proposal['end_date']));
-                    } else {
-                        echo 'N/A';
-                    }
-                    ?></div>
-            </div>
         </div>
     </div>
 
@@ -335,7 +325,8 @@ $visual_data = $images_stmt->fetchAll();
                 <th>Asset Details</th>
                 <th>Location / City</th>
                 <th>Size</th>
-                <th>Days</th>
+                <th>Start Date</th>
+                <th>End Date</th>
                 <th style="text-align: right;">Total (INR)</th>
             </tr>
         </thead>
@@ -357,8 +348,27 @@ $visual_data = $images_stmt->fetchAll();
                     </td>
                     <td style="font-weight: 600;"><?php echo (int) $item['width']; ?>' x <?php echo (int) $item['height']; ?>'
                     </td>
-                    <td style="font-weight: 600;"><?php echo $item['days']; ?></td>
-                    <td style="text-align: right; font-weight: 800; color: var(--dark);">
+                    <td style="font-size: 12px; color: var(--slate);">
+                        <?php 
+                        $sDate = (!empty($item['start_date']) && $item['start_date'] != '0000-00-00') ? $item['start_date'] : $proposal['start_date'];
+                        if (!empty($sDate) && $sDate !== '0000-00-00') {
+                            echo date('d M Y', strtotime($sDate));
+                        } else {
+                            echo '-';
+                        }
+                        ?>
+                    </td>
+                    <td style="font-size: 12px; color: var(--slate);">
+                        <?php 
+                        $eDate = (!empty($item['end_date']) && $item['end_date'] != '0000-00-00') ? $item['end_date'] : $proposal['end_date'];
+                        if (!empty($eDate) && $eDate !== '0000-00-00') {
+                            echo date('d M Y', strtotime($eDate));
+                        } else {
+                            echo '-';
+                        }
+                        ?>
+                    </td>
+                     <td style="text-align: right; font-weight: 800; color: var(--dark);">
                         ₹<?php echo number_format($item['amount'], 2); ?></td>
                 </tr>
             <?php endforeach; ?>
@@ -400,8 +410,35 @@ $visual_data = $images_stmt->fetchAll();
             </div>
 
             <div class="image-box">
-                <?php if ($v['image']): ?>
-                    <img src="../../uploads/sites/<?php echo $v['image']; ?>" alt="Site">
+                <?php 
+                $images = array_filter(explode(',', $v['image'] ?? ''));
+                $imgCount = count($images);
+                if ($imgCount > 0): 
+                    $cols = 1;
+                    if ($imgCount >= 10) $cols = 4;
+                    elseif ($imgCount >= 5) $cols = 3;
+                    elseif ($imgCount >= 2) $cols = 2;
+
+                    $rows = ceil($imgCount / $cols);
+                    $cellWidth = 100 / $cols;
+                    $cellHeight = 480 / $rows;
+                ?>
+                    <table style="width: 100%; height: 100%; border-collapse: collapse; border: none; table-layout: fixed; margin: 0; padding: 0;">
+                        <?php for ($r = 0; $r < $rows; $r++): ?>
+                            <tr>
+                                <?php for ($c = 0; $c < $cols; $c++): 
+                                    $idx = $r * $cols + $c;
+                                    $hasImg = isset($images[$idx]);
+                                ?>
+                                    <td style="width: <?php echo $cellWidth; ?>%; padding: 5px; border: none; vertical-align: middle; height: <?php echo $cellHeight; ?>px; box-sizing: border-box;">
+                                        <?php if ($hasImg): ?>
+                                            <img src="../../uploads/sites/<?php echo trim($images[$idx]); ?>" alt="Site" style="width: 100%; height: 100%; object-fit: <?php echo $imgCount === 1 ? 'contain' : 'cover'; ?>; border-radius: 8px; max-width: 100%; max-height: 100%;">
+                                        <?php endif; ?>
+                                    </td>
+                                <?php endfor; ?>
+                            </tr>
+                        <?php endfor; ?>
+                    </table>
                 <?php else: ?>
                     <div style="color: #94a3b8; font-weight: 800; font-size: 20px;">NO IMAGE AVAILABLE</div>
                 <?php endif; ?>

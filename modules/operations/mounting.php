@@ -197,11 +197,13 @@ $ratesStmt = $pdo->prepare("
         MAX(r.campaign_name) as campaign_name,
         MAX(r.brand_name) as brand_name,
         MAX(r.billing_gstin) as billing_gstin,
+        MAX(r.booking_id) as booking_id,
+        (SELECT invoice_number FROM invoices WHERE booking_id = MAX(r.booking_id) AND type = 'tax' LIMIT 1) as tax_invoice_number,
         MAX(c.state) as client_state,
         MAX(c.gstin) as client_gstin,
         MAX(c.additional_gst) as additional_gst,
-        (SELECT remarks FROM approval_requests WHERE entity_type = 'client_mounting' AND entity_ref COLLATE utf8mb4_unicode_ci = r.po_number COLLATE utf8mb4_unicode_ci ORDER BY id DESC LIMIT 1) as rejection_reason,
-        (SELECT COUNT(*) FROM bookings WHERE booking_number COLLATE utf8mb4_unicode_ci = r.po_number COLLATE utf8mb4_unicode_ci) as is_unified
+        MAX(r.booking_id) as booking_id,
+        (SELECT remarks FROM approval_requests WHERE entity_type = 'client_mounting' AND entity_ref COLLATE utf8mb4_unicode_ci = r.po_number COLLATE utf8mb4_unicode_ci ORDER BY id DESC LIMIT 1) as rejection_reason
     FROM client_mounting_rates r
     JOIN partners c ON r.client_id = c.id
     LEFT JOIN sites s ON r.site_id = s.id
@@ -342,18 +344,24 @@ $clients = $pdo->query("SELECT id, name FROM partners WHERE type = 'client' ORDE
                                     Reason: <?php echo htmlspecialchars($r['rejection_reason']); ?>
                                 </div>
                             <?php endif; ?>
-                        <?php elseif ($r['is_final_invoice']): ?>
+                        <?php elseif ($r['is_final_invoice'] || (!empty($r['booking_id']) && !empty($r['tax_invoice_number']))): ?>
                             <span style="background:#f0fdf4;color:#15803d;border:1px solid #dcfce7;padding:0.15rem 0.5rem;border-radius:50px;font-size:0.6rem;font-weight:800;display:inline-flex;align-items:center;gap:4px;">
                                 <i class="fas fa-check-circle"></i> Final Invoice
                             </span>
+                            <div style="margin-top: 4px;">
+                                <?php if (!empty($r['tax_invoice_number'])): ?>
+                                    <span class="badge" style="background: #ecfdf5; color: #047857; border: 1px solid #a7f3d0; padding: 0.15rem 0.5rem; border-radius: 4px; font-size: 0.65rem; font-weight: 700; display: inline-flex; align-items: center; gap: 4px;" title="Tax Invoice Number">
+                                        <i class="fas fa-file-invoice-dollar"></i> <?php echo htmlspecialchars($r['tax_invoice_number']); ?>
+                                    </span>
+                                <?php elseif (!empty($r['invoice_number'])): ?>
+                                    <span class="badge" style="background: #ecfdf5; color: #047857; border: 1px solid #a7f3d0; padding: 0.15rem 0.5rem; border-radius: 4px; font-size: 0.65rem; font-weight: 700; display: inline-flex; align-items: center; gap: 4px;" title="Custom Invoice Number">
+                                        <i class="fas fa-file-invoice-dollar"></i> <?php echo htmlspecialchars($r['invoice_number']); ?>
+                                    </span>
+                                <?php endif; ?>
+                            </div>
                         <?php else: ?>
                             <span style="background:#e0f2fe;color:#0369a1;border:1px solid #bae6fd;padding:0.15rem 0.5rem;border-radius:50px;font-size:0.6rem;font-weight:800;display:inline-flex;align-items:center;gap:4px;">
                                 <i class="fas fa-file-invoice"></i> Draft
-                            </span>
-                        <?php endif; ?>
-                        <?php if (!empty($r['is_unified'])): ?>
-                            <span style="background: #f3e8ff; color: #6b21a8; border: 1px solid #e9d5ff; padding: 0.15rem 0.5rem; border-radius: 50px; font-size: 0.6rem; font-weight: 800; display: inline-flex; align-items: center; gap: 4px; margin-top: 4px;">
-                                <i class="fas fa-link"></i> Unified Booking
                             </span>
                         <?php endif; ?>
                     </td>
@@ -394,25 +402,29 @@ $clients = $pdo->query("SELECT id, name FROM partners WHERE type = 'client' ORDE
                         <a href="<?php echo $viewUrl; ?>" target="_blank" class="btn-icon" style="color:#0d9488;" title="View / Print Invoice"><i class="fas fa-eye"></i></a>
                         <?php endif; ?>
  
-                        <?php if (!$r['is_final_invoice'] && $r['approval_status'] !== 'pending_approval' && empty($r['is_unified'])): ?>
-                        <button class="btn-icon" onclick="openFinalizePopup('<?php echo htmlspecialchars($r['po_number']??'',ENT_QUOTES); ?>',<?php echo $r['client_id']; ?>,'<?php echo implode(',',$ids); ?>', '<?php echo $defaultGstType; ?>')"
-                                style="color:#0f172a;" title="Generate Final Invoice">
-                            <i class="fas fa-file-invoice-dollar"></i>
-                        </button>
+                        <?php if (!$r['is_final_invoice'] && $r['approval_status'] !== 'pending_approval' && empty($r['booking_id'])): ?>
+                            <button class="btn-icon" onclick="openFinalizePopup('<?php echo htmlspecialchars($r['po_number']??'',ENT_QUOTES); ?>',<?php echo $r['client_id']; ?>,'<?php echo implode(',',$ids); ?>', '<?php echo $defaultGstType; ?>')"
+                                    style="color:#0f172a;" title="Generate Final Invoice">
+                                <i class="fas fa-file-invoice-dollar"></i>
+                            </button>
                         <?php endif; ?>
 
-                        <?php if ($r['is_final_invoice']): ?>
-                        <a href="<?php echo $viewUrl; ?>&final=1" target="_blank" class="btn-icon" style="color:#10b981;" title="Print Final Invoice"><i class="fas fa-print"></i></a>
+                        <?php if ($r['is_final_invoice'] || (!empty($r['booking_id']) && !empty($r['tax_invoice_number']))): ?>
+                            <?php if (!empty($r['booking_id'])): ?>
+                                <a href="generate_invoice.php?booking_id=<?php echo $r['booking_id']; ?>" target="_blank" class="btn-icon" style="color:#10b981;" title="View Booking Tax Invoice"><i class="fas fa-file-pdf"></i></a>
+                            <?php else: ?>
+                                <a href="<?php echo $viewUrl; ?>&final=1" target="_blank" class="btn-icon" style="color:#10b981;" title="Print Final Tax Invoice"><i class="fas fa-file-pdf"></i></a>
+                            <?php endif; ?>
                         <?php endif; ?>
 
-                        <?php if (hasRole('admin') || ($r['approval_status'] !== 'approved')): ?>
+                        <?php if ((hasRole('admin') || ($r['approval_status'] !== 'approved')) && empty($r['booking_id'])): ?>
                         <?php $editUrl = "create_mounting_po.php?action=edit&client_id={$r['client_id']}";
                               if ($r['po_number']) $editUrl .= "&po_number=".urlencode($r['po_number']);
                               else foreach($ids as $id) $editUrl .= "&rate_ids[]=$id"; ?>
                         <a href="<?php echo $editUrl; ?>" class="btn-icon" style="color:#0284c7;" title="Edit"><i class="fas fa-edit"></i></a>
                         <?php endif; ?>
 
-                        <?php if (canDelete('clients')): ?>
+                        <?php if (canDelete('clients') && empty($r['booking_id'])): ?>
                         <button class="btn-icon btn-delete" onclick="deletePO('<?php echo htmlspecialchars($r['po_number'] ?? '', ENT_QUOTES); ?>', '<?php echo implode(',', $ids); ?>')" title="Delete"><i class="fas fa-trash"></i></button>
                         <?php endif; ?>
                     </td>

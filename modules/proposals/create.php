@@ -3,6 +3,145 @@ $activePage = 'proposals';
 $pageTitle = 'Create New Proposal';
 $hideSidebar = true;
 include_once __DIR__ . '/../../includes/header.php';
+?>
+<style>
+/* Search Panel Styles */
+.media-search-grid { padding: 0.5rem 0; }
+.search-row { display: flex; align-items: center; }
+.radio-group { display: flex; gap: 1.5rem; }
+.radio-group label { display: flex; align-items: center; gap: 0.5rem; font-size: 0.85rem; font-weight: 600; color: #475569; cursor: pointer; }
+.radio-group input[type="radio"] { width: 18px; height: 18px; cursor: pointer; accent-color: var(--primary); }
+
+/* Layout Structure */
+.proposal-full-wrapper { max-width: 100%; margin: 0 auto; padding: 1.5rem; background: #f8fafc; min-height: 100vh; }
+
+.proposal-bottom-grid { 
+    display: grid; 
+    grid-template-columns: repeat(3, 1fr); 
+    gap: 1.5rem; 
+    margin-top: 2rem; 
+}
+
+/* Step Indicators */
+.step-indicator { 
+    background: var(--primary); 
+    color: white; 
+    padding: 0.35rem 1rem; 
+    border-radius: 50px; 
+    font-size: 0.75rem; 
+    font-weight: 800; 
+    text-transform: uppercase; 
+    letter-spacing: 0.05em;
+}
+
+/* Panel Styling */
+.p-panel { 
+    background: white; 
+    border-radius: 12px; 
+    padding: 1rem; 
+    border: 1px solid #e2e8f0; 
+    box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.05), 0 2px 4px -1px rgba(0, 0, 0, 0.03);
+    display: flex;
+    flex-direction: column;
+}
+
+.p-header { 
+    font-weight: 800; 
+    font-size: 0.95rem; 
+    color: var(--primary); 
+    margin-bottom: 1rem; 
+    border-bottom: 2px solid #f1f5f9; 
+    padding-bottom: 0.5rem; 
+    display: flex; 
+    justify-content: space-between; 
+    align-items: center; 
+}
+
+/* Form Elements */
+.form-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 0.75rem; }
+.form-group { margin-bottom: 0.75rem; }
+.form-group label { display: block; font-size: 0.75rem; font-weight: 800; color: var(--secondary); margin-bottom: 0.4rem; text-transform: uppercase; letter-spacing: 0.025em; }
+
+.p-input { 
+    width: 100%; padding: 0.5rem 0.6rem; border: 1px solid #e2e8f0; border-radius: 6px; 
+    font-family: inherit; font-size: 0.85rem; font-weight: 600; transition: all 0.2s ease; 
+    background: #fcfcfc;
+}
+.p-input:focus { border-color: var(--primary); box-shadow: 0 0 0 3px rgba(13, 148, 136, 0.1); outline: none; background: white; }
+
+/* Table Styling */
+.site-list-container { overflow-x: auto; border: 1px solid rgba(0,0,0,0.05); border-radius: 12px; background: white; }
+.crs-table { width: 100%; border-collapse: collapse; }
+.crs-table th { background: transparent; padding: 1rem; font-size: 0.75rem; text-transform: uppercase; letter-spacing: 0.05em; color: #475569; font-weight: 800; border-bottom: 1px solid #f1f5f9; text-align: left; }
+.crs-table td { padding: 1rem; vertical-align: middle; border-bottom: 1px solid #f8fafc; color: #64748b; font-size: 0.85rem; }
+
+.site-row { transition: all 0.2s; }
+.site-row:hover { background: #f8fafc; }
+.site-row.selected { background: #f0fdfa !important; }
+.site-row.selected td { color: var(--primary); }
+
+/* Previously associated with this client (proposal/booking) */
+.site-row.already-associated { box-shadow: inset 0 0 0 3px rgba(250,204,21,0.06); }
+.site-row .assoc-badge { background: #fef3c7; color: #92400e; padding: 0.15rem 0.45rem; border-radius: 6px; font-size: 0.65rem; font-weight: 800; margin-left: 0.5rem; display: inline-block; }
+
+.asset-chk {
+    width: 18px;
+    height: 18px;
+    border-radius: 4px;
+    border: 2px solid #e2e8f0;
+    cursor: pointer;
+    accent-color: var(--primary);
+}
+
+/* Summary Items */
+.stat-row { display: flex; justify-content: space-between; margin-bottom: 0.5rem; font-size: 0.85rem; font-weight: 700; color: #475569; }
+.summary-box { background: linear-gradient(to bottom right, #ffffff, #f8fafc); }
+.grand-total { border-top: 2px solid #e2e8f0; padding-top: 1rem; margin-top: 0.5rem; }
+
+/* Badges */
+.badge-media { background: #eff6ff; color: #1e40af; padding: 0.25rem 0.6rem; border-radius: 6px; font-size: 0.7rem; font-weight: 800; border: 1px solid #dbeafe; }
+.badge-ha { background: #dcfce7; color: #166534; padding: 0.35rem 0.75rem; border-radius: 8px; font-size: 0.75rem; font-weight: 800; }
+.badge-ta { background: #fef9c3; color: #854d0e; padding: 0.35rem 0.75rem; border-radius: 8px; font-size: 0.75rem; font-weight: 800; }
+
+.status-available { background: #ecfdf5; color: #059669; padding: 0.25rem 0.75rem; border-radius: 50px; font-size: 0.75rem; font-weight: 800; border: 1px solid #d1fae5; }
+.site-thumb { width: 140px; height: 90px; border-radius: 8px; object-fit: cover; cursor: zoom-in; border: 1px solid #e2e8f0; box-shadow: 0 2px 4px rgba(0,0,0,0.1); }
+.no-img { font-size: 0.7rem; color: #94a3b8; font-style: italic; }
+
+.sno-cell { font-weight: 800; color: #94a3b8; text-align: center; font-size: 0.85rem; }
+
+/* Pagination Styles */
+.pagination-wrap { display: flex; justify-content: space-between; align-items: center; padding: 1.5rem 2rem; background: #fafafa; border-top: 1px solid #f1f5f9; border-radius: 0 0 20px 20px; }
+.pg-info { font-size: 0.85rem; color: #64748b; font-weight: 600; }
+.pg-controls { display: flex; gap: 0.4rem; align-items: center; }
+.pg-btn { min-width: 38px; height: 38px; border: 1px solid #e2e8f0; background: white; border-radius: 10px; cursor: pointer; font-weight: 700; font-size: 0.85rem; transition: all 0.2s; color: #475569; display: flex; align-items: center; justify-content: center; }
+.pg-btn:hover:not(:disabled) { border-color: var(--primary); color: var(--primary); background: #f0fdfa; transform: translateY(-1px); }
+.pg-btn.active { background: var(--primary); color: white; border-color: var(--primary); box-shadow: 0 4px 12px rgba(13, 148, 136, 0.2); }
+.pg-btn:disabled { opacity: 0.4; cursor: not-allowed; background: #f8fafc; }
+.pg-dots { color: #94a3b8; font-weight: 800; padding: 0 0.5rem; }
+
+/* Responsive */
+@media (max-width: 1400px) {
+    .proposal-bottom-grid { grid-template-columns: repeat(3, 1fr); gap: 1rem; }
+}
+
+@media (max-width: 1200px) {
+    .proposal-bottom-grid { grid-template-columns: 1fr 1fr; }
+}
+
+@media (max-width: 768px) {
+    .proposal-bottom-grid { grid-template-columns: 1fr; }
+    .p-header { flex-direction: column; align-items: flex-start; gap: 1rem; }
+}
+
+/* Modal Styles */
+.modal-overlay { position: fixed; inset: 0; background: rgba(15, 23, 42, 0.6); z-index: 5000; display: flex; align-items: center; justify-content: center; backdrop-filter: blur(8px); }
+.modal-content { background: white; width: 95%; max-width: 550px; border-radius: 30px; box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.25); overflow: hidden; }
+.modal-header { padding: 2rem; border-bottom: 1px solid #f1f5f9; display: flex; justify-content: space-between; align-items: center; }
+.modal-body { padding: 2.5rem; }
+.modal-footer { padding: 1.5rem 2.5rem; background: #f8fafc; border-top: 1px solid #f1f5f9; display: flex; justify-content: flex-end; gap: 1rem; }
+</style>
+<?php
+
 
 requirePermission('proposals', 'add');
 
@@ -14,7 +153,10 @@ $sitesQuery = "
         s.*, 
         p.name as vendor_name,
         (SELECT GROUP_CONCAT(filename) FROM site_images WHERE site_id = s.id) as all_images,
-        (SELECT filename FROM site_images WHERE site_id = s.id LIMIT 1) as thumbnail 
+        COALESCE(
+            (SELECT filename FROM site_images WHERE site_id = s.id AND is_primary = 1 LIMIT 1),
+            (SELECT filename FROM site_images WHERE site_id = s.id LIMIT 1)
+        ) as thumbnail 
     FROM sites s 
     LEFT JOIN partners p ON s.vendor_id = p.id
     ORDER BY s.site_code ASC";
@@ -25,6 +167,7 @@ $cities = $pdo->query("SELECT DISTINCT city FROM sites WHERE city IS NOT NULL AN
 $states = $pdo->query("SELECT DISTINCT state FROM sites WHERE state IS NOT NULL AND state != '' ORDER BY state")->fetchAll(PDO::FETCH_COLUMN);
 $locations = $pdo->query("SELECT DISTINCT location FROM sites WHERE location IS NOT NULL AND location != '' ORDER BY location")->fetchAll(PDO::FETCH_COLUMN);
 $mediaTypes = $pdo->query("SELECT DISTINCT type FROM sites WHERE type IS NOT NULL AND type != '' ORDER BY type")->fetchAll(PDO::FETCH_COLUMN);
+$districts = $pdo->query("SELECT DISTINCT district FROM sites WHERE district IS NOT NULL AND district != '' ORDER BY district")->fetchAll(PDO::FETCH_COLUMN);
 $illuminations = $pdo->query("SELECT DISTINCT light_type FROM sites WHERE light_type IS NOT NULL AND light_type != '' ORDER BY light_type")->fetchAll(PDO::FETCH_COLUMN);
 $genres = $pdo->query("SELECT DISTINCT genre FROM sites WHERE genre IS NOT NULL AND genre != '' ORDER BY genre")->fetchAll(PDO::FETCH_COLUMN);
 $sizes = $pdo->query("SELECT DISTINCT CONCAT(width, 'x', height) as size FROM sites WHERE width IS NOT NULL AND height IS NOT NULL AND width != '' AND height != '' ORDER BY width, height")->fetchAll(PDO::FETCH_COLUMN);
@@ -188,43 +331,47 @@ $printingRates = $pdo->query("SELECT * FROM vendor_printing_rates")->fetchAll(PD
                     <input type="text" id="site-search" class="p-input" placeholder="Search by Site Name, Code, Location, City, State, Media..." oninput="filterSites()" style="height: 30px; font-size: 0.75rem; padding: 0 10px; box-sizing: border-box;">
                 </div>
                 <div class="form-group" style="flex: 1 1 110px; min-width: 90px; margin-bottom: 0;">
-                    <label style="font-size: 0.55rem; font-weight: 900; color: var(--secondary); margin-bottom: 0.2rem; text-transform: uppercase;">Media</label>
-                    <select id="media_type" class="p-input" onchange="filterSites()" style="height: 30px; font-size: 0.75rem; padding: 0 8px; box-sizing: border-box;">
+                    <label style="font-size: 0.55rem; font-weight: 900; color: var(--secondary); margin-bottom: 0.2rem; text-transform: uppercase;">District</label>
+                    <select id="filter-district" class="p-input select2 select2-filter-sm" onchange="filterSites()" style="height: 30px; font-size: 0.75rem; padding: 0 8px; box-sizing: border-box;">
                         <option value="">All</option>
-                        <?php foreach($mediaTypes as $mt): ?> <option value="<?php echo $mt; ?>"><?php echo $mt; ?></option> <?php endforeach; ?>
+                        <?php foreach($districts as $d): ?> <option value="<?php echo htmlspecialchars($d); ?>"><?php echo htmlspecialchars($d); ?></option> <?php endforeach; ?>
                     </select>
                 </div>
+                <select id="media_type" style="display: none;">
+                    <option value="">All</option>
+                    <?php foreach($mediaTypes as $mt): ?> <option value="<?php echo $mt; ?>"><?php echo $mt; ?></option> <?php endforeach; ?>
+                </select>
                 <div class="form-group" style="flex: 1 1 110px; min-width: 90px; margin-bottom: 0;">
                     <label style="font-size: 0.55rem; font-weight: 900; color: var(--secondary); margin-bottom: 0.2rem; text-transform: uppercase;">State</label>
-                    <select id="filter-state" class="p-input" onchange="filterSites()" style="height: 30px; font-size: 0.75rem; padding: 0 8px; box-sizing: border-box;">
+                    <select id="filter-state" class="p-input select2 select2-filter-sm" onchange="filterSites()" style="height: 30px; font-size: 0.75rem; padding: 0 8px; box-sizing: border-box;">
                         <option value="">All</option>
                         <?php foreach($states as $s): ?> <option value="<?php echo $s; ?>"><?php echo $s; ?></option> <?php endforeach; ?>
                     </select>
                 </div>
                 <div class="form-group" style="flex: 1 1 110px; min-width: 90px; margin-bottom: 0;">
                     <label style="font-size: 0.55rem; font-weight: 900; color: var(--secondary); margin-bottom: 0.2rem; text-transform: uppercase;">City</label>
-                    <select id="filter-city" class="p-input" onchange="filterSites()" style="height: 30px; font-size: 0.75rem; padding: 0 8px; box-sizing: border-box;">
+                    <select id="filter-city" class="p-input select2 select2-filter-sm" onchange="filterSites()" style="height: 30px; font-size: 0.75rem; padding: 0 8px; box-sizing: border-box;">
                         <option value="">All</option>
                         <?php foreach($cities as $c): ?> <option value="<?php echo $c; ?>"><?php echo $c; ?></option> <?php endforeach; ?>
                     </select>
                 </div>
                 <div class="form-group" style="flex: 1 1 110px; min-width: 90px; margin-bottom: 0;">
                     <label style="font-size: 0.55rem; font-weight: 900; color: var(--secondary); margin-bottom: 0.2rem; text-transform: uppercase;">Location</label>
-                    <select id="filter-location" class="p-input" onchange="filterSites()" style="height: 30px; font-size: 0.75rem; padding: 0 8px; box-sizing: border-box;">
+                    <select id="filter-location" class="p-input select2 select2-filter-sm" onchange="filterSites()" style="height: 30px; font-size: 0.75rem; padding: 0 8px; box-sizing: border-box;">
                         <option value="">All</option>
                         <?php foreach($locations as $loc): ?> <option value="<?php echo htmlspecialchars($loc); ?>"><?php echo htmlspecialchars($loc); ?></option> <?php endforeach; ?>
                     </select>
                 </div>
                 <div class="form-group" style="flex: 1 1 110px; min-width: 90px; margin-bottom: 0;">
                     <label style="font-size: 0.55rem; font-weight: 900; color: var(--secondary); margin-bottom: 0.2rem; text-transform: uppercase;">Light</label>
-                    <select id="light_type" class="p-input" onchange="filterSites()" style="height: 30px; font-size: 0.75rem; padding: 0 8px; box-sizing: border-box;">
+                    <select id="light_type" class="p-input select2 select2-filter-sm" onchange="filterSites()" style="height: 30px; font-size: 0.75rem; padding: 0 8px; box-sizing: border-box;">
                         <option value="">All</option>
                         <?php foreach($illuminations as $il): ?> <option value="<?php echo $il; ?>"><?php echo $il; ?></option> <?php endforeach; ?>
                     </select>
                 </div>
                 <div class="form-group" style="flex: 1 1 110px; min-width: 90px; margin-bottom: 0;">
                     <label style="font-size: 0.55rem; font-weight: 900; color: var(--secondary); margin-bottom: 0.2rem; text-transform: uppercase;">Size</label>
-                    <select id="filter-size" class="p-input" onchange="filterSites()" style="height: 30px; font-size: 0.75rem; padding: 0 8px; box-sizing: border-box;">
+                    <select id="filter-size" class="p-input select2 select2-filter-sm" onchange="filterSites()" style="height: 30px; font-size: 0.75rem; padding: 0 8px; box-sizing: border-box;">
                         <option value="">All</option>
                         <?php foreach($sizes as $sz): ?> <option value="<?php echo $sz; ?>"><?php echo $sz; ?></option> <?php endforeach; ?>
                     </select>
@@ -257,11 +404,10 @@ $printingRates = $pdo->query("SELECT * FROM vendor_printing_rates")->fetchAll(PD
                     <tr style="border-bottom: 2px solid #f1f5f9;">
                         <th style="width: 40px; padding: 0.8rem 1rem;">#</th>
                         <th style="width: 50px; padding: 0.8rem 1rem;"><i class="far fa-check-square"></i></th>
-                        <th style="width: 100px; padding: 0.8rem 1rem;">PREVIEW</th>
+                        <th style="width: 200px; padding: 0.8rem 1rem;">PREVIEW</th>
                         <th style="padding: 0.8rem 1rem;">CITY / CODE</th>
                         <th style="padding: 0.8rem 1rem;">ASSET DETAILS</th>
                         <th style="padding: 0.8rem 1rem;">SIZE</th>
-                        <th style="padding: 0.8rem 1rem;">PRICING</th>
                         <th style="padding: 0.8rem 1rem;">OFFER RATE</th>
                         <th style="padding: 0.8rem 1rem; text-align: right;">TOTAL</th>
                     </tr>
@@ -286,6 +432,7 @@ $printingRates = $pdo->query("SELECT * FROM vendor_printing_rates")->fetchAll(PD
                         data-prate="<?php echo $s['purchase_rate']; ?>" 
                         data-owner="<?php echo $s['owner_type']; ?>"
                         data-vendor="<?php echo $s['vendor_id']; ?>"
+                        data-district="<?php echo htmlspecialchars($s['district'] ?? ''); ?>"
                         data-vendor-name="<?php echo htmlspecialchars($s['vendor_name'] ?? ''); ?>"
                         data-width="<?php echo $s['width']; ?>"
                         data-height="<?php echo $s['height']; ?>"
@@ -305,19 +452,19 @@ $printingRates = $pdo->query("SELECT * FROM vendor_printing_rates")->fetchAll(PD
                                 $imgList = explode(',', $s['all_images'] ?? '');
                                 $imgCount = count($imgList);
                             ?>
-                                <div style="position: relative; width: 150px; height: 95px;">
+                                <div style="position: relative; width: 190px; height: 120px;">
                                     <img src="<?php echo BASE_URL; ?>uploads/sites/<?php echo $s['thumbnail']; ?>" 
                                          onclick="openLightboxSlider('<?php echo htmlspecialchars($s['all_images']); ?>', '<?php echo $s['id']; ?>')" 
                                          class="site-thumb" 
-                                         style="width: 100%; height: 100%; border-radius: 12px; object-fit: cover; border: 1px solid #e2e8f0; cursor: pointer; transition: transform 0.2s; box-shadow: 0 4px 6px rgba(0,0,0,0.05);">
+                                         style="width: 100%; height: 100%; border-radius: 12px; object-fit: cover; border: 1px solid #e2e8f0; cursor: pointer; transition: transform 0.2s; box-shadow: 0 4px 8px rgba(0,0,0,0.08);">
                                     <?php if ($imgCount > 1): ?>
-                                        <div style="position: absolute; bottom: 4px; right: 4px; background: rgba(0,0,0,0.7); color: white; font-size: 0.55rem; padding: 2px 5px; border-radius: 4px; font-weight: 800; backdrop-filter: blur(2px);">
+                                        <div style="position: absolute; bottom: 6px; right: 6px; background: rgba(0,0,0,0.75); color: white; font-size: 0.65rem; padding: 3px 6px; border-radius: 5px; font-weight: 800; backdrop-filter: blur(2px);">
                                             <i class="fas fa-images"></i> <?php echo $imgCount; ?>
                                         </div>
                                     <?php endif; ?>
                                 </div>
                             <?php else: ?>
-                                <div style="width: 80px; height: 50px; border-radius: 8px; background: #f8fafc; border: 1px dashed #e2e8f0; display: flex; align-items: center; justify-content: center; font-size: 0.6rem; color: #94a3b8; font-weight: 700;">No Img</div>
+                                <div style="width: 190px; height: 120px; border-radius: 12px; background: #f8fafc; border: 1px dashed #e2e8f0; display: flex; align-items: center; justify-content: center; font-size: 0.75rem; color: #94a3b8; font-weight: 700;">No Img</div>
                             <?php endif; ?>
                         </td>
 
@@ -344,15 +491,12 @@ $printingRates = $pdo->query("SELECT * FROM vendor_printing_rates")->fetchAll(PD
                             <div style="font-size: 0.65rem; color: #94a3b8; font-weight: 700;"><?php echo number_format($sqft); ?> SQFT</div>
                         </td>
 
-                        <td style="padding: 0.6rem 1rem;">
-                            <div style="font-size: 0.55rem; color: #94a3b8; font-weight: 800; text-transform: uppercase;">Card Rate</div>
-                            <div style="font-weight: 700; color: #1e293b; font-size: 0.8rem;">₹<?php echo number_format($s['card_rate']); ?></div>
-                        </td>
+                        
 
                         <td style="padding: 0.6rem 1rem;">
-                            <div style="font-size: 0.55rem; color: var(--primary); font-weight: 900; text-transform: uppercase; margin-bottom: 2px;">Offer Rate</div>
-                            <input type="number" step="any" class="p-input sale-rate-input" 
-                                   value="0" 
+                            <div style="font-size: 0.5rem; color: var(--primary); font-weight: 900; text-transform: uppercase; margin-bottom: 2px;">Offer Rate</div>
+                            <input type="number" class="p-input sale-rate-input" 
+                                   value="<?php echo (float)$s['card_rate']; ?>" 
                                    oninput="updateSitePrice('<?php echo $s['id']; ?>', this.value)"
                                    style="width: 80px; height: 24px; font-size: 0.75rem; font-weight: 800; border-radius: 5px; padding: 0 0.3rem;">
                         </td>
@@ -388,26 +532,6 @@ $printingRates = $pdo->query("SELECT * FROM vendor_printing_rates")->fetchAll(PD
                     <span id="bucket-count">0</span> Assets Selected
                 </div>
                 <button onclick="closeBucket()" style="background: rgba(0,0,0,0.1); border: none; color: white; width: 32px; height: 32px; border-radius: 8px; cursor: pointer; font-size: 1.2rem;">&times;</button>
-            </div>
-        </div>
-        <div style="display: flex; background: #f1f5f9; padding: 0.5rem 1rem; gap: 0.5rem; border-bottom: 1px solid #e2e8f0;">
-            <button type="button" class="btn bucket-tab active" id="btn-tab-rental" onclick="switchBucketTab('rental')" style="flex: 1; font-weight: 800; font-size: 0.8rem; height: 38px; border-radius: 8px; border: 1px solid transparent; cursor: pointer; transition: all 0.2s;">
-                <i class="fas fa-ad"></i> Space Rental
-            </button>
-            <button type="button" class="btn bucket-tab" id="btn-tab-printing" onclick="switchBucketTab('printing')" style="flex: 1; font-weight: 800; font-size: 0.8rem; height: 38px; border-radius: 8px; border: 1px solid transparent; cursor: pointer; transition: all 0.2s;">
-                <i class="fas fa-print"></i> Printing Service
-            </button>
-            <button type="button" class="btn bucket-tab" id="btn-tab-mounting" onclick="switchBucketTab('mounting')" style="flex: 1; font-weight: 800; font-size: 0.8rem; height: 38px; border-radius: 8px; border: 1px solid transparent; cursor: pointer; transition: all 0.2s;">
-                <i class="fas fa-tools"></i> Mounting Service
-            </button>
-        </div>
-        <div id="bucket-rate-master-container" style="display: flex; align-items: center; justify-content: flex-end; padding: 0.5rem 1rem; background: #f8fafc; border-bottom: 1px solid #e2e8f0; gap: 0.5rem;">
-            <div style="display: flex; align-items: center; gap: 0.5rem; background: #fff; border: 1.5px solid var(--primary); border-radius: 20px; padding: 3px 12px; box-shadow: 0 2px 4px rgba(0,0,0,0.02);">
-                <span id="bucket-rate-master-label" style="font-size: 0.7rem; font-weight: 800; color: var(--primary); text-transform: uppercase;">Offer Rate:</span>
-                <input type="number" id="bucketRateMasterInput" placeholder="Rate" step="0.01" style="width: 90px; height: 26px; font-size: 0.75rem; font-weight: 800; border-radius: 6px; border: 1px solid #cbd5e1; padding: 0 0.4rem; color: var(--primary); outline: none; background: #f8fafc; text-align: right;">
-                <button type="button" onclick="applyBucketRateMaster()" style="background: var(--primary); border: none; color: white; padding: 4px 12px; border-radius: 12px; font-weight: 800; font-size: 0.65rem; cursor: pointer; transition: all 0.2s; display: flex; align-items: center; justify-content: center; height: 26px;">
-                    Apply to All
-                </button>
             </div>
         </div>
         <div id="bucket-empty-msg" style="padding: 4rem 2rem; text-align: center; color: #94a3b8; font-weight: 700;">
@@ -447,9 +571,10 @@ $printingRates = $pdo->query("SELECT * FROM vendor_printing_rates")->fetchAll(PD
             <div style="width: 1px; height: 20px; background: #e2e8f0;"></div>
             <div style="display: flex; align-items: center; gap: 0.5rem;">
                 <label style="font-size: 0.6rem; font-weight: 800; color: #64748b; text-transform: uppercase;">Tax</label>
-                <select id="tax-type" class="p-input" onchange="recalcAll()" style="width: 90px; height: 28px; font-size: 0.65rem; padding: 0 0.25rem;">
+                <select id="tax-type" class="p-input" onchange="recalcAll()" style="width: 95px; height: 28px; font-size: 0.65rem; padding: 0 0.25rem;">
                     <option value="igst">IGST 18%</option>
                     <option value="cgst_sgst">CGST/SGST</option>
+                    <option value="no_tax">No Tax - 0%</option>
                 </select>
             </div>
         </div>
@@ -519,154 +644,7 @@ $printingRates = $pdo->query("SELECT * FROM vendor_printing_rates")->fetchAll(PD
     </div>
 </div>
 
-<style>
-/* Hide number input spinners */
-input[type=number]::-webkit-inner-spin-button, 
-input[type=number]::-webkit-outer-spin-button { 
-    -webkit-appearance: none; 
-    margin: 0; 
-}
-input[type=number] {
-    -moz-appearance: textfield; /* Firefox */
-}
 
-.bucket-tab { background: #e2e8f0; color: #475569; }
-.bucket-tab.active { background: #059669 !important; color: white !important; }
-/* Search Panel Styles */
-.media-search-grid { padding: 0.5rem 0; }
-.search-row { display: flex; align-items: center; }
-.radio-group { display: flex; gap: 1.5rem; }
-.radio-group label { display: flex; align-items: center; gap: 0.5rem; font-size: 0.85rem; font-weight: 600; color: #475569; cursor: pointer; }
-.radio-group input[type="radio"] { width: 18px; height: 18px; cursor: pointer; accent-color: var(--primary); }
-
-/* Layout Structure */
-.proposal-full-wrapper { max-width: 100%; margin: 0 auto; padding: 1.5rem; background: #f8fafc; min-height: 100vh; }
-
-.proposal-bottom-grid { 
-    display: grid; 
-    grid-template-columns: repeat(3, 1fr); 
-    gap: 1.5rem; 
-    margin-top: 2rem; 
-}
-
-/* Step Indicators */
-.step-indicator { 
-    background: var(--primary); 
-    color: white; 
-    padding: 0.35rem 1rem; 
-    border-radius: 50px; 
-    font-size: 0.75rem; 
-    font-weight: 800; 
-    text-transform: uppercase; 
-    letter-spacing: 0.05em;
-}
-
-/* Panel Styling */
-.p-panel { 
-    background: white; 
-    border-radius: 12px; 
-    padding: 1rem; 
-    border: 1px solid #e2e8f0; 
-    box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.05), 0 2px 4px -1px rgba(0, 0, 0, 0.03);
-    display: flex;
-    flex-direction: column;
-}
-
-.p-header { 
-    font-weight: 800; 
-    font-size: 0.95rem; 
-    color: var(--primary); 
-    margin-bottom: 1rem; 
-    border-bottom: 2px solid #f1f5f9; 
-    padding-bottom: 0.5rem; 
-    display: flex; 
-    justify-content: space-between; 
-    align-items: center; 
-}
-
-/* Form Elements */
-.form-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 0.75rem; }
-.form-group { margin-bottom: 0.75rem; }
-.form-group label { display: block; font-size: 0.75rem; font-weight: 800; color: var(--secondary); margin-bottom: 0.4rem; text-transform: uppercase; letter-spacing: 0.025em; }
-
-.p-input { 
-    width: 100%; padding: 0.5rem 0.6rem; border: 1px solid #e2e8f0; border-radius: 6px; 
-    font-family: inherit; font-size: 0.85rem; font-weight: 600; transition: all 0.2s ease; 
-    background: #fcfcfc;
-}
-.p-input:focus { border-color: var(--primary); box-shadow: 0 0 0 3px rgba(13, 148, 136, 0.1); outline: none; background: white; }
-
-/* Table Styling */
-.site-list-container { overflow-x: auto; border: 1px solid rgba(0,0,0,0.05); border-radius: 12px; background: white; }
-.crs-table { width: 100%; border-collapse: collapse; }
-.crs-table th { background: transparent; padding: 1rem; font-size: 0.75rem; text-transform: uppercase; letter-spacing: 0.05em; color: #475569; font-weight: 800; border-bottom: 1px solid #f1f5f9; text-align: left; }
-.crs-table td { padding: 1rem; vertical-align: middle; border-bottom: 1px solid #f8fafc; color: #64748b; font-size: 0.85rem; }
-
-.site-row { transition: all 0.2s; }
-.site-row:hover { background: #f8fafc; }
-.site-row.selected { background: #f0fdfa !important; }
-.site-row.selected td { color: var(--primary); }
-
-/* Previously associated with this client (proposal/booking) */
-.site-row.already-associated { box-shadow: inset 0 0 0 3px rgba(250,204,21,0.06); }
-.site-row .assoc-badge { background: #fef3c7; color: #92400e; padding: 0.15rem 0.45rem; border-radius: 6px; font-size: 0.65rem; font-weight: 800; margin-left: 0.5rem; display: inline-block; }
-
-.asset-chk {
-    width: 18px;
-    height: 18px;
-    border-radius: 4px;
-    border: 2px solid #e2e8f0;
-    cursor: pointer;
-    accent-color: var(--primary);
-}
-
-/* Summary Items */
-.stat-row { display: flex; justify-content: space-between; margin-bottom: 0.5rem; font-size: 0.85rem; font-weight: 700; color: #475569; }
-.summary-box { background: linear-gradient(to bottom right, #ffffff, #f8fafc); }
-.grand-total { border-top: 2px solid #e2e8f0; padding-top: 1rem; margin-top: 0.5rem; }
-
-/* Badges */
-.badge-media { background: #eff6ff; color: #1e40af; padding: 0.25rem 0.6rem; border-radius: 6px; font-size: 0.7rem; font-weight: 800; border: 1px solid #dbeafe; }
-.badge-ha { background: #dcfce7; color: #166534; padding: 0.35rem 0.75rem; border-radius: 8px; font-size: 0.75rem; font-weight: 800; }
-.badge-ta { background: #fef9c3; color: #854d0e; padding: 0.35rem 0.75rem; border-radius: 8px; font-size: 0.75rem; font-weight: 800; }
-
-.status-available { background: #ecfdf5; color: #059669; padding: 0.25rem 0.75rem; border-radius: 50px; font-size: 0.75rem; font-weight: 800; border: 1px solid #d1fae5; }
-.site-thumb { width: 140px; height: 90px; border-radius: 8px; object-fit: cover; cursor: zoom-in; border: 1px solid #e2e8f0; box-shadow: 0 2px 4px rgba(0,0,0,0.1); }
-.no-img { font-size: 0.7rem; color: #94a3b8; font-style: italic; }
-
-.sno-cell { font-weight: 800; color: #94a3b8; text-align: center; font-size: 0.85rem; }
-
-/* Pagination Styles */
-.pagination-wrap { display: flex; justify-content: space-between; align-items: center; padding: 1.5rem 2rem; background: #fafafa; border-top: 1px solid #f1f5f9; border-radius: 0 0 20px 20px; }
-.pg-info { font-size: 0.85rem; color: #64748b; font-weight: 600; }
-.pg-controls { display: flex; gap: 0.4rem; align-items: center; }
-.pg-btn { min-width: 38px; height: 38px; border: 1px solid #e2e8f0; background: white; border-radius: 10px; cursor: pointer; font-weight: 700; font-size: 0.85rem; transition: all 0.2s; color: #475569; display: flex; align-items: center; justify-content: center; }
-.pg-btn:hover:not(:disabled) { border-color: var(--primary); color: var(--primary); background: #f0fdfa; transform: translateY(-1px); }
-.pg-btn.active { background: var(--primary); color: white; border-color: var(--primary); box-shadow: 0 4px 12px rgba(13, 148, 136, 0.2); }
-.pg-btn:disabled { opacity: 0.4; cursor: not-allowed; background: #f8fafc; }
-.pg-dots { color: #94a3b8; font-weight: 800; padding: 0 0.5rem; }
-
-/* Responsive */
-@media (max-width: 1400px) {
-    .proposal-bottom-grid { grid-template-columns: repeat(3, 1fr); gap: 1rem; }
-}
-
-@media (max-width: 1200px) {
-    .proposal-bottom-grid { grid-template-columns: 1fr 1fr; }
-}
-
-@media (max-width: 768px) {
-    .proposal-bottom-grid { grid-template-columns: 1fr; }
-    .p-header { flex-direction: column; align-items: flex-start; gap: 1rem; }
-}
-
-/* Modal Styles */
-.modal-overlay { position: fixed; inset: 0; background: rgba(15, 23, 42, 0.6); z-index: 5000; display: flex; align-items: center; justify-content: center; backdrop-filter: blur(8px); }
-.modal-content { background: white; width: 95%; max-width: 550px; border-radius: 30px; box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.25); overflow: hidden; }
-.modal-header { padding: 2rem; border-bottom: 1px solid #f1f5f9; display: flex; justify-content: space-between; align-items: center; }
-.modal-body { padding: 2.5rem; }
-.modal-footer { padding: 1.5rem 2.5rem; background: #f8fafc; border-top: 1px solid #f1f5f9; display: flex; justify-content: flex-end; gap: 1rem; }
-</style>
 
 <script>
 let selectedSites = [];
@@ -693,6 +671,52 @@ function selectProposalMediaTab(mtype, btn) {
 }
 
 document.addEventListener('DOMContentLoaded', () => {
+    const urlParams = new URLSearchParams(window.location.search);
+    if (!urlParams.has('entity_id')) {
+        Swal.fire({
+            title: 'Select Company / Entity',
+            html: `
+                <select id="swal_entity_id" class="swal2-select" style="display: flex; width: 80%; margin: 10px auto; font-family: inherit; font-size: 0.9rem; font-weight: 600; padding: 0.5rem; border-radius: 8px;">
+                    <option value="">-- Choose Company --</option>
+                    <?php
+                    $allEntities = $pdo->query("SELECT id, name FROM entities")->fetchAll();
+                    foreach ($allEntities as $e) {
+                        echo '<option value="' . $e['id'] . '">' . htmlspecialchars($e['name']) . '</option>';
+                    }
+                    ?>
+                </select>
+            `,
+            icon: 'question',
+            allowOutsideClick: false,
+            allowEscapeKey: false,
+            showCancelButton: true,
+            cancelButtonText: 'Cancel',
+            cancelButtonColor: '#64748b',
+            showCloseButton: true,
+            confirmButtonText: 'Proceed',
+            confirmButtonColor: '#0d9488',
+            preConfirm: () => {
+                const entityId = document.getElementById('swal_entity_id').value;
+                if (!entityId) {
+                    Swal.showValidationMessage('Please select a company');
+                    return false;
+                }
+                return entityId;
+            }
+        }).then((result) => {
+            if (result.isConfirmed) {
+                const selectedEntity = result.value;
+                const params = new URLSearchParams(window.location.search);
+                params.set('entity_id', selectedEntity);
+                params.set('set_entity', selectedEntity);
+                window.location.search = params.toString();
+            } else {
+                window.location.href = 'proposals.php';
+            }
+        });
+        return;
+    }
+
     const select = document.getElementById('media_type');
     if (select) {
         select.addEventListener('change', function() {
@@ -707,18 +731,6 @@ document.addEventListener('DOMContentLoaded', () => {
             });
         });
     }
-    // Prevent mouse wheel increment/decrement on number inputs
-    document.addEventListener('wheel', function(e) {
-        if (document.activeElement.type === 'number') {
-            document.activeElement.blur();
-        }
-    });
-    // Prevent up/down keys from changing values in number inputs
-    document.addEventListener('keydown', function(e) {
-        if (document.activeElement.type === 'number' && (e.key === 'ArrowUp' || e.key === 'ArrowDown')) {
-            e.preventDefault();
-        }
-    });
 });
 const baseUrl = "<?php echo BASE_URL; ?>";
 const imgBaseUrl = "<?php echo BASE_URL; ?>uploads/sites/";
@@ -1040,18 +1052,12 @@ function toggleSite(id) {
         const pRate = bestRate ? parseFloat(bestRate.rate_per_sqft) : 0;
         const pTotal = pRate * sqft;
 
-        const mRate = 0;
-        const mType = 'Standard';
-        const mTotal = mRate * sqft;
-
         selectedSites.push({ 
-            id, name, cardRate: rate, purchaseRate: prate, saleRate: 0, owner, sqft, city, state, type, illumination, thumbnail, allImages, width, height, vendorName, siteCode, area, location,
+            id, name, cardRate: rate, purchaseRate: prate, saleRate: rate, owner, sqft, city, state, type, illumination, thumbnail, allImages, width, height, vendorName, siteCode, area, location,
             printing_vendor_id: pVendor,
             printing_rate: pRate,
             printing_total: pTotal,
-            mounting_type: mType,
-            mounting_rate: mRate,
-            mounting_total: mTotal
+            selected_images: thumbnail ? [thumbnail] : []
         });
         if(row) row.classList.add('selected');
         if(chk) chk.checked = true;
@@ -1079,73 +1085,6 @@ function toggleSite(id) {
     }
 }
 
-let activeBucketTab = 'rental';
-function switchBucketTab(tab) {
-    activeBucketTab = tab;
-    document.querySelectorAll('.bucket-tab').forEach(b => b.classList.remove('active'));
-    document.getElementById('btn-tab-' + tab).classList.add('active');
-    
-    const label = document.getElementById('bucket-rate-master-label');
-    const input = document.getElementById('bucketRateMasterInput');
-    if (label && input) {
-        if (tab === 'rental') {
-            label.innerText = 'Offer Rate:';
-            input.placeholder = 'Rate';
-        } else {
-            label.innerText = 'Rate / SQFT:';
-            input.placeholder = 'Rate';
-        }
-        input.value = '';
-    }
-    
-    updateBucketUI();
-}
-
-function applyBucketRateMaster() {
-    const input = document.getElementById('bucketRateMasterInput');
-    if (!input) return;
-    const val = parseFloat(input.value);
-    if (isNaN(val) || val < 0) {
-        return Swal.fire('Error', 'Please enter a valid rate', 'error');
-    }
-    
-    selectedSites.forEach(s => {
-        if (activeBucketTab === 'rental') {
-            s.saleRate = val;
-        } else if (activeBucketTab === 'printing') {
-            s.printing_rate = val;
-            s.printing_total = val * s.sqft;
-        } else if (activeBucketTab === 'mounting') {
-            s.mounting_rate = val;
-            s.mounting_total = val * s.sqft;
-        }
-    });
-    
-    recalcAll();
-    updateBucketUI();
-    
-    // If it's space rental, update the main table inputs as well:
-    if (activeBucketTab === 'rental') {
-        selectedSites.forEach(s => {
-            const mainRow = document.getElementById('row-' + s.id);
-            if (mainRow) {
-                const mainInput = mainRow.querySelector('.sale-rate-input');
-                if (mainInput) mainInput.value = val;
-                const totalCell = mainRow.querySelector('.total-cell');
-                if (totalCell) totalCell.innerText = '₹' + s.saleRate.toLocaleString();
-            }
-        });
-    }
-    
-    Swal.fire({
-        title: 'Success',
-        text: `Rate of ₹${val} applied to all selected assets.`,
-        icon: 'success',
-        timer: 1500,
-        showConfirmButton: false
-    });
-}
-
 function openBucket() {
     document.getElementById('selection-bucket-panel').style.right = '0';
     document.getElementById('bucket-backdrop').style.display = 'block';
@@ -1165,18 +1104,7 @@ function updatePrintingInfo(id, vendorId, rateVal) {
         selectedSites[idx].printing_rate = parseFloat(rateVal) || 0;
         selectedSites[idx].printing_total = selectedSites[idx].printing_rate * selectedSites[idx].sqft;
         
-        recalcAll();
-        updateBucketUI();
-    }
-}
-
-function updateMountingInfo(id, typeVal, rateVal) {
-    const idx = selectedSites.findIndex(s => s.id === id);
-    if (idx !== -1) {
-        selectedSites[idx].mounting_type = typeVal;
-        selectedSites[idx].mounting_rate = parseFloat(rateVal) || 0;
-        selectedSites[idx].mounting_total = selectedSites[idx].mounting_rate * selectedSites[idx].sqft;
-        
+        // Update the total cell in bucket for printing if needed, but recalcAll handles global sum
         recalcAll();
         updateBucketUI();
     }
@@ -1198,50 +1126,19 @@ function updateBucketUI() {
     document.getElementById('bucket-empty-msg').style.display = 'none';
     bucketCount.innerText = selectedSites.length;
     
-    let headers = '';
-    if (activeBucketTab === 'rental') {
-        headers = `
-            <th style="width: 40px; padding: 0.8rem 1rem;">#</th>
-            <th style="width: 50px; padding: 0.8rem 1rem;">ACT</th>
-            <th style="width: 80px; padding: 0.8rem 1rem;">PREVIEW</th>
-            <th style="padding: 0.8rem 1rem;">CITY / CODE</th>
-            <th style="padding: 0.8rem 1rem;">ASSET DETAILS</th>
-            <th style="padding: 0.8rem 1rem;">SIZE</th>
-            <th style="padding: 0.8rem 1rem;">PRICING</th>
-            <th style="padding: 0.8rem 1rem; text-align: right; width: 120px;">OFFER RATE</th>
-            <th style="padding: 0.8rem 1rem; text-align: right; width: 100px;">TOTAL</th>
-        `;
-    } else if (activeBucketTab === 'printing') {
-        headers = `
-            <th style="width: 40px; padding: 0.8rem 1rem;">#</th>
-            <th style="width: 50px; padding: 0.8rem 1rem;">ACT</th>
-            <th style="width: 80px; padding: 0.8rem 1rem;">PREVIEW</th>
-            <th style="padding: 0.8rem 1rem;">CITY / CODE</th>
-            <th style="padding: 0.8rem 1rem;">ASSET DETAILS</th>
-            <th style="padding: 0.8rem 1rem;">SIZE / SQFT</th>
-            <th style="padding: 0.8rem 1rem;">PRINTING VENDOR</th>
-            <th style="padding: 0.8rem 1rem; text-align: right; width: 120px;">RATE / SQFT</th>
-            <th style="padding: 0.8rem 1rem; text-align: right; width: 100px;">TOTAL</th>
-        `;
-    } else if (activeBucketTab === 'mounting') {
-        headers = `
-            <th style="width: 40px; padding: 0.8rem 1rem;">#</th>
-            <th style="width: 50px; padding: 0.8rem 1rem;">ACT</th>
-            <th style="width: 80px; padding: 0.8rem 1rem;">PREVIEW</th>
-            <th style="padding: 0.8rem 1rem;">CITY / CODE</th>
-            <th style="padding: 0.8rem 1rem;">ASSET DETAILS</th>
-            <th style="padding: 0.8rem 1rem;">SIZE / SQFT</th>
-            <th style="padding: 0.8rem 1rem;">MOUNTING TYPE</th>
-            <th style="padding: 0.8rem 1rem; text-align: right; width: 120px;">RATE / SQFT</th>
-            <th style="padding: 0.8rem 1rem; text-align: right; width: 100px;">TOTAL</th>
-        `;
-    }
-
     let html = `
         <table class="crs-table selection-table" style="width: 100%; border-collapse: separate; border-spacing: 0 0.5rem;">
             <thead>
                 <tr style="border-bottom: 2px solid #f1f5f9;">
-                    ${headers}
+                    <th style="width: 40px; padding: 0.8rem 1rem;">#</th>
+                    <th style="width: 50px; padding: 0.8rem 1rem;">ACT</th>
+                    <th style="width: 80px; padding: 0.8rem 1rem;">PREVIEW</th>
+                    <th style="padding: 0.8rem 1rem;">CITY / CODE</th>
+                    <th style="padding: 0.8rem 1rem;">ASSET DETAILS</th>
+                    <th style="padding: 0.8rem 1rem;">SIZE</th>
+                    <th style="padding: 0.8rem 1rem;">PRINTING</th>
+                    <th style="padding: 0.8rem 1rem; text-align: right;">OFFER RATE</th>
+                    <th style="padding: 0.8rem 1rem; text-align: right;">TOTAL</th>
                 </tr>
             </thead>
             <tbody>
@@ -1252,72 +1149,13 @@ function updateBucketUI() {
         const imgList = (site.allImages || "").split(',').filter(img => img.trim() !== "");
         const imgCount = imgList.length;
 
-        let cells = '';
-
-        if (activeBucketTab === 'rental') {
-            cells = `
-                <td style="padding: 0.6rem 1rem;">
-                    <div style="font-weight: 800; color: #64748b; font-size: 0.7rem;">CARD: ₹${site.cardRate.toLocaleString()}</div>
-                </td>
-                <td style="padding: 0.6rem 1rem;">
-                    <input type="number" step="any" class="p-input bucket-rate-input" 
-                           value="${site.saleRate}" 
-                           oninput="updateSitePrice('${site.id}', this.value)"
-                           style="width: 100px; height: 32px; font-size: 0.8rem; font-weight: 800; border-radius: 8px; border: 1px solid #e2e8f0; padding: 0 0.4rem; color: #1e293b; text-align: right;">
-                </td>
-                <td style="padding: 0.6rem 1rem; text-align: right; font-weight: 900; color: var(--primary);">
-                    ₹${site.saleRate.toLocaleString()}
-                </td>
-            `;
-        } else if (activeBucketTab === 'printing') {
-            let pOptions = '<option value="">Select Vendor</option>';
-            if (typeof printingVendors !== 'undefined') {
-                printingVendors.forEach(v => {
-                    const selected = v.id == site.printing_vendor_id ? 'selected' : '';
-                    pOptions += `<option value="${v.id}" ${selected}>${v.name}</option>`;
-                });
-            }
-
-            cells = `
-                <td style="padding: 0.6rem 1rem;">
-                    <select onchange="updatePrintingInfo('${site.id}', this.value, document.getElementById('p_rate_${site.id}').value)" 
-                            style="width: 150px; font-size: 0.75rem; padding: 0.4rem; border-radius: 6px; border: 1px solid #e2e8f0;">
-                        ${pOptions}
-                    </select>
-                </td>
-                <td style="padding: 0.6rem 1rem; text-align: right;">
-                    <input type="number" step="any" id="p_rate_${site.id}" value="${site.printing_rate || 0}" 
-                           oninput="updatePrintingInfo('${site.id}', this.closest('tr').querySelector('select').value, this.value)"
-                           style="width: 100px; height: 32px; font-size: 0.8rem; font-weight: 800; border-radius: 8px; border: 1px solid #e2e8f0; padding: 0 0.4rem; color: #1e293b; text-align: right;">
-                </td>
-                <td style="padding: 0.6rem 1rem; text-align: right; font-weight: 900; color: var(--primary);">
-                    ₹${(site.printing_total || 0).toLocaleString()}
-                </td>
-            `;
-        } else if (activeBucketTab === 'mounting') {
-            const mTypes = ['Standard', 'Premium', 'Non-Lit Flex', 'Back-Lit Flex', 'Vinyl'];
-            let mOptions = '';
-            mTypes.forEach(t => {
-                const selected = t === site.mounting_type ? 'selected' : '';
-                mOptions += `<option value="${t}" ${selected}>${t}</option>`;
+        // Printing Dropdown
+        let pOptions = '<option value="">Select Vendor</option>';
+        if (typeof printingVendors !== 'undefined') {
+            printingVendors.forEach(v => {
+                const selected = v.id == site.printing_vendor_id ? 'selected' : '';
+                pOptions += `<option value="${v.id}" ${selected}>${v.name}</option>`;
             });
-
-            cells = `
-                <td style="padding: 0.6rem 1rem;">
-                    <select onchange="updateMountingInfo('${site.id}', this.value, document.getElementById('m_rate_${site.id}').value)" 
-                            style="width: 150px; font-size: 0.75rem; padding: 0.4rem; border-radius: 6px; border: 1px solid #e2e8f0;">
-                        ${mOptions}
-                    </select>
-                </td>
-                <td style="padding: 0.6rem 1rem; text-align: right;">
-                    <input type="number" step="any" id="m_rate_${site.id}" value="${site.mounting_rate || 0}" 
-                           oninput="updateMountingInfo('${site.id}', this.closest('tr').querySelector('select').value, this.value)"
-                           style="width: 100px; height: 32px; font-size: 0.8rem; font-weight: 800; border-radius: 8px; border: 1px solid #e2e8f0; padding: 0 0.4rem; color: #1e293b; text-align: right;">
-                </td>
-                <td style="padding: 0.6rem 1rem; text-align: right; font-weight: 900; color: var(--primary);">
-                    ₹${(site.mounting_total || 0).toLocaleString()}
-                </td>
-            `;
         }
 
         html += `
@@ -1351,7 +1189,29 @@ function updateBucketUI() {
                     <div style="font-weight: 800; color: #1e293b; font-size: 0.8rem; margin-bottom: 1px;">${site.width}' x ${site.height}'</div>
                     <div style="font-size: 0.65rem; color: #94a3b8; font-weight: 700;">${site.sqft.toLocaleString()} SQFT</div>
                 </td>
-                ${cells}
+                <td style="padding: 0.6rem 1rem;">
+                    <select onchange="updatePrintingInfo('${site.id}', this.value, document.getElementById('p_rate_${site.id}').value)" 
+                            style="width: 120px; font-size: 0.7rem; padding: 0.3rem; border-radius: 6px; border: 1px solid #e2e8f0; margin-bottom: 4px;">
+                        ${pOptions}
+                    </select>
+                    <div style="display: flex; align-items: center; gap: 0.3rem;">
+                        <span style="font-size: 0.6rem; color: #64748b;">Rate:</span>
+                        <input type="number" id="p_rate_${site.id}" value="${site.printing_rate}" 
+                               oninput="updatePrintingInfo('${site.id}', document.getElementById('bucket-row-${site.id}').querySelector('select').value, this.value)"
+                               style="width: 60px; height: 24px; font-size: 0.7rem; border-radius: 4px; border: 1px solid #e2e8f0; padding: 0 0.3rem;">
+                    </div>
+                    <div style="font-size: 0.65rem; font-weight: 800; color: var(--primary); margin-top: 2px;">₹${(site.printing_total || 0).toLocaleString()}</div>
+                </td>
+                
+                <td style="padding: 0.6rem 1rem;">
+                    <input type="number" class="p-input bucket-rate-input" 
+                           value="${site.saleRate}" 
+                           oninput="updateSitePrice('${site.id}', this.value)"
+                           style="width: 80px; height: 32px; font-size: 0.8rem; font-weight: 800; border-radius: 8px; border: 1px solid #e2e8f0; padding: 0 0.4rem; color: #1e293b;">
+                </td>
+                <td style="padding: 0.6rem 1rem; text-align: right;">
+                    <div class="total-cell" style="font-weight: 900; color: var(--primary); font-size: 0.9rem;">₹${site.saleRate.toLocaleString()}</div>
+                </td>
             </tr>
         `;
     });
@@ -1391,19 +1251,8 @@ function updateSitePrice(id, val) {
 function recalcAll() {
     const globalDisc = parseFloat(document.getElementById('global_discount').value) || 0;
     const globalMark = parseFloat(document.getElementById('global_markup').value) || 0;
-    
-    // Auto-calculate printing and mounting totals from selected sites
-    const totalPrinting = selectedSites.reduce((acc, s) => acc + (s.printing_total || 0), 0);
-    const totalMounting = selectedSites.reduce((acc, s) => acc + (s.mounting_total || 0), 0);
-    
-    // Update inputs
-    const printCostInput = document.getElementById('print_cost');
-    if (printCostInput) printCostInput.value = totalPrinting;
-    const mountCostInput = document.getElementById('mount_cost');
-    if (mountCostInput) mountCostInput.value = totalMounting;
-
-    const print = totalPrinting;
-    const mount = totalMounting;
+    const print = parseFloat(document.getElementById('print_cost').value) || 0;
+    const mount = parseFloat(document.getElementById('mount_cost').value) || 0;
     const taxType = document.getElementById('tax-type').value;
 
     let totalDisplay = 0;
@@ -1429,13 +1278,21 @@ function recalcAll() {
         }
     });
 
+    // Calculate total SQFT
+    let totalSQFT = 0;
+    selectedSites.forEach((site) => {
+        totalSQFT += parseFloat(site.sqft) || 0;
+    });
+
     // Apply global discount/markup to the total display cost
     let adjustedDisplay = totalDisplay;
     if (globalMark > 0) adjustedDisplay += (totalDisplay * (globalMark / 100));
     if (globalDisc > 0) adjustedDisplay -= (totalDisplay * (globalDisc / 100));
 
-    const subtotal = adjustedDisplay + print + mount;
-    const totalTax = subtotal * 0.18;
+    const totalPrint = print * totalSQFT;
+    const totalMount = mount * totalSQFT;
+    const subtotal = adjustedDisplay + totalPrint + totalMount;
+    const totalTax = taxType === 'no_tax' ? 0 : subtotal * 0.18;
     const grand = subtotal + totalTax;
 
     // Update Summary Panel
@@ -1453,6 +1310,13 @@ function recalcAll() {
             <div class="stat-row" style="display:flex; justify-content:space-between; margin-bottom:0.4rem; font-size:0.85rem;">
                 <span style="color:#64748b; font-weight:600;">SGST (9%):</span>
                 <span style="font-weight:800; color:#1e293b;">₹${halfTax.toLocaleString(undefined, {minimumFractionDigits: 2, maximumFractionDigits: 2})}</span>
+            </div>
+        `;
+    } else if (taxType === 'no_tax') {
+        taxContainer.innerHTML = `
+            <div class="stat-row" style="display:flex; justify-content:space-between; margin-bottom:0.4rem; font-size:0.85rem;">
+                <span style="color:#64748b; font-weight:600;">Tax (0%):</span>
+                <span style="font-weight:800; color:#1e293b;">₹0.00</span>
             </div>
         `;
     } else {
@@ -1476,6 +1340,11 @@ function clearFilters() {
     document.getElementById('light_type').value = '';
     document.getElementById('filter-size').value = '';
     if(document.getElementById('filter-vendor')) document.getElementById('filter-vendor').value = '';
+    if(document.getElementById('filter-district')) document.getElementById('filter-district').value = '';
+    
+    if (window.jQuery && $.fn.select2) {
+        $('#filter-district, #filter-state, #filter-city, #filter-location, #light_type, #filter-size').val('').trigger('change');
+    }
     
     document.querySelector('input[name="ownership"][value="all"]').checked = true;
     document.querySelector('input[name="availability"][value="available"]').checked = true;
@@ -1494,6 +1363,7 @@ function clearFilters() {
 function filterSites() {
     const q = document.getElementById('site-search') ? document.getElementById('site-search').value.toLowerCase() : '';
     const mediaType = document.getElementById('media_type').value;
+    const district = document.getElementById('filter-district') ? document.getElementById('filter-district').value : '';
     const lightType = document.getElementById('light_type').value;
     const ownershipRadio = document.querySelector('input[name="ownership"]:checked').value;
     const availability = document.querySelector('input[name="availability"]:checked').value;
@@ -1530,6 +1400,7 @@ function filterSites() {
         if (ownershipRadio === 'TA' && vendorId && row.dataset.vendor !== vendorId) show = false;
         
         // Location & Size Filters
+        if (district && row.dataset.district !== district) show = false;
         if (state && row.dataset.state !== state) show = false;
         if (city && row.dataset.city !== city) show = false;
         if (locationFilter && row.dataset.location !== locationFilter) show = false;
@@ -1542,6 +1413,7 @@ function filterSites() {
                 row.dataset.code + ' ' + 
                 row.dataset.location + ' ' + 
                 row.dataset.city + ' ' + 
+                (row.dataset.district || '') + ' ' + 
                 row.dataset.state + ' ' + 
                 row.dataset.type + ' ' + 
                 row.dataset.illumination + ' ' + 
@@ -1612,6 +1484,18 @@ function saveProposal() {
         return;
     }
 
+    const cleanedSites = selectedSites.map(s => {
+        let selImages = s.selected_images || [s.thumbnail];
+        // Ensure primary (thumbnail) is always first
+        if (s.thumbnail) {
+            selImages = [s.thumbnail].concat(selImages.filter(img => img !== s.thumbnail));
+        }
+        return {
+            ...s,
+            selected_image: selImages.join(',')
+        };
+    });
+
     const data = {
         clientId,
         selectedGstin,
@@ -1626,7 +1510,7 @@ function saveProposal() {
         contactPerson,
         printCost: parseFloat(document.getElementById('print_cost').value) || 0,
         mountCost: parseFloat(document.getElementById('mount_cost').value) || 0,
-        selectedSites
+        selectedSites: cleanedSites
     };
 
     fetch('../../ajax/save_proposal.php', {
@@ -1720,14 +1604,23 @@ function updateSliderImage() {
     if(lbImg) {
         lbImg.src = imgBaseUrl + currentImages[currentImgIndex];
         if(lbBadge) {
-            lbBadge.innerText = (currentImgIndex + 1) + " / " + currentImages.length;
-            lbBadge.style.display = currentImages.length > 1 ? 'block' : 'none';
+            let selCount = 0;
+            if(window.currentLightboxSiteId) {
+                const idx = selectedSites.findIndex(s => s.id == window.currentLightboxSiteId);
+                if(idx !== -1) {
+                    const site = selectedSites[idx];
+                    const selImages = site.selected_images || [site.thumbnail];
+                    selCount = selImages.length;
+                }
+            }
+            lbBadge.innerText = (currentImgIndex + 1) + " / " + currentImages.length + " (" + selCount + " Selected)";
+            lbBadge.style.display = 'block'; // Always display the badge to show selection count
         }
 
         // Update Button State
         const btn = document.getElementById('primary-btn');
         if(btn && window.currentLightboxSiteId) {
-            const idx = selectedSites.findIndex(s => s.id === window.currentLightboxSiteId);
+            const idx = selectedSites.findIndex(s => s.id == window.currentLightboxSiteId);
             const isPrimary = (idx !== -1 && selectedSites[idx].thumbnail === currentImages[currentImgIndex]);
             
             if(isPrimary) {
@@ -1738,6 +1631,27 @@ function updateSliderImage() {
                 btn.style.background = 'var(--primary)';
             }
         }
+
+        // Update Export Button State
+        const expBtn = document.getElementById('export-print-btn');
+        if(expBtn && window.currentLightboxSiteId) {
+            const idx = selectedSites.findIndex(s => s.id == window.currentLightboxSiteId);
+            if(idx !== -1) {
+                const site = selectedSites[idx];
+                const selImages = site.selected_images || [site.thumbnail];
+                const isSelected = selImages.includes(currentImages[currentImgIndex]);
+                
+                if(isSelected) {
+                    expBtn.innerHTML = '<i class="fas fa-check-square"></i> Selected for PPT/PDF';
+                    expBtn.style.background = '#059669';
+                    expBtn.style.borderColor = '#059669';
+                } else {
+                    expBtn.innerHTML = '<i class="far fa-square"></i> Select for PPT/PDF';
+                    expBtn.style.background = 'rgba(0,0,0,0.75)';
+                    expBtn.style.borderColor = 'rgba(255,255,255,0.25)';
+                }
+            }
+        }
     }
 }
 
@@ -1746,10 +1660,17 @@ function setPrimaryImage(e) {
     const newThumb = currentImages[currentImgIndex];
     if(window.currentLightboxSiteId) {
         const id = window.currentLightboxSiteId;
-        const idx = selectedSites.findIndex(s => s.id === id);
+        const idx = selectedSites.findIndex(s => s.id == id);
         if(idx !== -1) {
             selectedSites[idx].thumbnail = newThumb;
             selectedSites[idx].isCustomized = true;
+            
+            // Also ensure it is selected for export/print
+            if(!selectedSites[idx].selected_images) {
+                selectedSites[idx].selected_images = [newThumb];
+            } else if(!selectedSites[idx].selected_images.includes(newThumb)) {
+                selectedSites[idx].selected_images.push(newThumb);
+            }
             
             updateBucketUI();
             
@@ -1757,7 +1678,7 @@ function setPrimaryImage(e) {
             if(row) {
                 const img = row.querySelector('.site-thumb');
                 if(img) {
-                    img.src = baseUrl + newThumb;
+                    img.src = imgBaseUrl + newThumb;
                     img.style.border = '2px solid #059669';
                 }
             }
@@ -1784,6 +1705,47 @@ function setPrimaryImage(e) {
     }
 }
 
+function toggleExportImage(e) {
+    if(e) e.stopPropagation();
+    if(!window.currentLightboxSiteId) return;
+    
+    const id = window.currentLightboxSiteId;
+    const idx = selectedSites.findIndex(s => s.id == id);
+    if(idx === -1) {
+        Swal.fire('Note', 'Please select this asset first to manage its export images.', 'info');
+        return;
+    }
+    
+    let site = selectedSites[idx];
+    if(!site.selected_images) {
+        site.selected_images = [site.thumbnail];
+    }
+    
+    const currentImg = currentImages[currentImgIndex];
+    const imgIdx = site.selected_images.indexOf(currentImg);
+    
+    if(imgIdx !== -1) {
+        if(site.selected_images.length <= 1) {
+            Swal.fire('Warning', 'You must keep at least one image selected for export.', 'warning');
+            return;
+        }
+        site.selected_images.splice(imgIdx, 1);
+        if(site.thumbnail === currentImg) {
+            site.thumbnail = site.selected_images[0];
+            const row = document.getElementById('row-' + id);
+            if(row) {
+                const img = row.querySelector('.site-thumb');
+                if(img) img.src = imgBaseUrl + site.thumbnail;
+            }
+        }
+    } else {
+        site.selected_images.push(currentImg);
+    }
+    
+    updateSliderImage();
+    updateBucketUI();
+}
+
 function nextSlide(e) {
     if(e) e.stopPropagation();
     currentImgIndex = (currentImgIndex + 1) % currentImages.length;
@@ -1801,6 +1763,50 @@ function closeLightbox() {
     if(lb) lb.style.display = 'none';
 }
 
+async function downloadLightboxImage() {
+    if (!currentImages || currentImages.length === 0) return;
+    const currentImg = currentImages[currentImgIndex];
+    if (!currentImg) return;
+    
+    const imgUrl = imgBaseUrl + currentImg;
+    
+    try {
+        const topBtn = document.getElementById('lightbox-download-top');
+        const botBtn = document.getElementById('lightbox-download-bottom');
+        const origTop = topBtn ? topBtn.innerHTML : '';
+        const origBot = botBtn ? botBtn.innerHTML : '';
+        if (topBtn) topBtn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Downloading...';
+        if (botBtn) botBtn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Downloading...';
+
+        const response = await fetch(imgUrl);
+        if (!response.ok) throw new Error('Network error');
+        const blob = await response.blob();
+        const blobUrl = window.URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = blobUrl;
+        
+        let rawName = currentImg.split('/').pop().split('?')[0];
+        let baseName = rawName.replace(/\.[^/.]+$/, "");
+        a.download = baseName + '.jpg';
+        
+        document.body.appendChild(a);
+        a.click();
+        document.body.removeChild(a);
+        window.URL.revokeObjectURL(blobUrl);
+
+        if (topBtn) topBtn.innerHTML = origTop;
+        if (botBtn) botBtn.innerHTML = origBot;
+    } catch (err) {
+        const a = document.createElement('a');
+        a.href = imgUrl;
+        a.download = currentImg.split('/').pop();
+        a.target = '_blank';
+        document.body.appendChild(a);
+        a.click();
+        document.body.removeChild(a);
+    }
+}
+
 // Keyboard Support
 document.addEventListener('keydown', function(e) {
     const lb = document.getElementById('simple-lightbox');
@@ -1815,32 +1821,50 @@ document.addEventListener('keydown', function(e) {
 
 <!-- Simple Lightbox HTML -->
 <div id="simple-lightbox" onclick="closeLightbox()" style="position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.95); z-index: 9999; display: none; align-items: center; justify-content: center; backdrop-filter: blur(10px);">
-    <div style="position: relative; max-width: 90%; max-height: 90%; display: flex; align-items: center; justify-content: center;" onclick="event.stopPropagation()">
+    <div style="position: relative; text-align: center; max-width: 90%; max-height: 90vh;" onclick="event.stopPropagation()">
+        <!-- Top Toolbar -->
+        <div style="display: flex; justify-content: flex-end; align-items: center; gap: 1rem; margin-bottom: 12px;">
+            <button id="lightbox-download-top" onclick="downloadLightboxImage(); event.stopPropagation();" style="background: rgba(255,255,255,0.18); color: white; border: 1px solid rgba(255,255,255,0.35); padding: 8px 18px; border-radius: 8px; font-weight: 800; font-size: 0.85rem; cursor: pointer; display: inline-flex; align-items: center; gap: 0.5rem; backdrop-filter: blur(8px); transition: all 0.2s;" onmouseover="this.style.background='var(--primary)'; this.style.borderColor='var(--primary)'" onmouseout="this.style.background='rgba(255,255,255,0.18)'; this.style.borderColor='rgba(255,255,255,0.35)'">
+                <i class="fas fa-download"></i> Download Full Size (JPEG)
+            </button>
+            <div onclick="closeLightbox()" style="color: white; font-size: 2.2rem; line-height: 1; cursor: pointer; opacity: 0.8; transition: opacity 0.2s;" onmouseover="this.style.opacity=1" onmouseout="this.style.opacity=0.8">&times;</div>
+        </div>
         
-        <!-- Prev Button -->
-        <button class="slider-nav" onclick="prevSlide(event)" style="position: absolute; left: -80px; background: rgba(255,255,255,0.1); color: white; border: 1px solid rgba(255,255,255,0.2); width: 50px; height: 50px; border-radius: 50%; display: flex; align-items: center; justify-content: center; cursor: pointer; font-size: 1.5rem; transition: all 0.3s; z-index: 10001;">
-            <i class="fas fa-chevron-left"></i>
-        </button>
-
-        <div style="position: relative;">
-            <img id="lightbox-img" src="" style="max-width: 100%; max-height: 85vh; border-radius: 16px; box-shadow: 0 30px 60px rgba(0,0,0,0.8); border: 2px solid rgba(255,255,255,0.15);">
-            
-            <!-- Select as Primary Button -->
-            <button id="primary-btn" onclick="setPrimaryImage(event)" style="position: absolute; top: 20px; left: 20px; background: var(--primary); color: white; border: none; padding: 0.6rem 1.2rem; border-radius: 10px; font-weight: 800; font-size: 0.8rem; cursor: pointer; display: flex; align-items: center; gap: 0.5rem; box-shadow: 0 10px 20px rgba(13, 148, 136, 0.3); transition: all 0.2s;">
-                <i class="fas fa-check-circle"></i> Use as Primary Photo
+        <div style="display: flex; align-items: center; justify-content: center; position: relative;">
+            <!-- Prev Button -->
+            <button class="slider-nav" onclick="prevSlide(event)" style="position: absolute; left: -60px; background: rgba(255,255,255,0.1); color: white; border: 1px solid rgba(255,255,255,0.2); width: 44px; height: 44px; border-radius: 50%; display: flex; align-items: center; justify-content: center; cursor: pointer; font-size: 1.2rem; transition: all 0.2s; z-index: 10001;" onmouseover="this.style.background='rgba(255,255,255,0.2)'" onmouseout="this.style.background='rgba(255,255,255,0.1)'">
+                <i class="fas fa-chevron-left"></i>
             </button>
 
-            <!-- Image Counter Badge -->
-            <div id="lightbox-badge" style="position: absolute; bottom: 20px; left: 50%; transform: translateX(-50%); background: rgba(0,0,0,0.7); color: white; padding: 6px 16px; border-radius: 50px; font-weight: 800; font-size: 0.85rem; backdrop-filter: blur(5px); border: 1px solid rgba(255,255,255,0.2);"></div>
+            <div style="position: relative;">
+                <img id="lightbox-img" src="" style="max-width: 100%; max-height: 78vh; border-radius: 16px; box-shadow: 0 30px 60px rgba(0,0,0,0.8); border: 2px solid rgba(255,255,255,0.15);">
+                
+                <!-- Select as Primary Button -->
+                <button id="primary-btn" onclick="setPrimaryImage(event)" style="position: absolute; top: 20px; left: 20px; background: var(--primary); color: white; border: none; padding: 0.6rem 1.2rem; border-radius: 10px; font-weight: 800; font-size: 0.8rem; cursor: pointer; display: flex; align-items: center; gap: 0.5rem; box-shadow: 0 10px 20px rgba(13, 148, 136, 0.3); transition: all 0.2s;">
+                    <i class="fas fa-check-circle"></i> Use as Primary Photo
+                </button>
+
+                <!-- Select for Export Button -->
+                <button id="export-print-btn" onclick="toggleExportImage(event)" style="position: absolute; top: 20px; right: 20px; background: rgba(0,0,0,0.75); color: white; border: 1px solid rgba(255,255,255,0.25); padding: 0.6rem 1.2rem; border-radius: 10px; font-weight: 800; font-size: 0.8rem; cursor: pointer; display: flex; align-items: center; gap: 0.5rem; transition: all 0.2s; z-index: 10002;">
+                    <i class="far fa-square"></i> Select for PPT/PDF
+                </button>
+
+                <!-- Image Counter Badge -->
+                <div id="lightbox-badge" style="position: absolute; bottom: 20px; left: 50%; transform: translateX(-50%); background: rgba(0,0,0,0.7); color: white; padding: 6px 16px; border-radius: 50px; font-weight: 800; font-size: 0.85rem; backdrop-filter: blur(5px); border: 1px solid rgba(255,255,255,0.2);"></div>
+            </div>
+
+            <!-- Next Button -->
+            <button class="slider-nav" onclick="nextSlide(event)" style="position: absolute; right: -60px; background: rgba(255,255,255,0.1); color: white; border: 1px solid rgba(255,255,255,0.2); width: 44px; height: 44px; border-radius: 50%; display: flex; align-items: center; justify-content: center; cursor: pointer; font-size: 1.2rem; transition: all 0.2s; z-index: 10001;" onmouseover="this.style.background='rgba(255,255,255,0.2)'" onmouseout="this.style.background='rgba(255,255,255,0.1)'">
+                <i class="fas fa-chevron-right"></i>
+            </button>
         </div>
 
-        <!-- Next Button -->
-        <button class="slider-nav" onclick="nextSlide(event)" style="position: absolute; right: -80px; background: rgba(255,255,255,0.1); color: white; border: 1px solid rgba(255,255,255,0.2); width: 50px; height: 50px; border-radius: 50%; display: flex; align-items: center; justify-content: center; cursor: pointer; font-size: 1.5rem; transition: all 0.3s; z-index: 10001;">
-            <i class="fas fa-chevron-right"></i>
-        </button>
-
-        <!-- Close Button -->
-        <div onclick="closeLightbox()" style="position: absolute; top: -60px; right: -60px; color: white; font-size: 2.5rem; cursor: pointer; opacity: 0.6; transition: opacity 0.2s;" onmouseover="this.style.opacity=1" onmouseout="this.style.opacity=0.6">&times;</div>
+        <!-- Bottom Actions -->
+        <div style="margin-top: 18px; display: flex; justify-content: center; gap: 1rem; flex-wrap: wrap;">
+            <button id="lightbox-download-bottom" onclick="downloadLightboxImage(); event.stopPropagation();" style="background: rgba(15, 23, 42, 0.85); color: white; border: 1px solid rgba(255,255,255,0.25); padding: 0.75rem 1.4rem; border-radius: 8px; font-weight: 800; font-size: 0.85rem; cursor: pointer; display: flex; align-items: center; gap: 0.5rem; transition: all 0.2s;" onmouseover="this.style.background='var(--primary)'; this.style.borderColor='var(--primary)'" onmouseout="this.style.background='rgba(15, 23, 42, 0.85)'; this.style.borderColor='rgba(255,255,255,0.25)'">
+                <i class="fas fa-download"></i> Download Full Size (JPEG)
+            </button>
+        </div>
     </div>
 </div>
 <?php include_once __DIR__ . '/../../includes/footer.php'; ?>

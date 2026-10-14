@@ -1,5 +1,6 @@
 <?php
 include_once __DIR__ . '/../config/db.php';
+require_once __DIR__ . '/../includes/ajax_auth.php';
 include_once __DIR__ . '/../includes/functions.php';
 
 header('Content-Type: application/json');
@@ -9,10 +10,10 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         echo json_encode(['success' => false, 'message' => 'Access Denied: You do not have permission to upload client PO.']);
         exit;
     }
-    $client_id = intval($_POST['client_id']);
-    $booking_id = intval($_POST['booking_id']);
-    $po_no = clean($_POST['po_no']);
-    $po_date = clean($_POST['po_date']);
+    $client_id = intval($_POST['client_id'] ?? 0);
+    $booking_id = intval($_POST['booking_id'] ?? 0);
+    $po_no = clean($_POST['po_no'] ?? '');
+    $po_date = clean($_POST['po_date'] ?? '');
     
     if (isset($_FILES['file']) && $_FILES['file']['error'] === UPLOAD_ERR_OK) {
         $uploadDir = __DIR__ . '/../uploads/client_pos/';

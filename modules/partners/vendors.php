@@ -270,8 +270,8 @@ $indian_states = ["Andhra Pradesh", "Arunachal Pradesh", "Assam", "Bihar", "Chha
                     <div class="form-group">
                         <label id="f_gstin_label">Primary GSTIN</label>
                         <div style="display: flex; gap: 0.5rem;">
-                            <input type="text" name="gstin" id="f_gstin" placeholder="Enter GSTIN" style="flex: 1;">
-                            <button type="button" class="btn btn-secondary" onclick="fetchGSTDetails()" style="padding: 0 1rem; background: #64748b; color: white;">
+                            <input type="text" name="gstin" id="f_gstin" placeholder="Enter GSTIN" style="flex: 1; height: 42px;">
+                            <button type="button" class="btn btn-secondary" onclick="fetchGSTDetails()" style="padding: 0 1.25rem; background: #0f172a; color: white; border: none; border-radius: 10px; font-weight: 700; height: 42px; display: inline-flex; align-items: center; gap: 6px; cursor: pointer; transition: background 0.2s;">
                                 <i class="fas fa-sync-alt" id="gst_loader"></i> Fetch
                             </button>
                         </div>
@@ -299,8 +299,8 @@ $indian_states = ["Andhra Pradesh", "Arunachal Pradesh", "Assam", "Bihar", "Chha
             </div>
             
             <div style="margin-top: 2rem; text-align: right;">
-                <button type="button" class="btn" onclick="closeModal()">Cancel</button>
-                <button type="submit" class="btn btn-primary">Save Vendor Profile</button>
+                <button type="button" class="btn" onclick="closeModal()" style="height: 42px; padding: 0 1.5rem; font-weight: 700; font-size: 0.85rem; border-radius: 10px; background: #e2e8f0; color: #475569; border: none; cursor: pointer; margin-right: 0.5rem;">Cancel</button>
+                <button type="submit" class="btn btn-primary" style="height: 42px; padding: 0 1.75rem; font-weight: 800; font-size: 0.85rem; border-radius: 10px; background: #0d9488; color: white; border: none; cursor: pointer; box-shadow: 0 4px 12px rgba(13,148,136,0.15);">Save Vendor Profile</button>
             </div>
         </form>
     </div>
@@ -332,10 +332,15 @@ $indian_states = ["Andhra Pradesh", "Arunachal Pradesh", "Assam", "Bihar", "Chha
 
 <style>
 .modal { display: none; position: fixed; z-index: 1000; left: 0; top: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.5); overflow-y: auto; }
-.modal-content { background: white; margin: 2% auto; padding: 2rem; border-radius: 12px; }
-.form-group label { display: block; font-size: 0.85rem; font-weight: 600; margin-bottom: 0.3rem; color: #475569; }
-.form-group input, .form-group select, .form-group textarea { width: 100%; padding: 0.65rem; border: 1px solid #ddd; border-radius: 6px; font-family: inherit; font-size: 0.9rem; }
-.close { cursor: pointer; float: right; font-size: 1.5rem; }
+.modal-content { background: white; margin: 2% auto; padding: 2rem; border-radius: 16px; box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.1), 0 8px 10px -6px rgba(0, 0, 0, 0.1); }
+.modal-header { display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid #f1f5f9; padding-bottom: 1rem; margin-bottom: 1.5rem; }
+.modal-header h2 { font-size: 1.25rem; font-weight: 800; color: #0f172a; margin: 0; }
+.close { cursor: pointer; font-size: 1.25rem; color: #64748b; transition: color 0.2s; }
+.close:hover { color: #ef4444; }
+.form-group { margin-bottom: 1.25rem; }
+.form-group label { display: block; font-size: 0.65rem; font-weight: 800; color: #94a3b8; text-transform: uppercase; letter-spacing: 0.05em; margin-bottom: 0.5rem; }
+.form-group input, .form-group select, .form-group textarea { width: 100%; padding: 0.6rem 0.75rem; border: 1px solid #e2e8f0; border-radius: 10px; font-size: 0.85rem; font-weight: 600; background: #f8fafc; transition: all 0.2s; font-family: inherit; box-sizing: border-box; }
+.form-group input:focus, .form-group select:focus, .form-group textarea:focus { outline: none; border-color: #0d9488; box-shadow: 0 0 0 3px rgba(13,148,136,0.1); background: white; }
 </style>
 
 <script>

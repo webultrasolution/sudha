@@ -1,8 +1,10 @@
 <?php
 include_once __DIR__ . '/../config/db.php';
+require_once __DIR__ . '/../includes/ajax_auth.php';
 include_once __DIR__ . '/../includes/functions.php';
 
 header('Content-Type: application/json');
+
 
 if (!isLoggedIn()) {
     echo json_encode(['success' => false, 'message' => 'Unauthorized']);
@@ -17,17 +19,24 @@ $q = isset($_GET['q']) ? $_GET['q'] : '';
 $media = isset($_GET['media']) ? $_GET['media'] : '';
 $state = isset($_GET['state']) ? $_GET['state'] : '';
 $city = isset($_GET['city']) ? $_GET['city'] : '';
+$district = isset($_GET['district']) ? $_GET['district'] : '';
 $vendor = isset($_GET['vendor']) ? $_GET['vendor'] : '';
 $locationFilter = isset($_GET['location']) ? $_GET['location'] : '';
 $availability = isset($_GET['availability']) ? $_GET['availability'] : 'available';
 $ownership = isset($_GET['ownership']) ? $_GET['ownership'] : 'all';
 $size = isset($_GET['size']) ? $_GET['size'] : '';
+$light = isset($_GET['light']) ? $_GET['light'] : '';
 
 $params = [];
 $where = ["1=1"];
 
 if ($q) {
-    $where[] = "(s.site_code LIKE ? OR s.location LIKE ? OR s.name LIKE ?)";
+    $where[] = "(s.site_code LIKE ? OR s.location LIKE ? OR s.name LIKE ? OR s.district LIKE ? OR s.state LIKE ? OR s.city LIKE ? OR s.light_type LIKE ? OR p.name LIKE ?)";
+    $params[] = "%$q%";
+    $params[] = "%$q%";
+    $params[] = "%$q%";
+    $params[] = "%$q%";
+    $params[] = "%$q%";
     $params[] = "%$q%";
     $params[] = "%$q%";
     $params[] = "%$q%";
@@ -35,10 +44,12 @@ if ($q) {
 if ($media) { $where[] = "s.type = ?"; $params[] = $media; }
 if ($state) { $where[] = "s.state = ?"; $params[] = $state; }
 if ($city) { $where[] = "s.city = ?"; $params[] = $city; }
+if ($district) { $where[] = "s.district = ?"; $params[] = $district; }
 if ($locationFilter) { $where[] = "s.location = ?"; $params[] = $locationFilter; }
 if ($vendor) { $where[] = "s.vendor_id = ?"; $params[] = $vendor; }
 if ($availability === 'available') { $where[] = "s.status = 'available'"; }
 if ($ownership !== 'all') { $where[] = "s.owner_type = ?"; $params[] = $ownership; }
+if ($light) { $where[] = "s.light_type = ?"; $params[] = $light; }
 
 // Already booked sites are no longer excluded from search results so they can be shown as selected in the modal
 // $bookingId = isset($_GET['booking_id']) ? intval($_GET['booking_id']) : 0;
@@ -59,7 +70,7 @@ if ($size) {
 $whereClause = implode(" AND ", $where);
 
 // Count total for pagination
-$countQuery = "SELECT COUNT(*) FROM sites s WHERE $whereClause";
+$countQuery = "SELECT COUNT(*) FROM sites s LEFT JOIN partners p ON s.vendor_id = p.id WHERE $whereClause";
 $stmtCount = $pdo->prepare($countQuery);
 $stmtCount->execute($params);
 $total = $stmtCount->fetchColumn();

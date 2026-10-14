@@ -119,6 +119,19 @@ include_once __DIR__ . '/../../includes/header.php';
         <div class="po-card-body">
             <div class="po-form-grid">
                 <div class="po-fg">
+                    <label>Issuing Company / Entity <span style="color:red;">*</span></label>
+                    <select id="po_entity_id">
+                        <?php 
+                        $allEntities = $pdo->query("SELECT id, name FROM entities ORDER BY name ASC")->fetchAll();
+                        foreach ($allEntities as $ent): 
+                        ?>
+                            <option value="<?php echo $ent['id']; ?>" <?php echo (($_SESSION['active_entity_id'] ?? null) == $ent['id']) ? 'selected' : ''; ?>>
+                                <?php echo htmlspecialchars($ent['name']); ?>
+                            </option>
+                        <?php endforeach; ?>
+                    </select>
+                </div>
+                <div class="po-fg">
                     <label>Campaign / Purpose <span style="color:red;">*</span></label>
                     <input type="text" id="po_campaign" placeholder="e.g. Summer 2026 Campaign" value="">
                 </div>
@@ -276,6 +289,47 @@ include_once __DIR__ . '/../../includes/header.php';
 </div>
 
 <script>
+document.addEventListener('DOMContentLoaded', function() {
+    const optionsHtml = `<?php 
+        $allEntities = $pdo->query("SELECT id, name FROM entities ORDER BY name ASC")->fetchAll();
+        $activeEnt = $_SESSION['active_entity_id'] ?? null;
+        $optStr = '';
+        foreach ($allEntities as $ent) {
+            $sel = ($activeEnt == $ent['id']) ? 'selected' : '';
+            $optStr .= '<option value="' . $ent['id'] . '" ' . $sel . '>' . htmlspecialchars($ent['name']) . '</option>';
+        }
+        echo addslashes($optStr);
+    ?>`;
+
+    Swal.fire({
+        title: '<div style="width: 70px; height: 70px; border-radius: 50%; border: 3px solid #cbd5e1; display: flex; align-items: center; justify-content: center; margin: 0 auto 0.5rem; color: #64748b; font-size: 2.2rem;"><i class="fas fa-question"></i></div><div style="font-size: 1.4rem; font-weight: 800; color: #0f172a;">Select Company / Entity</div>',
+        html: `
+            <p style="color: #475569; font-size: 0.9rem; margin-bottom: 1.25rem; font-weight: 500;">
+                Choose the company under which you want to create this PO:
+            </p>
+            <select id="modal_po_entity" style="width: 100%; padding: 0.75rem 1rem; border: 1.5px solid #cbd5e1; border-radius: 10px; font-size: 0.9rem; font-weight: 600; background: #f8fafc; outline: none;">
+                ${optionsHtml}
+            </select>
+        `,
+        showCancelButton: true,
+        confirmButtonText: 'Proceed',
+        cancelButtonText: 'Cancel',
+        confirmButtonColor: '#0d9488',
+        cancelButtonColor: '#64748b',
+        allowOutsideClick: false
+    }).then((result) => {
+        if (result.isConfirmed) {
+            const chosenEntity = document.getElementById('modal_po_entity').value;
+            const selObj = document.getElementById('po_entity_id');
+            if (selObj) {
+                selObj.value = chosenEntity;
+            }
+        } else {
+            window.location.href = 'vendors.php';
+        }
+    });
+});
+
 function filterSites() {
     const filter = document.getElementById('siteSearch').value.toLowerCase();
     const rows = document.querySelectorAll('.site-select-table tbody tr');
@@ -392,8 +446,10 @@ function generatePO() {
     btn.disabled = true;
     btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> SAVING...';
 
+    const entityId = document.getElementById('po_entity_id')?.value || '';
     const payload = {
         vendor_id: <?php echo $vendor_id; ?>,
+        entity_id: entityId,
         campaign_name: campaign,
         start_date: startDate,
         end_date: endDate,

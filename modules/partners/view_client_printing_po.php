@@ -11,7 +11,8 @@ date_default_timezone_set('Asia/Kolkata');
 
 $client_id = isset($_GET['client_id']) ? intval($_GET['client_id']) : 0;
 $po_number = isset($_GET['po_number']) ? $_GET['po_number'] : null;
-$rate_ids = isset($_GET['rate_ids']) ? $_GET['rate_ids'] : [];
+$rate_ids = isset($_GET['rate_ids']) ? (is_array($_GET['rate_ids']) ? $_GET['rate_ids'] : explode(',', $_GET['rate_ids'])) : [];
+$rate_ids = array_values(array_filter(array_map('intval', $rate_ids)));
 
 if (empty($rate_ids) && !$po_number) {
     echo "<div class='card'>Invalid PO reference.</div>";
@@ -19,17 +20,17 @@ if (empty($rate_ids) && !$po_number) {
     exit;
 }
 
-// Build query
-$where = "r.client_id = :client_id";
-$params = [':client_id' => $client_id];
+// Build query (positional placeholders only; PDO rejects mixing named and positional)
+$where = "r.client_id = ?";
+$params = [$client_id];
 
 if ($po_number) {
-    $where .= " AND r.po_number = :po_number";
-    $params[':po_number'] = $po_number;
+    $where .= " AND r.po_number = ?";
+    $params[] = $po_number;
 } else {
     $in = str_repeat('?,', count($rate_ids) - 1) . '?';
     $where .= " AND r.id IN ($in)";
-    $params = array_merge([$client_id], $rate_ids);
+    $params = array_merge($params, $rate_ids);
 }
 
 // Fetch Group info

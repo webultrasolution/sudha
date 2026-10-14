@@ -1,6 +1,7 @@
 <?php
 include_once __DIR__ . '/../../config/db.php';
 include_once __DIR__ . '/../../includes/functions.php';
+checkAuth();
 
 $id = isset($_GET['id']) ? (int)$_GET['id'] : 0;
 if (!$id) die("Invalid Proposal ID");
@@ -18,6 +19,7 @@ $stmt = $pdo->prepare("
     JOIN site_images si ON pi.site_id = si.site_id 
     JOIN sites s ON pi.site_id = s.id
     WHERE pi.proposal_id = ?
+    ORDER BY pi.sort_order ASC, pi.id ASC, si.id ASC
 ");
 $stmt->execute([$id]);
 $images = $stmt->fetchAll();

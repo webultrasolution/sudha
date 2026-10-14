@@ -1,6 +1,7 @@
 <?php
 include_once __DIR__ . '/../../config/db.php';
 include_once __DIR__ . '/../../includes/functions.php';
+checkAuth();
 
 date_default_timezone_set('Asia/Kolkata');
 
@@ -11,7 +12,7 @@ if (!$invoice_id) die("Invalid request: Invoice ID is required.");
 $stmt = $pdo->prepare("SELECT * FROM invoices WHERE id = ?");
 $stmt->execute([$invoice_id]);
 $invoice = $stmt->fetch();
-if (!$invoice) die("Invoice not found.");
+if (!$invoice || ($invoice['type'] ?? '') !== 'printing') die("Invoice not found.");
 
 if (session_status() === PHP_SESSION_NONE) {
     session_start();
@@ -30,7 +31,9 @@ $client_id = $invoice['entity_id'] ?? $invoice['client_id'] ?? 0;
 // Fetch Client Info
 $stmtC = $pdo->prepare("SELECT * FROM partners WHERE id = ? AND type = 'client'");
 $stmtC->execute([$client_id]);
-$c = $stmtC->fetch();
+// Normalise NULL columns (and a since-deleted client) to empty strings for display
+$c = array_map(fn($v) => $v ?? '', $stmtC->fetch() ?: [])
+   + array_fill_keys(['name', 'gstin', 'address', 'state', 'contact_person', 'phone', 'additional_gst'], '');
 
 // Resolve Billing details if selected
 $billing_gst = $invoice['billing_gstin'] ?? '';
@@ -81,8 +84,9 @@ $po_number = $invoice['invoice_number'];
 $po_date = date('d-m-Y', strtotime($invoice['invoice_date']));
 $is_final = false; // Based on original code logic, client_printing was mainly PO or Tax Invoice based on a flag. We can assume standard printing invoice here.
 
-// Company Settings — uses active session entity
-$co                 = resolveCompanyDetails();
+// Company Settings — entity priority: invoice entity → active session entity → settings
+$entityIdToResolve  = !empty($invoice['entity_id']) ? $invoice['entity_id'] : ($_SESSION['active_entity_id'] ?? null);
+$co                 = resolveCompanyDetails($entityIdToResolve);
 $company_name       = $co['name'];
 $company_gstin      = $co['gstin'];
 $company_pan        = $co['pan'];
@@ -91,6 +95,8 @@ $company_phone      = $co['phone'];
 $company_email      = $co['email'];
 $company_letterhead = $co['letterhead'];
 $company_signature  = $co['signature'];
+$company_bank_details = $co['bank_details'] ?? '';
+$company_terms      = $co['invoice_terms'] ?? '';
 $company_msme       = $co['msme_number'];
 $company_cin        = $co['cin'] ?? '';
 $company_tan        = $co['tan'] ?? '';
@@ -453,11 +459,14 @@ $company_tan        = $co['tan'] ?? '';
         </div>
 
         <div class="footer">
-            <div class="footer-left">
-                <div style="font-weight: bold; text-decoration: underline; margin-bottom: 5px;">Bank Details:</div>
-                <p style="margin: 2px 0;">Bank Name: <strong><?php echo getSetting('bank_name', 'Your Bank Name'); ?></strong></p>
-                <p style="margin: 2px 0;">Account No: <strong><?php echo getSetting('bank_account', 'XXXX-XXXX-XXXX'); ?></strong></p>
-                <p style="margin: 2px 0;">IFSC Code: <strong><?php echo getSetting('bank_ifsc', 'XXXX0000000'); ?></strong></p>
+            <div class="footer-left" style="padding: 6px 10px;">
+                <div style="font-weight: bold; text-decoration: underline; margin-bottom: 3px;">Bank Details:</div>
+                <div style="line-height: 1.2; font-size: 9.5px;">
+                    <?php
+                    $bank = $company_bank_details ?: "A/C Name: {$company_name}\nBank: STATE BANK OF INDIA\nA/C No: 1234567890123\nIFSC: SBIN0000123";
+                    echo nl2br(htmlspecialchars(strtoupper($bank)));
+                    ?>
+                </div>
             </div>
             <div class="footer-right">
                 <div>For <strong><?php echo $company_name; ?></strong></div>

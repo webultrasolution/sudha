@@ -1,6 +1,7 @@
 <?php
 header('Content-Type: application/json');
 include_once __DIR__ . '/../config/db.php';
+require_once __DIR__ . '/../includes/ajax_auth.php';
 
 $gstin = $_GET['gstin'] ?? '';
 

@@ -2,344 +2,12 @@
 $activePage = 'direct_booking';
 $pageTitle = 'Create Direct Booking';
 $hideSidebar = true;
+$backUrl = 'bookings.php';
 include_once __DIR__ . '/../../includes/header.php';
-
-$isEdit = false;
-$editBooking = null;
-$editItems = [];
-
-if (isset($_GET['action']) && $_GET['action'] === 'edit' && isset($_GET['id'])) {
-    $editId = intval($_GET['id']);
-    $stmt = $pdo->prepare("SELECT * FROM bookings WHERE id = ?");
-    $stmt->execute([$editId]);
-    $editBooking = $stmt->fetch(PDO::FETCH_ASSOC);
-    if ($editBooking) {
-        $isEdit = true;
-        // Fetch items
-        $stmtItems = $pdo->prepare("
-            SELECT bi.*, COALESCE(bi.custom_site_name, s.name) as name, s.site_code,
-                   COALESCE(bi.custom_location, s.location) as location,
-                   s.city, s.width, s.height, s.light_type, s.hsn_code, s.type, s.owner_type,
-                   p.name as vendor_name,
-                   (SELECT GROUP_CONCAT(filename) FROM site_images WHERE site_id = s.id) as all_images
-            FROM booking_items bi
-            JOIN sites s ON bi.site_id = s.id
-            LEFT JOIN partners p ON s.vendor_id = p.id
-            WHERE bi.booking_id = ?
-        ");
-        $stmtItems->execute([$editId]);
-        $editItems = $stmtItems->fetchAll(PDO::FETCH_ASSOC);
-    }
-}
-
-// Fetch initial data for filters only
-$clients = $pdo->query("SELECT id, name, city, contact_person FROM partners WHERE type = 'client' ORDER BY name ASC")->fetchAll();
-$vendors = $pdo->query("SELECT id, name FROM partners WHERE type = 'vendor' ORDER BY name ASC")->fetchAll();
-
-$cities = $pdo->query("SELECT DISTINCT city FROM sites WHERE city IS NOT NULL AND city != '' ORDER BY city")->fetchAll(PDO::FETCH_COLUMN);
-$locations = $pdo->query("SELECT DISTINCT location FROM sites WHERE location IS NOT NULL AND location != '' ORDER BY location")->fetchAll(PDO::FETCH_COLUMN);
-$states = $pdo->query("SELECT DISTINCT state FROM sites WHERE state IS NOT NULL AND state != '' ORDER BY state")->fetchAll(PDO::FETCH_COLUMN);
-$mediaTypes = $pdo->query("SELECT DISTINCT type FROM sites WHERE type IS NOT NULL AND type != '' ORDER BY type")->fetchAll(PDO::FETCH_COLUMN);
-$illuminations = $pdo->query("SELECT DISTINCT light_type FROM sites WHERE light_type IS NOT NULL AND light_type != '' ORDER BY light_type")->fetchAll(PDO::FETCH_COLUMN);
-$sizes = $pdo->query("SELECT DISTINCT CONCAT(width, 'x', height) as size FROM sites WHERE width IS NOT NULL AND height IS NOT NULL AND width != '' AND height != '' ORDER BY width, height")->fetchAll(PDO::FETCH_COLUMN);
-$printingVendors = $pdo->query("SELECT id, name FROM partners WHERE type = 'vendor' ORDER BY name ASC")->fetchAll();
-$printingRates = $pdo->query("SELECT * FROM vendor_printing_rates")->fetchAll(PDO::FETCH_ASSOC);
-$all_media_types = $pdo->query("SELECT name FROM media_types ORDER BY name ASC")->fetchAll(PDO::FETCH_COLUMN);
 ?>
-
-<div class="proposal-full-wrapper">
-    <input type="hidden" id="booking_id" value="<?php echo $isEdit ? $editBooking['id'] : ''; ?>">
-    <!-- Campaign Details Panel (Always Visible) -->
-    <div class="p-panel" style="max-width: 100%; margin-bottom: 1.5rem;">
-        <div class="p-header"><?php echo $isEdit ? 'Edit Campaign Details & Duration' : 'Campaign Details & Duration'; ?></div>
-        
-        <div class="form-grid" style="grid-template-columns: 1fr 1fr 1fr; margin-bottom: 1rem;">
-            <div class="form-group">
-                <label>Campaign Name <span style="color:red;">*</span></label>
-                <input type="text" id="campaign_name" class="p-input" placeholder="e.g. Summer Sale 2024" style="height: 38px;" value="<?php echo $isEdit ? htmlspecialchars($editBooking['campaign_name']) : ''; ?>" required>
-            </div>
-            <div class="form-group">
-                <label style="display: flex; justify-content: space-between; align-items: center;">
-                    <span>Company / Client <span style="color:red;">*</span></span>
-                    <button type="button" class="btn-text" onclick="openClientModal()" style="font-size: 0.7rem; color: var(--primary); background: none; border: none; cursor: pointer; padding: 0;">
-                        <i class="fas fa-plus-circle"></i> New
-                    </button>
-                </label>
-                <select id="client_id" class="p-input" style="height: 38px;" onchange="handleClientChange()" required>
-                    <option value="">-- Choose Client --</option>
-                    <?php foreach ($clients as $c): ?>
-                        <option value="<?php echo $c['id']; ?>" data-contact="<?php echo htmlspecialchars($c['contact_person'] ?? ''); ?>" <?php echo ($isEdit && $editBooking['client_id'] == $c['id']) ? 'selected' : ''; ?>>
-                            <?php echo $c['name']; ?> <?php echo $c['city'] ? "({$c['city']})" : ""; ?>
-                        </option>
-                    <?php endforeach; ?>
-                </select>
-            </div>
-            <!-- GST Selection for Group Companies -->
-            <div id="gst_selection_container" style="display: none; grid-column: span 3; margin-top: 0.5rem; background: #f0fdfa; padding: 1rem; border-radius: 12px; border: 1px solid #ccfbf1; box-shadow: inset 0 2px 4px rgba(0,0,0,0.05); margin-bottom: 1rem;">
-                <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 0.75rem;">
-                    <label style="color: var(--primary); font-weight: 800; font-size: 0.7rem; margin-bottom: 0; display: block; text-transform: uppercase;">
-                        <i class="fas fa-id-card"></i> Billing GSTIN / State Selection
-                    </label>
-                    <span id="gst_count_badge" style="background: var(--primary); color: white; font-size: 0.65rem; padding: 2px 8px; border-radius: 50px; font-weight: 700;"></span>
-                </div>
-                <div style="display: flex; gap: 1rem;">
-                    <select id="selected_gstin" class="p-input" style="flex: 1; height: 38px; border-color: #5eead4; background: white;" onchange="handleGstSelectionChange()">
-                        <!-- Dynamic Options -->
-                    </select>
-                    <div id="gst_details_preview" style="flex: 2; background: white; border: 1px solid #ccfbf1; border-radius: 6px; padding: 0.5rem; font-size: 0.75rem; color: #0f766e; display: flex; align-items: center; gap: 0.5rem;">
-                        <i class="fas fa-map-marker-alt"></i>
-                        <span id="gst_preview_text">Select a GSTIN to see location details</span>
-                    </div>
-                </div>
-            </div>
-            <div class="form-group">
-                <label>Contact Person</label>
-                <input type="text" id="contact_person" class="p-input" placeholder="Full Name" style="height: 38px;" value="<?php echo $isEdit ? htmlspecialchars($editBooking['contact_person']) : ''; ?>">
-            </div>
-        </div>
-
-        <div class="form-grid" style="grid-template-columns: 1fr 1fr 1fr;">
-            <div class="form-group">
-                <label>From Date <span style="color:red;">*</span></label>
-                <input type="date" id="start_date" class="p-input" style="height: 38px;" value="<?php echo $isEdit ? $editBooking['start_date'] : date('Y-m-d'); ?>" onchange="calculateEndDate()" required>
-            </div>
-            <div class="form-group">
-                <label>To Date <span style="color:red;">*</span></label>
-                <input type="date" id="end_date" class="p-input" style="height: 38px;" value="<?php echo $isEdit ? $editBooking['end_date'] : date('Y-m-d', strtotime('+1 month')); ?>" onchange="calculateTotalDays()" required>
-            </div>
-            <div class="form-group">
-                <label>Total Days</label>
-                <input type="number" id="total_days" class="p-input" placeholder="Days" style="height: 38px;" oninput="calculateEndDate()">
-            </div>
-        </div>
-        
-        <div class="form-group" style="margin-top: 1.5rem;">
-            <label>Internal Remarks</label>
-            <textarea id="remark" class="p-input" rows="2" placeholder="Notes for this booking..."><?php echo $isEdit ? htmlspecialchars($editBooking['remark'] ?? '') : ''; ?></textarea>
-        </div>
-    </div>
-
-    <!-- Assets Selection Section (Always Visible) -->
-    <div id="assets-selection-section">
-        <!-- Category Filter Tabs -->
-        <div class="inventory-tabs" id="direct-booking-tabs" style="margin-top: 1rem; margin-bottom: 1.5rem;">
-            <button type="button" class="tab active" onclick="selectMediaTab('all', this)">All</button>
-            <?php foreach ($all_media_types as $mtype): ?>
-                <button type="button" class="tab" onclick="selectMediaTab('<?php echo htmlspecialchars($mtype); ?>', this)">
-                    <?php echo htmlspecialchars($mtype); ?>
-                </button>
-            <?php endforeach; ?>
-        </div>
-
-        <div class="p-panel" style="margin-bottom: 1rem; padding: 1.5rem;">
-            <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 1.5rem; border-bottom: 1px solid #f1f5f9; padding-bottom: 1rem;">
-                <div style="display: flex; align-items: center; gap: 1rem;">
-                    <button onclick="goToStep1()" class="btn btn-secondary" style="height: 38px; border-radius: 8px; display: flex; align-items: center; gap: 0.5rem; font-weight: 800; padding: 0 1.2rem; background: #f1f5f9; border: 1px solid #e2e8f0; color: #475569; box-shadow: 0 2px 4px rgba(0,0,0,0.02);">
-                        <i class="fas fa-arrow-left"></i> Back
-                    </button>
-                    <h3 style="margin: 0; color: #0d9488; font-weight: 800; font-size: 1rem; text-transform: uppercase; letter-spacing: 0.05em;">Search Criteria</h3>
-                </div>
-                <div style="font-size: 0.65rem; font-weight: 800; color: #94a3b8; text-transform: uppercase;">Step 2: Assets & Strategy</div>
-            </div>
-
-            <div style="display: flex; gap: 3rem; margin-bottom: 1rem; align-items: center;">
-                <div class="search-group">
-                    <label style="font-size: 0.6rem; font-weight: 900; color: #94a3b8; text-transform: uppercase; margin-bottom: 0.5rem; display: block;">Ownership</label>
-                    <div class="radio-group" style="gap: 1.5rem; display: flex;">
-                        <label style="font-size: 0.8rem; font-weight: 700; color: #475569; display: flex; align-items: center; gap: 0.4rem; cursor: pointer;"><input type="radio" name="ownership" value="all" checked onchange="fetchSites(1)" style="width: 18px; height: 18px; accent-color: #0d9488;"> All</label>
-                        <label style="font-size: 0.8rem; font-weight: 700; color: #475569; display: flex; align-items: center; gap: 0.4rem; cursor: pointer;"><input type="radio" name="ownership" value="HA" onchange="fetchSites(1)" style="width: 18px; height: 18px; accent-color: #0d9488;"> Self</label>
-                        <label style="font-size: 0.8rem; font-weight: 700; color: #475569; display: flex; align-items: center; gap: 0.4rem; cursor: pointer;"><input type="radio" name="ownership" value="TA" onchange="fetchSites(1)" style="width: 18px; height: 18px; accent-color: #0d9488;"> Vendor</label>
-                    </div>
-                </div>
-                <div class="search-group">
-                    <label style="font-size: 0.6rem; font-weight: 900; color: #94a3b8; text-transform: uppercase; margin-bottom: 0.5rem; display: block;">Availability</label>
-                    <div class="radio-group" style="gap: 1.5rem; display: flex;">
-                        <label style="font-size: 0.8rem; font-weight: 700; color: #475569; display: flex; align-items: center; gap: 0.4rem; cursor: pointer;"><input type="radio" name="availability" value="available" checked onchange="fetchSites(1)" style="width: 18px; height: 18px; accent-color: #0d9488;"> Available</label>
-                        <label style="font-size: 0.8rem; font-weight: 700; color: #475569; display: flex; align-items: center; gap: 0.4rem; cursor: pointer;"><input type="radio" name="availability" value="all" onchange="fetchSites(1)" style="width: 18px; height: 18px; accent-color: #0d9488;"> All</label>
-                    </div>
-                </div>
-                <div id="vendor-filter-group" class="search-group" style="display: none; min-width: 200px;">
-                    <label style="font-size: 0.6rem; font-weight: 900; color: #94a3b8; text-transform: uppercase; margin-bottom: 0.5rem; display: block;">Vendor</label>
-                    <select id="filter-vendor" class="p-input" onchange="fetchSites(1)" style="height: 38px; font-size: 0.85rem; background: #fff; border: 1px solid #cbd5e1; border-radius: 8px;">
-                        <option value="">All Vendors</option>
-                        <?php foreach($vendors as $v): ?> <option value="<?php echo $v['id']; ?>"><?php echo $v['name']; ?></option> <?php endforeach; ?>
-                    </select>
-                </div>
-            </div>
-
-            <div style="display: flex; flex-wrap: wrap; gap: 0.5rem; margin-bottom: 0.5rem; align-items: flex-end; width: 100%;">
-                <div class="form-group" style="flex: 2 1 200px; min-width: 150px; margin-bottom: 0;">
-                    <label style="font-size: 0.55rem; font-weight: 900; color: #94a3b8; text-transform: uppercase; margin-bottom: 0.4rem; display: block;">Search Site / Code / Area</label>
-                    <input type="text" id="site-search" class="p-input" placeholder="Search by Site Name, Code, Location, City, State..." oninput="fetchSites(1)" style="height: 38px; font-size: 0.85rem; background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 8px;">
-                </div>
-                <div class="form-group" style="flex: 1 1 110px; min-width: 90px; margin-bottom: 0;">
-                    <label style="font-size: 0.55rem; font-weight: 900; color: #94a3b8; text-transform: uppercase; margin-bottom: 0.4rem; display: block;">Media</label>
-                    <select id="media_type" class="p-input" onchange="fetchSites(1)" style="height: 38px; font-size: 0.85rem; background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 8px;">
-                        <option value="">All</option>
-                        <?php foreach($mediaTypes as $mt): ?> <option value="<?php echo $mt; ?>"><?php echo $mt; ?></option> <?php endforeach; ?>
-                    </select>
-                </div>
-                <div class="form-group" style="flex: 1 1 110px; min-width: 90px; margin-bottom: 0;">
-                    <label style="font-size: 0.55rem; font-weight: 900; color: #94a3b8; text-transform: uppercase; margin-bottom: 0.4rem; display: block;">State</label>
-                    <select id="filter-state" class="p-input" onchange="fetchSites(1)" style="height: 38px; font-size: 0.85rem; background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 8px;">
-                        <option value="">All</option>
-                        <?php foreach($states as $s): ?> <option value="<?php echo $s; ?>"><?php echo $s; ?></option> <?php endforeach; ?>
-                    </select>
-                </div>
-                <div class="form-group" style="flex: 1 1 110px; min-width: 90px; margin-bottom: 0;">
-                    <label style="font-size: 0.55rem; font-weight: 900; color: #94a3b8; text-transform: uppercase; margin-bottom: 0.4rem; display: block;">City</label>
-                    <select id="filter-city" class="p-input" onchange="fetchSites(1)" style="height: 38px; font-size: 0.85rem; background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 8px;">
-                        <option value="">All</option>
-                        <?php foreach($cities as $c): ?> <option value="<?php echo $c; ?>"><?php echo $c; ?></option> <?php endforeach; ?>
-                    </select>
-                </div>
-                <div class="form-group" style="flex: 1 1 110px; min-width: 90px; margin-bottom: 0;">
-                    <label style="font-size: 0.55rem; font-weight: 900; color: #94a3b8; text-transform: uppercase; margin-bottom: 0.4rem; display: block;">Location</label>
-                    <select id="filter-location" class="p-input" onchange="fetchSites(1)" style="height: 38px; font-size: 0.85rem; background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 8px;">
-                        <option value="">All</option>
-                        <?php foreach($locations as $loc): ?> <option value="<?php echo htmlspecialchars($loc); ?>"><?php echo htmlspecialchars($loc); ?></option> <?php endforeach; ?>
-                    </select>
-                </div>
-                <div class="form-group" style="flex: 1 1 110px; min-width: 90px; margin-bottom: 0;">
-                    <label style="font-size: 0.55rem; font-weight: 900; color: #94a3b8; text-transform: uppercase; margin-bottom: 0.4rem; display: block;">Light</label>
-                    <select id="light_type" class="p-input" onchange="fetchSites(1)" style="height: 38px; font-size: 0.85rem; background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 8px;">
-                        <option value="">All</option>
-                        <?php foreach($illuminations as $il): ?> <option value="<?php echo $il; ?>"><?php echo $il; ?></option> <?php endforeach; ?>
-                    </select>
-                </div>
-                <div class="form-group" style="flex: 1 1 110px; min-width: 90px; margin-bottom: 0;">
-                    <label style="font-size: 0.55rem; font-weight: 900; color: #94a3b8; text-transform: uppercase; margin-bottom: 0.4rem; display: block;">Size</label>
-                    <select id="filter-size" class="p-input" onchange="fetchSites(1)" style="height: 38px; font-size: 0.85rem; background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 8px;">
-                        <option value="">All</option>
-                        <?php foreach($sizes as $sz): ?> <option value="<?php echo $sz; ?>"><?php echo $sz; ?></option> <?php endforeach; ?>
-                    </select>
-                </div>
-            </div>
-        </div>
-
-        <div class="p-panel" id="asset-plan-panel" style="margin-bottom: 2rem;">
-            <div class="p-header" style="display: flex; justify-content: space-between; align-items: center;">
-                <span>Select Assets</span>
-                <div style="display: flex; gap: 0.5rem; align-items: center;">
-                    <button type="button" onclick="openSiteModal()" class="btn btn-primary" style="height: 32px; padding: 0 1rem; font-size: 0.75rem; border-radius: 8px; display: inline-flex; align-items: center; gap: 0.25rem;">
-                        <i class="fas fa-plus"></i> Add New Site
-                    </button>
-                    <button onclick="openBucket()" style="background: #ecfdf5; color: #059669; border: 1px solid #d1fae5; padding: 0.4rem 1rem; border-radius: 8px; font-weight: 800; font-size: 0.8rem; cursor: pointer;">
-                        Selected: <span id="selected-count">0</span>
-                    </button>
-                </div>
-            </div>
-
-            <div style="min-height: 400px; position: relative;">
-                <div id="loading-overlay" style="display: none; position: absolute; inset: 0; background: rgba(255,255,255,0.7); z-index: 20; align-items: center; justify-content: center; flex-direction: column;">
-                    <i class="fas fa-spinner fa-spin" style="font-size: 2rem; color: var(--primary);"></i>
-                    <span style="margin-top: 1rem; font-weight: 700; color: #64748b;">Loading Sites...</span>
-                </div>
-                <table class="crs-table selection-table" style="width: 100%; border-collapse: separate; border-spacing: 0 0.5rem;">
-                    <thead>
-                        <tr style="border-bottom: 2px solid #f1f5f9;">
-                            <th style="width: 40px; padding: 0.8rem 1rem;">#</th>
-                            <th style="width: 50px; padding: 0.8rem 1rem; text-align:center;"><i class="far fa-check-square"></i></th>
-                            <th style="width: 100px; padding: 0.8rem 1rem;">PREVIEW</th>
-                            <th style="padding: 0.8rem 1rem;">CITY / CODE</th>
-                            <th style="padding: 0.8rem 1rem;">ASSET DETAILS</th>
-                            <th style="padding: 0.8rem 1rem;">SIZE</th>
-                            <th style="padding: 0.8rem 1rem; text-align:right;">OFFER RATE</th>
-                            <th style="padding: 0.8rem 1rem; text-align: right;">TOTAL</th>
-                        </tr>
-                    </thead>
-                    <tbody id="asset-body">
-                        <!-- Dynamic Content -->
-                    </tbody>
-                </table>
-            </div>
-
-            <div class="pagination-wrap" style="padding: 1rem; display: flex; justify-content: space-between; align-items: center; background: #f8fafc; border-top: 1px solid #e2e8f0;">
-                <div id="pg-info" style="font-size: 0.75rem; font-weight: 700; color: #64748b;">Showing 0 to 0 of 0 sites</div>
-                <div id="pg-numbers" style="display: flex; gap: 0.25rem;"></div>
-            </div>
-        </div>
-
-        <div class="proposal-action-bar" style="position: sticky; bottom: 0; background: white; border-top: 2px solid var(--primary); padding: 0.75rem 1.5rem; display: flex; align-items: center; justify-content: space-between; z-index: 1000; border-radius: 12px 12px 0 0; box-shadow: 0 -10px 25px rgba(0,0,0,0.05);">
-            <div style="display: flex; gap: 1.5rem; align-items: center; width: 100%; justify-content: flex-end;">
-                <div style="display: flex; align-items: center; gap: 0.5rem; margin-right: 1rem;">
-                    <label style="font-size: 0.6rem; font-weight: 800; color: #64748b; text-transform: uppercase;">Tax Type</label>
-                    <select id="tax-type" class="p-input" onchange="recalcAll()" style="width: 110px; height: 32px; font-size: 0.7rem; padding: 0 0.4rem; border-radius: 6px;">
-                        <option value="igst">IGST 18%</option>
-                        <option value="cgst_sgst">CGST/SGST</option>
-                    </select>
-                </div>
-                <div style="text-align: right;">
-                    <div style="font-size: 0.6rem; color: #64748b; font-weight: 800; text-transform: uppercase;">Subtotal</div>
-                    <div id="sum-display-btm" style="font-weight: 700; color: #1e293b; font-size: 0.9rem;">₹0</div>
-                </div>
-                <div style="text-align: right;" id="tax-breakdown-container">
-                    <div style="font-size: 0.6rem; color: #64748b; font-weight: 800; text-transform: uppercase;">GST (18%)</div>
-                    <div id="sum-tax-btm" style="font-weight: 700; color: #1e293b; font-size: 0.9rem;">₹0</div>
-                </div>
-                <div style="text-align: right;">
-                    <div style="font-size: 0.6rem; color: var(--primary); font-weight: 900; text-transform: uppercase;">Grand Total</div>
-                    <div id="sum-grand-btm" style="font-size: 1.3rem; font-weight: 900; color: var(--primary);">₹0</div>
-                </div>
-                <button class="btn btn-primary" onclick="saveDirectBooking()" id="submitBtn" style="height: 42px; padding: 0 1.5rem; border-radius: 8px; font-weight: 900;">
-                    GENERATE BOOKING
-                </button>
-            </div>
-        </div>
-    </div>
-
-    <!-- Bucket Drawer -->
-    <div id="bucket-backdrop" onclick="closeBucket()" style="position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.4); backdrop-filter: blur(4px); z-index: 2000; display: none;"></div>
-    <div id="selection-bucket-panel" style="position: fixed; top: 0; right: -1400px; width: 1200px; max-width: 95vw; height: 100%; background: white; z-index: 2001; box-shadow: -10px 0 30px rgba(0,0,0,0.1); transition: all 0.4s; display: flex; flex-direction: column;">
-        <div class="p-header" style="padding: 1.5rem; background: var(--primary); color: white; margin: 0; display: flex; justify-content: space-between; align-items: center;">
-            <div style="display: flex; align-items: center; gap: 1rem;"><i class="fas fa-shopping-basket"></i> Review Selected Assets</div>
-            <button onclick="closeBucket()" style="background: none; border: none; color: white; font-size: 1.5rem; cursor: pointer;">&times;</button>
-        </div>
-        <div style="display: flex; background: #f1f5f9; padding: 0.5rem 1rem; gap: 0.5rem; border-bottom: 1px solid #e2e8f0;">
-            <button type="button" class="btn bucket-tab active" id="btn-tab-rental" onclick="switchBucketTab('rental')" style="flex: 1; font-weight: 800; font-size: 0.8rem; height: 38px; border-radius: 8px; border: 1px solid transparent; cursor: pointer; transition: all 0.2s;">
-                <i class="fas fa-ad"></i> Space Rental
-            </button>
-            <button type="button" class="btn bucket-tab" id="btn-tab-printing" onclick="switchBucketTab('printing')" style="flex: 1; font-weight: 800; font-size: 0.8rem; height: 38px; border-radius: 8px; border: 1px solid transparent; cursor: pointer; transition: all 0.2s;">
-                <i class="fas fa-print"></i> Printing Service
-            </button>
-            <button type="button" class="btn bucket-tab" id="btn-tab-mounting" onclick="switchBucketTab('mounting')" style="flex: 1; font-weight: 800; font-size: 0.8rem; height: 38px; border-radius: 8px; border: 1px solid transparent; cursor: pointer; transition: all 0.2s;">
-                <i class="fas fa-tools"></i> Mounting Service
-            </button>
-        </div>
-        <div id="bucket-rate-master-container" style="display: flex; align-items: center; justify-content: flex-end; padding: 0.5rem 1rem; background: #f8fafc; border-bottom: 1px solid #e2e8f0; gap: 0.5rem;">
-            <div style="display: flex; align-items: center; gap: 0.5rem; background: #fff; border: 1.5px solid var(--primary); border-radius: 20px; padding: 3px 12px; box-shadow: 0 2px 4px rgba(0,0,0,0.02);">
-                <span id="bucket-rate-master-label" style="font-size: 0.7rem; font-weight: 800; color: var(--primary); text-transform: uppercase;">Offer Rate:</span>
-                <input type="number" id="bucketRateMasterInput" placeholder="Rate" step="0.01" style="width: 90px; height: 26px; font-size: 0.75rem; font-weight: 800; border-radius: 6px; border: 1px solid #cbd5e1; padding: 0 0.4rem; color: var(--primary); outline: none; background: #f8fafc; text-align: right;">
-                <button type="button" onclick="applyBucketRateMaster()" style="background: var(--primary); border: none; color: white; padding: 4px 12px; border-radius: 12px; font-weight: 800; font-size: 0.65rem; cursor: pointer; transition: all 0.2s; display: flex; align-items: center; justify-content: center; height: 26px;">
-                    Apply to All
-                </button>
-            </div>
-        </div>
-        <div id="bucket-list" style="flex: 1; overflow-y: auto; padding: 1rem;"></div>
-        <div style="padding: 1rem; border-top: 1px solid #e2e8f0; background: #f8fafc;">
-            <button onclick="closeBucket()" class="btn btn-primary" style="width: 100%; height: 45px; border-radius: 10px; font-weight: 800;">CONTINUE SELECTION</button>
-        </div>
-    </div>
-</div>
-
-<div id="clientModal" class="modal-overlay" style="display: none; position: fixed; inset: 0; background: rgba(0,0,0,0.5); z-index: 5000; align-items: center; justify-content: center;">
-    <div class="card" style="width: 90%; max-width: 500px; padding: 2rem; border-radius: 20px;">
-        <h3 style="margin-top: 0; font-weight: 800; border-bottom: 1px solid #f1f5f9; padding-bottom: 0.5rem;">New Client</h3>
-        <div class="form-group" style="margin-bottom: 1rem;"><label>Company Name</label><input type="text" id="new_client_name" class="p-input"></div>
-        <div class="form-group" style="margin-bottom: 1rem;"><label>Contact Person</label><input type="text" id="new_client_contact" class="p-input"></div>
-        <div class="form-group" style="margin-bottom: 1.5rem;"><label>City</label><input type="text" id="new_client_city" class="p-input"></div>
-        <div style="display: flex; justify-content: flex-end; gap: 1rem;">
-            <button class="btn" onclick="closeClientModal()">Cancel</button>
-            <button class="btn btn-primary" onclick="submitQuickClient()">Save & Select</button>
-        </div>
-    </div>
-</div>
-
 <style>
 .proposal-full-wrapper { padding: 2rem; background: #f8fafc; min-height: 100vh; }
 .p-panel { background: white; border-radius: 12px; padding: 1.5rem; border: 1px solid #e2e8f0; box-shadow: 0 4px 6px -1px rgba(0,0,0,0.05); }
-.bucket-tab { background: #e2e8f0; color: #475569; }
-.bucket-tab.active { background: var(--primary) !important; color: white !important; }
 .p-header { font-weight: 800; font-size: 0.95rem; color: var(--primary); margin-bottom: 1.25rem; border-bottom: 2px solid #f1f5f9; padding-bottom: 0.75rem; }
 .form-grid { display: grid; gap: 1rem; }
 .form-group label { display: block; font-size: 0.7rem; font-weight: 800; color: var(--secondary); margin-bottom: 0.4rem; text-transform: uppercase; }
@@ -467,45 +135,379 @@ $all_media_types = $pdo->query("SELECT name FROM media_types ORDER BY name ASC")
     justify-content: center;
     font-size: 0.7rem;
     cursor: pointer;
-    /* Hide number input spinners */
-input[type=number]::-webkit-inner-spin-button, 
-input[type=number]::-webkit-outer-spin-button { 
-    -webkit-appearance: none; 
-    margin: 0; 
-}
-input[type=number] {
-    -moz-appearance: textfield; /* Firefox */
+    border: none;
 }
 </style>
+<?php
+
+
+// Fetch initial data for filters only
+$clients = $pdo->query("SELECT id, name, city, contact_person FROM partners WHERE type = 'client' ORDER BY name ASC")->fetchAll();
+$vendors = $pdo->query("SELECT id, name FROM partners WHERE type = 'vendor' ORDER BY name ASC")->fetchAll();
+
+$cities = $pdo->query("SELECT DISTINCT city FROM sites WHERE city IS NOT NULL AND city != '' ORDER BY city")->fetchAll(PDO::FETCH_COLUMN);
+$locations = $pdo->query("SELECT DISTINCT location FROM sites WHERE location IS NOT NULL AND location != '' ORDER BY location")->fetchAll(PDO::FETCH_COLUMN);
+$states = $pdo->query("SELECT DISTINCT state FROM sites WHERE state IS NOT NULL AND state != '' ORDER BY state")->fetchAll(PDO::FETCH_COLUMN);
+$districts = $pdo->query("SELECT DISTINCT district FROM sites WHERE district IS NOT NULL AND district != '' ORDER BY district")->fetchAll(PDO::FETCH_COLUMN);
+$mediaTypes = $pdo->query("SELECT DISTINCT type FROM sites WHERE type IS NOT NULL AND type != '' ORDER BY type")->fetchAll(PDO::FETCH_COLUMN);
+$illuminations = $pdo->query("SELECT DISTINCT light_type FROM sites WHERE light_type IS NOT NULL AND light_type != '' ORDER BY light_type")->fetchAll(PDO::FETCH_COLUMN);
+$sizes = $pdo->query("SELECT DISTINCT CONCAT(width, 'x', height) as size FROM sites WHERE width IS NOT NULL AND height IS NOT NULL AND width != '' AND height != '' ORDER BY width, height")->fetchAll(PDO::FETCH_COLUMN);
+$printingVendors = $pdo->query("SELECT id, name FROM partners WHERE type = 'vendor' ORDER BY name ASC")->fetchAll();
+$printingRates = $pdo->query("SELECT * FROM vendor_printing_rates")->fetchAll(PDO::FETCH_ASSOC);
+$all_media_types = $pdo->query("SELECT name FROM media_types ORDER BY name ASC")->fetchAll(PDO::FETCH_COLUMN);
+?>
+
+<div class="proposal-full-wrapper">
+    <!-- STEP 1: Campaign Details -->
+    <div id="step-1">
+        <!-- Campaign Details Panel (Always Visible) -->
+        <div class="p-panel" style="max-width: 100%; margin-bottom: 1.5rem;">
+            <div class="p-header">Campaign Details & Duration</div>
+        
+        <div class="form-grid" style="grid-template-columns: 1fr 1fr 1fr 1fr; margin-bottom: 1rem;">
+            <div class="form-group">
+                <label>Company / Entity <span style="color:red;">*</span></label>
+                <select id="entity_id" class="p-input" style="height: 38px;" required>
+                    <option value="">-- Choose Company --</option>
+                    <?php 
+                    $allEntities = $pdo->query("SELECT id, name FROM entities")->fetchAll();
+                    foreach ($allEntities as $e): 
+                    ?>
+                        <option value="<?php echo $e['id']; ?>" <?php echo ($_SESSION['active_entity_id'] ?? '') == $e['id'] ? 'selected' : ''; ?>>
+                            <?php echo htmlspecialchars($e['name']); ?>
+                        </option>
+                    <?php endforeach; ?>
+                </select>
+            </div>
+            <div class="form-group">
+                <label>Campaign Name <span style="color:red;">*</span></label>
+                <input type="text" id="campaign_name" class="p-input" placeholder="e.g. Summer Sale 2024" style="height: 38px;" required>
+            </div>
+            <div class="form-group">
+                <label style="display: flex; justify-content: space-between; align-items: center;">
+                    <span>Company / Client <span style="color:red;">*</span></span>
+                    <button type="button" class="btn-text" onclick="openClientModal()" style="font-size: 0.7rem; color: var(--primary); background: none; border: none; cursor: pointer; padding: 0;">
+                        <i class="fas fa-plus-circle"></i> New
+                    </button>
+                </label>
+                <select id="client_id" class="p-input" style="height: 38px;" onchange="handleClientChange()" required>
+                    <option value="">-- Choose Client --</option>
+                    <?php foreach ($clients as $c): ?>
+                        <option value="<?php echo $c['id']; ?>" data-contact="<?php echo htmlspecialchars($c['contact_person'] ?? ''); ?>">
+                            <?php echo $c['name']; ?> <?php echo $c['city'] ? "({$c['city']})" : ""; ?>
+                        </option>
+                    <?php endforeach; ?>
+                </select>
+            </div>
+            <!-- GST Selection for Group Companies -->
+            <div id="gst_selection_container" style="display: none; grid-column: span 3; margin-top: 0.5rem; background: #f0fdfa; padding: 1rem; border-radius: 12px; border: 1px solid #ccfbf1; box-shadow: inset 0 2px 4px rgba(0,0,0,0.05); margin-bottom: 1rem;">
+                <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 0.75rem;">
+                    <label style="color: var(--primary); font-weight: 800; font-size: 0.7rem; margin-bottom: 0; display: block; text-transform: uppercase;">
+                        <i class="fas fa-id-card"></i> Billing GSTIN / State Selection
+                    </label>
+                    <span id="gst_count_badge" style="background: var(--primary); color: white; font-size: 0.65rem; padding: 2px 8px; border-radius: 50px; font-weight: 700;"></span>
+                </div>
+                <div style="display: flex; gap: 1rem;">
+                    <select id="selected_gstin" class="p-input" style="flex: 1; height: 38px; border-color: #5eead4; background: white;" onchange="handleGstSelectionChange()">
+                        <!-- Dynamic Options -->
+                    </select>
+                    <div id="gst_details_preview" style="flex: 2; background: white; border: 1px solid #ccfbf1; border-radius: 6px; padding: 0.5rem; font-size: 0.75rem; color: #0f766e; display: flex; align-items: center; gap: 0.5rem;">
+                        <i class="fas fa-map-marker-alt"></i>
+                        <span id="gst_preview_text">Select a GSTIN to see location details</span>
+                    </div>
+                </div>
+            </div>
+            <div class="form-group">
+                <label>Contact Person</label>
+                <input type="text" id="contact_person" class="p-input" placeholder="Full Name" style="height: 38px;">
+            </div>
+        </div>
+
+        <div class="form-grid" style="grid-template-columns: 1fr 1fr 1fr;">
+            <div class="form-group">
+                <label>From Date <span style="color:red;">*</span></label>
+                <input type="date" id="start_date" class="p-input" style="height: 38px;" value="<?php echo date('Y-m-d'); ?>" onchange="calculateEndDate()" required>
+            </div>
+            <div class="form-group">
+                <label>To Date <span style="color:red;">*</span></label>
+                <input type="date" id="end_date" class="p-input" style="height: 38px;" value="<?php echo date('Y-m-d', strtotime('+1 month')); ?>" onchange="calculateTotalDays()" required>
+            </div>
+            <div class="form-group">
+                <label>Total Days</label>
+                <input type="number" id="total_days" class="p-input" placeholder="Days" style="height: 38px;" oninput="calculateEndDate()">
+            </div>
+        </div>
+        
+        <div class="form-group" style="margin-top: 1.5rem;">
+            <label>Internal Remarks</label>
+            <textarea id="remark" class="p-input" rows="2" placeholder="Notes for this booking..."></textarea>
+        </div>
+    </div>
+    
+    <!-- Single Next Step Button for Step 1 -->
+    <div style="display: flex; justify-content: flex-end; margin: 2rem auto; max-width: 1100px;">
+        <button class="btn btn-primary" onclick="goToStep2()" style="width: 250px; height: 48px; border-radius: 12px; font-weight: 800; font-size: 0.95rem; box-shadow: 0 4px 15px rgba(0,0,0,0.1);">
+            Next Step: Search & Select <i class="fas fa-arrow-right" style="margin-left: 0.75rem;"></i>
+        </button>
+    </div>
+</div>
+
+<!-- STEP 2: Media Selection & Search -->
+<div id="step-2" style="display: none;">
+    <!-- Assets Selection Section (Always Visible) -->
+    <div id="assets-selection-section">
+        <!-- Category Filter Tabs -->
+        <div class="inventory-tabs" id="direct-booking-tabs" style="margin-top: 1rem; margin-bottom: 1.5rem;">
+            <button type="button" class="tab active" onclick="selectMediaTab('all', this)">All</button>
+            <?php foreach ($all_media_types as $mtype): ?>
+                <button type="button" class="tab" onclick="selectMediaTab('<?php echo htmlspecialchars($mtype); ?>', this)">
+                    <?php echo htmlspecialchars($mtype); ?>
+                </button>
+            <?php endforeach; ?>
+        </div>
+
+        <div class="p-panel" style="margin-bottom: 1rem; padding: 1.5rem;">
+            <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 1.5rem; border-bottom: 1px solid #f1f5f9; padding-bottom: 1rem;">
+                <div style="display: flex; align-items: center; gap: 1rem;">
+                    <button onclick="goToStep1()" class="btn btn-secondary" style="height: 38px; border-radius: 8px; display: flex; align-items: center; gap: 0.5rem; font-weight: 800; padding: 0 1.2rem; background: #f1f5f9; border: 1px solid #e2e8f0; color: #475569; box-shadow: 0 2px 4px rgba(0,0,0,0.02);">
+                        <i class="fas fa-arrow-left"></i> Back
+                    </button>
+                    <h3 style="margin: 0; color: #0d9488; font-weight: 800; font-size: 1rem; text-transform: uppercase; letter-spacing: 0.05em;">Search Criteria</h3>
+                </div>
+                <div style="font-size: 0.65rem; font-weight: 800; color: #94a3b8; text-transform: uppercase;">Step 2: Assets & Strategy</div>
+            </div>
+
+            <div style="display: flex; gap: 3rem; margin-bottom: 1rem; align-items: center;">
+                <div class="search-group">
+                    <label style="font-size: 0.6rem; font-weight: 900; color: #94a3b8; text-transform: uppercase; margin-bottom: 0.5rem; display: block;">Ownership</label>
+                    <div class="radio-group" style="gap: 1.5rem; display: flex;">
+                        <label style="font-size: 0.8rem; font-weight: 700; color: #475569; display: flex; align-items: center; gap: 0.4rem; cursor: pointer;"><input type="radio" name="ownership" value="all" checked onchange="fetchSites(1)" style="width: 18px; height: 18px; accent-color: #0d9488;"> All</label>
+                        <label style="font-size: 0.8rem; font-weight: 700; color: #475569; display: flex; align-items: center; gap: 0.4rem; cursor: pointer;"><input type="radio" name="ownership" value="HA" onchange="fetchSites(1)" style="width: 18px; height: 18px; accent-color: #0d9488;"> Self</label>
+                        <label style="font-size: 0.8rem; font-weight: 700; color: #475569; display: flex; align-items: center; gap: 0.4rem; cursor: pointer;"><input type="radio" name="ownership" value="TA" onchange="fetchSites(1)" style="width: 18px; height: 18px; accent-color: #0d9488;"> Vendor</label>
+                    </div>
+                </div>
+                <div class="search-group">
+                    <label style="font-size: 0.6rem; font-weight: 900; color: #94a3b8; text-transform: uppercase; margin-bottom: 0.5rem; display: block;">Availability</label>
+                    <div class="radio-group" style="gap: 1.5rem; display: flex;">
+                        <label style="font-size: 0.8rem; font-weight: 700; color: #475569; display: flex; align-items: center; gap: 0.4rem; cursor: pointer;"><input type="radio" name="availability" value="available" checked onchange="fetchSites(1)" style="width: 18px; height: 18px; accent-color: #0d9488;"> Available</label>
+                        <label style="font-size: 0.8rem; font-weight: 700; color: #475569; display: flex; align-items: center; gap: 0.4rem; cursor: pointer;"><input type="radio" name="availability" value="all" onchange="fetchSites(1)" style="width: 18px; height: 18px; accent-color: #0d9488;"> All</label>
+                    </div>
+                </div>
+                <div id="vendor-filter-group" class="search-group" style="display: none; min-width: 200px;">
+                    <label style="font-size: 0.6rem; font-weight: 900; color: #94a3b8; text-transform: uppercase; margin-bottom: 0.5rem; display: block;">Vendor</label>
+                    <select id="filter-vendor" class="p-input" onchange="fetchSites(1)" style="height: 38px; font-size: 0.85rem; background: #fff; border: 1px solid #cbd5e1; border-radius: 8px;">
+                        <option value="">All Vendors</option>
+                        <?php foreach($vendors as $v): ?> <option value="<?php echo $v['id']; ?>"><?php echo $v['name']; ?></option> <?php endforeach; ?>
+                    </select>
+                </div>
+            </div>
+
+            <div style="display: flex; flex-wrap: wrap; gap: 0.5rem; margin-bottom: 0.5rem; align-items: flex-end; width: 100%;">
+                <div class="form-group" style="flex: 2 1 200px; min-width: 150px; margin-bottom: 0;">
+                    <label style="font-size: 0.55rem; font-weight: 900; color: #94a3b8; text-transform: uppercase; margin-bottom: 0.4rem; display: block;">Search Site / Code / Area</label>
+                    <input type="text" id="site-search" class="p-input" placeholder="Search by Site Name, Code, Location, City, State..." oninput="fetchSites(1)" style="height: 38px; font-size: 0.85rem; background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 8px;">
+                </div>
+                <div class="form-group" style="flex: 1 1 110px; min-width: 90px; margin-bottom: 0;">
+                    <label style="font-size: 0.55rem; font-weight: 900; color: #94a3b8; text-transform: uppercase; margin-bottom: 0.4rem; display: block;">Media</label>
+                    <select id="media_type" class="p-input" onchange="fetchSites(1)" style="height: 38px; font-size: 0.85rem; background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 8px;">
+                        <option value="">All</option>
+                        <?php foreach($mediaTypes as $mt): ?> <option value="<?php echo $mt; ?>"><?php echo $mt; ?></option> <?php endforeach; ?>
+                    </select>
+                </div>
+                <div class="form-group" style="flex: 1 1 110px; min-width: 90px; margin-bottom: 0;">
+                    <label style="font-size: 0.55rem; font-weight: 900; color: #94a3b8; text-transform: uppercase; margin-bottom: 0.4rem; display: block;">District</label>
+                    <select id="filter-district" class="p-input" onchange="fetchSites(1)" style="height: 38px; font-size: 0.85rem; background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 8px;">
+                        <option value="">All</option>
+                        <?php foreach($districts as $d): ?> <option value="<?php echo htmlspecialchars($d); ?>"><?php echo htmlspecialchars($d); ?></option> <?php endforeach; ?>
+                    </select>
+                </div>
+                <div class="form-group" style="flex: 1 1 110px; min-width: 90px; margin-bottom: 0;">
+                    <label style="font-size: 0.55rem; font-weight: 900; color: #94a3b8; text-transform: uppercase; margin-bottom: 0.4rem; display: block;">State</label>
+                    <select id="filter-state" class="p-input" onchange="fetchSites(1)" style="height: 38px; font-size: 0.85rem; background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 8px;">
+                        <option value="">All</option>
+                        <?php foreach($states as $s): ?> <option value="<?php echo $s; ?>"><?php echo $s; ?></option> <?php endforeach; ?>
+                    </select>
+                </div>
+                <div class="form-group" style="flex: 1 1 110px; min-width: 90px; margin-bottom: 0;">
+                    <label style="font-size: 0.55rem; font-weight: 900; color: #94a3b8; text-transform: uppercase; margin-bottom: 0.4rem; display: block;">City</label>
+                    <select id="filter-city" class="p-input" onchange="fetchSites(1)" style="height: 38px; font-size: 0.85rem; background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 8px;">
+                        <option value="">All</option>
+                        <?php foreach($cities as $c): ?> <option value="<?php echo $c; ?>"><?php echo $c; ?></option> <?php endforeach; ?>
+                    </select>
+                </div>
+                <div class="form-group" style="flex: 1 1 110px; min-width: 90px; margin-bottom: 0;">
+                    <label style="font-size: 0.55rem; font-weight: 900; color: #94a3b8; text-transform: uppercase; margin-bottom: 0.4rem; display: block;">Location</label>
+                    <select id="filter-location" class="p-input" onchange="fetchSites(1)" style="height: 38px; font-size: 0.85rem; background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 8px;">
+                        <option value="">All</option>
+                        <?php foreach($locations as $loc): ?> <option value="<?php echo htmlspecialchars($loc); ?>"><?php echo htmlspecialchars($loc); ?></option> <?php endforeach; ?>
+                    </select>
+                </div>
+                <div class="form-group" style="flex: 1 1 110px; min-width: 90px; margin-bottom: 0;">
+                    <label style="font-size: 0.55rem; font-weight: 900; color: #94a3b8; text-transform: uppercase; margin-bottom: 0.4rem; display: block;">Light</label>
+                    <select id="light_type" class="p-input" onchange="fetchSites(1)" style="height: 38px; font-size: 0.85rem; background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 8px;">
+                        <option value="">All</option>
+                        <?php foreach($illuminations as $il): ?> <option value="<?php echo $il; ?>"><?php echo $il; ?></option> <?php endforeach; ?>
+                    </select>
+                </div>
+                <div class="form-group" style="flex: 1 1 110px; min-width: 90px; margin-bottom: 0;">
+                    <label style="font-size: 0.55rem; font-weight: 900; color: #94a3b8; text-transform: uppercase; margin-bottom: 0.4rem; display: block;">Size</label>
+                    <select id="filter-size" class="p-input" onchange="fetchSites(1)" style="height: 38px; font-size: 0.85rem; background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 8px;">
+                        <option value="">All</option>
+                        <?php foreach($sizes as $sz): ?> <option value="<?php echo $sz; ?>"><?php echo $sz; ?></option> <?php endforeach; ?>
+                    </select>
+                </div>
+            </div>
+        </div>
+
+        <div class="p-panel" id="asset-plan-panel" style="margin-bottom: 2rem;">
+            <div class="p-header" style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 1rem;">
+                <div style="display: flex; gap: 1rem; align-items: center;">
+                    <span>Select Assets</span>
+                    
+                    <div id="rateMasterContainer" style="display: flex; align-items: center; gap: 0.5rem; background: #fff; border: 1.5px solid #0d9488; border-radius: 20px; padding: 3px 8px 3px 12px; transition: all 0.2s; box-shadow: 0 2px 4px rgba(13, 148, 136, 0.05);">
+                        <span style="font-size: 0.7rem; font-weight: 800; color: #0d9488; font-family: inherit;">Rate Master:</span>
+                        
+                        <div id="rm_print_wrapper" style="display: flex; align-items: center;">
+                            <span style="font-size: 0.65rem; font-weight: 700; color: #475569; margin-left: 4px;">Print/sqft:</span>
+                            <input type="number" id="rm_print" placeholder="Rate" step="0.01" style="width: 65px; height: 24px; font-size: 0.75rem; font-weight: 800; border-radius: 6px; border: 1px solid #cbd5e1; padding: 0 0.4rem; color: #0d9488; outline: none; background: #f8fafc; text-align: right; margin-left: 4px;">
+                        </div>
+                        
+                        <div id="rm_mount_wrapper" style="display: flex; align-items: center;">
+                            <span style="font-size: 0.65rem; font-weight: 700; color: #475569; margin-left: 4px;">Mount/sqft:</span>
+                            <input type="number" id="rm_mount" placeholder="Rate" step="0.01" style="width: 65px; height: 24px; font-size: 0.75rem; font-weight: 800; border-radius: 6px; border: 1px solid #cbd5e1; padding: 0 0.4rem; color: #0d9488; outline: none; background: #f8fafc; text-align: right; margin-left: 4px;">
+                        </div>
+                        
+                        <button type="button" onclick="applyRateMaster()" style="background: #0d9488; border: none; color: white; padding: 4px 10px; border-radius: 12px; font-weight: 800; font-size: 0.65rem; cursor: pointer; transition: all 0.2s; display: flex; align-items: center; gap: 4px; height: 24px; margin-left: 4px;">
+                            Apply to Selected
+                        </button>
+                    </div>
+                </div>
+                <div style="display: flex; gap: 0.5rem; align-items: center;">
+                    <div style="display: flex; gap: 1rem; align-items: center; margin-right: 1rem; border: 1px solid #e2e8f0; padding: 0.2rem 0.8rem; border-radius: 8px; background: #f8fafc;">
+                        <label style="display: flex; align-items: center; gap: 0.4rem; font-size: 0.7rem; font-weight: 700; color: #475569; cursor: pointer; margin: 0;">
+                            <input type="checkbox" id="gen_booking" value="1" style="width: 14px; height: 14px; accent-color: #0d9488;" onchange="toggleRateVisibility()" checked> Booking
+                        </label>
+                        <label style="display: flex; align-items: center; gap: 0.4rem; font-size: 0.7rem; font-weight: 700; color: #475569; cursor: pointer; margin: 0;">
+                            <input type="checkbox" id="gen_client_print_invoice" value="1" style="width: 14px; height: 14px; accent-color: #0d9488;" onchange="toggleRateVisibility()"> Print Inv
+                        </label>
+                        <label style="display: flex; align-items: center; gap: 0.4rem; font-size: 0.7rem; font-weight: 700; color: #475569; cursor: pointer; margin: 0;">
+                            <input type="checkbox" id="gen_client_mounting_invoice" value="1" style="width: 14px; height: 14px; accent-color: #0d9488;" onchange="toggleRateVisibility()"> Mount Inv
+                        </label>
+                    </div>
+                    <button type="button" onclick="openSiteModal()" class="btn btn-primary" style="height: 32px; padding: 0 1rem; font-size: 0.75rem; border-radius: 8px; display: inline-flex; align-items: center; gap: 0.25rem;">
+                        <i class="fas fa-plus"></i> Add New Site
+                    </button>
+                    <button onclick="openBucket()" style="background: #ecfdf5; color: #059669; border: 1px solid #d1fae5; padding: 0.4rem 1rem; border-radius: 8px; font-weight: 800; font-size: 0.8rem; cursor: pointer;">
+                        Selected: <span id="selected-count">0</span>
+                    </button>
+                </div>
+            </div>
+
+            <div style="min-height: 400px; position: relative;">
+                <div id="loading-overlay" style="display: none; position: absolute; inset: 0; background: rgba(255,255,255,0.7); z-index: 20; align-items: center; justify-content: center; flex-direction: column;">
+                    <i class="fas fa-spinner fa-spin" style="font-size: 2rem; color: var(--primary);"></i>
+                    <span style="margin-top: 1rem; font-weight: 700; color: #64748b;">Loading Sites...</span>
+                </div>
+                <table class="crs-table selection-table" style="width: 100%; border-collapse: separate; border-spacing: 0 0.5rem;">
+                    <thead>
+                        <tr style="border-bottom: 2px solid #f1f5f9;">
+                            <th style="width: 40px; padding: 0.8rem 1rem;">#</th>
+                            <th style="width: 50px; padding: 0.8rem 1rem; text-align:center;"><i class="far fa-check-square"></i></th>
+                            <th style="width: 100px; padding: 0.8rem 1rem;">PREVIEW</th>
+                            <th style="padding: 0.8rem 1rem;">CITY / CODE</th>
+                            <th style="padding: 0.8rem 1rem;">ASSET DETAILS</th>
+                            <th style="padding: 0.8rem 1rem;">SIZE</th>
+                            <th style="padding: 0.8rem 1rem; text-align: center; width: 80px;">UNIT</th>
+                            <th style="padding: 0.8rem 1rem; text-align:right;">OFFER RATES</th>
+                            <th style="padding: 0.8rem 1rem; text-align: right;">TOTAL</th>
+                        </tr>
+                    </thead>
+                    <tbody id="asset-body">
+                        <!-- Dynamic Content -->
+                    </tbody>
+                    <tfoot style="background: #f8fafc; font-weight: 800; border-top: 2px solid #cbd5e1;">
+                        <tr>
+                            <td colspan="5" style="text-align: right; padding: 1rem; font-weight: 900; color: #475569;">Total / Summary:</td>
+                            <td id="tbl-total-sqft" style="padding: 1rem; font-weight: 800; color: #0f172a;">0 SQFT</td>
+                            <td></td>
+                            <td></td>
+                            <td id="tbl-total-amount" style="text-align: right; padding: 1rem; font-weight: 900; color: var(--primary);">₹0</td>
+                        </tr>
+                    </tfoot>
+                </table>
+            </div>
+
+            <div class="pagination-wrap" style="padding: 1rem; display: flex; justify-content: space-between; align-items: center; background: #f8fafc; border-top: 1px solid #e2e8f0;">
+                <div id="pg-info" style="font-size: 0.75rem; font-weight: 700; color: #64748b;">Showing 0 to 0 of 0 sites</div>
+                <div id="pg-numbers" style="display: flex; gap: 0.25rem;"></div>
+            </div>
+        </div>
+
+        <div class="proposal-action-bar" style="position: sticky; bottom: 0; background: white; border-top: 2px solid var(--primary); padding: 0.75rem 1.5rem; display: flex; align-items: center; justify-content: space-between; z-index: 1000; border-radius: 12px 12px 0 0; box-shadow: 0 -10px 25px rgba(0,0,0,0.05);">
+            <div style="display: flex; gap: 1.5rem; align-items: center; width: 100%; justify-content: flex-end;">
+                <div style="display: flex; align-items: center; gap: 0.5rem; margin-right: 1rem;">
+                    <label style="font-size: 0.6rem; font-weight: 800; color: #64748b; text-transform: uppercase;">Tax Type</label>
+                    <select id="tax-type" class="p-input" onchange="recalcAll()" style="width: 110px; height: 32px; font-size: 0.7rem; padding: 0 0.4rem; border-radius: 6px;">
+                        <option value="igst">IGST 18%</option>
+                        <option value="cgst_sgst">CGST/SGST</option>
+                    </select>
+                </div>
+                <div style="text-align: right;">
+                    <div style="font-size: 0.6rem; color: #64748b; font-weight: 800; text-transform: uppercase;">Total Area</div>
+                    <div id="sum-area-btm" style="font-weight: 700; color: #1e293b; font-size: 0.9rem;">0 SQFT</div>
+                </div>
+                <div style="text-align: right;">
+                    <div style="font-size: 0.6rem; color: #64748b; font-weight: 800; text-transform: uppercase;">Subtotal</div>
+                    <div id="sum-display-btm" style="font-weight: 700; color: #1e293b; font-size: 0.9rem;">₹0</div>
+                </div>
+                <div style="text-align: right;" id="tax-breakdown-container">
+                    <div style="font-size: 0.6rem; color: #64748b; font-weight: 800; text-transform: uppercase;">GST (18%)</div>
+                    <div id="sum-tax-btm" style="font-weight: 700; color: #1e293b; font-size: 0.9rem;">₹0</div>
+                </div>
+                <div style="text-align: right;">
+                    <div style="font-size: 0.6rem; color: var(--primary); font-weight: 900; text-transform: uppercase;">Grand Total</div>
+                    <div id="sum-grand-btm" style="font-size: 1.3rem; font-weight: 900; color: var(--primary);">₹0</div>
+                </div>
+                <button class="btn btn-primary" onclick="saveDirectBooking()" id="submitBtn" style="height: 42px; padding: 0 1.5rem; border-radius: 8px; font-weight: 900;">
+                    GENERATE BOOKING
+                </button>
+            </div>
+        </div>
+    </div>
+</div> <!-- step-2 close -->
+
+    <!-- Bucket Drawer -->
+    <div id="bucket-backdrop" onclick="closeBucket()" style="position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.4); backdrop-filter: blur(4px); z-index: 2000; display: none;"></div>
+    <div id="selection-bucket-panel" style="position: fixed; top: 0; right: -1400px; width: 1200px; max-width: 95vw; height: 100%; background: white; z-index: 2001; box-shadow: -10px 0 30px rgba(0,0,0,0.1); transition: all 0.4s; display: flex; flex-direction: column;">
+        <div class="p-header" style="padding: 1.5rem; background: var(--primary); color: white; margin: 0; display: flex; justify-content: space-between; align-items: center;">
+            <div style="display: flex; align-items: center; gap: 1rem;"><i class="fas fa-shopping-basket"></i> Review Selected Assets</div>
+            <button onclick="closeBucket()" style="background: none; border: none; color: white; font-size: 1.5rem; cursor: pointer;">&times;</button>
+        </div>
+        <div id="bucket-list" style="flex: 1; overflow-y: auto; padding: 1rem;"></div>
+        <div style="padding: 1rem; border-top: 1px solid #e2e8f0; background: #f8fafc;">
+            <button onclick="closeBucket()" class="btn btn-primary" style="width: 100%; height: 45px; border-radius: 10px; font-weight: 800;">CONTINUE SELECTION</button>
+        </div>
+    </div>
+</div>
+
+<div id="clientModal" class="modal-overlay" style="display: none; position: fixed; inset: 0; background: rgba(0,0,0,0.5); z-index: 5000; align-items: center; justify-content: center;">
+    <div class="card" style="width: 90%; max-width: 500px; padding: 2rem; border-radius: 20px;">
+        <h3 style="margin-top: 0; font-weight: 800; border-bottom: 1px solid #f1f5f9; padding-bottom: 0.5rem;">New Client</h3>
+        <div class="form-group" style="margin-bottom: 1rem;"><label>Company Name</label><input type="text" id="new_client_name" class="p-input"></div>
+        <div class="form-group" style="margin-bottom: 1rem;"><label>Contact Person</label><input type="text" id="new_client_contact" class="p-input"></div>
+        <div class="form-group" style="margin-bottom: 1.5rem;"><label>City</label><input type="text" id="new_client_city" class="p-input"></div>
+        <div style="display: flex; justify-content: flex-end; gap: 1rem;">
+            <button class="btn" onclick="closeClientModal()">Cancel</button>
+            <button class="btn btn-primary" onclick="submitQuickClient()">Save & Select</button>
+        </div>
+    </div>
+</div>
+
+
 
 <script>
-let selectedSites = <?php echo $isEdit ? json_encode(array_map(function($item) {
-    $sqft = floatval($item['width']) * floatval($item['height']);
-    return [
-        'id' => intval($item['site_id']),
-        'name' => $item['name'],
-        'rate' => floatval($item['sale_rate']),
-        'code' => $item['site_code'],
-        'location' => $item['location'],
-        'vendor' => intval($item['mounting_vendor_id']),
-        'thumbnail' => $item['selected_image'],
-        'city' => $item['city'],
-        'card_rate' => floatval($item['sale_rate']),
-        'size' => $item['width'] . 'x' . $item['height'],
-        'type' => $item['type'],
-        'light_type' => $item['light_type'],
-        'owner_type' => $item['owner_type'],
-        'vendor_name' => $item['vendor_name'],
-        'all_images' => $item['all_images'],
-        'printing_vendor_id' => $item['printing_vendor_id'] ? intval($item['printing_vendor_id']) : null,
-        'printing_rate' => floatval($item['printing_rate']),
-        'printing_total' => floatval($item['printing_amount']),
-        'mounting_type' => 'Standard',
-        'mounting_rate' => floatval($item['mounting_rate']),
-        'mounting_total' => floatval($item['mounting_amount']),
-        'sqft' => $sqft
-    ];
-}, $editItems)) : '[]'; ?>;
+let selectedSites = [];
+let currentSites = [];
 let currentPage = 1;
 let totalSites = 0;
 const pageSize = 6;
@@ -529,6 +531,52 @@ function selectMediaTab(mtype, btn) {
 }
 
 document.addEventListener('DOMContentLoaded', () => {
+    const urlParams = new URLSearchParams(window.location.search);
+    if (!urlParams.has('entity_id')) {
+        Swal.fire({
+            title: 'Select Company / Entity',
+            html: `
+                <select id="swal_entity_id" class="swal2-select" style="display: flex; width: 80%; margin: 10px auto; font-family: inherit; font-size: 0.9rem; font-weight: 600; padding: 0.5rem; border-radius: 8px;">
+                    <option value="">-- Choose Company --</option>
+                    <?php
+                    $allEntities = $pdo->query("SELECT id, name FROM entities")->fetchAll();
+                    foreach ($allEntities as $e) {
+                        echo '<option value="' . $e['id'] . '">' . htmlspecialchars($e['name']) . '</option>';
+                    }
+                    ?>
+                </select>
+            `,
+            icon: 'question',
+            allowOutsideClick: false,
+            allowEscapeKey: false,
+            showCancelButton: true,
+            cancelButtonText: 'Cancel',
+            cancelButtonColor: '#64748b',
+            showCloseButton: true,
+            confirmButtonText: 'Proceed',
+            confirmButtonColor: '#0d9488',
+            preConfirm: () => {
+                const entityId = document.getElementById('swal_entity_id').value;
+                if (!entityId) {
+                    Swal.showValidationMessage('Please select a company');
+                    return false;
+                }
+                return entityId;
+            }
+        }).then((result) => {
+            if (result.isConfirmed) {
+                const selectedEntity = result.value;
+                const params = new URLSearchParams(window.location.search);
+                params.set('entity_id', selectedEntity);
+                params.set('set_entity', selectedEntity);
+                window.location.search = params.toString();
+            } else {
+                window.location.href = 'bookings.php';
+            }
+        });
+        return;
+    }
+
     const select = document.getElementById('media_type');
     if (select) {
         select.addEventListener('change', function() {
@@ -543,23 +591,6 @@ document.addEventListener('DOMContentLoaded', () => {
             });
         });
     }
-    if (selectedSites.length > 0) {
-        recalcAll();
-        updateBucketUI();
-        calculateTotalDays();
-    }
-    // Prevent mouse wheel increment/decrement on number inputs
-    document.addEventListener('wheel', function(e) {
-        if (document.activeElement.type === 'number') {
-            document.activeElement.blur();
-        }
-    });
-    // Prevent up/down keys from changing values in number inputs
-    document.addEventListener('keydown', function(e) {
-        if (document.activeElement.type === 'number' && (e.key === 'ArrowUp' || e.key === 'ArrowDown')) {
-            e.preventDefault();
-        }
-    });
 });
 const baseUrl = "<?php echo BASE_URL; ?>";
 const imgBaseUrl = "../../uploads/sites/";
@@ -687,13 +718,14 @@ function goToStep1() {
 }
 
 function goToStep2() {
+    const entity = document.getElementById('entity_id').value;
     const client = document.getElementById('client_id').value;
     const campaign = document.getElementById('campaign_name').value;
     const start = document.getElementById('start_date').value;
     const end = document.getElementById('end_date').value;
 
-    if (!client || !campaign || !start || !end) {
-        return Swal.fire('Required', 'Please fill Campaign Name, Client, and Booking Dates.', 'warning');
+    if (!entity || !client || !campaign || !start || !end) {
+        return Swal.fire('Required', 'Please fill Company / Entity, Campaign Name, Client, and Booking Dates.', 'warning');
     }
     document.getElementById('step-1').style.display = 'none';
     document.getElementById('step-2').style.display = 'block';
@@ -708,12 +740,13 @@ function fetchSites(page = 1) {
 
     const q = document.getElementById('site-search').value;
     const media = document.getElementById('media_type').value;
+    const district = document.getElementById('filter-district') ? document.getElementById('filter-district').value : '';
     const state = document.getElementById('filter-state').value;
     const city = document.getElementById('filter-city').value;
     const locationFilter = document.getElementById('filter-location') ? document.getElementById('filter-location').value : '';
     const ownership = document.querySelector('input[name="ownership"]:checked').value;
     const availability = document.querySelector('input[name="availability"]:checked').value;
-    const vendor = document.getElementById('filter-vendor').value;
+    const vendor = (ownership === 'HA') ? '' : document.getElementById('filter-vendor').value;
     const size = document.getElementById('filter-size').value;
     const light = document.getElementById('light_type').value;
 
@@ -723,7 +756,7 @@ function fetchSites(page = 1) {
         vendorGroup.style.display = (ownership === 'TA') ? 'block' : 'none';
     }
 
-    const url = `../../ajax/fetch_sites.php?page=${page}&limit=${pageSize}&q=${encodeURIComponent(q)}&media=${encodeURIComponent(media)}&state=${encodeURIComponent(state)}&city=${encodeURIComponent(city)}&location=${encodeURIComponent(locationFilter)}&availability=${availability}&ownership=${ownership}&vendor=${vendor}&size=${encodeURIComponent(size)}&light=${encodeURIComponent(light)}`;
+    const url = `../../ajax/fetch_sites.php?page=${page}&limit=${pageSize}&q=${encodeURIComponent(q)}&media=${encodeURIComponent(media)}&district=${encodeURIComponent(district)}&state=${encodeURIComponent(state)}&city=${encodeURIComponent(city)}&location=${encodeURIComponent(locationFilter)}&availability=${availability}&ownership=${ownership}&vendor=${vendor}&size=${encodeURIComponent(size)}&light=${encodeURIComponent(light)}`;
 
     fetch(url)
     .then(r => r.json())
@@ -799,6 +832,7 @@ function renderPagination(total) {
 }
 
 function renderSites(sites) {
+    currentSites = sites;
     const body = document.getElementById('asset-body');
     body.innerHTML = '';
     
@@ -810,8 +844,21 @@ function renderSites(sites) {
     sites.forEach((s, i) => {
         const selectedSite = selectedSites.find(ss => ss.id == s.id);
         const isSelected = !!selectedSite;
-        const defaultRate = 0;
+        const defaultRate = s.owner_type === 'HA' ? parseFloat(s.card_rate || 0) : parseFloat(s.purchase_rate || 0);
         const currentRate = isSelected ? selectedSite.rate : defaultRate;
+        const currentPrintRate = isSelected ? (selectedSite.print_rate_offer || 0) : 0;
+        const currentMountRate = isSelected ? (selectedSite.mount_rate_offer || 0) : 0;
+        
+        const width = parseFloat(s.width) || 0;
+        const height = parseFloat(s.height) || 0;
+        const sqft = width * height;
+        
+        const unit = selectedSite ? (selectedSite.unit || 1) : 1;
+        const totalItemSqft = sqft * unit;
+        
+        const totalAssetRate = (document.getElementById('gen_booking') && document.getElementById('gen_booking').checked ? (currentRate * unit) : 0) + 
+                               (document.getElementById('gen_client_print_invoice') && document.getElementById('gen_client_print_invoice').checked ? (currentPrintRate * totalItemSqft) : 0) + 
+                               (document.getElementById('gen_client_mounting_invoice') && document.getElementById('gen_client_mounting_invoice').checked ? (currentMountRate * totalItemSqft) : 0);
         
         const thumb = s.thumbnail ? imgBaseUrl + s.thumbnail : 'https://via.placeholder.com/150x95?text=No+Img';
         const imgList = (s.all_images || "").split(',').filter(img => img.trim() !== "");
@@ -837,15 +884,15 @@ function renderSites(sites) {
         row.style.background = 'white';
         row.innerHTML = `
             <td style="font-weight:700; color:#64748b; padding:1rem;">${startIdx}</td>
-            <td style="text-align:center; padding:1rem;"><input type="checkbox" ${isSelected ? 'checked' : ''} onclick="toggleSite(${s.id}, '${s.name.replace(/'/g, "\\'")}', ${currentRate}, '${s.site_code}', '${s.location.replace(/'/g, "\\'")}', ${s.vendor_id}, '${s.thumbnail || ''}', '${s.city || ''}', ${cardRate}, '${s.width}x${s.height}', '${s.type}', '${s.light_type}', '${s.owner_type}', '${s.vendor_name}', '${s.all_images || ''}')" style="width:18px; height:18px; accent-color:var(--primary);"></td>
+            <td style="text-align:center; padding:1rem;"><input type="checkbox" ${isSelected ? 'checked' : ''} onclick="toggleSite(${s.id})" style="width:18px; height:18px; accent-color:var(--primary);"></td>
             <td style="padding:1rem;">${previewHtml}</td>
             <td style="padding:1rem;">
                 <div style="font-weight:800; color:#1e293b; font-size:0.8rem; margin-bottom:1px;">${s.city || ''}</div>
-                <div style="color:#f97316; font-size:0.65rem; font-weight:800; text-transform:uppercase;">${s.site_code}</div>
+                <div style="color:#f97316; font-size:0.65rem; font-weight:800; text-transform:uppercase;">${s.site_code || ''}</div>
             </td>
             <td style="padding:1rem;">
-                <div style="font-weight:800; color:#1e293b; font-size:0.8rem; margin-bottom:1px;">${s.name}</div>
-                <div style="font-size:0.65rem; color:#64748b; margin-bottom:4px; line-height:1.1;">${s.location}</div>
+                <div style="font-weight:800; color:#1e293b; font-size:0.8rem; margin-bottom:1px;">${s.name || ''}</div>
+                <div style="font-size:0.65rem; color:#64748b; margin-bottom:4px; line-height:1.1;">${s.location || ''}</div>
                 <div style="display:flex; gap:0.3rem; align-items:center;">
                     <span style="background:#ecfdf5; color:#059669; padding:0.1rem 0.4rem; border-radius:4px; font-size:0.55rem; font-weight:800; text-transform:uppercase;">${s.type}</span>
                     <span style="background:#f1f5f9; color:#475569; padding:0.1rem 0.4rem; border-radius:4px; font-size:0.55rem; font-weight:800; text-transform:uppercase;">${s.light_type}</span>
@@ -856,110 +903,98 @@ function renderSites(sites) {
             </td>
             <td style="padding:1rem;">
                 <div style="font-weight:800; color:#1e293b; font-size:0.8rem; margin-bottom:1px;">${s.width}' x ${s.height}'</div>
-                <div style="font-size:0.65rem; color:#94a3b8; font-weight:700;">${(s.width*s.height).toLocaleString()} SQFT</div>
+                <div class="sqft-display" data-base-sqft="${sqft}" style="font-size:0.65rem; color:#94a3b8; font-weight:700;">${(sqft * (selectedSite ? (selectedSite.unit || 1) : 1)).toLocaleString()} SQFT</div>
             </td>
-            <td style="padding:1rem; text-align:right;">
-                <div style="font-size:0.65rem; color:var(--primary); font-weight:800; margin-bottom:4px; text-transform:uppercase;">Offer Rate</div>
-                <input type="number" step="any" class="p-input offer-rate-input" value="${currentRate}" oninput="updateSitePrice(${s.id}, this.value)" style="width:100px; height:32px; text-align:right; font-weight:900; color:var(--primary); padding:0 0.5rem; border-radius:8px; border: 1px solid #e2e8f0;">
+            <td style="padding:1rem; text-align: center;">
+                <input type="number" class="p-input unit-input" value="${selectedSite ? (selectedSite.unit || 1) : 1}" min="1" oninput="updateUnit(${s.id}, this.value)" style="width:60px; height:28px; text-align:center; font-weight:800; border-radius:6px; border: 1px solid #e2e8f0; display: inline-block;">
             </td>
-            <td style="padding:1.5rem 1rem; text-align:right;">
+            <td style="padding:0.5rem 1rem; text-align:right;">
+                <div style="display: flex; flex-direction: column; gap: 0.4rem; align-items: flex-end;">
+                    <div class="rate-row-booking" style="display: flex; align-items: center; justify-content: flex-end; gap: 0.5rem;">
+                        <span style="font-size:0.55rem; color:#64748b; font-weight:800; text-transform:uppercase;">Booking</span>
+                        <input type="number" class="p-input offer-rate-input" value="${currentRate}" oninput="updateSitePrice(${s.id}, 'booking', this.value, ${sqft})" style="width:80px; height:28px; text-align:right; font-weight:800; color:var(--primary); padding:0 0.5rem; border-radius:6px; border: 1px solid #e2e8f0;">
+                        <span style="min-width:55px;"></span>
+                    </div>
+                    <div class="rate-row-print" style="display: flex; align-items: center; justify-content: flex-end; gap: 0.5rem;">
+                        <span style="font-size:0.55rem; color:#64748b; font-weight:800; text-transform:uppercase;">Print /sqft</span>
+                        <input type="number" class="p-input" value="${currentPrintRate}" oninput="updateSitePrice(${s.id}, 'print', this.value, ${sqft})" style="width:80px; height:28px; text-align:right; font-weight:800; color:var(--primary); padding:0 0.5rem; border-radius:6px; border: 1px solid #e2e8f0;">
+                        <span class="print-calc-total" style="font-size:0.75rem; font-weight:800; color:#059669; min-width:55px; text-align:right;">₹${(currentPrintRate * totalItemSqft).toLocaleString()}</span>
+                    </div>
+                    <div class="rate-row-mount" style="display: flex; align-items: center; justify-content: flex-end; gap: 0.5rem;">
+                        <span style="font-size:0.55rem; color:#64748b; font-weight:800; text-transform:uppercase;">Mount /sqft</span>
+                        <input type="number" class="p-input" value="${currentMountRate}" oninput="updateSitePrice(${s.id}, 'mount', this.value, ${sqft})" style="width:80px; height:28px; text-align:right; font-weight:800; color:var(--primary); padding:0 0.5rem; border-radius:6px; border: 1px solid #e2e8f0;">
+                        <span class="mount-calc-total" style="font-size:0.75rem; font-weight:800; color:#059669; min-width:55px; text-align:right;">₹${(currentMountRate * totalItemSqft).toLocaleString()}</span>
+                    </div>
+                </div>
+            </td>
+            <td style="padding:1.5rem 1rem; text-align:right; vertical-align: middle;">
                 <div style="font-size:0.65rem; color:#64748b; font-weight:800; margin-bottom:4px; text-transform:uppercase;">Total</div>
-                <div class="total-cell" style="font-weight:900; color:var(--primary); font-size:1.1rem;">₹${currentRate.toLocaleString()}</div>
+                <div class="total-cell" style="font-weight:900; color:var(--primary); font-size:1.1rem;">₹${totalAssetRate.toLocaleString()}</div>
             </td>
         `;
         body.appendChild(row);
     });
+    
+    // Set initial visibility
+    toggleRateVisibility();
 }
 
-let activeBucketTab = 'rental';
-function switchBucketTab(tab) {
-    activeBucketTab = tab;
-    document.querySelectorAll('.bucket-tab').forEach(b => b.classList.remove('active'));
-    document.getElementById('btn-tab-' + tab).classList.add('active');
-    
-    const label = document.getElementById('bucket-rate-master-label');
-    const input = document.getElementById('bucketRateMasterInput');
-    if (label && input) {
-        if (tab === 'rental') {
-            label.innerText = 'Offer Rate:';
-            input.placeholder = 'Rate';
-        } else {
-            label.innerText = 'Rate / SQFT:';
-            input.placeholder = 'Rate';
-        }
-        input.value = '';
-    }
-    
-    updateBucketUI();
-}
-
-function applyBucketRateMaster() {
-    const input = document.getElementById('bucketRateMasterInput');
-    if (!input) return;
-    const val = parseFloat(input.value);
-    if (isNaN(val) || val < 0) {
-        return Swal.fire('Error', 'Please enter a valid rate', 'error');
-    }
-    
-    selectedSites.forEach(s => {
-        if (activeBucketTab === 'rental') {
-            s.rate = val;
-        } else if (activeBucketTab === 'printing') {
-            s.printing_rate = val;
-            s.printing_total = val * s.sqft;
-        } else if (activeBucketTab === 'mounting') {
-            s.mounting_rate = val;
-            s.mounting_total = val * s.sqft;
-        }
-    });
-    
-    recalcAll();
-    updateBucketUI();
-    
-    // If it's space rental, update the main table inputs as well:
-    if (activeBucketTab === 'rental') {
-        selectedSites.forEach(s => {
-            const mainRow = document.getElementById('row-' + s.id);
-            if (mainRow) {
-                const totalCell = mainRow.querySelector('.total-cell');
-                if (totalCell) totalCell.innerText = '₹' + s.rate.toLocaleString();
-                const mainInput = mainRow.querySelector('.offer-rate-input');
-                if (mainInput) mainInput.value = s.rate;
-            }
-        });
-    }
-    
-    Swal.fire({
-        title: 'Success',
-        text: `Rate of ₹${val} applied to all selected assets.`,
-        icon: 'success',
-        timer: 1500,
-        showConfirmButton: false
-    });
-}
-
-function toggleSite(id, name, rate, code, location, vendor, thumbnail = '', city = '', card_rate = 0, size = '', type = '', light_type = '', owner_type = '', vendor_name = '', all_images = '') {
+function toggleSite(id, sObject = null) {
     const idx = selectedSites.findIndex(s => s.id == id);
     if (idx === -1) {
-        const sqft = parseFloat(size.split('x')[0]) * parseFloat(size.split('x')[1]);
-        const bestRate = getBestPrintingRate(id, type);
+        let s = currentSites.find(x => x.id == id);
+        if (!s && sObject) s = sObject;
+        if (!s) return;
+        
+        const row = document.getElementById('row-' + id);
+        let bookingRate = s.owner_type === 'HA' ? parseFloat(s.card_rate || 0) : parseFloat(s.purchase_rate || 0);
+        let printRate = 0;
+        let mountRate = 0;
+        
+        let unit = 1;
+        if (row) {
+            const bookingInput = row.querySelector('.rate-row-booking input');
+            if (bookingInput) bookingRate = parseFloat(bookingInput.value) || bookingRate;
+            
+            const printInput = row.querySelector('.rate-row-print input');
+            if (printInput) printRate = parseFloat(printInput.value) || 0;
+            
+            const mountInput = row.querySelector('.rate-row-mount input');
+            if (mountInput) mountRate = parseFloat(mountInput.value) || 0;
+
+            const unitInput = row.querySelector('.unit-input');
+            if (unitInput) unit = parseInt(unitInput.value) || 1;
+        }
+
+        const sqft = parseFloat(s.width) * parseFloat(s.height);
+        const bestRate = getBestPrintingRate(id, s.type);
         const pVendor = bestRate ? bestRate.vendor_id : null;
         const pRate = bestRate ? parseFloat(bestRate.rate_per_sqft) : 0;
-        const pTotal = pRate * sqft;
+        const pTotal = pRate * sqft * unit;
 
-        const mRate = 0;
-        const mType = 'Standard';
-        const mTotal = mRate * sqft;
-
-        selectedSites.push({ 
-            id, name, rate: 0, code, location, vendor, thumbnail, city, card_rate, size, type, light_type, owner_type, vendor_name, all_images,
+        selectedSites.push({
+            id: s.id,
+            name: s.name,
+            rate: bookingRate,
+            print_rate_offer: printRate,
+            mount_rate_offer: mountRate,
+            code: s.site_code,
+            location: s.location,
+            vendor_id: s.vendor_id,
             printing_vendor_id: pVendor,
             printing_rate: pRate,
             printing_total: pTotal,
-            mounting_type: mType,
-            mounting_rate: mRate,
-            mounting_total: mTotal,
-            sqft: sqft
+            thumbnail: s.thumbnail,
+            city: s.city,
+            card_rate: parseFloat(s.card_rate) || 0,
+            size: s.width + 'x' + s.height,
+            type: s.type,
+            light_type: s.light_type,
+            owner_type: s.owner_type,
+            sqft: sqft,
+            vendor_name: s.vendor_name,
+            all_images: s.all_images,
+            unit: unit
         });
     } else {
         selectedSites.splice(idx, 1);
@@ -969,7 +1004,7 @@ function toggleSite(id, name, rate, code, location, vendor, thumbnail = '', city
     recalcAll();
     
     // Update row visual locally
-    const row = document.querySelector(`.site-row input[onclick*="toggleSite(${id}"]`)?.closest('tr');
+    const row = document.getElementById('row-' + id);
     if (row) {
         row.classList.toggle('selected', idx === -1);
         const chk = row.querySelector('input[type="checkbox"]');
@@ -982,21 +1017,77 @@ function updatePrintingInfo(id, vendorId, rateVal) {
     if (idx !== -1) {
         selectedSites[idx].printing_vendor_id = vendorId;
         selectedSites[idx].printing_rate = parseFloat(rateVal) || 0;
-        selectedSites[idx].printing_total = selectedSites[idx].printing_rate * selectedSites[idx].sqft;
+        const unit = selectedSites[idx].unit || 1;
+        selectedSites[idx].printing_total = selectedSites[idx].printing_rate * selectedSites[idx].sqft * unit;
         recalcAll();
         updateBucketUI();
     }
 }
 
-function updateMountingInfo(id, typeVal, rateVal) {
+function updateRowTotal(id) {
+    const row = document.getElementById('row-' + id);
+    if (!row) return;
+    
+    const showBooking = document.getElementById('gen_booking') ? document.getElementById('gen_booking').checked : true;
+    const showPrint = document.getElementById('gen_client_print_invoice') ? document.getElementById('gen_client_print_invoice').checked : false;
+    const showMount = document.getElementById('gen_client_mounting_invoice') ? document.getElementById('gen_client_mounting_invoice').checked : false;
+    
+    const unitInput = row.querySelector('.unit-input');
+    const unit = unitInput ? (parseInt(unitInput.value) || 1) : 1;
+    
+    const sqftLabel = row.querySelector('.sqft-display');
+    const sqft = sqftLabel ? (parseFloat(sqftLabel.dataset.baseSqft) || 0) : 0;
+    const totalItemSqft = sqft * unit;
+    
+    let rowTotal = 0;
+    
+    const bookingInput = row.querySelector('.rate-row-booking input');
+    const rate = bookingInput ? (parseFloat(bookingInput.value) || 0) : 0;
+    if (showBooking) rowTotal += (rate * unit);
+    
+    const printInput = row.querySelector('.rate-row-print input');
+    const printRate = printInput ? (parseFloat(printInput.value) || 0) : 0;
+    if (showPrint) rowTotal += (printRate * totalItemSqft);
+    
+    const mountInput = row.querySelector('.rate-row-mount input');
+    const mountRate = mountInput ? (parseFloat(mountInput.value) || 0) : 0;
+    if (showMount) rowTotal += (mountRate * totalItemSqft);
+    
+    const totalCell = row.querySelector('.total-cell');
+    if (totalCell) {
+        totalCell.innerText = '₹' + rowTotal.toLocaleString();
+    }
+    
+    // Also update print/mount calc totals labels
+    const printCalc = row.querySelector('.print-calc-total');
+    if (printCalc) printCalc.innerText = '₹' + (printRate * totalItemSqft).toLocaleString();
+    
+    const mountCalc = row.querySelector('.mount-calc-total');
+    if (mountCalc) mountCalc.innerText = '₹' + (mountRate * totalItemSqft).toLocaleString();
+}
+
+function updateUnit(id, value) {
+    const val = parseInt(value) || 1;
     const idx = selectedSites.findIndex(s => s.id == id);
     if (idx !== -1) {
-        selectedSites[idx].mounting_type = typeVal;
-        selectedSites[idx].mounting_rate = parseFloat(rateVal) || 0;
-        selectedSites[idx].mounting_total = selectedSites[idx].mounting_rate * selectedSites[idx].sqft;
-        recalcAll();
-        updateBucketUI();
+        selectedSites[idx].unit = val;
+        const sqft = parseFloat(selectedSites[idx].sqft) || 0;
+        selectedSites[idx].printing_total = selectedSites[idx].printing_rate * sqft * val;
     }
+    
+    // Update total sqft label for this row
+    const row = document.getElementById('row-' + id);
+    if (row) {
+        const sqftLabel = row.querySelector('.sqft-display');
+        if (sqftLabel) {
+            const baseSqft = parseFloat(sqftLabel.dataset.baseSqft) || 0;
+            sqftLabel.innerText = (baseSqft * val).toLocaleString() + ' SQFT';
+        }
+    }
+    
+    updateRowTotal(id);
+    updateBucketUI();
+    recalcAll();
 }
 
 function updateBucketUI() {
@@ -1010,50 +1101,20 @@ function updateBucketUI() {
         return;
     }
 
-    let headers = '';
-    if (activeBucketTab === 'rental') {
-        headers = `
-            <th style="width: 40px;">#</th>
-            <th style="width: 50px; text-align:center;">ACT</th>
-            <th style="width: 80px;">PREVIEW</th>
-            <th>CITY / CODE</th>
-            <th>ASSET DETAILS</th>
-            <th>SIZE</th>
-            <th>PRICING</th>
-            <th style="text-align:right; width: 120px;">OFFER RATE</th>
-            <th style="text-align:right; width: 100px;">TOTAL</th>
-        `;
-    } else if (activeBucketTab === 'printing') {
-        headers = `
-            <th style="width: 40px;">#</th>
-            <th style="width: 50px; text-align:center;">ACT</th>
-            <th style="width: 80px;">PREVIEW</th>
-            <th>CITY / CODE</th>
-            <th>ASSET DETAILS</th>
-            <th>SIZE / SQFT</th>
-            <th>PRINTING VENDOR</th>
-            <th style="text-align:right; width: 120px;">RATE / SQFT</th>
-            <th style="text-align:right; width: 100px;">TOTAL</th>
-        `;
-    } else if (activeBucketTab === 'mounting') {
-        headers = `
-            <th style="width: 40px;">#</th>
-            <th style="width: 50px; text-align:center;">ACT</th>
-            <th style="width: 80px;">PREVIEW</th>
-            <th>CITY / CODE</th>
-            <th>ASSET DETAILS</th>
-            <th>SIZE / SQFT</th>
-            <th>MOUNTING TYPE</th>
-            <th style="text-align:right; width: 120px;">RATE / SQFT</th>
-            <th style="text-align:right; width: 100px;">TOTAL</th>
-        `;
-    }
-
     let html = `
         <table class="crs-table selection-table" style="width: 100%; border-collapse: separate; border-spacing: 0 0.5rem;">
             <thead>
                 <tr style="border-bottom: 2px solid #f1f5f9;">
-                    ${headers}
+                    <th style="width: 40px;">#</th>
+                    <th style="width: 50px; text-align:center;">ACT</th>
+                    <th style="width: 80px;">PREVIEW</th>
+                    <th>CITY / CODE</th>
+                    <th>ASSET DETAILS</th>
+                    <th>SIZE</th>
+                    <th>PRINTING</th>
+                    <th>PRICING</th>
+                    <th style="text-align:right;">OFFER RATE</th>
+                    <th style="text-align:right;">TOTAL</th>
                 </tr>
             </thead>
             <tbody>
@@ -1066,68 +1127,20 @@ function updateBucketUI() {
         const imgList = (s.all_images || "").split(',').filter(img => img.trim() !== "");
         const imgCount = imgList.length;
 
-        let cells = '';
+        // Printing Dropdown
+        let pOptions = '<option value="">Select Vendor</option>';
+        printingVendors.forEach(v => {
+            const selected = v.id == s.printing_vendor_id ? 'selected' : '';
+            pOptions += `<option value="${v.id}" ${selected}>${v.name}</option>`;
+        });
 
-        if (activeBucketTab === 'rental') {
-            cells = `
-                <td>
-                    <div style="font-weight:800; color:#64748b; font-size:0.7rem;">CARD: ₹${cardRate.toLocaleString()}</div>
-                </td>
-                <td style="text-align:right;">
-                    <input type="number" step="any" class="p-input" value="${rate}" oninput="updateSitePrice(${s.id}, this.value)" style="width:100px; height:32px; text-align:right; font-weight:900; color:var(--primary); padding:0 0.5rem; border-radius:8px; border: 1px solid #e2e8f0;">
-                </td>
-                <td style="text-align:right; font-weight:900; color:var(--primary);">
-                    ₹${rate.toLocaleString()}
-                </td>
-            `;
-        } else if (activeBucketTab === 'printing') {
-            let pOptions = '<option value="">Select Vendor</option>';
-            printingVendors.forEach(v => {
-                const selected = v.id == s.printing_vendor_id ? 'selected' : '';
-                pOptions += `<option value="${v.id}" ${selected}>${v.name}</option>`;
-            });
-
-            cells = `
-                <td>
-                    <select onchange="updatePrintingInfo(${s.id}, this.value, document.getElementById('p_rate_${s.id}').value)" 
-                            style="width: 150px; font-size: 0.75rem; padding: 0.4rem; border-radius: 6px; border: 1px solid #e2e8f0;">
-                        ${pOptions}
-                    </select>
-                </td>
-                <td style="text-align:right;">
-                    <input type="number" step="any" id="p_rate_${s.id}" value="${s.printing_rate || 0}" 
-                           oninput="updatePrintingInfo(${s.id}, this.closest('tr').querySelector('select').value, this.value)"
-                           style="width:100px; height:32px; text-align:right; font-weight:900; color:var(--primary); padding:0 0.5rem; border-radius:8px; border: 1px solid #e2e8f0;">
-                </td>
-                <td style="text-align:right; font-weight:900; color:var(--primary);">
-                    ₹${(s.printing_total || 0).toLocaleString()}
-                </td>
-            `;
-        } else if (activeBucketTab === 'mounting') {
-            const mTypes = ['Standard', 'Premium', 'Non-Lit Flex', 'Back-Lit Flex', 'Vinyl'];
-            let mOptions = '';
-            mTypes.forEach(t => {
-                const selected = t === s.mounting_type ? 'selected' : '';
-                mOptions += `<option value="${t}" ${selected}>${t}</option>`;
-            });
-
-            cells = `
-                <td>
-                    <select onchange="updateMountingInfo(${s.id}, this.value, document.getElementById('m_rate_${s.id}').value)" 
-                            style="width: 150px; font-size: 0.75rem; padding: 0.4rem; border-radius: 6px; border: 1px solid #e2e8f0;">
-                        ${mOptions}
-                    </select>
-                </td>
-                <td style="text-align:right;">
-                    <input type="number" step="any" id="m_rate_${s.id}" value="${s.mounting_rate || 0}" 
-                           oninput="updateMountingInfo(${s.id}, this.closest('tr').querySelector('select').value, this.value)"
-                           style="width:100px; height:32px; text-align:right; font-weight:900; color:var(--primary); padding:0 0.5rem; border-radius:8px; border: 1px solid #e2e8f0;">
-                </td>
-                <td style="text-align:right; font-weight:900; color:var(--primary);">
-                    ₹${(s.mounting_total || 0).toLocaleString()}
-                </td>
-            `;
-        }
+        const width = parseFloat(s.width) || 0;
+        const height = parseFloat(s.height) || 0;
+        const sqft = width * height;
+        
+        const totalAssetRate = (document.getElementById('gen_booking') && document.getElementById('gen_booking').checked ? rate : 0) + 
+                               (document.getElementById('gen_client_print_invoice') && document.getElementById('gen_client_print_invoice').checked ? ((s.print_rate_offer || 0) * sqft) : 0) + 
+                               (document.getElementById('gen_client_mounting_invoice') && document.getElementById('gen_client_mounting_invoice').checked ? ((s.mount_rate_offer || 0) * sqft) : 0);
 
         html += `
             <tr class="site-row selected" style="background: white;">
@@ -1159,38 +1172,219 @@ function updateBucketUI() {
                     <div style="font-weight:800; color:#1e293b; font-size:0.8rem; margin-bottom:1px;">${s.size}</div>
                     <div style="font-size:0.65rem; color:#94a3b8; font-weight:700;">${s.sqft.toLocaleString()} SQFT</div>
                 </td>
-                ${cells}
+                <td>
+                    <select onchange="updatePrintingInfo(${s.id}, this.value, document.getElementById('p_rate_${s.id}').value)" 
+                            style="width: 120px; font-size: 0.7rem; padding: 0.3rem; border-radius: 6px; border: 1px solid #e2e8f0; margin-bottom: 4px;">
+                        ${pOptions}
+                    </select>
+                    <div style="display: flex; align-items: center; gap: 0.3rem;">
+                        <span style="font-size: 0.6rem; color: #64748b;">Rate:</span>
+                        <input type="number" id="p_rate_${s.id}" value="${s.printing_rate}" 
+                               oninput="updatePrintingInfo(${s.id}, document.getElementById('p_rate_${s.id}').previousElementSibling.previousElementSibling ? document.getElementById('p_rate_${s.id}').previousElementSibling.previousElementSibling.value : '', this.value)"
+                               style="width: 60px; height: 24px; font-size: 0.7rem; border-radius: 4px; border: 1px solid #e2e8f0; padding: 0 0.3rem;">
+                    </div>
+                    <div style="font-size: 0.65rem; font-weight: 800; color: var(--primary); margin-top: 2px;">₹${(s.printing_total || 0).toLocaleString()}</div>
+                </td>
+                <td>
+                    <div style="font-weight:800; color:#64748b; font-size:0.7rem;">CARD: ₹${cardRate.toLocaleString()}</div>
+                </td>
+                <td style="text-align:right;">
+                    <div style="display: flex; flex-direction: column; gap: 0.4rem; align-items: flex-end;">
+                        <div class="rate-row-booking" style="display: flex; align-items: center; justify-content: flex-end; gap: 0.5rem;">
+                            <span style="font-size:0.55rem; color:#64748b; font-weight:800; text-transform:uppercase;">Booking</span>
+                            <input type="number" class="p-input" value="${rate}" oninput="updateSitePrice(${s.id}, 'booking', this.value, ${sqft})" style="width:80px; height:24px; text-align:right; font-weight:800; color:var(--primary); padding:0 0.5rem; border-radius:6px; border: 1px solid #e2e8f0; font-size: 0.75rem;">
+                            <span style="min-width:45px;"></span>
+                        </div>
+                        <div class="rate-row-print" style="display: flex; align-items: center; justify-content: flex-end; gap: 0.5rem;">
+                            <span style="font-size:0.55rem; color:#64748b; font-weight:800; text-transform:uppercase;">Print /sqft</span>
+                            <input type="number" class="p-input" value="${s.print_rate_offer || 0}" oninput="updateSitePrice(${s.id}, 'print', this.value, ${sqft})" style="width:80px; height:24px; text-align:right; font-weight:800; color:var(--primary); padding:0 0.5rem; border-radius:6px; border: 1px solid #e2e8f0; font-size: 0.75rem;">
+                            <span class="print-calc-total" style="font-size:0.75rem; font-weight:800; color:#059669; min-width:45px; text-align:right;">₹${((s.print_rate_offer || 0) * sqft).toLocaleString()}</span>
+                        </div>
+                        <div class="rate-row-mount" style="display: flex; align-items: center; justify-content: flex-end; gap: 0.5rem;">
+                            <span style="font-size:0.55rem; color:#64748b; font-weight:800; text-transform:uppercase;">Mount /sqft</span>
+                            <input type="number" class="p-input" value="${s.mount_rate_offer || 0}" oninput="updateSitePrice(${s.id}, 'mount', this.value, ${sqft})" style="width:80px; height:24px; text-align:right; font-weight:800; color:var(--primary); padding:0 0.5rem; border-radius:6px; border: 1px solid #e2e8f0; font-size: 0.75rem;">
+                            <span class="mount-calc-total" style="font-size:0.75rem; font-weight:800; color:#059669; min-width:45px; text-align:right;">₹${((s.mount_rate_offer || 0) * sqft).toLocaleString()}</span>
+                        </div>
+                    </div>
+                </td>
+                <td style="text-align:right; vertical-align: middle;">
+                    <div class="total-cell" style="font-weight:900; color:var(--primary); font-size:1.05rem;">₹${totalAssetRate.toLocaleString()}</div>
+                </td>
             </tr>
         `;
     });
 
     html += `</tbody></table>`;
     list.innerHTML = html;
+    
+    toggleRateVisibility();
 }
 
-function updateSitePrice(id, val) {
-    const rate = parseFloat(val) || 0;
+function updateSitePrice(id, type, val, sqft = 0) {
+    const rateValue = parseFloat(val) || 0;
     const idx = selectedSites.findIndex(s => s.id == id);
     if (idx !== -1) {
-        selectedSites[idx].rate = rate;
+        if (type === 'booking') selectedSites[idx].rate = rateValue;
+        if (type === 'print') selectedSites[idx].print_rate_offer = rateValue;
+        if (type === 'mount') selectedSites[idx].mount_rate_offer = rateValue;
         
-        // Update main table if row exists
-        const mainRow = document.getElementById('row-' + id);
-        if (mainRow) {
-            const totalCell = mainRow.querySelector('.total-cell');
-            if (totalCell) totalCell.innerText = '₹' + rate.toLocaleString();
+        recalcAll(); // this will also update the total cells
+    }
+    
+    // Always update the inline DOM for visual feedback (even if unchecked)
+    const row = document.getElementById('row-' + id);
+    let unit = 1;
+    if (row) {
+        const unitInput = row.querySelector('.unit-input');
+        if (unitInput) unit = parseInt(unitInput.value) || 1;
+    }
+    const totalItemSqft = sqft * unit;
+    if (row && sqft > 0) {
+        if (type === 'print') {
+            const printCalc = row.querySelector('.print-calc-total');
+            if (printCalc) printCalc.innerText = '₹' + (rateValue * totalItemSqft).toLocaleString();
         }
-
-        recalcAll();
-        updateBucketUI(); 
+        if (type === 'mount') {
+            const mountCalc = row.querySelector('.mount-calc-total');
+            if (mountCalc) mountCalc.innerText = '₹' + (rateValue * totalItemSqft).toLocaleString();
+        }
     }
 }
 
+function applyRateMaster() {
+    const showPrint = document.getElementById('gen_client_print_invoice') ? document.getElementById('gen_client_print_invoice').checked : false;
+    const showMount = document.getElementById('gen_client_mounting_invoice') ? document.getElementById('gen_client_mounting_invoice').checked : false;
+
+    const printRateInput = document.getElementById('rm_print').value;
+    const mountRateInput = document.getElementById('rm_mount').value;
+    
+    if ((!showPrint || printRateInput === '') && (!showMount || mountRateInput === '')) {
+        Swal.fire('Error', 'Please enter at least one rate (Print or Mount) for the checked options', 'error');
+        return;
+    }
+    
+    if (selectedSites.length === 0) {
+        Swal.fire('Info', 'No sites selected', 'info');
+        return;
+    }
+    
+    let appliedCount = 0;
+    
+    selectedSites.forEach(s => {
+        let updated = false;
+        
+        if (showPrint && printRateInput !== '') {
+            const pr = parseFloat(printRateInput);
+            if (!isNaN(pr)) {
+                s.print_rate_offer = pr;
+                updated = true;
+                const row = document.getElementById('row-' + s.id);
+                if (row) {
+                    const input = row.querySelector('.rate-row-print input');
+                    if (input) input.value = pr;
+                    const calc = row.querySelector('.print-calc-total');
+                    if (calc) calc.innerText = '₹' + (pr * s.sqft).toLocaleString();
+                }
+            }
+        }
+        
+        if (showMount && mountRateInput !== '') {
+            const mr = parseFloat(mountRateInput);
+            if (!isNaN(mr)) {
+                s.mount_rate_offer = mr;
+                updated = true;
+                const row = document.getElementById('row-' + s.id);
+                if (row) {
+                    const input = row.querySelector('.rate-row-mount input');
+                    if (input) input.value = mr;
+                    const calc = row.querySelector('.mount-calc-total');
+                    if (calc) calc.innerText = '₹' + (mr * s.sqft).toLocaleString();
+                }
+            }
+        }
+        
+        if (updated) appliedCount++;
+    });
+    
+    recalcAll();
+    updateBucketUI();
+    Swal.fire('Success', `Applied rates to ${appliedCount} sites`, 'success');
+}
+
+function toggleRateVisibility() {
+    const showBooking = document.getElementById('gen_booking') ? document.getElementById('gen_booking').checked : true;
+    const showPrint = document.getElementById('gen_client_print_invoice') ? document.getElementById('gen_client_print_invoice').checked : false;
+    const showMount = document.getElementById('gen_client_mounting_invoice') ? document.getElementById('gen_client_mounting_invoice').checked : false;
+    
+    document.querySelectorAll('.rate-row-booking').forEach(el => el.style.display = showBooking ? 'flex' : 'none');
+    document.querySelectorAll('.rate-row-print').forEach(el => el.style.display = showPrint ? 'flex' : 'none');
+    document.querySelectorAll('.rate-row-mount').forEach(el => el.style.display = showMount ? 'flex' : 'none');
+    
+    const rmPrint = document.getElementById('rm_print_wrapper');
+    if (rmPrint) rmPrint.style.display = showPrint ? 'flex' : 'none';
+    
+    const rmMount = document.getElementById('rm_mount_wrapper');
+    if (rmMount) rmMount.style.display = showMount ? 'flex' : 'none';
+    
+    const rmContainer = document.getElementById('rateMasterContainer');
+    if (rmContainer) rmContainer.style.display = (showPrint || showMount) ? 'flex' : 'none';
+    
+    recalcAll();
+}
+
 function recalcAll() {
-    const subtotalAssets = selectedSites.reduce((acc, s) => acc + s.rate, 0);
-    const totalPrinting = selectedSites.reduce((acc, s) => acc + (s.printing_total || 0), 0);
-    const totalMounting = selectedSites.reduce((acc, s) => acc + (s.mounting_total || 0), 0);
-    const subtotal = subtotalAssets + totalPrinting + totalMounting;
+    const showBooking = document.getElementById('gen_booking') ? document.getElementById('gen_booking').checked : true;
+    const showPrint = document.getElementById('gen_client_print_invoice') ? document.getElementById('gen_client_print_invoice').checked : false;
+    const showMount = document.getElementById('gen_client_mounting_invoice') ? document.getElementById('gen_client_mounting_invoice').checked : false;
+
+    let totalAllSQFT = 0;
+    const subtotalAssets = selectedSites.reduce((acc, s) => {
+        let assetTotal = 0;
+        const sqft = parseFloat(s.sqft) || 0;
+        const unit = parseInt(s.unit) || 1;
+        const totalItemSqft = sqft * unit;
+        totalAllSQFT += totalItemSqft;
+        
+        if (showBooking) assetTotal += (s.rate * unit);
+        if (showPrint) assetTotal += ((s.print_rate_offer || 0) * totalItemSqft);
+        if (showMount) assetTotal += ((s.mount_rate_offer || 0) * totalItemSqft);
+        
+        // Update main table row total
+        const mainRow = document.getElementById('row-' + s.id);
+        if (mainRow) {
+            const totalCell = mainRow.querySelector('.total-cell');
+            if (totalCell) totalCell.innerText = '₹' + assetTotal.toLocaleString();
+            
+            const printCalc = mainRow.querySelector('.print-calc-total');
+            if (printCalc) printCalc.innerText = '₹' + ((s.print_rate_offer || 0) * totalItemSqft).toLocaleString();
+            
+            const mountCalc = mainRow.querySelector('.mount-calc-total');
+            if (mountCalc) mountCalc.innerText = '₹' + ((s.mount_rate_offer || 0) * totalItemSqft).toLocaleString();
+        }
+        
+        // Update bucket row total
+        const bucketList = document.getElementById('bucket-list');
+        if (bucketList) {
+            // Find the idx
+            const idx = selectedSites.findIndex(x => x.id === s.id);
+            if (idx !== -1) {
+                const bucketTotalCell = bucketList.querySelector('.site-row:nth-child(' + (idx + 1) + ') .total-cell');
+                if (bucketTotalCell) {
+                     bucketTotalCell.innerText = '₹' + assetTotal.toLocaleString();
+                }
+                
+                const bPrintCalc = bucketList.querySelector('.site-row:nth-child(' + (idx + 1) + ') .print-calc-total');
+                if (bPrintCalc) bPrintCalc.innerText = '₹' + ((s.print_rate_offer || 0) * totalItemSqft).toLocaleString();
+                
+                const bMountCalc = bucketList.querySelector('.site-row:nth-child(' + (idx + 1) + ') .mount-calc-total');
+                if (bMountCalc) bMountCalc.innerText = '₹' + ((s.mount_rate_offer || 0) * totalItemSqft).toLocaleString();
+            }
+        }
+        
+        return acc + assetTotal;
+    }, 0);
+    const subtotal = subtotalAssets; // No longer adding totalPrinting as that's a vendor cost, not charged to client in subtotal
+    
     
     const taxType = document.getElementById('tax-type').value;
     const totalTax = subtotal * 0.18;
@@ -1223,6 +1417,20 @@ function recalcAll() {
     }
 
     document.getElementById('sum-grand-btm').innerText = '₹' + grand.toLocaleString(undefined, {minimumFractionDigits: 2, maximumFractionDigits: 2});
+    const sumArea = document.getElementById('sum-area-btm');
+    if (sumArea) {
+        sumArea.innerText = totalAllSQFT.toLocaleString() + ' SQFT';
+    }
+    
+    // Update table footer
+    const tblTotalSqft = document.getElementById('tbl-total-sqft');
+    if (tblTotalSqft) {
+        tblTotalSqft.innerText = totalAllSQFT.toLocaleString() + ' SQFT';
+    }
+    const tblTotalAmount = document.getElementById('tbl-total-amount');
+    if (tblTotalAmount) {
+        tblTotalAmount.innerText = '₹' + subtotal.toLocaleString(undefined, {minimumFractionDigits: 2, maximumFractionDigits: 2});
+    }
 }
 
 function openBucket() { document.getElementById('selection-bucket-panel').style.right = '0'; document.getElementById('bucket-backdrop').style.display = 'block'; }
@@ -1260,11 +1468,13 @@ function submitQuickClient() {
 }
 
 function saveDirectBooking() {
+    const entityVal = document.getElementById('entity_id').value;
     const clientVal = document.getElementById('client_id').value;
     const campaignVal = document.getElementById('campaign_name').value.trim();
     const startVal = document.getElementById('start_date').value;
     const endVal = document.getElementById('end_date').value;
 
+    if (!entityVal) return Swal.fire('Error', 'Please select a Company / Entity', 'error');
     if (!clientVal) return Swal.fire('Error', 'Please select a Client', 'error');
     if (!campaignVal) return Swal.fire('Error', 'Please enter Campaign Name', 'error');
     if (!startVal || !endVal) return Swal.fire('Error', 'Please select Booking Dates', 'error');
@@ -1274,7 +1484,7 @@ function saveDirectBooking() {
     btn.disabled = true; btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> SAVING...';
 
     const data = {
-        booking_id: document.getElementById('booking_id')?.value || null,
+        entity_id: document.getElementById('entity_id').value,
         client_id: document.getElementById('client_id').value,
         campaign_name: document.getElementById('campaign_name').value,
         contact_person: document.getElementById('contact_person').value,
@@ -1283,8 +1493,21 @@ function saveDirectBooking() {
         remark: document.getElementById('remark').value,
         billing_gstin: document.getElementById('selected_gstin')?.value || '',
         tax_type: document.getElementById('tax-type').value,
+        
+        gen_booking: document.getElementById('gen_booking') ? (document.getElementById('gen_booking').checked ? 1 : 0) : 1,
+        gen_client_print_invoice: document.getElementById('gen_client_print_invoice') ? (document.getElementById('gen_client_print_invoice').checked ? 1 : 0) : 0,
+        gen_client_mounting_invoice: document.getElementById('gen_client_mounting_invoice') ? (document.getElementById('gen_client_mounting_invoice').checked ? 1 : 0) : 0,
+        
         site_ids: selectedSites.map(s => s.id),
-        rates: selectedSites.reduce((acc, s) => { acc[s.id] = s.rate; return acc; }, {}),
+        rates: selectedSites.reduce((acc, s) => { 
+            acc[s.id] = {
+                booking: s.rate,
+                print: s.print_rate_offer || 0,
+                mount: s.mount_rate_offer || 0,
+                unit: s.unit || 1
+            };
+            return acc; 
+        }, {}),
         printing_info: selectedSites.reduce((acc, s) => { 
             acc[s.id] = { 
                 vendor_id: s.printing_vendor_id, 
@@ -1292,14 +1515,6 @@ function saveDirectBooking() {
                 total: s.printing_total 
             }; 
             return acc; 
-        }, {}),
-        mounting_info: selectedSites.reduce((acc, s) => {
-            acc[s.id] = {
-                type: s.mounting_type,
-                rate: s.mounting_rate,
-                total: s.mounting_total
-            };
-            return acc;
         }, {})
     };
 
@@ -1320,7 +1535,9 @@ function saveDirectBooking() {
         if (res.success) {
             let msg = res.message || 'Booking generated successfully!';
             
-            Swal.fire('Success', msg, 'success').then(() => window.location.href = 'bookings.php');
+            Swal.fire('Success', msg, 'success').then(() => {
+                window.location.href = res.redirect || 'bookings.php';
+            });
             if(res.po_id && res.approval_status !== 'pending_approval') {
                 // We don't auto-open pending POs
                 // window.open('generate_po.php?po_id=' + res.po_id, '_blank'); // Removed auto open per user request
@@ -1357,8 +1574,17 @@ function updateSliderImage() {
     if(lbImg) {
         lbImg.src = imgBaseUrl + currentImages[currentImgIndex];
         if(lbBadge) {
-            lbBadge.innerText = (currentImgIndex + 1) + " / " + currentImages.length;
-            lbBadge.style.display = currentImages.length > 1 ? 'block' : 'none';
+            let selCount = 0;
+            if(window.currentLightboxSiteId) {
+                const idx = selectedSites.findIndex(s => s.id == window.currentLightboxSiteId);
+                if(idx !== -1) {
+                    const site = selectedSites[idx];
+                    const selImages = site.selected_images || [site.thumbnail];
+                    selCount = selImages.length;
+                }
+            }
+            lbBadge.innerText = (currentImgIndex + 1) + " / " + currentImages.length + " (" + selCount + " Selected)";
+            lbBadge.style.display = 'block'; // Always display the badge to show selection count
         }
 
         // Update Button State
@@ -1375,6 +1601,27 @@ function updateSliderImage() {
                 btn.style.background = 'var(--primary)';
             }
         }
+
+        // Update Export Button State
+        const expBtn = document.getElementById('export-print-btn');
+        if(expBtn && window.currentLightboxSiteId) {
+            const idx = selectedSites.findIndex(s => s.id == window.currentLightboxSiteId);
+            if(idx !== -1) {
+                const site = selectedSites[idx];
+                const selImages = site.selected_images || [site.thumbnail];
+                const isSelected = selImages.includes(currentImages[currentImgIndex]);
+                
+                if(isSelected) {
+                    expBtn.innerHTML = '<i class="fas fa-check-square"></i> Selected for PPT/PDF';
+                    expBtn.style.background = '#059669';
+                    expBtn.style.borderColor = '#059669';
+                } else {
+                    expBtn.innerHTML = '<i class="far fa-square"></i> Select for PPT/PDF';
+                    expBtn.style.background = 'rgba(0,0,0,0.75)';
+                    expBtn.style.borderColor = 'rgba(255,255,255,0.25)';
+                }
+            }
+        }
     }
 }
 
@@ -1386,6 +1633,13 @@ function setPrimaryImage(e) {
         const idx = selectedSites.findIndex(s => s.id == id);
         if(idx !== -1) {
             selectedSites[idx].thumbnail = newThumb;
+            
+            // Also ensure it is selected for export/print
+            if(!selectedSites[idx].selected_images) {
+                selectedSites[idx].selected_images = [newThumb];
+            } else if(!selectedSites[idx].selected_images.includes(newThumb)) {
+                selectedSites[idx].selected_images.push(newThumb);
+            }
             
             updateBucketUI();
             
@@ -1413,6 +1667,47 @@ function setPrimaryImage(e) {
             Swal.fire('Note', 'Please select this asset first to set its primary image.', 'info');
         }
     }
+}
+
+function toggleExportImage(e) {
+    if(e) e.stopPropagation();
+    if(!window.currentLightboxSiteId) return;
+    
+    const id = window.currentLightboxSiteId;
+    const idx = selectedSites.findIndex(s => s.id == id);
+    if(idx === -1) {
+        Swal.fire('Note', 'Please select this asset first to manage its export images.', 'info');
+        return;
+    }
+    
+    let site = selectedSites[idx];
+    if(!site.selected_images) {
+        site.selected_images = [site.thumbnail || ''];
+    }
+    
+    const currentImg = currentImages[currentImgIndex];
+    const imgIdx = site.selected_images.indexOf(currentImg);
+    
+    if(imgIdx !== -1) {
+        if(site.selected_images.length <= 1) {
+            Swal.fire('Warning', 'You must keep at least one image selected for export.', 'warning');
+            return;
+        }
+        site.selected_images.splice(imgIdx, 1);
+        if((site.thumbnail || '') === currentImg) {
+            site.thumbnail = site.selected_images[0];
+            const row = document.getElementById('row-' + id);
+            if(row) {
+                const img = row.querySelector('img[onclick*="openLightboxSlider"]');
+                if(img) img.src = imgBaseUrl + site.thumbnail;
+            }
+        }
+    } else {
+        site.selected_images.push(currentImg);
+    }
+    
+    updateSliderImage();
+    updateBucketUI();
 }
 
 function nextSlide(e) { if(e) e.stopPropagation(); currentImgIndex = (currentImgIndex + 1) % currentImages.length; updateSliderImage(); }
@@ -1624,23 +1919,24 @@ document.addEventListener('DOMContentLoaded', () => {
                         closeSiteModal();
                         
                         // Select the newly added site
-                        toggleSite(
-                            res.id,
-                            res.name,
-                            parseFloat(res.rate),
-                            res.site_code,
-                            res.location,
-                            res.vendor_id,
-                            res.thumbnail,
-                            res.city,
-                            parseFloat(res.card_rate),
-                            res.size,
-                            res.type,
-                            res.light_type,
-                            res.owner_type,
-                            res.vendor_name,
-                            res.all_images
-                        );
+                        toggleSite(res.id, {
+                            id: res.id,
+                            name: res.name,
+                            card_rate: parseFloat(res.card_rate),
+                            purchase_rate: parseFloat(res.rate),
+                            site_code: res.site_code,
+                            location: res.location,
+                            vendor_id: res.vendor_id,
+                            thumbnail: res.thumbnail,
+                            city: res.city,
+                            width: parseFloat((res.size || '0x0').split('x')[0]) || 0,
+                            height: parseFloat((res.size || '0x0').split('x')[1]) || 0,
+                            type: res.type,
+                            light_type: res.light_type,
+                            owner_type: res.owner_type,
+                            vendor_name: res.vendor_name,
+                            all_images: res.all_images
+                        });
 
                         // Reload list to show it at the top
                         fetchSites(1);
@@ -1714,6 +2010,11 @@ fetchSites(1);
             <!-- Select as Primary Button -->
             <button id="primary-btn" onclick="setPrimaryImage(event)" style="position: absolute; top: 20px; left: 20px; background: var(--primary); color: white; border: none; padding: 0.6rem 1.2rem; border-radius: 10px; font-weight: 800; font-size: 0.8rem; cursor: pointer; display: flex; align-items: center; gap: 0.5rem; box-shadow: 0 10px 20px rgba(0,0,0,0.3); transition: all 0.2s;">
                 <i class="fas fa-check-circle"></i> Use as Primary Photo
+            </button>
+
+            <!-- Select for Export Button -->
+            <button id="export-print-btn" onclick="toggleExportImage(event)" style="position: absolute; top: 20px; right: 20px; background: rgba(0,0,0,0.75); color: white; border: 1px solid rgba(255,255,255,0.25); padding: 0.6rem 1.2rem; border-radius: 10px; font-weight: 800; font-size: 0.8rem; cursor: pointer; display: flex; align-items: center; gap: 0.5rem; transition: all 0.2s; z-index: 10002;">
+                <i class="far fa-square"></i> Select for PPT/PDF
             </button>
 
             <!-- Image Counter Badge -->

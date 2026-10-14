@@ -1,5 +1,6 @@
 <?php
 include_once __DIR__ . '/../config/db.php';
+require_once __DIR__ . '/../includes/ajax_auth.php';
 include_once __DIR__ . '/../includes/functions.php';
 
 header('Content-Type: application/json');
@@ -9,7 +10,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         echo json_encode(['success' => false, 'message' => 'Access Denied: You do not have permission to upload PO attachments.']);
         exit;
     }
-    $po_id = intval($_POST['po_id']);
+    $po_id = intval($_POST['po_id'] ?? 0);
     
     if (isset($_FILES['file']) && $_FILES['file']['error'] === UPLOAD_ERR_OK) {
         $uploadDir = __DIR__ . '/../uploads/pos/';
@@ -21,7 +22,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         if (move_uploaded_file($_FILES['file']['tmp_name'], $targetFile)) {
             $stmt = $pdo->prepare("INSERT INTO po_attachments (po_id, filename) VALUES (?, ?)");
             $stmt->execute([$po_id, $filename]);
-            echo json_encode(['success' => true]);
+            $insertId = $pdo->lastInsertId();
+            echo json_encode(['success' => true, 'filename' => $filename, 'attachment_id' => $insertId]);
         } else {
             echo json_encode(['success' => false, 'message' => 'Move failed']);
         }

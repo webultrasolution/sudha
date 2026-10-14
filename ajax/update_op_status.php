@@ -1,10 +1,11 @@
 <?php
 include_once __DIR__ . '/../config/db.php';
+require_once __DIR__ . '/../includes/ajax_auth.php';
 include_once __DIR__ . '/../includes/functions.php';
 
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     $data = json_decode(file_get_contents('php://input'), true);
-    $opId = intval($data['op_id']);
+    $opId = intval($data['op_id'] ?? 0);
     $status = isset($data['status']) ? clean($data['status']) : null;
     $mounterId = isset($data['assigned_mounter_id']) ? intval($data['assigned_mounter_id']) : null;
 

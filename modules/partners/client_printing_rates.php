@@ -161,7 +161,7 @@ $ratesStmt = $pdo->prepare("
         GROUP_CONCAT(COALESCE(s.site_code, '-') SEPARATOR '||') as site_codes,
         GROUP_CONCAT(COALESCE(s.width, 0) SEPARATOR '||') as widths,
         GROUP_CONCAT(COALESCE(s.height, 0) SEPARATOR '||') as heights,
-        GROUP_CONCAT(r.media_type SEPARATOR '||') as media_types,
+        GROUP_CONCAT(COALESCE(r.media_type, s.type, 'Billboard') SEPARATOR '||') as media_types,
         GROUP_CONCAT(r.rate_per_sqft SEPARATOR '||') as rates,
         MIN(r.created_at) as created_at,
         SUM(r.rate_per_sqft * COALESCE(s.width, 0) * COALESCE(s.height, 0)) as total_amount,
@@ -172,6 +172,13 @@ $ratesStmt = $pdo->prepare("
         MAX(r.campaign_name) as campaign_name,
         MAX(r.brand_name) as brand_name,
         MAX(r.custom_invoice_number) as custom_invoice_number,
+        MAX(r.custom_invoice_date) as invoice_date,
+        MAX(r.billing_gstin) as billing_gstin,
+        MAX(r.booking_id) as booking_id,
+        (SELECT invoice_number FROM invoices WHERE booking_id = MAX(r.booking_id) AND type = 'tax' LIMIT 1) as tax_invoice_number,
+        MAX(c.state) as client_state,
+        MAX(c.gstin) as client_gstin,
+        MAX(c.additional_gst) as additional_gst,
         (SELECT remarks FROM approval_requests WHERE entity_type = 'client_printing' AND entity_ref COLLATE utf8mb4_unicode_ci = r.po_number COLLATE utf8mb4_unicode_ci ORDER BY id DESC LIMIT 1) as rejection_reason,
         (SELECT COUNT(*) FROM bookings WHERE booking_number COLLATE utf8mb4_unicode_ci = r.po_number COLLATE utf8mb4_unicode_ci) as is_unified
     FROM client_printing_rates r
@@ -187,233 +194,341 @@ $rates = $ratesStmt->fetchAll();
 $clients = $pdo->query("SELECT id, name FROM partners WHERE type = 'client' ORDER BY name ASC")->fetchAll();
 ?>
 
-<div class="card">
-    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1.5rem;">
-        <h2 style="font-size: 1.25rem;">Client Printing Invoice</h2>
+<div class="card" style="box-shadow: 0 4px 12px rgba(0,0,0,0.03); border: 1px solid #e2e8f0; border-radius: 12px;">
+    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1.5rem; flex-wrap: wrap; gap: 1rem;">
+        <div>
+            <h2 style="font-size: 1.35rem; font-weight: 800; color: #0f172a; margin: 0; display: flex; align-items: center; gap: 8px;">
+                <i class="fas fa-file-invoice-dollar" style="color: #0d9488;"></i> Client Printing Invoice
+            </h2>
+            <p style="margin: 3px 0 0 0; font-size: 0.82rem; color: #64748b;">Manage client printing estimates, invoices, rates, and tax orders</p>
+        </div>
         <div style="display: flex; gap: 0.75rem;">
             <?php if (canAdd('clients')): ?>
-            <a href="create_client_printing_po.php" class="btn btn-primary" style="display: inline-flex; align-items: center; gap: 6px; text-decoration: none; background: #0d9488; border-color: #0d9488;">
+            <a href="create_client_printing_po.php" class="btn btn-primary" style="display: inline-flex; align-items: center; gap: 6px; text-decoration: none; padding: 0.6rem 1.15rem; font-weight: 600; border-radius: 8px; box-shadow: 0 2px 6px rgba(13, 148, 136, 0.25);">
                 <i class="fas fa-plus"></i> Add New Client Printing Invoice 
             </a>
             <?php endif; ?>
         </div>
     </div>
 
-    <form method="get" action="client_printing_rates.php" style="display:flex; flex-wrap: wrap; gap:1rem; align-items:flex-end; margin-bottom:1.5rem;">
-        <div style="display:flex; flex-direction:column; gap:0.35rem;">
-            <label style="font-size:0.85rem; color:#475569; font-weight:600;">Client</label>
-            <select name="client_id" style="padding:0.75rem 0.95rem; border-radius:0.75rem; border:1px solid #d1d5db; min-width:220px;">
-                <option value="">All Clients</option>
-                <?php foreach ($clients as $client): ?>
-                    <option value="<?php echo $client['id']; ?>" <?php echo $selectedClientId === intval($client['id']) ? 'selected' : ''; ?>><?php echo htmlspecialchars($client['name']); ?></option>
-                <?php endforeach; ?>
-            </select>
-        </div>
-        <div style="display:flex; flex-direction:column; gap:0.35rem; min-width:280px;">
-            <label style="font-size:0.85rem; color:#475569; font-weight:600;">Campaign Name</label>
-            <input type="text" name="campaign_name" value="<?php echo htmlspecialchars($campaignFilter); ?>" placeholder="Search campaign..." style="padding:0.75rem 0.95rem; border-radius:0.75rem; border:1px solid #d1d5db; min-width:280px;">
-        </div>
-        <div style="display:flex; gap:0.75rem;">
-            <button type="submit" class="btn btn-primary" style="padding:0.85rem 1.25rem;">Filter</button>
-            <a href="client_printing_rates.php" class="btn" style="background:#f8fafc; color:#475569; border:1px solid #cbd5e1; padding:0.85rem 1.25rem; text-decoration:none;">Reset</a>
-        </div>
-    </form>
+    <!-- Filter Toolbar -->
+    <div style="background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 10px; padding: 0.85rem 1.25rem; margin-bottom: 1.5rem;">
+        <form method="get" action="client_printing_rates.php" style="display: flex; align-items: flex-end; gap: 0.75rem; flex-wrap: nowrap; width: 100%;">
+            <div style="flex: 1; min-width: 180px;">
+                <label style="display: block; font-size: 0.72rem; font-weight: 700; color: #475569; text-transform: uppercase; letter-spacing: 0.03em; margin-bottom: 0.35rem; white-space: nowrap;">
+                    <i class="fas fa-user-tie text-slate-400" style="margin-right: 4px;"></i> Client
+                </label>
+                <select name="client_id" class="form-control" style="width: 100%; height: 38px; border-radius: 7px; border: 1px solid #cbd5e1; font-size: 0.85rem; padding: 0 0.75rem; background-color: #fff; box-sizing: border-box;">
+                    <option value="">All Clients</option>
+                    <?php foreach ($clients as $client): ?>
+                        <option value="<?php echo $client['id']; ?>" <?php echo $selectedClientId === intval($client['id']) ? 'selected' : ''; ?>><?php echo htmlspecialchars($client['name']); ?></option>
+                    <?php endforeach; ?>
+                </select>
+            </div>
+            <div style="flex: 1.5; min-width: 200px;">
+                <label style="display: block; font-size: 0.72rem; font-weight: 700; color: #475569; text-transform: uppercase; letter-spacing: 0.03em; margin-bottom: 0.35rem; white-space: nowrap;">
+                    <i class="fas fa-bullhorn text-slate-400" style="margin-right: 4px;"></i> Campaign Name
+                </label>
+                <input type="text" name="campaign_name" value="<?php echo htmlspecialchars($campaignFilter); ?>" placeholder="Search campaign..." class="form-control" style="width: 100%; height: 38px; border-radius: 7px; border: 1px solid #cbd5e1; font-size: 0.85rem; padding: 0 0.75rem; background-color: #fff; box-sizing: border-box;">
+            </div>
+            <div style="display: flex; gap: 0.4rem; flex-shrink: 0;">
+                <button type="submit" class="btn btn-primary" style="height: 38px; padding: 0 1.15rem; border-radius: 7px; font-weight: 600; display: inline-flex; align-items: center; gap: 5px; box-shadow: 0 2px 4px rgba(13, 148, 136, 0.15); white-space: nowrap;">
+                    <i class="fas fa-filter"></i> Filter
+                </button>
+                <a href="client_printing_rates.php" class="btn" style="height: 38px; padding: 0 0.85rem; border-radius: 7px; font-weight: 600; display: inline-flex; align-items: center; gap: 5px; background: #fff; color: #64748b; border: 1px solid #cbd5e1; text-decoration: none; white-space: nowrap;">
+                    <i class="fas fa-undo"></i> Reset
+                </a>
+            </div>
+        </form>
+    </div>
 
-    <table class="table">
-        <thead>
-            <tr>
-                <th>Invoice / PO #</th>
-                <th>Campaign / Brand</th>
-                <th>Client</th>
-                <th>Date</th>
-                <th>Amount</th>
-                <th>Status</th>
-                <th>Actions</th>
-            </tr>
-        </thead>
-        <tbody>
-            <?php if (empty($rates)): ?>
+    <!-- Table -->
+    <div class="table-responsive" style="overflow-x: auto; border: 1px solid #e2e8f0; border-radius: 10px; background: #fff;">
+        <table class="table" style="margin-bottom: 0; width: 100%; border-collapse: collapse;">
+            <thead style="background: #f8fafc;">
                 <tr>
-                    <td colspan="7" style="text-align: center; color: var(--secondary); padding: 2rem;">No client printing invoices found.</td>
+                    <th style="padding: 12px 14px; font-size: 0.75rem; font-weight: 700; color: #475569; text-transform: uppercase; letter-spacing: 0.05em; border-bottom: 2px solid #e2e8f0; white-space: nowrap;">Invoice / PO #</th>
+                    <th style="padding: 12px 14px; font-size: 0.75rem; font-weight: 700; color: #475569; text-transform: uppercase; letter-spacing: 0.05em; border-bottom: 2px solid #e2e8f0;">Campaign / Brand</th>
+                    <th style="padding: 12px 14px; font-size: 0.75rem; font-weight: 700; color: #475569; text-transform: uppercase; letter-spacing: 0.05em; border-bottom: 2px solid #e2e8f0;">Client</th>
+                    <th style="padding: 12px 14px; font-size: 0.75rem; font-weight: 700; color: #475569; text-transform: uppercase; letter-spacing: 0.05em; border-bottom: 2px solid #e2e8f0; white-space: nowrap;">Sites</th>
+                    <th style="padding: 12px 14px; font-size: 0.75rem; font-weight: 700; color: #475569; text-transform: uppercase; letter-spacing: 0.05em; border-bottom: 2px solid #e2e8f0; white-space: nowrap;">Media Type</th>
+                    <th style="padding: 12px 14px; font-size: 0.75rem; font-weight: 700; color: #475569; text-transform: uppercase; letter-spacing: 0.05em; border-bottom: 2px solid #e2e8f0; white-space: nowrap;">Date</th>
+                    <th style="padding: 12px 14px; font-size: 0.75rem; font-weight: 700; color: #475569; text-transform: uppercase; letter-spacing: 0.05em; border-bottom: 2px solid #e2e8f0; white-space: nowrap;">Amount</th>
+                    <th style="padding: 12px 14px; font-size: 0.75rem; font-weight: 700; color: #475569; text-transform: uppercase; letter-spacing: 0.05em; border-bottom: 2px solid #e2e8f0; text-align: center; white-space: nowrap;">Status</th>
+                    <th style="padding: 12px 14px; font-size: 0.75rem; font-weight: 700; color: #475569; text-transform: uppercase; letter-spacing: 0.05em; border-bottom: 2px solid #e2e8f0; text-align: center; white-space: nowrap;">Actions</th>
                 </tr>
-            <?php else: ?>
-                <?php foreach ($rates as $r): ?>
-                 <?php 
-                    $ids = explode('||', $r['rate_ids']);
-                    
-                    // Re-calculate Total Amount
-                    $widths = explode('||', $r['widths']);
-                    $heights = explode('||', $r['heights']);
-                    $unitRates = explode('||', $r['rates']);
-                    
-                    $totalGroupAmount = 0;
-                    foreach($ids as $i => $id) {
-                        $sqft = floatval($widths[$i]) * floatval($heights[$i]);
-                        $totalGroupAmount += ($sqft * floatval($unitRates[$i]));
-                    }
-                    $gst = $totalGroupAmount * 0.18;
-                    $grandTotal = $totalGroupAmount + $gst;
-                ?>
-                <tr>
-                    <td>
-                        <?php if ($r['is_final_invoice'] && !empty($r['custom_invoice_number'])): ?>
-                            <strong>#<?php echo $r['custom_invoice_number']; ?></strong>
-                        <?php elseif ($r['po_number']): ?>
-                            <strong>#<?php echo $r['po_number']; ?></strong>
-                        <?php else: ?>
-                            <span style="color: #cbd5e1; font-weight: 400;">N/A</span>
-                        <?php endif; ?>
-                    </td>
-                    <td>
-                        <?php 
-                        $camp_brand = [];
-                        if (!empty($r['campaign_name'])) $camp_brand[] = trim($r['campaign_name']);
-                        if (!empty($r['brand_name'])) $camp_brand[] = trim($r['brand_name']);
-                        $display_camp_brand = implode(' / ', $camp_brand);
-                        if (!empty($display_camp_brand)): ?>
-                            <div style="font-size: 0.72rem; color: #2563eb; font-weight: 700; display: inline-flex; align-items: center; gap: 4px; background: #eff6ff; padding: 2px 6px; border-radius: 4px;">
-                                <i class="fas fa-bullhorn" style="font-size: 0.65rem;"></i> <?php echo htmlspecialchars($display_camp_brand); ?>
+            </thead>
+            <tbody>
+                <?php if (empty($rates)): ?>
+                    <tr>
+                        <td colspan="9" style="text-align: center; color: #64748b; padding: 3rem 1rem;">
+                            <div style="font-size: 2rem; color: #cbd5e1; margin-bottom: 0.5rem;"><i class="fas fa-folder-open"></i></div>
+                            <div style="font-weight: 600; font-size: 0.95rem;">No client printing invoices found</div>
+                            <div style="font-size: 0.8rem; color: #94a3b8; margin-top: 4px;">Try adjusting your filter options or add a new invoice.</div>
+                        </td>
+                    </tr>
+                <?php else: ?>
+                    <?php foreach ($rates as $r): ?>
+                    <?php 
+                        $ids = explode('||', $r['rate_ids']);
+                        $widths = explode('||', $r['widths']);
+                        $heights = explode('||', $r['heights']);
+                        $unitRates = explode('||', $r['rates']);
+                        $siteCodes = explode('||', $r['site_codes']);
+                        $mtypes = array_filter(array_unique(explode('||', $r['media_types'])));
+                        if (empty($mtypes)) $mtypes = ['-'];
+                        
+                        $totalGroupAmount = 0;
+                        foreach($ids as $i => $id) {
+                            $sqft = floatval($widths[$i] ?? 0) * floatval($heights[$i] ?? 0);
+                            $totalGroupAmount += ($sqft * floatval($unitRates[$i] ?? 0));
+                        }
+                        $gst = $totalGroupAmount * 0.18;
+                        $grandTotal = $totalGroupAmount + $gst;
+                    ?>
+                    <tr style="border-bottom: 1px solid #f1f5f9; transition: background 0.15s ease;">
+                        <td style="vertical-align: middle; padding: 12px 14px; white-space: nowrap;">
+                            <?php if (!empty($r['custom_invoice_number'])): ?>
+                                <strong style="color: #0d9488; font-weight: 800; font-size: 0.9rem;"><?php echo htmlspecialchars($r['custom_invoice_number']); ?></strong><br>
+                                <span style="font-size: 0.65rem; color: #94a3b8; font-weight: 600;">#<?php echo htmlspecialchars($r['po_number'] ?? ''); ?></span>
+                            <?php elseif ($r['po_number']): ?>
+                                <strong style="color: #0d9488; font-weight: 800; font-size: 0.9rem;">#<?php echo htmlspecialchars($r['po_number']); ?></strong>
+                            <?php else: ?>
+                                <span style="color: #cbd5e1; font-weight: 500;">N/A</span>
+                            <?php endif; ?>
+                        </td>
+                        <td style="vertical-align: middle; padding: 12px 14px;">
+                            <?php 
+                            $camp_brand = [];
+                            if (!empty($r['campaign_name'])) $camp_brand[] = trim($r['campaign_name']);
+                            if (!empty($r['brand_name'])) $camp_brand[] = trim($r['brand_name']);
+                            $display_camp_brand = implode(' / ', $camp_brand);
+                            if (!empty($display_camp_brand)): ?>
+                                <div style="font-size: 0.72rem; color: #2563eb; font-weight: 700; display: inline-flex; align-items: center; gap: 4px; background: #eff6ff; border: 1px solid #dbeafe; padding: 2px 7px; border-radius: 4px; max-width: 240px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;" title="<?php echo htmlspecialchars($display_camp_brand); ?>">
+                                    <i class="fas fa-bullhorn" style="font-size: 0.65rem; flex-shrink: 0;"></i> <span><?php echo htmlspecialchars($display_camp_brand); ?></span>
+                                </div>
+                            <?php else: ?>
+                                <span style="color: #cbd5e1;">-</span>
+                            <?php endif; ?>
+                        </td>
+                        <td style="vertical-align: middle; padding: 12px 14px;">
+                            <div style="font-weight: 700; color: #1e293b; font-size: 0.9rem;"><?php echo htmlspecialchars($r['client_name'], ENT_QUOTES, 'UTF-8', false); ?></div>
+                        </td>
+                        <td style="vertical-align: middle; padding: 12px 14px; white-space: nowrap;">
+                            <div style="font-size: 0.8rem; color: #475569; font-weight: 600;"><?php echo count($ids); ?> site<?php echo count($ids) > 1 ? 's' : ''; ?></div>
+                            <div style="font-size: 0.7rem; color: #94a3b8;">
+                                <?php echo htmlspecialchars(implode(', ', array_slice($siteCodes, 0, 3))); ?>
+                                <?php if (count($siteCodes) > 3) echo ' +' . (count($siteCodes) - 3) . ' more'; ?>
                             </div>
-                        <?php else: ?>
-                            <span style="color: #cbd5e1;">-</span>
-                        <?php endif; ?>
-                    </td>
-                    <td>
-                        <div style="font-weight: 700; color: #1e293b;"><?php echo htmlspecialchars($r['client_name'], ENT_QUOTES, 'UTF-8', false); ?></div>
-                    </td>
-                    <td>
-                        <?php echo date('d M Y', strtotime($r['created_at'])); ?>
-                    </td>
-                    <td>
-                        <div style="font-weight: 800; color: #059669;">₹<?php echo number_format($totalGroupAmount, 2); ?></div>
-                        <div style="font-size: 0.65rem; color: #94a3b8;">+GST: ₹<?php echo number_format($gst, 2); ?></div>
-                        <div style="font-size: 0.7rem; font-weight: 800; color: #0f172a;">Total: ₹<?php echo number_format($grandTotal, 2); ?></div>
-                    </td>
-                    <td>
-                        <?php if ($r['approval_status'] === 'pending_approval'): ?>
-                            <span style="background: #fff7ed; color: #c2410c; border: 1px solid #fed7aa; padding: 0.15rem 0.5rem; border-radius: 50px; font-size: 0.6rem; font-weight: 800; display: inline-flex; align-items: center; gap: 4px; animation: pulse-approval 2s infinite;" title="Pending Admin Approval">
-                                <i class="fas fa-clock"></i> Awaiting Approval
-                            </span>
-                        <?php elseif ($r['approval_status'] === 'rejected'): ?>
-                            <span style="background: #fee2e2; color: #991b1b; border: 1px solid #fca5a5; padding: 0.15rem 0.5rem; border-radius: 50px; font-size: 0.6rem; font-weight: 800; display: inline-flex; align-items: center; gap: 4px;" title="Rejected by Admin">
-                                <i class="fas fa-times-circle"></i> Rejected
-                            </span>
-                            <?php if (!empty($r['rejection_reason'])): ?>
-                                <div style="font-size: 0.65rem; color: #ef4444; margin-top: 4px; font-weight: 600;" title="<?php echo htmlspecialchars($r['rejection_reason']); ?>">
-                                    Reason: <?php echo htmlspecialchars($r['rejection_reason']); ?>
+                        </td>
+                        <td style="vertical-align: middle; padding: 12px 14px;">
+                            <?php foreach ($mtypes as $mt): ?>
+                                <span style="background: #f0fdf4; color: #0d9488; padding: 0.15rem 0.5rem; border-radius: 4px; font-size: 0.65rem; font-weight: 800; display: inline-block; margin: 1px; white-space: nowrap;"><?php echo htmlspecialchars($mt); ?></span>
+                            <?php endforeach; ?>
+                        </td>
+                        <td style="vertical-align: middle; padding: 12px 14px; white-space: nowrap; font-size: 0.82rem; color: #475569; font-weight: 500;">
+                            <i class="far fa-calendar-alt" style="color: #94a3b8; margin-right: 4px;"></i>
+                            <?php echo !empty($r['invoice_date']) ? date('d M Y', strtotime($r['invoice_date'])) : date('d M Y', strtotime($r['created_at'])); ?>
+                        </td>
+                        <td style="vertical-align: middle; padding: 12px 14px; white-space: nowrap;">
+                            <div style="font-weight: 800; color: #059669; font-size: 0.92rem;">₹<?php echo number_format($totalGroupAmount, 2); ?></div>
+                            <div style="font-size: 0.7rem; color: #64748b; margin-top: 1px;">+GST: ₹<?php echo number_format($gst, 2); ?></div>
+                            <div style="font-size: 0.75rem; font-weight: 800; color: #0f172a; margin-top: 1px;">Total: ₹<?php echo number_format($grandTotal, 2); ?></div>
+                        </td>
+                        <td style="vertical-align: middle; padding: 12px 14px; text-align: center; white-space: nowrap;">
+                            <?php if ($r['approval_status'] === 'pending_approval'): ?>
+                                <span class="status-badge status-pending" title="Pending Admin Approval">
+                                    <i class="fas fa-clock"></i> Awaiting Approval
+                                </span>
+                            <?php elseif ($r['approval_status'] === 'rejected'): ?>
+                                <span class="status-badge status-rejected" title="Rejected by Admin">
+                                    <i class="fas fa-times-circle"></i> Rejected
+                                </span>
+                                <?php if (!empty($r['rejection_reason'])): ?>
+                                    <div style="font-size: 0.68rem; color: #dc2626; margin-top: 3px; font-weight: 600;" title="<?php echo htmlspecialchars($r['rejection_reason']); ?>">
+                                        Reason: <?php echo htmlspecialchars($r['rejection_reason']); ?>
+                                    </div>
+                                <?php endif; ?>
+                            <?php elseif ($r['is_final_invoice'] || (!empty($r['booking_id']) && !empty($r['tax_invoice_number']))): ?>
+                                <span class="status-badge status-approved">
+                                    <i class="fas fa-check-circle"></i> Final Invoice
+                                </span>
+                                <div style="margin-top: 4px;">
+                                    <?php if (!empty($r['tax_invoice_number'])): ?>
+                                        <span class="badge" style="background: #ecfdf5; color: #047857; border: 1px solid #a7f3d0; padding: 0.15rem 0.5rem; border-radius: 4px; font-size: 0.65rem; font-weight: 700; display: inline-flex; align-items: center; gap: 4px;" title="Tax Invoice Number">
+                                            <i class="fas fa-file-invoice-dollar"></i> <?php echo htmlspecialchars($r['tax_invoice_number']); ?>
+                                        </span>
+                                    <?php elseif (!empty($r['custom_invoice_number'])): ?>
+                                        <span class="badge" style="background: #ecfdf5; color: #047857; border: 1px solid #a7f3d0; padding: 0.15rem 0.5rem; border-radius: 4px; font-size: 0.65rem; font-weight: 700; display: inline-flex; align-items: center; gap: 4px;" title="Custom Invoice Number">
+                                            <i class="fas fa-file-invoice-dollar"></i> <?php echo htmlspecialchars($r['custom_invoice_number']); ?>
+                                        </span>
+                                    <?php endif; ?>
+                                </div>
+                            <?php else: ?>
+                                <span class="status-badge status-draft">
+                                    <i class="fas fa-file-invoice"></i> Draft
+                                </span>
+                            <?php endif; ?>
+                            <?php if (!empty($r['is_unified'])): ?>
+                                <div style="margin-top: 3px;">
+                                    <span style="background: #f3e8ff; color: #6b21a8; border: 1px solid #e9d5ff; padding: 2px 7px; border-radius: 50px; font-size: 0.65rem; font-weight: 800; display: inline-flex; align-items: center; gap: 4px;">
+                                        <i class="fas fa-link"></i> Unified Booking
+                                    </span>
                                 </div>
                             <?php endif; ?>
-                        <?php elseif ($r['is_final_invoice']): ?>
-                            <span style="background: #f0fdf4; color: #15803d; border: 1px solid #dcfce7; padding: 0.15rem 0.5rem; border-radius: 50px; font-size: 0.6rem; font-weight: 800; display: inline-flex; align-items: center; gap: 4px;">
-                                <i class="fas fa-check-circle"></i> Final Invoice
-                            </span>
-                        <?php else: ?>
-                            <span style="background: #e0f2fe; color: #0369a1; border: 1px solid #bae6fd; padding: 0.15rem 0.5rem; border-radius: 50px; font-size: 0.6rem; font-weight: 800; display: inline-flex; align-items: center; gap: 4px;">
-                                <i class="fas fa-file-invoice"></i> Draft
-                            </span>
-                        <?php endif; ?>
-                        <?php if (!empty($r['is_unified'])): ?>
-                            <span style="background: #f3e8ff; color: #6b21a8; border: 1px solid #e9d5ff; padding: 0.15rem 0.5rem; border-radius: 50px; font-size: 0.6rem; font-weight: 800; display: inline-flex; align-items: center; gap: 4px; margin-top: 4px;">
-                                <i class="fas fa-link"></i> Unified Booking
-                            </span>
-                        <?php endif; ?>
-                    </td>
-                    <td>
-                        <?php 
-                            $viewUrl = "view_client_printing_po.php?client_id=" . $r['client_id'];
-                            if ($r['po_number']) {
-                                $viewUrl .= "&po_number=" . urlencode($r['po_number']);
-                            } else {
-                                foreach($ids as $id) $viewUrl .= "&rate_ids[]=" . $id;
-                            }
-                        ?>
-                        <?php if (hasRole('admin') || $r['approval_status'] === 'approved' || $r['approval_status'] === 'rejected'): ?>
-                        <a href="<?php echo $viewUrl; ?>" class="btn-icon" style="color: #0d9488;" title="View Details">
-                            <i class="fas fa-eye"></i>
-                        </a>
-                        <?php endif; ?>
-                        
-                        <?php if ($r['is_final_invoice']): ?>
-                            <?php 
-                                $taxInvUrl = "../operations/client_printing.php?client_id=" . $r['client_id'] . "&preview=1&is_final=1";
-                                foreach($ids as $id) $taxInvUrl .= "&rate_ids[]=" . $id;
-                            ?>
-                            <a href="<?php echo $taxInvUrl; ?>" target="_blank" class="btn-icon" style="color: #10b981;" title="View Final Tax Invoice">
-                                <i class="fas fa-file-pdf"></i>
-                            </a>
-                        <?php else: ?>
-                            <?php if ($r['approval_status'] !== 'pending_approval' && empty($r['is_unified'])): ?>
-                            <button class="btn-icon" onclick="openPrintingInvoicePopup('<?php echo htmlspecialchars($r['po_number'] ?? '', ENT_QUOTES); ?>', <?php echo $r['client_id']; ?>, '<?php echo implode(',', $ids); ?>')" style="color: #0f172a;" title="Generate Final Tax Invoice">
-                                <i class="fas fa-file-invoice-dollar"></i>
-                            </button>
-                            <?php endif; ?>
-                        <?php endif; ?>
+                        </td>
+                        <td style="vertical-align: middle; padding: 12px 14px; text-align: center; white-space: nowrap;">
+                            <div style="display: inline-flex; align-items: center; gap: 4px; background: #f8fafc; border: 1px solid #e2e8f0; padding: 3px 4px; border-radius: 8px;">
+                                <?php 
+                                    $viewUrl = "view_client_printing_po.php?client_id=" . $r['client_id'];
+                                    if ($r['po_number']) {
+                                        $viewUrl .= "&po_number=" . urlencode($r['po_number']);
+                                    } else {
+                                        foreach($ids as $id) $viewUrl .= "&rate_ids[]=" . $id;
+                                    }
+                                ?>
+                                <?php if (hasRole('admin') || $r['approval_status'] === 'approved' || $r['approval_status'] === 'rejected'): ?>
+                                <a href="<?php echo $viewUrl; ?>" target="_blank" class="table-action-btn action-view" title="View Details / Print Estimate">
+                                    <i class="fas fa-eye"></i>
+                                </a>
+                                <?php endif; ?>
+                                
+                                <?php if (!$r['is_final_invoice'] && $r['approval_status'] !== 'pending_approval' && empty($r['booking_id'])): ?>
+                                <button type="button" class="table-action-btn action-invoice" onclick="openPrintingInvoicePopup('<?php echo htmlspecialchars($r['po_number'] ?? '', ENT_QUOTES); ?>', <?php echo $r['client_id']; ?>, '<?php echo implode(',', $ids); ?>')" title="Generate Final Tax Invoice">
+                                    <i class="fas fa-file-invoice-dollar"></i>
+                                </button>
+                                <?php endif; ?>
 
-                        <?php if (hasRole('admin') || ($r['approval_status'] !== 'approved')): ?>
-                        <?php 
-                            $editUrl = "create_client_printing_po.php?action=edit&client_id=" . $r['client_id'];
-                            if ($r['po_number']) {
-                                $editUrl .= "&po_number=" . urlencode($r['po_number']);
-                            } else {
-                                foreach($ids as $id) $editUrl .= "&rate_ids[]=" . $id;
-                            }
-                        ?>
-                        <a href="<?php echo $editUrl; ?>" class="btn-icon" style="color: #0284c7;" title="Edit">
-                            <i class="fas fa-edit"></i>
-                        </a>
-                        <?php endif; ?>
-                        
-                        <?php if (canDelete('clients')): ?>
-                        <button class="btn-icon btn-delete" onclick="deleteRate('<?php echo htmlspecialchars($r['po_number'] ?? '', ENT_QUOTES); ?>', '<?php echo htmlspecialchars($r['rate_ids'], ENT_QUOTES); ?>')" title="Delete">
-                            <i class="fas fa-trash"></i>
-                        </button>
-                        <?php endif; ?>
-                    </td>
-                </tr>
-                <?php endforeach; ?>
-            <?php endif; ?>
-        </tbody>
-    </table>
+                                <?php if ($r['is_final_invoice'] || (!empty($r['booking_id']) && !empty($r['tax_invoice_number']))): ?>
+                                    <?php if (!empty($r['booking_id'])): ?>
+                                        <a href="../operations/generate_invoice.php?booking_id=<?php echo $r['booking_id']; ?>" target="_blank" class="table-action-btn action-pdf" title="View Booking Tax Invoice">
+                                            <i class="fas fa-file-pdf"></i>
+                                        </a>
+                                    <?php else: ?>
+                                        <?php 
+                                            $taxInvUrl = "../operations/client_printing.php?client_id=" . $r['client_id'] . "&preview=1&is_final=1";
+                                            foreach($ids as $id) $taxInvUrl .= "&rate_ids[]=" . $id;
+                                        ?>
+                                        <a href="<?php echo $taxInvUrl; ?>" target="_blank" class="table-action-btn action-pdf" title="View Final Tax Invoice">
+                                            <i class="fas fa-file-pdf"></i>
+                                        </a>
+                                    <?php endif; ?>
+                                <?php endif; ?>
+
+                                <?php if ((hasRole('admin') || ($r['approval_status'] !== 'approved')) && empty($r['booking_id'])): ?>
+                                <?php 
+                                    $editUrl = "create_client_printing_po.php?action=edit&client_id=" . $r['client_id'];
+                                    if ($r['po_number']) {
+                                        $editUrl .= "&po_number=" . urlencode($r['po_number']);
+                                    } else {
+                                        foreach($ids as $id) $editUrl .= "&rate_ids[]=" . $id;
+                                    }
+                                ?>
+                                <a href="<?php echo $editUrl; ?>" class="table-action-btn action-edit" title="Edit Invoice">
+                                    <i class="fas fa-edit"></i>
+                                </a>
+                                <?php endif; ?>
+                                
+                                <?php if (canDelete('clients') && empty($r['booking_id'])): ?>
+                                <button type="button" class="table-action-btn action-delete" onclick="deleteRate('<?php echo htmlspecialchars($r['po_number'] ?? '', ENT_QUOTES); ?>', '<?php echo htmlspecialchars($r['rate_ids'], ENT_QUOTES); ?>')" title="Delete Invoice">
+                                    <i class="fas fa-trash-alt"></i>
+                                </button>
+                                <?php endif; ?>
+                            </div>
+                        </td>
+                    </tr>
+                    <?php endforeach; ?>
+                <?php endif; ?>
+            </tbody>
+        </table>
+    </div>
 </div>
 
 <input type="file" id="po-list-upload-input" style="display: none;" onchange="handlePOUpload(this)" accept=".pdf,.png,.jpg,.jpeg">
 
 <style>
-.btn-upload-row {
-    background: #f0fdf4;
-    color: #166534;
-    border: 1px dashed #bbf7d0;
-    padding: 0.25rem 0.5rem;
-    border-radius: 6px;
-    font-size: 0.75rem;
-    font-weight: 700;
-    cursor: pointer;
+/* Status Badges */
+.status-badge {
     display: inline-flex;
     align-items: center;
     gap: 4px;
-    transition: all 0.2s;
+    padding: 3px 8px;
+    border-radius: 50px;
+    font-size: 0.68rem;
+    font-weight: 700;
+    white-space: nowrap;
 }
-.btn-upload-row:hover {
-    background: #dcfce7;
-    border-color: #86efac;
-    transform: translateY(-1px);
+.status-approved {
+    background: #f0fdf4;
+    color: #15803d;
+    border: 1px solid #bbf7d0;
 }
-.attachment-badge {
+.status-pending {
+    background: #fff7ed;
+    color: #c2410c;
+    border: 1px solid #fed7aa;
+    animation: pulse-approval 2s infinite;
+}
+.status-rejected {
+    background: #fef2f2;
+    color: #b91c1c;
+    border: 1px solid #fecaca;
+}
+.status-draft {
+    background: #f1f5f9;
+    color: #475569;
+    border: 1px solid #cbd5e1;
+}
+
+/* Table Action Buttons */
+.table-action-btn {
     display: inline-flex;
     align-items: center;
     justify-content: center;
-    width: 26px;
-    height: 26px;
+    width: 28px;
+    height: 28px;
     border-radius: 6px;
-    background: #f1f5f9;
-    color: #475569;
-    font-size: 0.85rem;
-    transition: all 0.2s;
+    font-size: 0.8rem;
+    background: #ffffff;
+    border: 1px solid #e2e8f0;
+    color: #64748b;
+    cursor: pointer;
+    transition: all 0.15s ease-in-out;
+    text-decoration: none;
 }
-.attachment-badge:hover {
-    background: #e2e8f0;
-    color: #0d9488;
+.table-action-btn:hover {
     transform: translateY(-1px);
+    box-shadow: 0 2px 4px rgba(0,0,0,0.06);
+}
+.table-action-btn.action-view:hover {
+    background: #f0fdfa;
+    border-color: #99f6e4;
+    color: #0d9488;
+}
+.table-action-btn.action-edit:hover {
+    background: #f0f9ff;
+    border-color: #bae6fd;
+    color: #0284c7;
+}
+.table-action-btn.action-invoice:hover {
+    background: #ecfdf5;
+    border-color: #a7f3d0;
+    color: #059669;
+}
+.table-action-btn.action-pdf:hover {
+    background: #fff1f2;
+    border-color: #fecdd3;
+    color: #e11d48;
+}
+.table-action-btn.action-delete:hover {
+    background: #fef2f2;
+    border-color: #fecaca;
+    color: #dc2626;
+}
+
+@keyframes pulse-approval {
+    0%, 100% { opacity: 1; transform: scale(1); }
+    50% { opacity: 0.85; transform: scale(0.98); }
 }
 </style>
 

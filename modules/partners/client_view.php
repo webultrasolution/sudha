@@ -5,7 +5,7 @@ include_once __DIR__ . '/../../includes/functions.php';
 // Enforce View Permission at Page Level
 requirePermission('clients', 'view');
 
-$id = $_GET['id'] ?? null;
+$id = intval($_GET['id'] ?? 0);
 if (!$id) { header("Location: clients.php"); exit; }
 
 $client = $pdo->prepare("SELECT * FROM partners WHERE id = ? AND type = 'client'");
