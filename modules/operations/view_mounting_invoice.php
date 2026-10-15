@@ -507,7 +507,14 @@ $igst_pct = $isInterState ? 18 : 0;
                 <div style="font-weight: bold; text-decoration: underline; font-size: 10px;">Terms & Conditions</div>
             </div>
             <div style="margin: 0; line-height: 1.2; white-space: pre-wrap;">
-                <?php echo nl2br(htmlspecialchars($company_terms)); ?>
+                <?php if (!empty($company_terms)): ?>
+                    <?php echo nl2br(htmlspecialchars($company_terms)); ?>
+                <?php else: ?>
+                    <div>E.&amp; O.E.</div>
+                    <div>1. Interest @ 18% p.a. will be charged if the payment is not made within the stipulated time.</div>
+                    <div>2. Subject to &lsquo;Malda&rsquo; Jurisdiction only.</div>
+                    <div>3. It is declared that M/S Sudha Creative is not required to issue E-Invoice in terms of rule 48(4) CGST rules, 2017.</div>
+                <?php endif; ?>
             </div>
         </div>
 

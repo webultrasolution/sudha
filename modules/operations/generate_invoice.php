@@ -582,6 +582,7 @@ td:last-child {
                         <div>E.&amp; O.E.</div>
                         <div>1. Interest @ 18% p.a. will be charged if the payment is not made within the stipulated time.</div>
                         <div>2. Subject to &lsquo;Malda&rsquo; Jurisdiction only.</div>
+                        <div>3. It is declared that M/S Sudha Creative is not required to issue E-Invoice in terms of rule 48(4) CGST rules, 2017.</div>
                     <?php endif; ?>
                 </div>
             </div>
