@@ -78,8 +78,8 @@ $stmt = $pdo->prepare("
     JOIN partners pr ON p.partner_id = pr.id 
     LEFT JOIN invoices i ON (p.type = 'receivable' AND p.invoice_id = i.id)
     LEFT JOIN client_printing_rates cpr ON (p.type = 'receivable' AND p.invoice_id = cpr.id)
-    LEFT JOIN purchase_orders po ON (p.type = 'payable' AND p.proposal_id = po.id)
-    LEFT JOIN vendor_printing_rates vpr ON (p.type = 'payable' AND p.proposal_id = vpr.id)
+    LEFT JOIN purchase_orders po ON (p.type = 'payable' AND p.proposal_id = po.id AND po.vendor_id = p.partner_id)
+    LEFT JOIN vendor_printing_rates vpr ON (p.type = 'payable' AND po.id IS NULL AND p.proposal_id = vpr.id AND vpr.vendor_id = p.partner_id)
     LEFT JOIN proposals prop ON (p.type = 'receivable' AND p.proposal_id = prop.id)
     LEFT JOIN approval_requests ar ON (ar.entity_type = 'payment' AND ar.entity_id = p.id)
     $whereClause

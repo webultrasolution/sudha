@@ -147,7 +147,7 @@ $payments = $pdo->query("
     LEFT JOIN users u ON ar.requested_by = u.id
     LEFT JOIN invoices inv ON p.invoice_id = inv.id
     LEFT JOIN bookings b ON inv.booking_id = b.id
-    LEFT JOIN purchase_orders po ON p.proposal_id = po.id
+    LEFT JOIN purchase_orders po ON (p.type = 'payable' AND p.proposal_id = po.id AND po.vendor_id = p.partner_id)
     WHERE p.approval_status = 'pending_approval'
     ORDER BY p.created_at DESC
 ")->fetchAll();
