@@ -95,6 +95,13 @@ function validateMountingTripInput(PDO $pdo, array $in) {
         }
     }
 
+    $mountingDate = trim((string)($in['mounting_date'] ?? ''));
+    if ($mountingDate !== '') {
+        $md = DateTime::createFromFormat('Y-m-d', $mountingDate);
+        if (!$md || $md->format('Y-m-d') !== $mountingDate) throw new Exception('Enter a valid mounting date.');
+        if ($mountingDate > date('Y-m-d')) throw new Exception('Mounting date cannot be in the future.');
+    }
+
     $rawSites = $in['sites'] ?? [];
     if (!is_array($rawSites) || !count($rawSites)) throw new Exception('Add at least one site.');
 
@@ -128,6 +135,7 @@ function validateMountingTripInput(PDO $pdo, array $in) {
         'food_amount' => mountingMoney($in['food_amount'] ?? 0),
         'travel_amount' => mountingMoney($in['travel_amount'] ?? 0),
         'misc_amount' => mountingMoney($in['misc_amount'] ?? 0),
+        'mounting_date' => $mountingDate !== '' ? $mountingDate : null,
         'description' => trim((string)($in['description'] ?? '')) ?: null,
         'sites' => $sites,
     ];
@@ -155,19 +163,19 @@ function saveMountingTrip(PDO $pdo, array $input, $tripId, $userId, $isAdmin, $e
             $tripNumber = $old['trip_number'];
 
             $pdo->prepare("UPDATE mounting_trips SET trip_date=?, contractor_name=?, contractor_mobile=?, rate_per_sqft=?,
-                    total_sqft=?, labour_amount=?, food_amount=?, travel_amount=?, misc_amount=?, total_amount=?, description=?,
+                    total_sqft=?, labour_amount=?, food_amount=?, travel_amount=?, misc_amount=?, mounting_date=?, total_amount=?, description=?,
                     approval_status=?, approved_by=?, approved_at=?, rejection_reason=NULL WHERE id=?")
                 ->execute([$d['trip_date'], $d['contractor_name'], $d['contractor_mobile'], $d['rate_per_sqft'],
-                    $calc['total_sqft'], $calc['labour_amount'], $d['food_amount'], $d['travel_amount'], $d['misc_amount'],
+                    $calc['total_sqft'], $calc['labour_amount'], $d['food_amount'], $d['travel_amount'], $d['misc_amount'], $d['mounting_date'],
                     $calc['total_amount'], $d['description'], $status, $isAdmin ? $userId : null, $isAdmin ? date('Y-m-d H:i:s') : null, $tripId]);
             $pdo->prepare("DELETE FROM mounting_trip_sites WHERE trip_id = ?")->execute([$tripId]);
         } else {
             $tripNumber = generateSequenceNumber($pdo, MOUNTING_MODULE_KEY, $d['trip_date']);
             $pdo->prepare("INSERT INTO mounting_trips (entity_id, trip_number, trip_date, contractor_name, contractor_mobile, rate_per_sqft,
-                    total_sqft, labour_amount, food_amount, travel_amount, misc_amount, total_amount, description,
-                    approval_status, approved_by, approved_at, created_by) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)")
+                    total_sqft, labour_amount, food_amount, travel_amount, misc_amount, mounting_date, total_amount, description,
+                    approval_status, approved_by, approved_at, created_by) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)")
                 ->execute([$entityId, $tripNumber, $d['trip_date'], $d['contractor_name'], $d['contractor_mobile'], $d['rate_per_sqft'],
-                    $calc['total_sqft'], $calc['labour_amount'], $d['food_amount'], $d['travel_amount'], $d['misc_amount'],
+                    $calc['total_sqft'], $calc['labour_amount'], $d['food_amount'], $d['travel_amount'], $d['misc_amount'], $d['mounting_date'],
                     $calc['total_amount'], $d['description'], $status, $isAdmin ? $userId : null, $isAdmin ? date('Y-m-d H:i:s') : null, $userId]);
             $tripId = intval($pdo->lastInsertId());
         }
@@ -205,16 +213,15 @@ function setMountingTripApproval(PDO $pdo, $tripId, $approve, $adminId, $reason 
 }
 
 /* ------------------------------------------------------------------------------------------------
- * Contractor payments (table mounting_payments)
- *   payment    = cash paid against one entry (partial allowed, never more than the entry's balance)
- *   advance    = cash given to a contractor before/without an entry
- *   adjustment = part of an advance applied to an entry (no new cash)
- * An entry's paid amount = its active payments + adjustments; status pending / partial / paid.
+ * Contractor payments (table mounting_payments, kind 'payment')
+ *   Payments are made only against an approved mounting entry: full or partial, never more than its balance.
+ *   No advance payments (business rule); old 'advance'/'adjustment' rows, if any, are ignored everywhere.
+ * An entry's paid amount = its active payments; status pending / partial / paid.
  * Revert keeps the row for audit (status 'reversed'); delete removes a wrong entry (admin).
  * ---------------------------------------------------------------------------------------------- */
 
 function mountingTripHasPayments(PDO $pdo, $tripId) {
-    $stmt = $pdo->prepare("SELECT COUNT(*) FROM mounting_payments WHERE trip_id = ? AND status = 'active'");
+    $stmt = $pdo->prepare("SELECT COUNT(*) FROM mounting_payments WHERE trip_id = ? AND kind = 'payment' AND status = 'active'");
     $stmt->execute([$tripId]);
     return $stmt->fetchColumn() > 0;
 }
@@ -237,7 +244,7 @@ function mountingRupees($v) {
 
 /** Recalculate an entry's paid amount and payment status from its active payments + adjustments. */
 function recomputeMountingTripPayment(PDO $pdo, $tripId) {
-    $stmt = $pdo->prepare("SELECT COALESCE(SUM(amount), 0), MAX(paid_date) FROM mounting_payments WHERE trip_id = ? AND status = 'active'");
+    $stmt = $pdo->prepare("SELECT COALESCE(SUM(amount), 0), MAX(paid_date) FROM mounting_payments WHERE trip_id = ? AND kind = 'payment' AND status = 'active'");
     $stmt->execute([$tripId]);
     [$paid, $last] = $stmt->fetch(PDO::FETCH_NUM);
     $paid = round(floatval($paid), 2);
@@ -260,7 +267,7 @@ function mountingLockTrip(PDO $pdo, $tripId) {
 }
 
 /** Cash payment against an entry (full or partial). */
-function addMountingTripPayment(PDO $pdo, $tripId, $amount, $date, $mode, $ref, $notes, $userId) {
+function addMountingTripPayment(PDO $pdo, $tripId, $amount, $date, $mode, $ref, $notes, $userId, $attachment = null) {
     $amount = mountingValidAmount($amount);
     mountingValidDate($date);
     if (!in_array($mode, MOUNTING_PAYMENT_MODES, true)) throw new Exception('Select a payment mode.');
@@ -268,92 +275,47 @@ function addMountingTripPayment(PDO $pdo, $tripId, $amount, $date, $mode, $ref, 
     try {
         $t = mountingLockTrip($pdo, $tripId);
         $state = recomputeMountingTripPayment($pdo, $tripId);
-        if ($amount > $state['balance'] + 0.009) throw new Exception('Amount is more than the balance of ' . mountingRupees($state['balance']) . '. Use "Give Advance" for extra money.');
-        $pdo->prepare("INSERT INTO mounting_payments (entity_id, kind, trip_id, contractor_name, contractor_mobile, amount, paid_date, payment_mode, payment_ref, notes, created_by)
-                       VALUES (?, 'payment', ?, ?, ?, ?, ?, ?, ?, ?, ?)")
+        if ($amount > $state['balance'] + 0.009) throw new Exception('Amount is more than the balance of ' . mountingRupees($state['balance'])  . '.');
+        $pdo->prepare("INSERT INTO mounting_payments (entity_id, kind, trip_id, contractor_name, contractor_mobile, amount, paid_date, payment_mode, payment_ref, notes, attachment, created_by)
+                       VALUES (?, 'payment', ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)")
             ->execute([$t['entity_id'], $tripId, $t['contractor_name'], $t['contractor_mobile'], $amount, $date, $mode,
-                       mb_substr(trim((string)$ref), 0, 100) ?: null, mb_substr(trim((string)$notes), 0, 255) ?: null, $userId]);
+                       mb_substr(trim((string)$ref), 0, 100) ?: null, mb_substr(trim((string)$notes), 0, 255) ?: null, $attachment ?: null, $userId]);
         $state = recomputeMountingTripPayment($pdo, $tripId);
         $pdo->commit();
         return $state;
     } catch (Exception $e) { $pdo->rollBack(); throw $e; }
 }
 
-/** Advance to a contractor, not tied to any entry yet. */
-function addMountingAdvance(PDO $pdo, $contractorName, $mobile, $amount, $date, $mode, $ref, $notes, $userId, $entityId = null) {
-    $name = trim((string)$contractorName);
-    if ($name === '' || mb_strlen($name) > 150) throw new Exception('Labour contractor name is required.');
-    $amount = mountingValidAmount($amount);
-    mountingValidDate($date);
-    if (!in_array($mode, MOUNTING_PAYMENT_MODES, true)) throw new Exception('Select a payment mode.');
-    $m = preg_replace('/\D/', '', (string)$mobile);
-    if (strlen($m) === 12 && substr($m, 0, 2) === '91') $m = substr($m, 2);
-    if (strlen($m) === 11 && $m[0] === '0') $m = substr($m, 1);
-    if ($m !== '' && !preg_match('/^[6-9][0-9]{9}$/', $m)) throw new Exception('Enter a valid 10-digit mobile number.');
-    $pdo->prepare("INSERT INTO mounting_payments (entity_id, kind, contractor_name, contractor_mobile, amount, paid_date, payment_mode, payment_ref, notes, created_by)
-                   VALUES (?, 'advance', ?, ?, ?, ?, ?, ?, ?, ?)")
-        ->execute([$entityId, $name, $m ?: null, $amount, $date, $mode, mb_substr(trim((string)$ref), 0, 100) ?: null, mb_substr(trim((string)$notes), 0, 255) ?: null, $userId]);
-    return intval($pdo->lastInsertId());
+const MOUNTING_UPLOAD_DIR = __DIR__ . '/../uploads/mounting_payments/';
+
+/**
+ * Save an uploaded receipt / screenshot for a payment. Returns the stored file name, or null when no file was sent.
+ * Allowed: pdf, jpg, jpeg, png, doc(x), xls(x) up to 10 MB (UploadValidator); the name is generated, never the uploader's.
+ */
+function saveMountingAttachment($file) {
+    if (empty($file) || ($file['error'] ?? UPLOAD_ERR_NO_FILE) === UPLOAD_ERR_NO_FILE) return null;
+    if ($file['error'] !== UPLOAD_ERR_OK) throw new Exception('Attachment upload failed. Try a smaller file (max 10 MB).');
+    require_once __DIR__ . '/upload_validator.php';
+    $ext = UploadValidator::validate($file);
+    UploadValidator::ensureUploadDir(MOUNTING_UPLOAD_DIR);
+    $name = 'mpay_' . date('Ymd_His') . '_' . bin2hex(random_bytes(5)) . '.' . $ext;
+    if (!move_uploaded_file($file['tmp_name'], MOUNTING_UPLOAD_DIR . $name)) throw new Exception('Could not save the attachment.');
+    return $name;
 }
 
-/** Unused part of an advance (advance minus its active adjustments); null if not an active advance. */
-function mountingAdvanceRemaining(PDO $pdo, $advanceId) {
-    $stmt = $pdo->prepare("SELECT a.amount - COALESCE((SELECT SUM(x.amount) FROM mounting_payments x WHERE x.advance_id = a.id AND x.status = 'active'), 0)
-                           FROM mounting_payments a WHERE a.id = ? AND a.kind = 'advance' AND a.status = 'active'");
-    $stmt->execute([$advanceId]);
-    $v = $stmt->fetchColumn();
-    return $v === false ? null : round(floatval($v), 2);
-}
-
-/** Open advances of a contractor (remaining > 0), oldest first. */
-function listMountingOpenAdvances(PDO $pdo, $contractorName) {
-    $stmt = $pdo->prepare("SELECT a.id, a.amount, a.paid_date, a.payment_mode, a.payment_ref,
-               a.amount - COALESCE((SELECT SUM(x.amount) FROM mounting_payments x WHERE x.advance_id = a.id AND x.status = 'active'), 0) AS remaining
-        FROM mounting_payments a WHERE a.kind = 'advance' AND a.status = 'active' AND a.contractor_name = ?
-        HAVING remaining > 0.009 ORDER BY a.paid_date, a.id");
-    $stmt->execute([trim((string)$contractorName)]);
-    return $stmt->fetchAll(PDO::FETCH_ASSOC);
-}
-
-/** Apply part of an advance to an entry of the same contractor. No new cash moves. */
-function adjustMountingAdvance(PDO $pdo, $advanceId, $tripId, $amount, $userId) {
-    $amount = mountingValidAmount($amount);
-    $pdo->beginTransaction();
-    try {
-        $t = mountingLockTrip($pdo, $tripId);
-        $stmt = $pdo->prepare("SELECT * FROM mounting_payments WHERE id = ? AND kind = 'advance' AND status = 'active' FOR UPDATE");
-        $stmt->execute([$advanceId]);
-        $adv = $stmt->fetch(PDO::FETCH_ASSOC);
-        if (!$adv) throw new Exception('Advance not found or reverted.');
-        if (mb_strtolower(trim($adv['contractor_name'])) !== mb_strtolower(trim($t['contractor_name']))) throw new Exception('This advance belongs to a different contractor.');
-        $remaining = mountingAdvanceRemaining($pdo, $advanceId);
-        if ($amount > $remaining + 0.009) throw new Exception('Only ' . mountingRupees($remaining) . ' of this advance is left.');
-        $state = recomputeMountingTripPayment($pdo, $tripId);
-        if ($amount > $state['balance'] + 0.009) throw new Exception('Amount is more than the entry balance of ' . mountingRupees($state['balance']) . '.');
-        $pdo->prepare("INSERT INTO mounting_payments (entity_id, kind, trip_id, advance_id, contractor_name, contractor_mobile, amount, paid_date, payment_mode, payment_ref, notes, created_by)
-                       VALUES (?, 'adjustment', ?, ?, ?, ?, ?, ?, 'Advance', ?, ?, ?)")
-            ->execute([$t['entity_id'], $tripId, $advanceId, $t['contractor_name'], $t['contractor_mobile'], $amount, date('Y-m-d'),
-                       'ADV #' . $advanceId, 'Adjusted from advance of ' . date('d M Y', strtotime($adv['paid_date'])), $userId]);
-        $state = recomputeMountingTripPayment($pdo, $tripId);
-        $pdo->commit();
-        return $state;
-    } catch (Exception $e) { $pdo->rollBack(); throw $e; }
+function removeMountingAttachment($name) {
+    if ($name && preg_match('/^mpay_[0-9_]+_[a-f0-9]+\.[a-z0-9]+$/', $name) && is_file(MOUNTING_UPLOAD_DIR . $name)) @unlink(MOUNTING_UPLOAD_DIR . $name);
 }
 
 function mountingLoadPaymentForChange(PDO $pdo, $paymentId) {
     $stmt = $pdo->prepare("SELECT * FROM mounting_payments WHERE id = ? FOR UPDATE");
     $stmt->execute([$paymentId]);
     $p = $stmt->fetch(PDO::FETCH_ASSOC);
-    if (!$p) throw new Exception('Payment not found.');
-    if ($p['kind'] === 'advance') {
-        $c = $pdo->prepare("SELECT COUNT(*) FROM mounting_payments WHERE advance_id = ? AND status = 'active'");
-        $c->execute([$paymentId]);
-        if ($c->fetchColumn() > 0) throw new Exception('Part of this advance is adjusted against entries. Revert those adjustments first.');
-    }
+    if (!$p || $p['kind'] !== 'payment') throw new Exception('Payment not found.');
     return $p;
 }
 
-/** Revert a payment / advance / adjustment: the row stays (status reversed) for audit; balances update. */
+/** Revert a payment: the row stays (status reversed) for audit; balances update. */
 function reverseMountingPayment(PDO $pdo, $paymentId, $userId, $reason = null) {
     $pdo->beginTransaction();
     try {
@@ -371,32 +333,17 @@ function deleteMountingPayment(PDO $pdo, $paymentId) {
     $pdo->beginTransaction();
     try {
         $p = mountingLoadPaymentForChange($pdo, $paymentId);
-        if ($p['kind'] === 'advance') {
-            $c = $pdo->prepare("SELECT COUNT(*) FROM mounting_payments WHERE advance_id = ?");
-            $c->execute([$paymentId]);
-            if ($c->fetchColumn() > 0) throw new Exception('This advance has adjustment history. Revert it instead of deleting.');
-        }
         $pdo->prepare("DELETE FROM mounting_payments WHERE id = ?")->execute([$paymentId]);
         if ($p['trip_id']) recomputeMountingTripPayment($pdo, $p['trip_id']);
         $pdo->commit();
+        removeMountingAttachment($p['attachment'] ?? null);
     } catch (Exception $e) { $pdo->rollBack(); throw $e; }
 }
 
-/** Payment history of one entry (payments + adjustments, including reverted). */
+/** Payment history of one entry (including reverted). */
 function listMountingTripPayments(PDO $pdo, $tripId) {
-    $stmt = $pdo->prepare("SELECT * FROM mounting_payments WHERE trip_id = ? ORDER BY paid_date, id");
+    $stmt = $pdo->prepare("SELECT * FROM mounting_payments WHERE trip_id = ? AND kind = 'payment' ORDER BY paid_date, id");
     $stmt->execute([$tripId]);
-    return $stmt->fetchAll(PDO::FETCH_ASSOC);
-}
-
-/** Advances of one contractor (or all), with remaining amount, including reverted. */
-function listMountingAdvances(PDO $pdo, $contractorName = null) {
-    $sql = "SELECT a.*, a.amount - COALESCE((SELECT SUM(x.amount) FROM mounting_payments x WHERE x.advance_id = a.id AND x.status = 'active'), 0) AS remaining
-            FROM mounting_payments a WHERE a.kind = 'advance'";
-    $p = [];
-    if ($contractorName !== null && $contractorName !== '') { $sql .= " AND a.contractor_name = ?"; $p[] = trim($contractorName); }
-    $stmt = $pdo->prepare($sql . " ORDER BY a.paid_date DESC, a.id DESC");
-    $stmt->execute($p);
     return $stmt->fetchAll(PDO::FETCH_ASSOC);
 }
 
@@ -455,30 +402,18 @@ function listMountingTrips(PDO $pdo, array $f = []) {
 
 /** Contractor-wise payable summary (approved trips only). */
 function getMountingContractorSummary(PDO $pdo, $entityId = null) {
-    // total = approved entries; paid = active payments + adjustments on them; pending = total - paid;
-    // advance_left = active advances not yet adjusted; net_due = pending - advance_left (negative = advance with contractor)
-    $ent = $entityId ? " AND (entity_id = " . intval($entityId) . " OR entity_id IS NULL)" : "";
-    $rows = $pdo->query("
-        SELECT c.contractor_name,
-               COALESCE((SELECT x.contractor_mobile FROM mounting_trips x WHERE x.contractor_name = c.contractor_name AND x.contractor_mobile IS NOT NULL ORDER BY x.trip_date DESC LIMIT 1),
-                        (SELECT y.contractor_mobile FROM mounting_payments y WHERE y.contractor_name = c.contractor_name AND y.contractor_mobile IS NOT NULL ORDER BY y.id DESC LIMIT 1)) AS contractor_mobile,
-               (SELECT COUNT(*) FROM mounting_trips t WHERE t.contractor_name = c.contractor_name AND t.approval_status = 'approved' $ent) AS trips,
-               (SELECT COALESCE(SUM(t.total_amount), 0) FROM mounting_trips t WHERE t.contractor_name = c.contractor_name AND t.approval_status = 'approved' $ent) AS total,
-               (SELECT COALESCE(SUM(t.paid_amount), 0) FROM mounting_trips t WHERE t.contractor_name = c.contractor_name AND t.approval_status = 'approved' $ent) AS paid,
-               (SELECT COALESCE(SUM(a.amount), 0) FROM mounting_payments a WHERE a.kind = 'advance' AND a.status = 'active' AND a.contractor_name = c.contractor_name $ent) AS advance_given,
-               (SELECT COALESCE(SUM(j.amount), 0) FROM mounting_payments j WHERE j.kind = 'adjustment' AND j.status = 'active' AND j.contractor_name = c.contractor_name $ent) AS advance_used
-        FROM (SELECT contractor_name FROM mounting_trips WHERE approval_status = 'approved' $ent
-              UNION SELECT contractor_name FROM mounting_payments WHERE kind = 'advance' AND status = 'active' $ent) c
-    ")->fetchAll(PDO::FETCH_ASSOC);
-    foreach ($rows as &$r) {
-        $r['pending'] = round($r['total'] - $r['paid'], 2);
-        $r['advance_left'] = round($r['advance_given'] - $r['advance_used'], 2);
-        $r['net_due'] = round($r['pending'] - $r['advance_left'], 2);
-    }
-    unset($r);
-    usort($rows, fn($a, $b) => ($b['net_due'] <=> $a['net_due']) ?: strcmp($a['contractor_name'], $b['contractor_name']));
-    return $rows;
+    // total = approved entries; paid = active payments on them; pending = total - paid
+    $sql = "SELECT contractor_name,
+                   (SELECT x.contractor_mobile FROM mounting_trips x WHERE x.contractor_name = t.contractor_name AND x.contractor_mobile IS NOT NULL ORDER BY x.trip_date DESC, x.id DESC LIMIT 1) AS contractor_mobile,
+                   COUNT(*) AS trips, SUM(total_amount) AS total, SUM(paid_amount) AS paid, SUM(total_amount - paid_amount) AS pending
+            FROM mounting_trips t WHERE approval_status = 'approved'";
+    $p = [];
+    if ($entityId) { $sql .= " AND (entity_id = ? OR entity_id IS NULL)"; $p[] = intval($entityId); }
+    $stmt = $pdo->prepare($sql . " GROUP BY contractor_name ORDER BY pending DESC, contractor_name");
+    $stmt->execute($p);
+    return $stmt->fetchAll(PDO::FETCH_ASSOC);
 }
+
 
 /** Auto-suggest: previously used contractors matching $q, with their latest mobile. */
 function suggestMountingContractors(PDO $pdo, $q, $limit = 10) {

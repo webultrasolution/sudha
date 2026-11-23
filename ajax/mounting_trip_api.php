@@ -9,11 +9,9 @@
  * POST {action:'save', id?, trip_date, contractor_name, contractor_mobile, rate_per_sqft,
  *       food_amount, travel_amount, misc_amount, description, sites:[{site_id, sqft, remarks}]}
  * POST {action:'preview', ...same as save}                                             -> calculated split, nothing saved
- * GET  ?action=payments&id=            -> {success, trip, payments, advances}   (entry payment history + contractor's open advances)
- * GET  ?action=advances&contractor=    -> {success, advances}
+ * GET  ?action=payments&id=            -> {success, trip, payments}   (entry payment history)
  * POST {action:'pay', id, amount, paid_date, payment_mode, payment_ref, notes}       full or partial payment against an entry
- * POST {action:'advance', contractor_name, contractor_mobile, amount, paid_date, payment_mode, payment_ref, notes}
- * POST {action:'adjust', id, advance_id, amount}                                    apply an advance to an entry
+ *      (may be sent as multipart/form-data with an optional file field 'attachment'). No advance payments.
  * POST {action:'revert', payment_id, reason}                                        keeps the row, marks it reversed
  * POST {action:'delete_payment', payment_id}   (admin only)
  * POST {action:'delete', id}
@@ -99,33 +97,17 @@ try {
             if (!canView(MOUNTING_MODULE_KEY)) mountingDeny();
             $trip = getMountingTrip($pdo, intval($_GET['id'] ?? 0));
             if (!$trip) throw new Exception('Entry not found.');
-            echo json_encode(['success' => true, 'trip' => $trip, 'payments' => listMountingTripPayments($pdo, $trip['id']),
-                              'advances' => listMountingOpenAdvances($pdo, $trip['contractor_name'])]);
-            break;
-
-        case 'advances':
-            if (!canView(MOUNTING_MODULE_KEY)) mountingDeny();
-            echo json_encode(['success' => true, 'advances' => listMountingAdvances($pdo, trim($_GET['contractor'] ?? ''))]);
+            echo json_encode(['success' => true, 'trip' => $trip, 'payments' => listMountingTripPayments($pdo, $trip['id'])]);
             break;
 
         case 'pay':
             if (!canEdit(MOUNTING_MODULE_KEY)) mountingDeny();
-            $st = addMountingTripPayment($pdo, intval($body['id'] ?? 0), $body['amount'] ?? 0, $body['paid_date'] ?? '', $body['payment_mode'] ?? '',
-                                         $body['payment_ref'] ?? '', $body['notes'] ?? '', $userId);
+            $file = saveMountingAttachment($_FILES['attachment'] ?? null);
+            try {
+                $st = addMountingTripPayment($pdo, intval($body['id'] ?? 0), $body['amount'] ?? 0, $body['paid_date'] ?? '', $body['payment_mode'] ?? '',
+                                             $body['payment_ref'] ?? '', $body['notes'] ?? '', $userId, $file);
+            } catch (Exception $e) { removeMountingAttachment($file); throw $e; }
             echo json_encode(['success' => true, 'message' => $st['status'] === 'paid' ? 'Payment saved. Entry fully paid.' : 'Payment saved. Balance ' . mountingRupees($st['balance']) . '.'] + $st);
-            break;
-
-        case 'advance':
-            if (!canEdit(MOUNTING_MODULE_KEY)) mountingDeny();
-            addMountingAdvance($pdo, $body['contractor_name'] ?? '', $body['contractor_mobile'] ?? '', $body['amount'] ?? 0, $body['paid_date'] ?? '',
-                               $body['payment_mode'] ?? '', $body['payment_ref'] ?? '', $body['notes'] ?? '', $userId, $entityId);
-            echo json_encode(['success' => true, 'message' => 'Advance saved.']);
-            break;
-
-        case 'adjust':
-            if (!canEdit(MOUNTING_MODULE_KEY)) mountingDeny();
-            $st = adjustMountingAdvance($pdo, intval($body['advance_id'] ?? 0), intval($body['id'] ?? 0), $body['amount'] ?? 0, $userId);
-            echo json_encode(['success' => true, 'message' => 'Advance adjusted. Balance ' . mountingRupees($st['balance']) . '.'] + $st);
             break;
 
         case 'revert':

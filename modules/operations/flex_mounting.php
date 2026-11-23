@@ -52,7 +52,6 @@ $perm = [
 .fm-x { background: #f1f5f9; border: none; border-radius: 8px; width: 34px; height: 34px; font-size: 1rem; color: #334155; cursor: pointer; }
 .fm-x:hover { background: #fee2e2; color: #b91c1c; }
 .fm-pill.partial { background: #ffedd5; color: #9a3412; } .fm-pill.reversed { background: #f1f5f9; color: #64748b; text-decoration: line-through; }
-.fm-pill.advance { background: #ede9fe; color: #5b21b6; } .fm-pill.adjustment { background: #e0f2fe; color: #075985; }
 .fm-form { display: grid; grid-template-columns: repeat(auto-fit, minmax(160px, 1fr)); gap: 10px; align-items: end; }
 .fm-form label { display: block; font-size: .68rem; font-weight: 700; color: #475569; text-transform: uppercase; margin-bottom: 3px; }
 .fm-form input, .fm-form select { width: 100%; box-sizing: border-box; }
@@ -70,7 +69,6 @@ tr.rev td { color: #94a3b8; }
             <div style="font-size:.78rem;color:#64748b;">Labour contractor trips, site-wise cost split and contractor payments. Approved trips go into each site's P&amp;L.</div>
         </div>
         <div style="display:flex;gap:8px;flex-wrap:wrap">
-            <?php if ($perm['edit']): ?><button class="fm-btn ghost" onclick="openAdvance()"><i class="fas fa-hand-holding-usd"></i> Give Advance</button><?php endif; ?>
             <?php if ($perm['add']): ?><button class="fm-btn primary" onclick="openTrip()"><i class="fas fa-plus"></i> New Mounting Entry</button><?php endif; ?>
         </div>
     </div>
@@ -81,7 +79,6 @@ tr.rev td { color: #94a3b8; }
         <div class="fm-card"><div class="lbl">Total Expense (approved)</div><div class="val" id="cTotal">₹0</div></div>
         <div class="fm-card"><div class="lbl">Paid to Contractors</div><div class="val" id="cPaid" style="color:#2563eb">₹0</div></div>
         <div class="fm-card"><div class="lbl">Pending Payment</div><div class="val" id="cPending" style="color:#dc2626">₹0</div></div>
-        <div class="fm-card"><div class="lbl">Advance with Contractors</div><div class="val" id="cAdvance" style="color:#7c3aed">₹0</div></div>
     </div>
 
     <div class="fm-bar">
@@ -108,7 +105,7 @@ tr.rev td { color: #94a3b8; }
     <div class="fm-table-wrap">
         <div class="fm-h"><span><i class="fas fa-user-hard-hat" style="color:#0f766e"></i> Contractor-wise Payment Summary (approved entries)</span></div>
         <table class="fm-table">
-            <thead><tr><th>Contractor</th><th>Mobile</th><th class="num">Entries</th><th class="num">Total</th><th class="num">Paid</th><th class="num">Pending</th><th class="num">Advance left</th><th class="num">Net to pay</th><th></th></tr></thead>
+            <thead><tr><th>Contractor</th><th>Mobile</th><th class="num">Entries</th><th class="num">Total</th><th class="num">Paid</th><th class="num">Pending</th></tr></thead>
             <tbody id="summaryRows"></tbody>
         </table>
     </div>
@@ -130,6 +127,7 @@ tr.rev td { color: #94a3b8; }
             <div><label>Fooding (₹)</label><input type="number" step="0.01" min="0" id="tFood" oninput="recalc()"></div>
             <div><label>Travelling (₹)</label><input type="number" step="0.01" min="0" id="tTravel" oninput="recalc()"></div>
             <div><label>Miscellaneous (₹)</label><input type="number" step="0.01" min="0" id="tMisc" oninput="recalc()"></div>
+            <div><label for="tMountDate">Mounting Date</label><input type="date" id="tMountDate"></div>
         </div>
         <div style="margin-top:10px"><label>Description / Work details</label><textarea id="tDesc" rows="2" style="width:100%;box-sizing:border-box" placeholder="e.g. Flex mounting at Malda town sites, outstation trip"></textarea></div>
 
@@ -181,7 +179,7 @@ tr.rev td { color: #94a3b8; }
         <div class="fm-kv" id="payKv"></div>
         <div class="fm-table-wrap" style="margin:12px 0 0">
             <table class="fm-table">
-                <thead><tr><th>Date</th><th>Type</th><th>Mode / Ref</th><th>Notes</th><th class="num">Amount</th><th>Status</th><th></th></tr></thead>
+                <thead><tr><th>Date</th><th>Type</th><th>Mode / Ref</th><th>Notes</th><th>File</th><th class="num">Amount</th><th>Status</th><th></th></tr></thead>
                 <tbody id="payRows"></tbody>
             </table>
         </div>
@@ -192,44 +190,10 @@ tr.rev td { color: #94a3b8; }
                 <div><label for="pDate">Payment date *</label><input type="date" id="pDate"></div>
                 <div><label for="pMode">Mode *</label><select id="pMode"></select></div>
                 <div><label for="pRef">Reference / UTR</label><input type="text" id="pRef" maxlength="100"></div>
+                <div><label for="pFile">Attachment</label><input type="file" id="pFile" accept=".pdf,.jpg,.jpeg,.png,.doc,.docx,.xls,.xlsx" style="padding:.32rem"></div>
                 <div style="grid-column:1/-1"><label for="pNotes">Notes</label><input type="text" id="pNotes" maxlength="255" placeholder="Optional"></div>
             </div>
             <div style="display:flex;justify-content:flex-end;margin-top:10px"><button class="fm-btn blue" id="pSaveBtn" onclick="savePayment()"><i class="fas fa-check"></i> Save Payment</button></div>
-        </div>
-        <div class="fm-box" id="payAdvBox" hidden>
-            <h4><i class="fas fa-exchange-alt" style="color:#7c3aed"></i> Use contractor's advance</h4>
-            <div class="fm-form">
-                <div style="grid-column:span 2"><label for="aSel">Advance</label><select id="aSel" onchange="pickAdv()"></select></div>
-                <div><label for="aAmt">Amount to adjust (₹)</label><input type="number" step="0.01" min="0.01" id="aAmt"></div>
-            </div>
-            <div style="display:flex;justify-content:flex-end;margin-top:10px"><button class="fm-btn ghost" onclick="saveAdjust()" style="background:#ede9fe;color:#5b21b6"><i class="fas fa-check"></i> Adjust Advance</button></div>
-        </div>
-    </div>
-</div>
-
-<!-- Advance to a contractor -->
-<div class="fm-modal-bg" id="advModal">
-    <div class="fm-modal" style="max-width:820px">
-        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px;">
-            <h3 style="margin:0;font-size:1.05rem;font-weight:800">Contractor Advance</h3>
-            <button class="fm-x" title="Close" aria-label="Close" onclick="closeModal('advModal')"><i class="fas fa-times"></i></button>
-        </div>
-        <div class="fm-form">
-            <div style="position:relative"><label for="vName">Labour Contractor Name *</label><input type="text" id="vName" autocomplete="off" oninput="suggestAdvContractor()" onchange="loadAdvHistory()"><div class="fm-sug" id="vSug" style="display:none"></div></div>
-            <div><label for="vMobile">Mobile</label><input type="text" id="vMobile" maxlength="16" placeholder="e.g. 9876543210"></div>
-            <div><label for="vAmount">Amount (₹) *</label><input type="number" step="0.01" min="0.01" id="vAmount"></div>
-            <div><label for="vDate">Date *</label><input type="date" id="vDate"></div>
-            <div><label for="vMode">Mode *</label><select id="vMode"></select></div>
-            <div><label for="vRef">Reference / UTR</label><input type="text" id="vRef" maxlength="100"></div>
-            <div style="grid-column:1/-1"><label for="vNotes">Notes</label><input type="text" id="vNotes" maxlength="255" placeholder="Optional"></div>
-        </div>
-        <div style="display:flex;justify-content:flex-end;margin-top:10px"><button class="fm-btn primary" id="vSaveBtn" onclick="saveAdvance()"><i class="fas fa-check"></i> Save Advance</button></div>
-        <div class="fm-table-wrap" style="margin:14px 0 0">
-            <div class="fm-h"><span>Advances of this contractor</span></div>
-            <table class="fm-table">
-                <thead><tr><th>Date</th><th>Mode / Ref</th><th class="num">Amount</th><th class="num">Not yet adjusted</th><th>Status</th><th></th></tr></thead>
-                <tbody id="advRows"><tr><td colspan="6" style="text-align:center;padding:1rem;color:#94a3b8">Enter a contractor name.</td></tr></tbody>
-            </table>
         </div>
     </div>
 </div>
@@ -247,6 +211,18 @@ const esc = s => String(s ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt
 const fmtDate = d => d ? new Date(d + 'T00:00:00').toLocaleDateString('en-GB', {day:'2-digit', month:'short', year:'numeric'}) : '';
 const ownerLabel = t => t === 'HA' ? 'Own (HA)' : (t === 'TA' ? 'Traded (TA)' : '-');
 
+async function apiForm(params, fileInput) {
+    const fd = new FormData();
+    Object.entries(params).forEach(([k, v]) => fd.append(k, v ?? ''));
+    if (fileInput && fileInput.files[0]) {
+        if (fileInput.files[0].size > 10 * 1024 * 1024) throw new Error('Attachment is larger than 10 MB.');
+        fd.append('attachment', fileInput.files[0]);
+    }
+    const res = await fetch(FM_API, {method: 'POST', body: fd});
+    const data = await res.json().catch(() => ({success: false, message: 'Server error'}));
+    if (!data.success) throw new Error(data.message || 'Request failed');
+    return data;
+}
 async function api(method, params) {
     let res;
     if (method === 'GET') res = await fetch(FM_API + '?' + new URLSearchParams(params));
@@ -281,7 +257,7 @@ function renderTrips() {
         if (!locked && PERM.delete) act += ` <button class="fm-btn ghost sm" onclick="deleteTrip(${t.id})" title="Delete" style="color:#dc2626"><i class="fas fa-trash"></i></button>`;
         const apLabel = {pending_approval: 'Pending approval', approved: 'Approved', rejected: 'Rejected'}[t.approval_status];
         return `<tr>
-            <td><b>${esc(t.trip_number)}</b><div style="font-size:.7rem;color:#64748b">${fmtDate(t.trip_date)}</div></td>
+            <td><b>${esc(t.trip_number)}</b><div style="font-size:.7rem;color:#64748b">${fmtDate(t.trip_date)}</div>${t.mounting_date ? `<div style="font-size:.68rem;color:#0f766e">Mounted ${fmtDate(t.mounting_date)}</div>` : ''}</td>
             <td>${esc(t.contractor_name)}<div style="font-size:.7rem;color:#64748b">${esc(t.contractor_mobile || '')}</div></td>
             <td style="max-width:220px">${esc(t.site_codes || '')}<div style="font-size:.7rem;color:#64748b">${t.site_count} site(s)</div></td>
             <td class="num">${num(t.total_sqft)}</td><td class="num">${inr(t.rate_per_sqft)}</td><td class="num">${inr(t.labour_amount)}</td>
@@ -296,32 +272,27 @@ function renderTrips() {
 }
 const payLabel = s => ({pending: 'Unpaid', partial: 'Partly paid', paid: 'Paid'}[s] || s);
 const payPill = s => ({pending: 'unpaid', partial: 'partial', paid: 'paid'}[s] || 'unpaid');
-const kindLabel = k => ({payment: 'Payment', advance: 'Advance', adjustment: 'From advance'}[k] || k);
+const FM_UPLOADS = '<?php echo BASE_URL; ?>uploads/mounting_payments/';
+const fileLink = f => f ? `<a href="${FM_UPLOADS + encodeURIComponent(f)}" target="_blank" rel="noopener" title="Open attachment" style="color:#2563eb"><i class="fas fa-paperclip"></i> View</a>` : '-';
+const kindLabel = k => ({payment: 'Payment'}[k] || k);
 function renderSummary(rows) {
-    let adv = 0;
-    summaryRows.innerHTML = rows.length ? rows.map(r => {
-        adv += +r.advance_left;
-        const nd = +r.net_due;
-        return `<tr><td>${esc(r.contractor_name)}</td><td>${esc(r.contractor_mobile || '')}</td><td class="num">${r.trips}</td><td class="num">${inr(r.total)}</td>
-            <td class="num" style="color:#2563eb">${inr(r.paid)}</td><td class="num" style="color:#dc2626">${inr(r.pending)}</td>
-            <td class="num" style="color:#7c3aed">${+r.advance_left ? inr(r.advance_left) : '-'}</td>
-            <td class="num" style="font-weight:800;color:${nd > 0 ? '#dc2626' : (nd < 0 ? '#7c3aed' : '#16a34a')}">${nd < 0 ? inr(-nd) + ' adv.' : inr(nd)}</td>
-            <td>${PERM.edit ? `<button class="fm-btn ghost sm" onclick='openAdvance(${JSON.stringify({n: r.contractor_name, m: r.contractor_mobile || ''}).replace(/'/g, "&#39;")})'><i class="fas fa-hand-holding-usd"></i> Advance</button>` : ''}</td></tr>`;
-    }).join('') : '<tr><td colspan="9" style="text-align:center;padding:1.2rem;color:#94a3b8">No approved entries or advances.</td></tr>';
-    cAdvance.textContent = inr(adv);
+    summaryRows.innerHTML = rows.length ? rows.map(r => `<tr><td>${esc(r.contractor_name)}</td><td>${esc(r.contractor_mobile || '')}</td><td class="num">${r.trips}</td><td class="num">${inr(r.total)}</td>
+        <td class="num" style="color:#2563eb">${inr(r.paid)}</td><td class="num" style="color:${+r.pending > 0 ? '#dc2626' : '#16a34a'};font-weight:700">${inr(r.pending)}</td></tr>`).join('')
+        : '<tr><td colspan="6" style="text-align:center;padding:1.2rem;color:#94a3b8">No approved entries.</td></tr>';
 }
+
 
 /* ---------- form ---------- */
 function closeModal(id) { document.getElementById(id).style.display = 'none'; }
-document.addEventListener('keydown', e => { if (e.key === 'Escape' && !Swal.isVisible()) ['tripModal', 'viewModal', 'payModal', 'advModal'].forEach(closeModal); });
+document.addEventListener('keydown', e => { if (e.key === 'Escape' && !Swal.isVisible()) ['tripModal', 'viewModal', 'payModal'].forEach(closeModal); });
 async function openTrip(id) {
-    tId.value = ''; tDate.value = todayISO(); tName.value = tMobile.value = tRate.value = tFood.value = tTravel.value = tMisc.value = tDesc.value = '';
+    tId.value = ''; tDate.value = todayISO(); tName.value = tMobile.value = tRate.value = tFood.value = tTravel.value = tMisc.value = tDesc.value = tMountDate.value = ''; tMountDate.max = todayISO();
     LINES = []; tripModalTitle.textContent = 'New Mounting Entry';
     if (id) {
         try {
             const {trip} = await api('GET', {action: 'get', id});
             tId.value = trip.id; tDate.value = trip.trip_date; tName.value = trip.contractor_name; tMobile.value = trip.contractor_mobile || '';
-            tRate.value = +trip.rate_per_sqft || ''; tFood.value = +trip.food_amount || ''; tTravel.value = +trip.travel_amount || ''; tMisc.value = +trip.misc_amount || ''; tDesc.value = trip.description || '';
+            tRate.value = +trip.rate_per_sqft || ''; tFood.value = +trip.food_amount || ''; tTravel.value = +trip.travel_amount || ''; tMisc.value = +trip.misc_amount || ''; tDesc.value = trip.description || ''; tMountDate.value = trip.mounting_date || '';
             LINES = trip.sites.map(s => ({site_id: +s.site_id, site_code: s.site_code, site_name: s.site_name, location: s.location, owner_type: s.owner_type, sqft: +s.sqft, remarks: s.remarks || ''}));
             tripModalTitle.textContent = 'Edit ' + trip.trip_number;
         } catch (e) { return toast('error', e.message); }
@@ -409,7 +380,7 @@ async function saveTrip() {
     saveBtn.disabled = true;
     try {
         const d = await api('POST', {action: 'save', id: +tId.value || 0, trip_date: tDate.value, contractor_name: tName.value.trim(), contractor_mobile: tMobile.value.trim(),
-            rate_per_sqft: tRate.value || 0, food_amount: tFood.value || 0, travel_amount: tTravel.value || 0, misc_amount: tMisc.value || 0, description: tDesc.value,
+            rate_per_sqft: tRate.value || 0, food_amount: tFood.value || 0, travel_amount: tTravel.value || 0, misc_amount: tMisc.value || 0, mounting_date: tMountDate.value, description: tDesc.value,
             sites: LINES.map(l => ({site_id: l.site_id, sqft: l.sqft, remarks: l.remarks}))});
         closeModal('tripModal'); toast('success', d.message + ' (' + d.trip_number + ')'); loadTrips();
     } catch (e) { toast('error', e.message); }
@@ -424,6 +395,7 @@ async function viewTrip(id) {
         viewBody.innerHTML = `<div id="printArea">
             <div class="fm-grid" style="margin-bottom:10px;font-size:.84rem">
                 <div><label>Contractor</label>${esc(t.contractor_name)}</div><div><label>Mobile</label>${esc(t.contractor_mobile || '-')}</div>
+                <div><label>Mounting date</label>${t.mounting_date ? fmtDate(t.mounting_date) : '-'}</div>
                 <div><label>Rate / sqft</label>${inr(t.rate_per_sqft)}</div><div><label>Status</label>${esc(t.approval_status.replace('_', ' '))} · ${payLabel(t.payment_status)} (paid ${inr(t.paid_amount)}, balance ${inr(+t.total_amount - +t.paid_amount)})</div>
             </div>
             ${t.description ? `<div style="font-size:.82rem;margin-bottom:10px"><label>Description</label>${esc(t.description)}</div>` : ''}
@@ -455,28 +427,25 @@ async function decide(id, action) {
     d.success ? (toast('success', action === 'approve' ? 'Approved' : 'Rejected'), loadTrips()) : toast('error', d.message);
 }
 /* ---------- payments of an entry ---------- */
-let PAYTRIP = null, ADVS = [];
+let PAYTRIP = null;
 const todayISO = () => { const d = new Date(); return d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-' + String(d.getDate()).padStart(2, '0'); };
 function modeOptions(sel) { sel.innerHTML = MODES.map(m => `<option>${m}</option>`).join(''); }
-modeOptions(pMode); modeOptions(vMode);
+modeOptions(pMode);
 
 async function openPayments(id) {
     try {
         const d = await api('GET', {action: 'payments', id});
-        PAYTRIP = d.trip; ADVS = d.advances;
+        PAYTRIP = d.trip;
         const t = d.trip, paidAmt = +t.paid_amount, bal = Math.round((+t.total_amount - paidAmt) * 100) / 100;
         payTitle.textContent = 'Payments · ' + t.trip_number + ' · ' + t.contractor_name;
         payKv.innerHTML = `<span>Total <b>${inr(t.total_amount)}</b></span><span>Paid <b style="color:#2563eb">${inr(paidAmt)}</b></span>
             <span>Balance <b style="color:${bal > 0 ? '#dc2626' : '#16a34a'}">${inr(bal)}</b></span><span class="fm-pill ${payPill(t.payment_status)}">${payLabel(t.payment_status)}</span>`;
         payRows.innerHTML = d.payments.length ? d.payments.map(p => payRowHtml(p)).join('')
-            : '<tr><td colspan="7" style="text-align:center;padding:1rem;color:#94a3b8">No payments yet.</td></tr>';
+            : '<tr><td colspan="8" style="text-align:center;padding:1rem;color:#94a3b8">No payments yet.</td></tr>';
         const canPay = PERM.edit && bal > 0.009;
         payAddBox.hidden = !canPay;
-        payAdvBox.hidden = !(canPay && ADVS.length);
         if (canPay) {
-            pAmount.value = bal.toFixed(2); pAmount.max = bal; pDate.value = todayISO(); pDate.max = todayISO(); pMode.value = 'Cash'; pRef.value = pNotes.value = '';
-            aSel.innerHTML = ADVS.map(a => `<option value="${a.id}">${fmtDate(a.paid_date)} · ${esc(a.payment_mode || '')} · ${inr(a.remaining)} left of ${inr(a.amount)}</option>`).join('');
-            pickAdv();
+            pAmount.value = bal.toFixed(2); pAmount.max = bal; pDate.value = todayISO(); pDate.max = todayISO(); pMode.value = 'Cash'; pRef.value = pNotes.value = ''; pFile.value = '';
         }
         payModal.style.display = 'flex';
     } catch (e) { toast('error', e.message); }
@@ -489,27 +458,17 @@ function payRowHtml(p, withRemaining) {
     return `<tr class="${rev ? 'rev' : ''}"><td>${fmtDate(p.paid_date)}</td><td><span class="fm-pill ${p.kind}">${kindLabel(p.kind)}</span></td>
         <td>${esc(p.payment_mode || '')}${p.payment_ref ? '<div style="font-size:.7rem;color:#64748b">' + esc(p.payment_ref) + '</div>' : ''}</td>
         <td style="max-width:200px">${esc(p.notes || '')}${rev && p.reverse_reason ? '<div style="font-size:.7rem">Reverted: ' + esc(p.reverse_reason) + '</div>' : ''}</td>
+        <td>${fileLink(p.attachment)}</td>
         <td class="num"><b>${inr(p.amount)}</b></td>${withRemaining ? `<td class="num">${rev ? '-' : inr(p.remaining)}</td>` : ''}
         <td><span class="fm-pill ${rev ? 'reversed' : 'approved'}">${rev ? 'Reverted' : 'Active'}</span></td><td style="white-space:nowrap">${act}</td></tr>`;
-}
-function pickAdv() {
-    const a = ADVS.find(x => +x.id === +aSel.value); if (!a || !PAYTRIP) return;
-    const bal = +PAYTRIP.total_amount - +PAYTRIP.paid_amount;
-    aAmt.value = Math.min(+a.remaining, bal).toFixed(2);
 }
 async function savePayment() {
     pSaveBtn.disabled = true;
     try {
-        const d = await api('POST', {action: 'pay', id: PAYTRIP.id, amount: pAmount.value, paid_date: pDate.value, payment_mode: pMode.value, payment_ref: pRef.value, notes: pNotes.value});
+        const d = await apiForm({action: 'pay', id: PAYTRIP.id, amount: pAmount.value, paid_date: pDate.value, payment_mode: pMode.value, payment_ref: pRef.value, notes: pNotes.value}, pFile);
         toast('success', d.message); await openPayments(PAYTRIP.id); loadTrips();
     } catch (e) { toast('error', e.message); }
     pSaveBtn.disabled = false;
-}
-async function saveAdjust() {
-    try {
-        const d = await api('POST', {action: 'adjust', id: PAYTRIP.id, advance_id: aSel.value, amount: aAmt.value});
-        toast('success', d.message); await openPayments(PAYTRIP.id); loadTrips();
-    } catch (e) { toast('error', e.message); }
 }
 async function revertPayment(pid) {
     const r = await SwalX.fire({title: 'Revert this payment?', text: 'It stays in the history as reverted and the balance goes back up.', input: 'text', inputPlaceholder: 'Reason (optional)', icon: 'warning', showCancelButton: true, confirmButtonText: 'Revert', confirmButtonColor: '#f59e0b'});
@@ -523,63 +482,17 @@ async function deletePayment(pid) {
 }
 function refreshOpenModals() {
     if (payModal.style.display === 'flex' && PAYTRIP) openPayments(PAYTRIP.id);
-    if (advModal.style.display === 'flex') loadAdvHistory();
     loadTrips();
 }
 
-/* ---------- advances ---------- */
-function openAdvance(c) {
-    vName.value = c ? c.n : ''; vMobile.value = c ? c.m : ''; vAmount.value = vRef.value = vNotes.value = '';
-    vDate.value = todayISO(); vDate.max = todayISO(); vMode.value = 'Cash';
-    advModal.style.display = 'flex'; loadAdvHistory();
-}
-async function loadAdvHistory() {
-    const n = vName.value.trim();
-    if (!n) { advRows.innerHTML = '<tr><td colspan="6" style="text-align:center;padding:1rem;color:#94a3b8">Enter a contractor name.</td></tr>'; return; }
-    try {
-        const {advances} = await api('GET', {action: 'advances', contractor: n});
-        advRows.innerHTML = advances.length ? advances.map(a => {
-            const rev = a.status === 'reversed';
-            let act = '';
-            if (!rev && PERM.edit) act += `<button class="fm-btn ghost sm" onclick="revertPayment(${a.id})"><i class="fas fa-undo"></i> Revert</button>`;
-            if (PERM.admin) act += ` <button class="fm-btn ghost sm" onclick="deletePayment(${a.id})" style="color:#dc2626"><i class="fas fa-trash"></i></button>`;
-            return `<tr class="${rev ? 'rev' : ''}"><td>${fmtDate(a.paid_date)}</td><td>${esc(a.payment_mode || '')}${a.payment_ref ? '<div style="font-size:.7rem;color:#64748b">' + esc(a.payment_ref) + '</div>' : ''}</td>
-                <td class="num"><b>${inr(a.amount)}</b></td><td class="num" style="color:#7c3aed">${rev ? '-' : inr(a.remaining)}</td>
-                <td><span class="fm-pill ${rev ? 'reversed' : 'approved'}">${rev ? 'Reverted' : 'Active'}</span></td><td style="white-space:nowrap">${act}</td></tr>`;
-        }).join('') : '<tr><td colspan="6" style="text-align:center;padding:1rem;color:#94a3b8">No advances for this contractor.</td></tr>';
-    } catch (e) { advRows.innerHTML = `<tr><td colspan="6" style="color:#dc2626;padding:1rem">${esc(e.message)}</td></tr>`; }
-}
-async function saveAdvance() {
-    vSaveBtn.disabled = true;
-    try {
-        const d = await api('POST', {action: 'advance', contractor_name: vName.value.trim(), contractor_mobile: vMobile.value.trim(), amount: vAmount.value, paid_date: vDate.value, payment_mode: vMode.value, payment_ref: vRef.value, notes: vNotes.value});
-        toast('success', d.message); vAmount.value = vRef.value = vNotes.value = ''; loadAdvHistory(); loadTrips();
-    } catch (e) { toast('error', e.message); }
-    vSaveBtn.disabled = false;
-}
-function suggestAdvContractor() {
-    clearTimeout(sugTimer);
-    const q = vName.value.trim();
-    if (q.length < 1) { vSug.style.display = 'none'; return; }
-    sugTimer = setTimeout(async () => {
-        try {
-            const {contractors} = await api('GET', {action: 'suggest', q});
-            if (!contractors.length) { vSug.style.display = 'none'; return; }
-            vSug.innerHTML = contractors.map(c => `<div onclick='pickAdvContractor(${JSON.stringify(c).replace(/'/g, "&#39;")})'>${esc(c.contractor_name)} <span style="color:#64748b">${esc(c.contractor_mobile || '')}</span></div>`).join('');
-            vSug.style.display = 'block';
-        } catch (e) { vSug.style.display = 'none'; }
-    }, 250);
-}
-function pickAdvContractor(c) { vName.value = c.contractor_name; if (c.contractor_mobile) vMobile.value = c.contractor_mobile; vSug.style.display = 'none'; loadAdvHistory(); }
-document.addEventListener('click', e => { if (!e.target.closest('.fm-sug') && e.target !== vName) vSug.style.display = 'none'; });
 async function deleteTrip(id) {
     const r = await SwalX.fire({title: 'Delete this entry?', text: 'Its site costs will be removed too. This cannot be undone.', icon: 'warning', showCancelButton: true, confirmButtonText: 'Delete', confirmButtonColor: '#ef4444'});
     if (!r.isConfirmed) return;
     try { const d = await api('POST', {action: 'delete', id}); toast('success', d.message); loadTrips(); } catch (e) { toast('error', e.message); }
 }
 function exportCsv() {
-    const head = ['Entry No', 'Date', 'Contractor', 'Mobile', 'Sites', 'Sqft', 'Rate', 'Labour', 'Food', 'Travel', 'Misc', 'Total', 'Paid', 'Balance', 'Approval', 'Payment', 'Last Paid'];
-    const rows = TRIPS.map(t => [t.trip_number, t.trip_date, t.contractor_name, t.contractor_mobile || '', t.site_codes || '', t.total_sqft, t.rate_per_sqft, t.labour_amount, t.food_amount, t.travel_amount, t.misc_amount, t.total_amount, t.paid_amount, (+t.total_amount - +t.paid_amount).toFixed(2), t.approval_status, payLabel(t.payment_status), t.paid_date || '']);
+    const head = ['Entry No', 'Date', 'Mounting Date', 'Contractor', 'Mobile', 'Sites', 'Sqft', 'Rate', 'Labour', 'Food', 'Travel', 'Misc', 'Total', 'Paid', 'Balance', 'Approval', 'Payment', 'Last Paid'];
+    const rows = TRIPS.map(t => [t.trip_number, t.trip_date, t.mounting_date || '', t.contractor_name, t.contractor_mobile || '', t.site_codes || '', t.total_sqft, t.rate_per_sqft, t.labour_amount, t.food_amount, t.travel_amount, t.misc_amount, t.total_amount, t.paid_amount, (+t.total_amount - +t.paid_amount).toFixed(2), t.approval_status, payLabel(t.payment_status), t.paid_date || '']);
     const csv = [head, ...rows].map(r => r.map(v => '"' + String(v).replace(/"/g, '""') + '"').join(',')).join('\n');
     const a = document.createElement('a'); a.href = URL.createObjectURL(new Blob(['﻿' + csv], {type: 'text/csv'})); a.download = 'flex_mounting_register.csv'; a.click();
 }
