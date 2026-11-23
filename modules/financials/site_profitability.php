@@ -7,8 +7,8 @@ include_once __DIR__ . '/../../includes/site_profit_functions.php';
 requirePermission('financials', 'view');
 
 // Period: financial year (default the active FY), or a custom range
-$fy = getFinancialYear();
-[$fyA, $fyB] = array_map('intval', explode('-', $fy));
+$spFy = getFinancialYear();
+[$fyA, $fyB] = array_map('intval', explode('-', $spFy));
 $fyFrom = sprintf('20%02d-04-01', $fyA);
 $fyTo = sprintf('20%02d-03-31', $fyB);
 $validDate = fn($d) => ($d && preg_match('/^\d{4}-\d{2}-\d{2}$/', $d)) ? $d : null;
@@ -91,7 +91,7 @@ $qs = fn($extra = []) => '?' . http_build_query(array_merge(['period' => $period
         </div>
         <input type="hidden" name="owner" value="<?php echo htmlspecialchars($owner); ?>">
         <select name="period" id="spPeriod" onchange="document.getElementById('spCustom').style.display = this.value === 'custom' ? 'inline-flex' : 'none'">
-            <?php foreach (['fy' => 'FY ' . $fy, 'this_month' => 'This month', 'last_month' => 'Last month', 'custom' => 'Custom range', 'all' => 'All time'] as $k => $lbl): ?>
+            <?php foreach (['fy' => 'FY 20' . str_replace('-', '-20', $spFy), 'this_month' => 'This month', 'last_month' => 'Last month', 'custom' => 'Custom range', 'all' => 'All time'] as $k => $lbl): ?>
                 <option value="<?php echo $k; ?>" <?php echo $period === $k ? 'selected' : ''; ?>><?php echo $lbl; ?></option>
             <?php endforeach; ?>
         </select>
