@@ -15,8 +15,9 @@ if (!$vendor) { echo "Vendor not found."; exit; }
 // Fetch vendor sites
 $sites = $pdo->prepare("
     SELECT s.*, 
-        (SELECT filename FROM site_images WHERE site_id = s.id LIMIT 1) as thumbnail
-    FROM sites s 
+        (SELECT filename FROM site_images WHERE site_id = s.id LIMIT 1) as thumbnail,
+        (SELECT GROUP_CONCAT(filename ORDER BY id SEPARATOR ',') FROM site_images WHERE site_id = s.id) as all_images
+    FROM sites s
     WHERE s.vendor_id = ? 
     ORDER BY s.site_code ASC
 ");
@@ -227,7 +228,9 @@ include_once __DIR__ . '/../../includes/header.php';
                         <td style="font-weight:700; color:#94a3b8;"><?php echo $idx + 1; ?></td>
                         <td>
                             <?php if ($thumb): ?>
-                                <img src="<?php echo $thumb; ?>" class="site-thumb" alt="">
+                                <img src="<?php echo $thumb; ?>" class="site-thumb" alt="" style="cursor:zoom-in" title="Click to enlarge"
+                                     data-images="<?php echo htmlspecialchars($s['all_images'] ?: $s['thumbnail'], ENT_QUOTES); ?>"
+                                     onclick="event.stopPropagation(); vpoOpenPhotos(this.dataset.images)">
                             <?php else: ?>
                                 <div style="width:70px; height:45px; background:#f1f5f9; border-radius:8px; display:flex; align-items:center; justify-content:center; font-size:0.6rem; color:#94a3b8;">No Img</div>
                             <?php endif; ?>
@@ -503,6 +506,43 @@ function generatePO() {
         btn.innerHTML = '<i class="fas fa-file-invoice-dollar"></i> GENERATE PO';
     });
 }
+</script>
+
+<!-- Site photo lightbox (click a thumbnail to enlarge; arrows / Esc) -->
+<div id="vpo-lightbox" onclick="vpoClosePhotos()" style="position:fixed; inset:0; background:rgba(0,0,0,0.95); z-index:9999; display:none; align-items:center; justify-content:center; backdrop-filter:blur(10px);">
+    <div style="position:relative; max-width:90%; max-height:90%; display:flex; align-items:center; justify-content:center;" onclick="event.stopPropagation()">
+        <button class="vpo-nav" onclick="vpoStep(-1)" style="position:absolute; left:-70px; background:rgba(255,255,255,0.1); color:#fff; border:1px solid rgba(255,255,255,0.2); width:50px; height:50px; border-radius:50%; cursor:pointer; font-size:1.4rem;"><i class="fas fa-chevron-left"></i></button>
+        <div style="position:relative;">
+            <img id="vpo-lightbox-img" src="" alt="" style="max-width:100%; max-height:85vh; border-radius:16px; box-shadow:0 30px 60px rgba(0,0,0,0.8); border:2px solid rgba(255,255,255,0.15);">
+            <div id="vpo-lightbox-badge" style="position:absolute; bottom:20px; left:50%; transform:translateX(-50%); background:rgba(0,0,0,0.7); color:#fff; padding:6px 16px; border-radius:50px; font-weight:800; font-size:0.85rem;"></div>
+        </div>
+        <button class="vpo-nav" onclick="vpoStep(1)" style="position:absolute; right:-70px; background:rgba(255,255,255,0.1); color:#fff; border:1px solid rgba(255,255,255,0.2); width:50px; height:50px; border-radius:50%; cursor:pointer; font-size:1.4rem;"><i class="fas fa-chevron-right"></i></button>
+    </div>
+    <button onclick="vpoClosePhotos()" style="position:absolute; top:20px; right:24px; background:none; border:none; color:#fff; font-size:2rem; cursor:pointer;">&times;</button>
+</div>
+<script>
+let vpoImgs = [], vpoIdx = 0;
+function vpoShow() {
+    document.getElementById('vpo-lightbox-img').src = '../../uploads/sites/' + vpoImgs[vpoIdx];
+    const b = document.getElementById('vpo-lightbox-badge');
+    b.innerText = (vpoIdx + 1) + ' / ' + vpoImgs.length;
+    b.style.display = vpoImgs.length > 1 ? 'block' : 'none';
+}
+function vpoOpenPhotos(list) {
+    vpoImgs = (list || '').split(',').map(s => s.trim()).filter(Boolean);
+    if (!vpoImgs.length) return;
+    vpoIdx = 0; vpoShow();
+    document.querySelectorAll('.vpo-nav').forEach(n => n.style.display = vpoImgs.length > 1 ? 'block' : 'none');
+    document.getElementById('vpo-lightbox').style.display = 'flex';
+}
+function vpoStep(d) { vpoIdx = (vpoIdx + d + vpoImgs.length) % vpoImgs.length; vpoShow(); }
+function vpoClosePhotos() { document.getElementById('vpo-lightbox').style.display = 'none'; }
+document.addEventListener('keydown', function (e) {
+    if (document.getElementById('vpo-lightbox').style.display !== 'flex') return;
+    if (e.key === 'Escape') vpoClosePhotos();
+    if (e.key === 'ArrowRight') vpoStep(1);
+    if (e.key === 'ArrowLeft') vpoStep(-1);
+});
 </script>
 
 <?php include_once __DIR__ . '/../../includes/footer.php'; ?>
