@@ -4,6 +4,10 @@
  *
  * GET  ?action=list&from=&to=&contractor=&site_id=&approval_status=&payment_status=   -> {success, trips}
  * GET  ?action=get&id=                                                                 -> {success, trip}
+ * GET  ?action=contractors&q=                                                     -> {success, contractors}  (master with total/paid/due)
+ * GET  ?action=contractor_ledger&id=                                               -> {success, contractor, entries, payments, totals}
+ * GET  ?action=brands&q=                                                           -> {success, brands}
+ * POST {action:'contractor_save', id?, name, mobile, address, notes, is_active}
  * GET  ?action=suggest&q=                                                              -> {success, contractors}
  * GET  ?action=sites&q=                                                                -> {success, sites}  (site master search)
  * POST {action:'save', id?, trip_date, contractor_name, contractor_mobile, rate_per_sqft,
@@ -70,6 +74,29 @@ try {
         case 'suggest':
             if (!canView(MOUNTING_MODULE_KEY)) mountingDeny();
             echo json_encode(['success' => true, 'contractors' => suggestMountingContractors($pdo, $_GET['q'] ?? '')]);
+            break;
+
+        case 'contractors':
+            if (!canView(MOUNTING_MODULE_KEY)) mountingDeny();
+            echo json_encode(['success' => true, 'contractors' => listMountingContractors($pdo, $_GET['q'] ?? '', $entityId)]);
+            break;
+
+        case 'contractor_ledger':
+            if (!canView(MOUNTING_MODULE_KEY)) mountingDeny();
+            $l = getMountingContractorLedger($pdo, intval($_GET['id'] ?? 0), $entityId);
+            if (!$l) throw new Exception('Contractor not found.');
+            echo json_encode(['success' => true] + $l);
+            break;
+
+        case 'contractor_save':
+            if (!canEdit(MOUNTING_MODULE_KEY)) mountingDeny();
+            $cid = saveMountingContractor($pdo, intval($body['id'] ?? 0), $body, $userId);
+            echo json_encode(['success' => true, 'id' => $cid, 'message' => 'Contractor saved.']);
+            break;
+
+        case 'brands':
+            if (!canView(MOUNTING_MODULE_KEY)) mountingDeny();
+            echo json_encode(['success' => true, 'brands' => suggestMountingBrands($pdo, $_GET['q'] ?? '')]);
             break;
 
         case 'sites':

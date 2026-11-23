@@ -95,6 +95,9 @@ function validateMountingTripInput(PDO $pdo, array $in) {
         }
     }
 
+    $brand = trim((string)($in['brand_campaign'] ?? ''));
+    if (mb_strlen($brand) > 150) throw new Exception('Brand / campaign is too long (max 150 characters).');
+
     $mountingDate = trim((string)($in['mounting_date'] ?? ''));
     if ($mountingDate !== '') {
         $md = DateTime::createFromFormat('Y-m-d', $mountingDate);
@@ -136,6 +139,7 @@ function validateMountingTripInput(PDO $pdo, array $in) {
         'travel_amount' => mountingMoney($in['travel_amount'] ?? 0),
         'misc_amount' => mountingMoney($in['misc_amount'] ?? 0),
         'mounting_date' => $mountingDate !== '' ? $mountingDate : null,
+        'brand_campaign' => $brand !== '' ? $brand : null,
         'description' => trim((string)($in['description'] ?? '')) ?: null,
         'sites' => $sites,
     ];
@@ -153,6 +157,7 @@ function saveMountingTrip(PDO $pdo, array $input, $tripId, $userId, $isAdmin, $e
 
     $pdo->beginTransaction();
     try {
+        $contractorId = mountingFindOrCreateContractor($pdo, $d['contractor_name'], $d['contractor_mobile'], $userId);
         if ($tripId > 0) {
             $stmt = $pdo->prepare("SELECT * FROM mounting_trips WHERE id = ? FOR UPDATE");
             $stmt->execute([$tripId]);
@@ -162,19 +167,19 @@ function saveMountingTrip(PDO $pdo, array $input, $tripId, $userId, $isAdmin, $e
             if ($old['approval_status'] === 'approved' && !$isAdmin) throw new Exception('Approved trips can only be edited by admin.');
             $tripNumber = $old['trip_number'];
 
-            $pdo->prepare("UPDATE mounting_trips SET trip_date=?, contractor_name=?, contractor_mobile=?, rate_per_sqft=?,
+            $pdo->prepare("UPDATE mounting_trips SET trip_date=?, contractor_id=?, contractor_name=?, contractor_mobile=?, brand_campaign=?, rate_per_sqft=?,
                     total_sqft=?, labour_amount=?, food_amount=?, travel_amount=?, misc_amount=?, mounting_date=?, total_amount=?, description=?,
                     approval_status=?, approved_by=?, approved_at=?, rejection_reason=NULL WHERE id=?")
-                ->execute([$d['trip_date'], $d['contractor_name'], $d['contractor_mobile'], $d['rate_per_sqft'],
+                ->execute([$d['trip_date'], $contractorId, $d['contractor_name'], $d['contractor_mobile'], $d['brand_campaign'], $d['rate_per_sqft'],
                     $calc['total_sqft'], $calc['labour_amount'], $d['food_amount'], $d['travel_amount'], $d['misc_amount'], $d['mounting_date'],
                     $calc['total_amount'], $d['description'], $status, $isAdmin ? $userId : null, $isAdmin ? date('Y-m-d H:i:s') : null, $tripId]);
             $pdo->prepare("DELETE FROM mounting_trip_sites WHERE trip_id = ?")->execute([$tripId]);
         } else {
             $tripNumber = generateSequenceNumber($pdo, MOUNTING_MODULE_KEY, $d['trip_date']);
-            $pdo->prepare("INSERT INTO mounting_trips (entity_id, trip_number, trip_date, contractor_name, contractor_mobile, rate_per_sqft,
+            $pdo->prepare("INSERT INTO mounting_trips (entity_id, trip_number, trip_date, contractor_id, contractor_name, contractor_mobile, brand_campaign, rate_per_sqft,
                     total_sqft, labour_amount, food_amount, travel_amount, misc_amount, mounting_date, total_amount, description,
-                    approval_status, approved_by, approved_at, created_by) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)")
-                ->execute([$entityId, $tripNumber, $d['trip_date'], $d['contractor_name'], $d['contractor_mobile'], $d['rate_per_sqft'],
+                    approval_status, approved_by, approved_at, created_by) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)")
+                ->execute([$entityId, $tripNumber, $d['trip_date'], $contractorId, $d['contractor_name'], $d['contractor_mobile'], $d['brand_campaign'], $d['rate_per_sqft'],
                     $calc['total_sqft'], $calc['labour_amount'], $d['food_amount'], $d['travel_amount'], $d['misc_amount'], $d['mounting_date'],
                     $calc['total_amount'], $d['description'], $status, $isAdmin ? $userId : null, $isAdmin ? date('Y-m-d H:i:s') : null, $userId]);
             $tripId = intval($pdo->lastInsertId());
@@ -449,7 +454,7 @@ function listMountingTrips(PDO $pdo, array $f = []) {
     $p = [];
     if (!empty($f['from'])) { $where[] = 't.trip_date >= ?'; $p[] = $f['from']; }
     if (!empty($f['to'])) { $where[] = 't.trip_date <= ?'; $p[] = $f['to']; }
-    if (!empty($f['contractor'])) { $where[] = 't.contractor_name LIKE ?'; $p[] = '%' . $f['contractor'] . '%'; }
+    if (!empty($f['contractor'])) { $where[] = '(t.contractor_name LIKE ? OR t.brand_campaign LIKE ?)'; $p[] = '%' . $f['contractor'] . '%'; $p[] = '%' . $f['contractor'] . '%'; }
     if (!empty($f['approval_status'])) { $where[] = 't.approval_status = ?'; $p[] = $f['approval_status']; }
     if (!empty($f['payment_status'])) { $where[] = 't.payment_status = ?'; $p[] = $f['payment_status']; }
     if (!empty($f['entity_id'])) { $where[] = '(t.entity_id = ? OR t.entity_id IS NULL)'; $p[] = intval($f['entity_id']); }
@@ -463,14 +468,122 @@ function listMountingTrips(PDO $pdo, array $f = []) {
     return $stmt->fetchAll(PDO::FETCH_ASSOC);
 }
 
-/** Auto-suggest: previously used contractors matching $q, with their latest mobile. */
+/** Auto-suggest: active contractors from the master matching $q (name or mobile). */
 function suggestMountingContractors(PDO $pdo, $q, $limit = 10) {
-    $stmt = $pdo->prepare("SELECT t.contractor_name,
-               (SELECT t2.contractor_mobile FROM mounting_trips t2 WHERE t2.contractor_name = t.contractor_name AND t2.contractor_mobile IS NOT NULL ORDER BY t2.trip_date DESC, t2.id DESC LIMIT 1) AS contractor_mobile
-        FROM mounting_trips t WHERE t.contractor_name LIKE ? GROUP BY t.contractor_name ORDER BY MAX(t.trip_date) DESC LIMIT " . intval($limit));
-    $stmt->execute(['%' . trim((string)$q) . '%']);
+    $like = '%' . trim((string)$q) . '%';
+    $stmt = $pdo->prepare("SELECT id, name AS contractor_name, mobile AS contractor_mobile FROM mounting_contractors
+                           WHERE is_active = 1 AND (name LIKE ? OR mobile LIKE ?) ORDER BY name LIMIT " . intval($limit));
+    $stmt->execute([$like, $like]);
     return $stmt->fetchAll(PDO::FETCH_ASSOC);
 }
+
+/* ------------------------------------------------------------------------------------------------
+ * Labour contractor master (mounting_contractors). Entries keep a copy of the name/mobile and link by contractor_id.
+ * ---------------------------------------------------------------------------------------------- */
+
+function mountingCleanMobile($mobile) {
+    $m = preg_replace('/\D/', '', (string)$mobile);
+    if (strlen($m) === 12 && substr($m, 0, 2) === '91') $m = substr($m, 2);
+    if (strlen($m) === 11 && $m[0] === '0') $m = substr($m, 1);
+    if ($m !== '' && !preg_match('/^[6-9][0-9]{9}$/', $m)) throw new Exception('Enter a valid 10-digit mobile number (e.g. 9876543210).');
+    return $m !== '' ? $m : null;
+}
+
+/** Contractor id for a name; adds the contractor to the master when new, fills a missing mobile. */
+function mountingFindOrCreateContractor(PDO $pdo, $name, $mobile = null, $userId = null) {
+    $name = trim((string)$name);
+    $st = $pdo->prepare("SELECT id, mobile FROM mounting_contractors WHERE name = ?");
+    $st->execute([$name]);
+    $c = $st->fetch(PDO::FETCH_ASSOC);
+    if ($c) {
+        if (!$c['mobile'] && $mobile) $pdo->prepare("UPDATE mounting_contractors SET mobile = ? WHERE id = ?")->execute([$mobile, $c['id']]);
+        return intval($c['id']);
+    }
+    $pdo->prepare("INSERT INTO mounting_contractors (name, mobile, created_by) VALUES (?, ?, ?)")->execute([$name, $mobile ?: null, $userId]);
+    return intval($pdo->lastInsertId());
+}
+
+/** Add (id = 0) or edit a contractor. A rename is copied to that contractor's entries and payments. */
+function saveMountingContractor(PDO $pdo, $id, array $in, $userId) {
+    $name = trim((string)($in['name'] ?? ''));
+    if ($name === '' || mb_strlen($name) > 150) throw new Exception('Contractor name is required (max 150 characters).');
+    $mobile = mountingCleanMobile($in['mobile'] ?? '');
+    $address = mb_substr(trim((string)($in['address'] ?? '')), 0, 255) ?: null;
+    $notes = mb_substr(trim((string)($in['notes'] ?? '')), 0, 255) ?: null;
+    $active = !isset($in['is_active']) || !empty($in['is_active']) ? 1 : 0;
+    $dup = $pdo->prepare("SELECT id FROM mounting_contractors WHERE name = ? AND id <> ?");
+    $dup->execute([$name, intval($id)]);
+    if ($dup->fetchColumn()) throw new Exception('A contractor with this name already exists.');
+    $pdo->beginTransaction();
+    try {
+        if ($id > 0) {
+            $st = $pdo->prepare("UPDATE mounting_contractors SET name = ?, mobile = ?, address = ?, notes = ?, is_active = ? WHERE id = ?");
+            $st->execute([$name, $mobile, $address, $notes, $active, $id]);
+            $pdo->prepare("UPDATE mounting_trips SET contractor_name = ?, contractor_mobile = COALESCE(?, contractor_mobile) WHERE contractor_id = ?")->execute([$name, $mobile, $id]);
+            $pdo->prepare("UPDATE mounting_payments p JOIN mounting_trips t ON t.id = p.trip_id SET p.contractor_name = ? WHERE t.contractor_id = ?")->execute([$name, $id]);
+        } else {
+            $pdo->prepare("INSERT INTO mounting_contractors (name, mobile, address, notes, is_active, created_by) VALUES (?, ?, ?, ?, ?, ?)")
+                ->execute([$name, $mobile, $address, $notes, $active, $userId]);
+            $id = intval($pdo->lastInsertId());
+        }
+        $pdo->commit();
+    } catch (Exception $e) { $pdo->rollBack(); throw $e; }
+    return intval($id);
+}
+
+/** Contractors with their approved entries total, paid and due. Filter by name / mobile with $q. */
+function listMountingContractors(PDO $pdo, $q = '', $entityId = null) {
+    $ent = $entityId ? " AND (t.entity_id = " . intval($entityId) . " OR t.entity_id IS NULL)" : "";
+    $like = '%' . trim((string)$q) . '%';
+    $st = $pdo->prepare("
+        SELECT c.*,
+               COUNT(t.id) AS entries,
+               COALESCE(SUM(t.total_amount), 0) AS total,
+               COALESCE(SUM(t.paid_amount), 0) AS paid,
+               COALESCE(SUM(t.total_amount - t.paid_amount), 0) AS due,
+               MAX(t.trip_date) AS last_entry
+        FROM mounting_contractors c
+        LEFT JOIN mounting_trips t ON t.contractor_id = c.id AND t.approval_status = 'approved' $ent
+        WHERE c.name LIKE ? OR c.mobile LIKE ?
+        GROUP BY c.id ORDER BY c.is_active DESC, due DESC, c.name");
+    $st->execute([$like, $like]);
+    return $st->fetchAll(PDO::FETCH_ASSOC);
+}
+
+/** One contractor: details, all entries (any status) and all payments, with approved totals. */
+function getMountingContractorLedger(PDO $pdo, $id, $entityId = null) {
+    $st = $pdo->prepare("SELECT * FROM mounting_contractors WHERE id = ?");
+    $st->execute([intval($id)]);
+    $c = $st->fetch(PDO::FETCH_ASSOC);
+    if (!$c) return null;
+    $ent = $entityId ? " AND (t.entity_id = " . intval($entityId) . " OR t.entity_id IS NULL)" : "";
+    $st = $pdo->prepare("SELECT t.*,
+               (SELECT GROUP_CONCAT(s.site_code ORDER BY mts.id SEPARATOR ', ') FROM mounting_trip_sites mts JOIN sites s ON s.id = mts.site_id WHERE mts.trip_id = t.id) AS site_codes
+        FROM mounting_trips t WHERE t.contractor_id = ? $ent ORDER BY t.trip_date DESC, t.id DESC");
+    $st->execute([$c['id']]);
+    $entries = $st->fetchAll(PDO::FETCH_ASSOC);
+    $st = $pdo->prepare("SELECT p.*, t.trip_number, t.brand_campaign FROM mounting_payments p JOIN mounting_trips t ON t.id = p.trip_id
+                         WHERE t.contractor_id = ? AND p.kind = 'payment' $ent ORDER BY p.paid_date DESC, p.id DESC");
+    $st->execute([$c['id']]);
+    $payments = $st->fetchAll(PDO::FETCH_ASSOC);
+    $total = $paid = 0.0;
+    foreach ($entries as $e) if ($e['approval_status'] === 'approved') { $total += $e['total_amount']; $paid += $e['paid_amount']; }
+    return ['contractor' => $c, 'entries' => $entries, 'payments' => $payments,
+            'totals' => ['total' => round($total, 2), 'paid' => round($paid, 2), 'due' => round($total - $paid, 2)]];
+}
+
+/** Brand / campaign suggestions: earlier entries and bookings. */
+function suggestMountingBrands(PDO $pdo, $q, $limit = 15) {
+    $like = '%' . trim((string)$q) . '%';
+    $st = $pdo->prepare("SELECT v FROM (
+            SELECT brand_campaign AS v FROM mounting_trips WHERE brand_campaign LIKE ?
+            UNION SELECT CONVERT(campaign_name USING utf8mb4) COLLATE utf8mb4_general_ci FROM bookings WHERE campaign_name LIKE ?
+            UNION SELECT CONVERT(brand_name USING utf8mb4) COLLATE utf8mb4_general_ci FROM bookings WHERE brand_name LIKE ?
+        ) x WHERE v IS NOT NULL AND v <> '' ORDER BY v LIMIT " . intval($limit));
+    $st->execute([$like, $like, $like]);
+    return $st->fetchAll(PDO::FETCH_COLUMN);
+}
+
 
 /**
  * Site P&L feed: approved mounting cost lines for one site, optionally within a date range.
