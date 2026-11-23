@@ -48,6 +48,9 @@ $perm = [
 .fm-total { background: #f0fdfa; border: 1px solid #99f6e4; border-radius: 10px; padding: 10px 14px; display: flex; flex-wrap: wrap; gap: 18px; font-size: .82rem; margin-top: 10px; }
 .fm-total b { color: #0f766e; }
 @media (max-width: 700px) { .fm-modal { padding: 14px; } }
+.swal2-container { z-index: 3000 !important; }
+.fm-x { background: #f1f5f9; border: none; border-radius: 8px; width: 34px; height: 34px; font-size: 1rem; color: #334155; cursor: pointer; }
+.fm-x:hover { background: #fee2e2; color: #b91c1c; }
 </style>
 
 <div class="fm-wrap">
@@ -102,13 +105,13 @@ $perm = [
     <div class="fm-modal">
         <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px;">
             <h3 style="margin:0;font-size:1.05rem;font-weight:800" id="tripModalTitle">New Mounting Entry</h3>
-            <button class="fm-btn ghost sm" onclick="closeModal('tripModal')"><i class="fas fa-times"></i></button>
+            <button class="fm-x" title="Close" aria-label="Close" onclick="closeModal('tripModal')"><i class="fas fa-times"></i></button>
         </div>
         <input type="hidden" id="tId">
         <div class="fm-grid">
             <div><label>Date *</label><input type="date" id="tDate"></div>
             <div style="position:relative"><label>Labour Contractor Name *</label><input type="text" id="tName" autocomplete="off" oninput="suggestContractor()"><div class="fm-sug" id="nameSug" style="display:none"></div></div>
-            <div><label>Mobile</label><input type="text" id="tMobile" maxlength="13" placeholder="10-digit"></div>
+            <div><label>Mobile</label><input type="text" id="tMobile" maxlength="16" placeholder="e.g. 9876543210"></div>
             <div><label>Rate per Sqft (₹)</label><input type="number" step="0.01" min="0" id="tRate" oninput="recalc()"></div>
             <div><label>Fooding (₹)</label><input type="number" step="0.01" min="0" id="tFood" oninput="recalc()"></div>
             <div><label>Travelling (₹)</label><input type="number" step="0.01" min="0" id="tTravel" oninput="recalc()"></div>
@@ -148,7 +151,7 @@ $perm = [
     <div class="fm-modal" style="max-width:820px">
         <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px;">
             <h3 style="margin:0;font-size:1.05rem;font-weight:800" id="viewTitle">Entry</h3>
-            <div style="display:flex;gap:6px"><button class="fm-btn ghost sm" onclick="printView()"><i class="fas fa-print"></i> Print</button><button class="fm-btn ghost sm" onclick="closeModal('viewModal')"><i class="fas fa-times"></i></button></div>
+            <div style="display:flex;gap:6px"><button class="fm-btn ghost sm" onclick="printView()"><i class="fas fa-print"></i> Print</button><button class="fm-x" title="Close" aria-label="Close" onclick="closeModal('viewModal')"><i class="fas fa-times"></i></button></div>
         </div>
         <div id="viewBody"></div>
     </div>
@@ -175,7 +178,8 @@ async function api(method, params) {
     if (!data.success) throw new Error(data.message || 'Request failed');
     return data;
 }
-function toast(icon, title) { Swal.fire({icon, title, timer: icon === 'success' ? 1600 : undefined, showConfirmButton: icon !== 'success'}); }
+const SwalX = Swal.mixin({showCloseButton: true});
+function toast(icon, title) { SwalX.fire({icon, title, timer: icon === 'success' ? 1600 : undefined, showConfirmButton: icon !== 'success'}); }
 
 async function loadTrips() {
     try {
@@ -219,6 +223,7 @@ function renderSummary(rows) {
 
 /* ---------- form ---------- */
 function closeModal(id) { document.getElementById(id).style.display = 'none'; }
+document.addEventListener('keydown', e => { if (e.key === 'Escape' && !Swal.isVisible()) { closeModal('tripModal'); closeModal('viewModal'); } });
 async function openTrip(id) {
     tId.value = ''; tDate.value = new Date().toISOString().slice(0, 10); tName.value = tMobile.value = tRate.value = tFood.value = tTravel.value = tMisc.value = tDesc.value = '';
     LINES = []; tripModalTitle.textContent = 'New Mounting Entry';
@@ -345,10 +350,10 @@ function printView() {
 async function decide(id, action) {
     let reason = '';
     if (action === 'reject') {
-        const r = await Swal.fire({title: 'Reject entry?', input: 'text', inputPlaceholder: 'Reason', showCancelButton: true, confirmButtonText: 'Reject', confirmButtonColor: '#ef4444'});
+        const r = await SwalX.fire({title: 'Reject entry?', input: 'text', inputPlaceholder: 'Reason', showCancelButton: true, confirmButtonText: 'Reject', confirmButtonColor: '#ef4444'});
         if (!r.isConfirmed) return; reason = r.value || '';
     } else {
-        const r = await Swal.fire({title: 'Approve entry?', text: 'Its cost will be added to the sites\' P&L.', icon: 'question', showCancelButton: true, confirmButtonText: 'Approve', confirmButtonColor: '#10b981'});
+        const r = await SwalX.fire({title: 'Approve entry?', text: 'Its cost will be added to the sites\' P&L.', icon: 'question', showCancelButton: true, confirmButtonText: 'Approve', confirmButtonColor: '#10b981'});
         if (!r.isConfirmed) return;
     }
     const res = await fetch(FM_APPROVE, {method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify({entity_type: 'mounting_trip', entity_id: id, action, reason})});
@@ -357,7 +362,7 @@ async function decide(id, action) {
 }
 async function payTrip(id) {
     const t = TRIPS.find(x => +x.id === id);
-    const r = await Swal.fire({
+    const r = await SwalX.fire({
         title: 'Mark paid: ' + inr(t.total_amount),
         html: `<div style="text-align:left;font-size:.85rem">To <b>${esc(t.contractor_name)}</b><br><br>
             <label>Payment date</label><input type="date" id="pDate" class="swal2-input" style="margin:4px 0 10px" value="${new Date().toISOString().slice(0, 10)}">
@@ -370,12 +375,12 @@ async function payTrip(id) {
     try { const d = await api('POST', {action: 'pay', id, ...r.value}); toast('success', d.message); loadTrips(); } catch (e) { toast('error', e.message); }
 }
 async function unpayTrip(id) {
-    const r = await Swal.fire({title: 'Reverse payment?', text: 'Entry will go back to unpaid.', icon: 'warning', showCancelButton: true, confirmButtonText: 'Reverse'});
+    const r = await SwalX.fire({title: 'Reverse payment?', text: 'Entry will go back to unpaid.', icon: 'warning', showCancelButton: true, confirmButtonText: 'Reverse'});
     if (!r.isConfirmed) return;
     try { const d = await api('POST', {action: 'unpay', id}); toast('success', d.message); loadTrips(); } catch (e) { toast('error', e.message); }
 }
 async function deleteTrip(id) {
-    const r = await Swal.fire({title: 'Delete this entry?', text: 'Its site costs will be removed too. This cannot be undone.', icon: 'warning', showCancelButton: true, confirmButtonText: 'Delete', confirmButtonColor: '#ef4444'});
+    const r = await SwalX.fire({title: 'Delete this entry?', text: 'Its site costs will be removed too. This cannot be undone.', icon: 'warning', showCancelButton: true, confirmButtonText: 'Delete', confirmButtonColor: '#ef4444'});
     if (!r.isConfirmed) return;
     try { const d = await api('POST', {action: 'delete', id}); toast('success', d.message); loadTrips(); } catch (e) { toast('error', e.message); }
 }

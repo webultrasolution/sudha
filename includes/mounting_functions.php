@@ -83,8 +83,11 @@ function validateMountingTripInput(PDO $pdo, array $in) {
     $name = trim($in['contractor_name'] ?? '');
     if ($name === '' || mb_strlen($name) > 150) throw new Exception('Labour contractor name is required (max 150 chars).');
 
-    $mobile = preg_replace('/[^0-9+]/', '', (string)($in['contractor_mobile'] ?? ''));
-    if ($mobile !== '' && !preg_match('/^(\+91)?[6-9][0-9]{9}$/', $mobile)) throw new Exception('Enter a valid 10-digit mobile number.');
+    // Accept 9876543210, 09876543210, +91 98765 43210, 91-9876543210; store the plain 10 digits
+    $mobile = preg_replace('/\D/', '', (string)($in['contractor_mobile'] ?? ''));
+    if (strlen($mobile) === 12 && substr($mobile, 0, 2) === '91') $mobile = substr($mobile, 2);
+    if (strlen($mobile) === 11 && $mobile[0] === '0') $mobile = substr($mobile, 1);
+    if ($mobile !== '' && !preg_match('/^[6-9][0-9]{9}$/', $mobile)) throw new Exception('Enter a valid 10-digit mobile number (e.g. 9876543210).');
 
     foreach (['rate_per_sqft', 'food_amount', 'travel_amount', 'misc_amount'] as $k) {
         if (isset($in[$k]) && $in[$k] !== '' && (!is_numeric($in[$k]) || floatval($in[$k]) < 0)) {
