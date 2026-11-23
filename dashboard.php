@@ -87,7 +87,15 @@ $totalSites = 1;
 $bookedSites = 0;
 if ($canViewInventory) {
     $totalSites = $pdo->query("SELECT COUNT(*) FROM sites")->fetchColumn() ?: 1;
-    $bookedSites = $pdo->query("SELECT COUNT(*) FROM sites WHERE status = 'booked'")->fetchColumn();
+    // Occupied = site is in an approved, non-cancelled booking whose period covers today (sites.status is never updated)
+    $bookedSites = (int)$pdo->query("
+        SELECT COUNT(DISTINCT bi.site_id)
+        FROM booking_items bi
+        JOIN bookings b ON b.id = bi.booking_id
+        JOIN sites s ON s.id = bi.site_id
+        WHERE b.approval_status = 'approved' AND b.status <> 'cancelled'
+          AND CURDATE() BETWEEN COALESCE(bi.start_date, b.start_date) AND COALESCE(bi.end_date, b.end_date)
+    ")->fetchColumn();
 }
 
 // New Dashboard Metrics & Stats calculations
