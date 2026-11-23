@@ -84,16 +84,23 @@ tr.rev td { color: #94a3b8; }
         <div class="fm-card"><div class="lbl">Pending Payment</div><div class="val" id="cPending" style="color:#dc2626">₹0</div></div>
     </div>
 
+    <div style="display:flex;gap:6px;margin-bottom:12px;flex-wrap:wrap" role="tablist">
+        <button class="fm-btn primary sm" id="tabE" role="tab" aria-selected="true" onclick="showTab('entries')"><i class="fas fa-clipboard-list"></i> Entries</button>
+        <button class="fm-btn ghost sm" id="tabP" role="tab" aria-selected="false" onclick="showTab('payments')"><i class="fas fa-rupee-sign"></i> Payments</button>
+    </div>
+
     <div class="fm-bar">
         <input type="date" id="fFrom" title="From"> <span style="color:#94a3b8">to</span> <input type="date" id="fTo" title="To">
         <input type="text" id="fContractor" placeholder="Contractor or brand">
         <select id="fApproval"><option value="">All approval</option><option value="pending_approval">Pending approval</option><option value="approved">Approved</option><option value="rejected">Rejected</option></select>
         <select id="fPayment"><option value="">All payment</option><option value="pending">Unpaid</option><option value="partial">Partly paid</option><option value="paid">Paid</option></select>
-        <button class="fm-btn primary sm" onclick="loadTrips()"><i class="fas fa-search"></i> Filter</button>
+        <select id="fPayList" hidden><option value="">All payments</option><option value="active">Active</option><option value="reversed">Reverted</option></select>
+        <button class="fm-btn primary sm" onclick="reloadTab()"><i class="fas fa-search"></i> Filter</button>
         <button class="fm-btn ghost sm" onclick="resetFilters()"><i class="fas fa-undo"></i> Reset</button>
         <button class="fm-btn ghost sm" onclick="exportCsv()" style="margin-left:auto"><i class="fas fa-file-csv"></i> Export CSV</button>
     </div>
 
+    <div id="entriesPanel">
     <div id="selBar" hidden style="display:flex;justify-content:space-between;align-items:center;gap:10px;flex-wrap:wrap;background:#eff6ff;border:1px solid #bfdbfe;border-radius:12px;padding:10px 14px;margin-bottom:10px">
         <span style="font-size:.85rem;color:#1e3a8a" id="selInfo"></span>
         <span style="display:flex;gap:8px"><button class="fm-btn ghost sm" onclick="clearTicks()">Clear</button><button class="fm-btn blue" onclick="openBulkPay()"><i class="fas fa-money-bill-wave"></i> Pay ticked entries</button></span>
@@ -110,6 +117,15 @@ tr.rev td { color: #94a3b8; }
             <tbody id="tripRows"><tr><td colspan="17" style="text-align:center;padding:2rem;color:#94a3b8">Loading…</td></tr></tbody>
         </table>
     </div>
+    </div>
+
+    <div class="fm-table-wrap" id="paymentsPanel" hidden>
+        <table class="fm-table">
+            <thead><tr><th>Payment No / Date</th><th>Contractor</th><th>Entries paid</th><th>Mode / Ref</th><th>Notes</th><th>File</th><th class="num">Amount</th><th>Status</th><th></th></tr></thead>
+            <tbody id="payListRows"></tbody>
+            <tfoot id="payListFoot"></tfoot>
+        </table>
+    </div>
 
 </div>
 
@@ -123,7 +139,7 @@ tr.rev td { color: #94a3b8; }
         <input type="hidden" id="tId">
         <div class="fm-grid">
             <div><label>Date *</label><input type="date" id="tDate"></div>
-            <div style="position:relative"><label>Labour Contractor Name *</label><input type="text" id="tName" autocomplete="off" oninput="suggestContractor()"><div class="fm-sug" id="nameSug" style="display:none"></div></div>
+            <div><label for="tConSel">Labour Contractor *</label><select id="tConSel" onchange="pickConOption()"></select><input type="hidden" id="tName"></div>
             <div><label>Mobile</label><input type="text" id="tMobile" maxlength="16" placeholder="e.g. 9876543210"></div>
             <div><label for="tBrand">Brand / Campaign</label><input type="text" id="tBrand" maxlength="150" list="brandList" autocomplete="off" oninput="suggestBrand()" placeholder="e.g. Kisna Jewellers"><datalist id="brandList"></datalist></div>
             <div><label>Rate per Sqft (₹)</label><input type="number" step="0.01" min="0" id="tRate" oninput="recalc()"></div>
@@ -334,7 +350,52 @@ async function loadTrips() {
         TRIPS = d.trips; renderTrips();
     } catch (e) { tripRows.innerHTML = `<tr><td colspan="17" style="text-align:center;padding:2rem;color:#dc2626">${esc(e.message)}</td></tr>`; }
 }
-function resetFilters() { fFrom.value = fTo.value = fContractor.value = fApproval.value = fPayment.value = ''; loadTrips(); }
+function resetFilters() { fFrom.value = fTo.value = fContractor.value = fApproval.value = fPayment.value = fPayList.value = ''; reloadTab(); }
+let TAB = 'entries', PAYS = [];
+function showTab(t) {
+    TAB = t;
+    tabE.className = 'fm-btn sm ' + (t === 'entries' ? 'primary' : 'ghost'); tabP.className = 'fm-btn sm ' + (t === 'payments' ? 'primary' : 'ghost');
+    tabE.setAttribute('aria-selected', t === 'entries'); tabP.setAttribute('aria-selected', t === 'payments');
+    entriesPanel.hidden = t !== 'entries'; paymentsPanel.hidden = t !== 'payments';
+    fApproval.hidden = fPayment.hidden = t !== 'entries'; fPayList.hidden = t !== 'payments';
+    selBar.hidden = t !== 'entries' || !TICKED.size;
+    reloadTab();
+}
+function reloadTab() { loadTrips(); if (TAB === 'payments') loadPayList(); }
+async function loadPayList() {
+    try {
+        const d = await api('GET', {action: 'payment_list', from: fFrom.value, to: fTo.value, contractor: fContractor.value.trim(), status: fPayList.value});
+        PAYS = d.payments;
+        let tot = 0;
+        payListRows.innerHTML = PAYS.length ? PAYS.map(p => {
+            const rev = +p.active_rows === 0; if (!rev) tot += +p.amount;
+            const entries = (p.entries || '').split('; ').filter(Boolean).map(x => esc(x).replace('Rs.', '₹')).join('<br>');
+            let act = '';
+            if (!rev && PERM.edit && p.payment_number) act += `<button class="fm-btn ghost sm" onclick="revertGroup('${esc(p.payment_number)}')" title="Revert this whole payment"><i class="fas fa-undo"></i> Revert</button>`;
+            if (PERM.admin && p.payment_number) act += ` <button class="fm-btn ghost sm" onclick="deleteGroup('${esc(p.payment_number)}')" title="Delete wrong payment" style="color:#dc2626"><i class="fas fa-trash"></i></button>`;
+            return `<tr class="${rev ? 'rev' : ''}"><td><b>${esc(p.payment_number || p.ref)}</b><div style="font-size:.7rem;color:#64748b">${fmtDate(p.paid_date)}</div></td>
+                <td>${p.contractor_id ? `<a href="#" onclick="openLedger(${p.contractor_id});return false" style="color:#0f766e;font-weight:700">${esc(p.contractor_name)}</a>` : esc(p.contractor_name)}</td>
+                <td style="font-size:.74rem;min-width:180px">${+p.rows_count > 1 ? `<span class="fm-pill partial" style="margin-bottom:3px">Bulk · ${+p.rows_count} entries</span><br>` : ''}${entries}</td>
+                <td>${esc(p.payment_mode || '')}${p.payment_ref ? '<div style="font-size:.7rem;color:#64748b">' + esc(p.payment_ref) + '</div>' : ''}</td>
+                <td style="max-width:200px">${esc(p.notes || '')}${rev && p.reverse_reason ? '<div style="font-size:.7rem">Reverted: ' + esc(p.reverse_reason) + '</div>' : ''}</td>
+                <td>${fileLink(p.attachment)}</td>
+                <td class="num"><b>${inr(rev ? p.original_amount : p.amount)}</b></td>
+                <td><span class="fm-pill ${rev ? 'reversed' : 'approved'}">${rev ? 'Reverted' : (+p.active_rows < +p.rows_count ? 'Part reverted' : 'Active')}</span></td>
+                <td style="white-space:nowrap">${act}</td></tr>`;
+        }).join('') : '<tr><td colspan="9" style="text-align:center;padding:2rem;color:#94a3b8">No payments yet.</td></tr>';
+        payListFoot.innerHTML = PAYS.length ? `<tr><td colspan="6">Total paid (${PAYS.filter(p => +p.active_rows > 0).length} payments)</td><td class="num">${inr(tot)}</td><td colspan="2"></td></tr>` : '';
+    } catch (e) { payListRows.innerHTML = `<tr><td colspan="9" style="color:#dc2626;padding:1rem">${esc(e.message)}</td></tr>`; }
+}
+async function revertGroup(no) {
+    const r = await SwalX.fire({title: 'Revert ' + no + '?', text: 'Every entry this payment paid goes back to its old balance. The payment stays in the list as reverted.', input: 'text', inputPlaceholder: 'Reason (optional)', icon: 'warning', showCancelButton: true, confirmButtonText: 'Revert', confirmButtonColor: '#f59e0b'});
+    if (!r.isConfirmed) return;
+    try { const d = await api('POST', {action: 'revert_group', payment_number: no, reason: r.value || ''}); toast('success', d.message); reloadTab(); } catch (e) { toast('error', e.message); }
+}
+async function deleteGroup(no) {
+    const r = await SwalX.fire({title: 'Delete ' + no + '?', text: 'Use this only for a wrong payment. It is removed from every entry it paid and cannot be undone.', icon: 'warning', showCancelButton: true, confirmButtonText: 'Delete', confirmButtonColor: '#ef4444'});
+    if (!r.isConfirmed) return;
+    try { const d = await api('POST', {action: 'delete_group', payment_number: no}); toast('success', d.message); reloadTab(); } catch (e) { toast('error', e.message); }
+}
 
 function renderTrips() {
     let sqft = 0, total = 0, paid = 0, pending = 0;
@@ -505,7 +566,7 @@ async function saveBulk() {
     try {
         const ids = tickedTrips().map(t => t.id);
         const d = await apiForm({action: 'bulk_pay', trip_ids: ids.join(','), amount: bAmount.value, paid_date: bDate.value, payment_mode: bMode.value, payment_ref: bRef.value, notes: bNotes.value}, bFile);
-        closeModal('bulkModal'); TICKED.clear(); toast('success', d.message); loadTrips();
+        closeModal('bulkModal'); TICKED.clear(); toast('success', d.message); reloadTab();
     } catch (e) { toast('error', e.message); }
     bSaveBtn.disabled = false;
 }
@@ -521,12 +582,14 @@ const kindLabel = k => ({payment: 'Payment'}[k] || k);
 function closeModal(id) { document.getElementById(id).style.display = 'none'; }
 document.addEventListener('keydown', e => { if (e.key === 'Escape' && !Swal.isVisible()) ['ledgerModal', 'conModal', 'tripModal', 'viewModal', 'payModal', 'bulkModal'].forEach(closeModal); });
 async function openTrip(id) {
+    await loadConOptions();
     tId.value = ''; tDate.value = todayISO(); tName.value = tMobile.value = tBrand.value = tRate.value = tFood.value = tTravel.value = tMisc.value = tDesc.value = tMountDate.value = ''; tMountDate.max = todayISO();
+    tConSel.value = '';
     LINES = []; tripModalTitle.textContent = 'New Mounting Entry';
     if (id) {
         try {
             const {trip} = await api('GET', {action: 'get', id});
-            tId.value = trip.id; tDate.value = trip.trip_date; tName.value = trip.contractor_name; tMobile.value = trip.contractor_mobile || '';
+            tId.value = trip.id; tDate.value = trip.trip_date; selectConByName(trip.contractor_name, trip.contractor_mobile); tMobile.value = trip.contractor_mobile || '';
             tRate.value = +trip.rate_per_sqft || ''; tFood.value = +trip.food_amount || ''; tTravel.value = +trip.travel_amount || ''; tMisc.value = +trip.misc_amount || ''; tDesc.value = trip.description || ''; tBrand.value = trip.brand_campaign || ''; tMountDate.value = trip.mounting_date || '';
             LINES = trip.sites.map(s => ({site_id: +s.site_id, site_code: s.site_code, site_name: s.site_name, location: s.location, owner_type: s.owner_type, sqft: +s.sqft, remarks: s.remarks || ''}));
             tripModalTitle.textContent = 'Edit ' + trip.trip_number;
@@ -594,24 +657,48 @@ function addSite(s) {
     renderLines();
     const inputs = lineRows.querySelectorAll('input[type=number]'); if (inputs.length) { const el = inputs[inputs.length - 1]; el.focus(); el.select(); }
 }
-function suggestContractor() {
-    clearTimeout(sugTimer);
-    const q = tName.value.trim();
-    if (q.length < 1) { nameSug.style.display = 'none'; return; }
-    sugTimer = setTimeout(async () => {
-        try {
-            const {contractors} = await api('GET', {action: 'suggest', q});
-            if (!contractors.length) { nameSug.style.display = 'none'; return; }
-            nameSug.innerHTML = contractors.map(c => `<div onclick='pickContractor(${JSON.stringify(c).replace(/'/g, "&#39;")})'>${esc(c.contractor_name)} <span style="color:#64748b">${esc(c.contractor_mobile || '')}</span></div>`).join('');
-            nameSug.style.display = 'block';
-        } catch (e) { nameSug.style.display = 'none'; }
-    }, 250);
+/* contractor dropdown (from the Labour Contractor master) */
+let CON_OPTS = [];
+async function loadConOptions() {
+    try { CON_OPTS = (await api('GET', {action: 'contractor_options'})).contractors; } catch (e) { CON_OPTS = []; }
+    tConSel.innerHTML = '<option value="">Select contractor…</option>' + CON_OPTS.map(c => `<option value="${c.id}">${esc(c.name)}${c.mobile ? ' · ' + esc(c.mobile) : ''}</option>`).join('')
+        + (PERM.edit ? '<option value="__new">+ Add new contractor…</option>' : '');
 }
-function pickContractor(c) { tName.value = c.contractor_name; if (c.contractor_mobile) tMobile.value = c.contractor_mobile; nameSug.style.display = 'none'; }
-document.addEventListener('click', e => { if (!e.target.closest('.fm-sug') && e.target !== siteSearch && e.target !== tName) { siteSug.style.display = 'none'; nameSug.style.display = 'none'; } });
+function selectConByName(name, mobile) {
+    const c = CON_OPTS.find(x => x.name.trim().toLowerCase() === String(name || '').trim().toLowerCase());
+    if (!c && name) {   // inactive or old name: keep it selectable for this entry
+        const o = document.createElement('option'); o.value = 'name:' + name; o.textContent = name + (mobile ? ' · ' + mobile : '') + ' (inactive)';
+        tConSel.insertBefore(o, tConSel.options[1] || null);
+    }
+    tConSel.value = c ? String(c.id) : (name ? 'name:' + name : '');
+    tName.value = name || '';
+}
+async function pickConOption() {
+    const v = tConSel.value;
+    if (v === '__new') {
+        tConSel.value = '';
+        const r = await SwalX.fire({title: 'New labour contractor', html: `<div style="text-align:left"><label style="font-size:.75rem;font-weight:700">Name *</label><input id="nqName" class="swal2-input" style="margin:4px 0 10px;width:100%" maxlength="150">
+            <label style="font-size:.75rem;font-weight:700">Mobile</label><input id="nqMobile" class="swal2-input" style="margin:4px 0;width:100%" maxlength="16" placeholder="e.g. 9876543210"></div>`,
+            showCancelButton: true, confirmButtonText: 'Add', focusConfirm: false,
+            preConfirm: async () => {
+                const name = document.getElementById('nqName').value.trim(), mobile = document.getElementById('nqMobile').value.trim();
+                if (!name) { Swal.showValidationMessage('Enter the contractor name'); return false; }
+                try { const d = await api('POST', {action: 'contractor_save', id: 0, name, mobile, is_active: 1}); return {id: d.id, name, mobile}; }
+                catch (e) { Swal.showValidationMessage(e.message); return false; }
+            }});
+        if (!r.isConfirmed || !r.value) return;
+        await loadConOptions();
+        tConSel.value = String(r.value.id);
+    }
+    const c = CON_OPTS.find(x => String(x.id) === tConSel.value);
+    if (c) { tName.value = c.name; tMobile.value = c.mobile || ''; }
+    else if (tConSel.value.startsWith('name:')) { tName.value = tConSel.value.slice(5); }
+    else { tName.value = ''; }
+}
+document.addEventListener('click', e => { if (!e.target.closest('.fm-sug') && e.target !== siteSearch) siteSug.style.display = 'none'; });
 
 async function saveTrip() {
-    if (!tName.value.trim()) return toast('warning', 'Enter labour contractor name');
+    if (!tName.value.trim()) return toast('warning', 'Select the labour contractor');
     if (!LINES.length) return toast('warning', 'Add at least one site');
     const noSqft = LINES.find(l => !(+l.sqft > 0));
     if (noSqft) return toast('warning', 'Enter the sqft mounted for site ' + noSqft.site_code);
@@ -731,6 +818,13 @@ async function deleteTrip(id) {
     try { const d = await api('POST', {action: 'delete', id}); toast('success', d.message); loadTrips(); } catch (e) { toast('error', e.message); }
 }
 function exportCsv() {
+    if (TAB === 'payments') {
+        const head = ['Payment No', 'Date', 'Contractor', 'Entries', 'Entry details', 'Mode', 'Reference', 'Notes', 'Amount', 'Status'];
+        const rows = PAYS.map(p => [p.payment_number || p.ref, p.paid_date, p.contractor_name, p.rows_count, (p.entries || '').replace(/Rs\./g, 'Rs '), p.payment_mode || '', p.payment_ref || '', p.notes || '', +p.active_rows ? p.amount : p.original_amount, +p.active_rows ? 'Active' : 'Reverted']);
+        const csv = [head, ...rows].map(r => r.map(v => '"' + String(v ?? '').replace(/"/g, '""') + '"').join(',')).join('\n');
+        const a = document.createElement('a'); a.href = URL.createObjectURL(new Blob(['\ufeff' + csv], {type: 'text/csv'})); a.download = 'flex_mounting_payments.csv'; a.click();
+        return;
+    }
     const head = ['Entry No', 'Date', 'Mounting Date', 'Contractor', 'Mobile', 'Brand / Campaign', 'Sites', 'Sqft', 'Rate', 'Labour', 'Food', 'Travel', 'Misc', 'Total', 'Paid', 'Balance', 'Approval', 'Payment', 'Last Paid'];
     const rows = TRIPS.map(t => [t.trip_number, t.trip_date, t.mounting_date || '', t.contractor_name, t.contractor_mobile || '', t.brand_campaign || '', t.site_codes || '', t.total_sqft, t.rate_per_sqft, t.labour_amount, t.food_amount, t.travel_amount, t.misc_amount, t.total_amount, t.paid_amount, (+t.total_amount - +t.paid_amount).toFixed(2), t.approval_status, payLabel(t.payment_status), t.paid_date || '']);
     const csv = [head, ...rows].map(r => r.map(v => '"' + String(v).replace(/"/g, '""') + '"').join(',')).join('\n');

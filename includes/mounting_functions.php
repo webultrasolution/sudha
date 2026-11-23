@@ -404,6 +404,83 @@ function deleteMountingPayment(PDO $pdo, $paymentId) {
     } catch (Exception $e) { $pdo->rollBack(); throw $e; }
 }
 
+/**
+ * Payment transactions, one line per payment number (a bulk payment over several entries is one line).
+ * Filters: from, to (paid_date), contractor (LIKE), status ('active' | 'reversed'), entity_id.
+ */
+function listMountingPaymentGroups(PDO $pdo, array $f = []) {
+    $where = ["p.kind = 'payment'"];
+    $par = [];
+    if (!empty($f['from'])) { $where[] = 'p.paid_date >= ?'; $par[] = $f['from']; }
+    if (!empty($f['to'])) { $where[] = 'p.paid_date <= ?'; $par[] = $f['to']; }
+    if (!empty($f['contractor'])) { $where[] = 'p.contractor_name LIKE ?'; $par[] = '%' . $f['contractor'] . '%'; }
+    if (!empty($f['entity_id'])) { $where[] = '(t.entity_id = ? OR t.entity_id IS NULL)'; $par[] = intval($f['entity_id']); }
+    $having = '';
+    if (($f['status'] ?? '') === 'active') $having = " HAVING active_rows > 0";
+    if (($f['status'] ?? '') === 'reversed') $having = " HAVING active_rows = 0";
+    $st = $pdo->prepare("
+        SELECT COALESCE(p.payment_number, CONCAT('#', p.id)) AS ref,
+               MAX(p.payment_number) AS payment_number, MIN(p.id) AS first_id,
+               MIN(p.paid_date) AS paid_date, MAX(p.contractor_name) AS contractor_name, MAX(t.contractor_id) AS contractor_id,
+               MAX(p.payment_mode) AS payment_mode, MAX(p.payment_ref) AS payment_ref, MAX(p.notes) AS notes, MAX(p.attachment) AS attachment,
+               COUNT(*) AS rows_count,
+               SUM(p.status = 'active') AS active_rows,
+               SUM(CASE WHEN p.status = 'active' THEN p.amount ELSE 0 END) AS amount,
+               SUM(p.amount) AS original_amount,
+               GROUP_CONCAT(CONCAT(t.trip_number, ': Rs.', p.amount, IF(p.status = 'reversed', ' (reverted)', '')) ORDER BY t.trip_date, t.id SEPARATOR '; ') AS entries,
+               MAX(p.reverse_reason) AS reverse_reason
+        FROM mounting_payments p JOIN mounting_trips t ON t.id = p.trip_id
+        WHERE " . implode(' AND ', $where) . "
+        GROUP BY COALESCE(p.payment_number, CONCAT('#', p.id))" . $having . "
+        ORDER BY MIN(p.paid_date) DESC, MIN(p.id) DESC");
+    $st->execute($par);
+    return $st->fetchAll(PDO::FETCH_ASSOC);
+}
+
+/** Revert a whole payment (every entry it paid). Rows stay as reversed; entry balances go back up. */
+function reverseMountingPaymentGroup(PDO $pdo, $paymentNumber, $userId, $reason = null) {
+    $pdo->beginTransaction();
+    try {
+        $st = $pdo->prepare("SELECT id, trip_id FROM mounting_payments WHERE payment_number = ? AND kind = 'payment' AND status = 'active' FOR UPDATE");
+        $st->execute([$paymentNumber]);
+        $rows = $st->fetchAll(PDO::FETCH_ASSOC);
+        if (!$rows) throw new Exception('Payment not found or already reverted.');
+        $pdo->prepare("UPDATE mounting_payments SET status = 'reversed', reversed_by = ?, reversed_at = NOW(), reverse_reason = ? WHERE payment_number = ? AND status = 'active'")
+            ->execute([$userId, mb_substr(trim((string)$reason), 0, 255) ?: null, $paymentNumber]);
+        foreach (array_unique(array_column($rows, 'trip_id')) as $tid) recomputeMountingTripPayment($pdo, $tid);
+        $pdo->commit();
+        return count($rows);
+    } catch (Exception $e) { $pdo->rollBack(); throw $e; }
+}
+
+/** Permanently remove a wrong payment and all its entry rows (admin). */
+function deleteMountingPaymentGroup(PDO $pdo, $paymentNumber) {
+    $pdo->beginTransaction();
+    try {
+        $st = $pdo->prepare("SELECT id, trip_id, attachment FROM mounting_payments WHERE payment_number = ? AND kind = 'payment' FOR UPDATE");
+        $st->execute([$paymentNumber]);
+        $rows = $st->fetchAll(PDO::FETCH_ASSOC);
+        if (!$rows) throw new Exception('Payment not found.');
+        $pdo->prepare("DELETE FROM mounting_payments WHERE payment_number = ?")->execute([$paymentNumber]);
+        foreach (array_unique(array_column($rows, 'trip_id')) as $tid) recomputeMountingTripPayment($pdo, $tid);
+        $files = array_unique(array_filter(array_column($rows, 'attachment')));
+        $left = [];
+        foreach ($files as $f) {
+            $c = $pdo->prepare("SELECT COUNT(*) FROM mounting_payments WHERE attachment = ?");
+            $c->execute([$f]);
+            if (!$c->fetchColumn()) $left[] = $f;
+        }
+        $pdo->commit();
+        foreach ($left as $f) removeMountingAttachment($f);
+        return count($rows);
+    } catch (Exception $e) { $pdo->rollBack(); throw $e; }
+}
+
+/** Active contractors for the entry form dropdown. */
+function listActiveMountingContractors(PDO $pdo) {
+    return $pdo->query("SELECT id, name, mobile FROM mounting_contractors WHERE is_active = 1 ORDER BY name")->fetchAll(PDO::FETCH_ASSOC);
+}
+
 /** Payment history of one entry (including reverted). */
 function listMountingTripPayments(PDO $pdo, $tripId) {
     $stmt = $pdo->prepare("SELECT p.*,

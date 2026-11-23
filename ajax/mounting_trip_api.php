@@ -8,6 +8,9 @@
  * GET  ?action=contractor_ledger&id=                                               -> {success, contractor, entries, payments, totals}
  * GET  ?action=brands&q=                                                           -> {success, brands}
  * POST {action:'contractor_save', id?, name, mobile, address, notes, is_active}
+ * GET  ?action=contractor_options                                                -> {success, contractors}  (active, for the entry form)
+ * GET  ?action=payment_list&from=&to=&contractor=&status=                          -> {success, payments}  (one line per payment number)
+ * POST {action:'revert_group' | 'delete_group', payment_number, reason}            whole bulk payment (delete: admin)
  * GET  ?action=suggest&q=                                                              -> {success, contractors}
  * GET  ?action=sites&q=                                                                -> {success, sites}  (site master search)
  * POST {action:'save', id?, trip_date, contractor_name, contractor_mobile, rate_per_sqft,
@@ -38,6 +41,10 @@ function mountingDeny($msg = 'Access denied.') {
     http_response_code(403);
     echo json_encode(['success' => false, 'message' => $msg]);
     exit;
+}
+
+function mountingDateParam($v) {
+    return ($v && preg_match('/^\d{4}-\d{2}-\d{2}$/', $v)) ? $v : null;
 }
 
 $body = [];
@@ -79,6 +86,20 @@ try {
         case 'contractors':
             if (!canView(MOUNTING_MODULE_KEY)) mountingDeny();
             echo json_encode(['success' => true, 'contractors' => listMountingContractors($pdo, $_GET['q'] ?? '', $entityId)]);
+            break;
+
+        case 'contractor_options':
+            if (!canView(MOUNTING_MODULE_KEY)) mountingDeny();
+            echo json_encode(['success' => true, 'contractors' => listActiveMountingContractors($pdo)]);
+            break;
+
+        case 'payment_list':
+            if (!canView(MOUNTING_MODULE_KEY)) mountingDeny();
+            echo json_encode(['success' => true, 'payments' => listMountingPaymentGroups($pdo, [
+                'from' => mountingDateParam($_GET['from'] ?? null), 'to' => mountingDateParam($_GET['to'] ?? null),
+                'contractor' => trim($_GET['contractor'] ?? ''), 'entity_id' => $entityId,
+                'status' => in_array($_GET['status'] ?? '', ['active', 'reversed'], true) ? $_GET['status'] : null,
+            ])]);
             break;
 
         case 'contractor_ledger':
@@ -156,6 +177,18 @@ try {
             if (!canEdit(MOUNTING_MODULE_KEY)) mountingDeny();
             reverseMountingPayment($pdo, intval($body['payment_id'] ?? 0), $userId, $body['reason'] ?? '');
             echo json_encode(['success' => true, 'message' => 'Payment reverted.']);
+            break;
+
+        case 'revert_group':
+            if (!canEdit(MOUNTING_MODULE_KEY)) mountingDeny();
+            $n = reverseMountingPaymentGroup($pdo, trim((string)($body['payment_number'] ?? '')), $userId, $body['reason'] ?? '');
+            echo json_encode(['success' => true, 'message' => 'Payment reverted on ' . $n . ' entr' . ($n === 1 ? 'y' : 'ies') . '.']);
+            break;
+
+        case 'delete_group':
+            if (!$isAdmin) mountingDeny('Only admin can delete a payment. Use Revert instead.');
+            $n = deleteMountingPaymentGroup($pdo, trim((string)($body['payment_number'] ?? '')));
+            echo json_encode(['success' => true, 'message' => 'Payment deleted (' . $n . ' entr' . ($n === 1 ? 'y' : 'ies') . ').']);
             break;
 
         case 'delete_payment':
