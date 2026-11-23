@@ -51,7 +51,7 @@ if (!empty($b['billing_gstin']) && $b['billing_gstin'] !== $b['client_gstin'] &&
 $stmtItems = $pdo->prepare("
     SELECT bi.*, COALESCE(bi.custom_site_name, s.name) as site_name, s.site_code,
            COALESCE(bi.custom_location, s.location) as location,
-           s.city, s.width, s.height, s.light_type, s.hsn_code, s.mounting_hsn, s.type as media_type
+           s.city, s.district, s.state, s.width, s.height, s.light_type, s.hsn_code, s.mounting_hsn, s.type as media_type
     FROM booking_items bi
     JOIN sites s ON bi.site_id = s.id
     WHERE bi.booking_id = ?
@@ -450,10 +450,36 @@ td:last-child {
                 $sDate = (!empty($item['start_date']) && $item['start_date'] != '0000-00-00') ? $item['start_date'] : $b['start_date'];
                 $eDate = (!empty($item['end_date'])   && $item['end_date']   != '0000-00-00') ? $item['end_date']   : $b['end_date'];
                 $parts = [];
-                if (!empty(trim($item['city'])))       $parts[] = trim($item['city']);
-                if (!empty(trim($item['site_name'])))  $parts[] = trim($item['site_name']);
-                if (!empty(trim($item['location'])))   $parts[] = trim($item['location']);
-                if (!empty(trim($item['media_type']))) $parts[] = trim($item['media_type']);
+                // Sequence: state, District, city, location, media_type
+                if (!empty(trim($item['state'] ?? ''))) {
+                    $parts[] = trim($item['state']);
+                }
+                if (!empty(trim($item['district'] ?? ''))) {
+                    $d = trim($item['district']);
+                    if (empty($parts) || strcasecmp(end($parts), $d) !== 0) {
+                        $parts[] = $d;
+                    }
+                }
+                if (!empty(trim($item['city'] ?? ''))) {
+                    $c = trim($item['city']);
+                    if (empty($parts) || strcasecmp(end($parts), $c) !== 0) {
+                        $parts[] = $c;
+                    }
+                }
+                // Site name (e.g. 'Mangalbari, Jhagra More') on the invoice; the landmark/location only when there is no name
+                $loc = !empty(trim($item['site_name'] ?? '')) ? trim($item['site_name']) : trim($item['location'] ?? '');
+                if (!empty(trim($loc))) {
+                    $l = trim($loc);
+                    if (empty($parts) || strcasecmp(end($parts), $l) !== 0) {
+                        $parts[] = $l;
+                    }
+                }
+                if (!empty(trim($item['media_type'] ?? ''))) {
+                    $m = trim($item['media_type']);
+                    if (empty($parts) || strcasecmp(end($parts), $m) !== 0) {
+                        $parts[] = $m;
+                    }
+                }
             ?>
             <tr>
                 <td><?php echo $item['sn']; ?></td>
@@ -576,13 +602,18 @@ td:last-child {
                 </div>
                 <div style="border-top: 1px dashed #ccc; padding-top: 4px; font-size: 8.5px; line-height: 1.2;">
                     <div style="font-weight: bold; margin-bottom: 2px;">Terms &amp; Conditions</div>
-                    <?php if (!empty($company_terms)): ?>
-                        <?php echo nl2br(htmlspecialchars($company_terms)); ?>
+                    <?php 
+                    $company_ms = (stripos($company_name, 'M/S') === 0 || stripos($company_name, 'M/s') === 0) ? $company_name : 'M/S ' . $company_name;
+                    if (!empty($company_terms)): ?>
+                        <?php echo nl2br(htmlspecialchars(str_ireplace('M/S Sudha Creative', $company_ms, $company_terms))); ?>
+                        <?php if (stripos($company_terms, '48(4)') === false): ?>
+                            <div>It is declared that <?php echo htmlspecialchars($company_ms); ?> is not required to issue E-Invoice in terms of rule 48(4) CGST rules, 2017.</div>
+                        <?php endif; ?>
                     <?php else: ?>
                         <div>E.&amp; O.E.</div>
                         <div>1. Interest @ 18% p.a. will be charged if the payment is not made within the stipulated time.</div>
                         <div>2. Subject to &lsquo;Malda&rsquo; Jurisdiction only.</div>
-                        <div>3. It is declared that M/S Sudha Creative is not required to issue E-Invoice in terms of rule 48(4) CGST rules, 2017.</div>
+                        <div>3. It is declared that <?php echo htmlspecialchars($company_ms); ?> is not required to issue E-Invoice in terms of rule 48(4) CGST rules, 2017.</div>
                     <?php endif; ?>
                 </div>
             </div>

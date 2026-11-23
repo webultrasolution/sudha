@@ -2,6 +2,31 @@
 $activePage = 'dashboard';
 $pageTitle = 'Business Intelligence Dashboard';
 include_once __DIR__ . '/includes/header.php';
+include_once __DIR__ . '/includes/outstanding_functions.php';
+
+/**
+ * Ledger statements for every vendor that has bills or payments (cached per request).
+ * Each row: id, name, billed, received, net_outstanding.
+ */
+function dashboardVendorStatements($pdo, $entityId) {
+    static $cache = [];
+    $key = (string)$entityId;
+    if (isset($cache[$key])) return $cache[$key];
+    $vendors = $pdo->query("
+        SELECT p.id, p.name FROM partners p
+        WHERE p.type = 'vendor' AND (
+            EXISTS (SELECT 1 FROM purchase_orders po WHERE po.vendor_id = p.id AND po.approval_status = 'approved')
+            OR EXISTS (SELECT 1 FROM vendor_printing_rates r WHERE r.vendor_id = p.id)
+            OR EXISTS (SELECT 1 FROM payments pay WHERE pay.partner_id = p.id AND pay.type = 'payable'))
+    ")->fetchAll(PDO::FETCH_ASSOC);
+    $rows = [];
+    foreach ($vendors as $v) {
+        $st = getOutstandingStatement($pdo, (int)$v['id'], 'vendor', $entityId ?: null, 0);
+        $rows[] = ['id' => (int)$v['id'], 'name' => $v['name'], 'billed' => (float)$st['billed'],
+                   'received' => (float)$st['received'], 'net_outstanding' => (float)$st['net_outstanding']];
+    }
+    return $cache[$key] = $rows;
+}
 
 // Check Dashboard Specific Permission
 if (!canView('dashboard')) {
@@ -337,13 +362,63 @@ if ($canViewFinancials) {
     $totalCollectedAmount = (float)$pdo->query("SELECT SUM(amount) FROM payments WHERE type = 'receivable' AND approval_status = 'approved' $entityCondPay")->fetchColumn() ?: 0;
     $outstandingReceivables = max(0, $totalInvoicedAmount - $totalCollectedAmount);
 
-    $totalPOAmount = (float)$pdo->query("SELECT SUM(total_amount) FROM purchase_orders WHERE approval_status = 'approved' $entityCondPO")->fetchColumn() ?: 0;
-    $totalPaidVendor = (float)$pdo->query("SELECT SUM(amount) FROM payments WHERE type = 'payable' AND approval_status = 'approved' $entityCondPay")->fetchColumn() ?: 0;
-    $outstandingPayables = max(0, $totalPOAmount - $totalPaidVendor);
+    // A/P = sum of each vendor's ledger outstanding (approved POs with approved vendor invoice + approved printing bills,
+    // minus approved payments), so it matches modules/financials/partner_ledger.php. A vendor's advance does not
+    // reduce another vendor's dues.
+    $outstandingPayables = 0.0;
+    foreach (dashboardVendorStatements($pdo, $activeEntityId) as $vs) {
+        $outstandingPayables += max(0, $vs['net_outstanding']);
+    }
+    $outstandingPayables = round($outstandingPayables, 2);
 
-    // Metric cards totals for the selected period
-    $currentMonthBilling = (float)$pdo->query("SELECT COALESCE(SUM(total_amount), 0) FROM invoices WHERE type = 'tax' AND approval_status = 'approved' AND $dateCondInvoice $entityCondInv")->fetchColumn() ?: 0;
-    $currentMonthCollection = (float)$pdo->query("SELECT COALESCE(SUM(amount), 0) FROM payments WHERE type = 'receivable' AND approval_status = 'approved' AND $dateCondPayment $entityCondPay")->fetchColumn() ?: 0;
+    // Metric cards totals and GST tax breakdown for the selected period
+    $billingBreakdown = $pdo->query("
+        SELECT 
+            COALESCE(SUM(sub_total), 0) as total_taxable,
+            COALESCE(SUM(cgst + sgst), 0) as total_cgst_sgst,
+            COALESCE(SUM(cgst), 0) as total_cgst,
+            COALESCE(SUM(sgst), 0) as total_sgst,
+            COALESCE(SUM(igst), 0) as total_igst,
+            COALESCE(SUM(total_amount), 0) as total_amount
+        FROM invoices 
+        WHERE type = 'tax' AND approval_status = 'approved' AND $dateCondInvoice $entityCondInv
+    ")->fetch(PDO::FETCH_ASSOC) ?: [];
+
+    $currentMonthBilling = (float)($billingBreakdown['total_amount'] ?? 0);
+    $billingTaxable = (float)($billingBreakdown['total_taxable'] ?? 0);
+    $billingCgstSgst = (float)($billingBreakdown['total_cgst_sgst'] ?? 0);
+    $billingIgst = (float)($billingBreakdown['total_igst'] ?? 0);
+    $billingTotalTax = round($billingCgstSgst + $billingIgst, 2);
+
+    // Collection tax breakdown apportioned from linked invoices
+    $dateCondPaymentWithAlias = str_replace('payment_date', 'p.payment_date', $dateCondPayment);
+    $entityCondPayWithAlias = $activeEntityId ? " AND p.entity_id = $activeEntityId" : "";
+
+    $collectionBreakdown = $pdo->query("
+        SELECT 
+            COALESCE(SUM(p.amount), 0) as total_amount,
+            COALESCE(SUM(CASE 
+                WHEN i.total_amount > 0 THEN ROUND(p.amount * (i.sub_total / i.total_amount), 2)
+                ELSE p.amount 
+            END), 0) as total_taxable,
+            COALESCE(SUM(CASE 
+                WHEN i.total_amount > 0 THEN ROUND(p.amount * ((i.cgst + i.sgst) / i.total_amount), 2)
+                ELSE 0 
+            END), 0) as total_cgst_sgst,
+            COALESCE(SUM(CASE 
+                WHEN i.total_amount > 0 THEN ROUND(p.amount * (i.igst / i.total_amount), 2)
+                ELSE 0 
+            END), 0) as total_igst
+        FROM payments p
+        LEFT JOIN invoices i ON p.invoice_id = i.id
+        WHERE p.type = 'receivable' AND p.approval_status = 'approved' AND $dateCondPaymentWithAlias $entityCondPayWithAlias
+    ")->fetch(PDO::FETCH_ASSOC) ?: [];
+
+    $currentMonthCollection = (float)($collectionBreakdown['total_amount'] ?? 0);
+    $collectionTaxable = (float)($collectionBreakdown['total_taxable'] ?? 0);
+    $collectionCgstSgst = (float)($collectionBreakdown['total_cgst_sgst'] ?? 0);
+    $collectionIgst = (float)($collectionBreakdown['total_igst'] ?? 0);
+    $collectionTotalTax = round($collectionCgstSgst + $collectionIgst, 2);
 
     // Client Receivables List (Top 5)
     $dateCondInvoiceWithAlias = str_replace(
@@ -393,39 +468,20 @@ if ($canViewFinancials) {
         ];
     }
 
-    // Vendor Payables List (Top 5 Outstanding Payables)
-    $vendorPayablesRaw = $pdo->query("
-        SELECT p.id, p.name,
-            COALESCE((
-                SELECT SUM(po.total_amount) 
-                FROM purchase_orders po 
-                WHERE po.vendor_id = p.id 
-                  AND po.approval_status = 'approved'
-                  $entityCondPOAlias
-            ), 0) as total_po,
-            COALESCE((
-                SELECT SUM(pay.amount) 
-                FROM payments pay 
-                WHERE pay.partner_id = p.id 
-                  AND pay.type = 'payable' AND pay.approval_status = 'approved'
-                  $entityCondPayAlias
-            ), 0) as total_paid
-        FROM partners p
-        WHERE p.type = 'vendor'
-        HAVING (total_po - total_paid) > 0
-        ORDER BY (total_po - total_paid) DESC
-        LIMIT 5
-    ")->fetchAll();
-
+    // Vendor Payables List (Top 5 Outstanding Payables) - same figures as each vendor's ledger
     $vendorPayables = [];
-    foreach ($vendorPayablesRaw as $vp) {
-        $vendorPayables[] = [
-            'name' => $vp['name'],
-            'total_po' => (float)$vp['total_po'],
-            'total_paid' => (float)$vp['total_paid'],
-            'balance_payable' => (float)$vp['total_po'] - (float)$vp['total_paid']
-        ];
+    foreach (dashboardVendorStatements($pdo, $activeEntityId) as $vs) {
+        if ($vs['net_outstanding'] > 0.009) {
+            $vendorPayables[] = [
+                'name' => $vs['name'],
+                'total_po' => $vs['billed'],
+                'total_paid' => $vs['received'],
+                'balance_payable' => $vs['net_outstanding'],
+            ];
+        }
     }
+    usort($vendorPayables, fn($a, $b) => $b['balance_payable'] <=> $a['balance_payable']);
+    $vendorPayables = array_slice($vendorPayables, 0, 5);
 }
 
 $upcomingMountings = [];
@@ -451,6 +507,37 @@ if ($canViewBookings) {
         ORDER BY b.end_date ASC
         LIMIT 5
     ")->fetchAll();
+}
+
+// Landlord radar: rent dues (overdue + next 30 days) and agreements expiring in the next 3 months
+include_once __DIR__ . '/includes/landlord_functions.php';
+$canViewLandlords = canView('landlords') && landlordTablesReady($pdo);
+$landlordDues = [];
+$landlordDueTotals = ['overdue' => 0, 'upcoming' => 0];
+$landlordExpiring = [];
+if ($canViewLandlords) {
+    $landlordDues = $pdo->query("
+        SELECT d.id, d.due_date, d.amount - d.paid_amount AS balance, l.id AS landlord_id, l.name AS landlord_name, s.site_code,
+               DATEDIFF(d.due_date, CURDATE()) AS days
+        FROM landlord_dues d
+        JOIN landlord_agreements a ON a.id = d.agreement_id
+        JOIN landlords l ON l.id = a.landlord_id
+        JOIN sites s ON s.id = a.site_id
+        WHERE d.status IN ('pending','partial') AND a.status <> 'terminated' AND d.due_date <= DATE_ADD(CURDATE(), INTERVAL 30 DAY)
+        ORDER BY d.due_date ASC
+    ")->fetchAll(PDO::FETCH_ASSOC);
+    foreach ($landlordDues as $ld) {
+        $landlordDueTotals[$ld['days'] < 0 ? 'overdue' : 'upcoming'] += $ld['balance'];
+    }
+    $landlordExpiring = $pdo->query("
+        SELECT a.id, a.end_date, a.agreement_no, l.id AS landlord_id, l.name AS landlord_name, s.site_code,
+               DATEDIFF(a.end_date, CURDATE()) AS days
+        FROM landlord_agreements a
+        JOIN landlords l ON l.id = a.landlord_id
+        JOIN sites s ON s.id = a.site_id
+        WHERE a.status = 'active' AND a.end_date <= DATE_ADD(CURDATE(), INTERVAL 3 MONTH)
+        ORDER BY a.end_date ASC
+    ")->fetchAll(PDO::FETCH_ASSOC);
 }
 ?>
 
@@ -483,6 +570,93 @@ if ($canViewBookings) {
 .m-data span { font-size: 0.75rem; opacity: 0.85; text-transform: uppercase; font-weight: 700; letter-spacing: 0.05em; }
 .m-data h3 { font-size: 1.45rem; font-weight: 800; margin: 0; margin-top: 4px; }
 .m-mini-badge { position: absolute; top: 12px; right: 12px; padding: 2px 8px; border-radius: 50px; font-size: 0.6rem; font-weight: 800; }
+
+/* GST Hover Popover Styles */
+.has-hover-popover {
+    position: relative;
+    cursor: default;
+}
+.has-hover-popover:hover {
+    z-index: 50;
+}
+.gst-hover-card {
+    position: absolute;
+    top: calc(100% + 10px);
+    left: 50%;
+    transform: translateX(-50%) translateY(6px);
+    width: 270px;
+    background: #0f172a;
+    color: #f8fafc;
+    border: 1px solid rgba(255, 255, 255, 0.18);
+    border-radius: 14px;
+    padding: 12px 14px;
+    box-shadow: 0 20px 30px -5px rgba(15, 23, 42, 0.5), 0 0 0 1px rgba(255, 255, 255, 0.1);
+    opacity: 0;
+    visibility: hidden;
+    pointer-events: none;
+    transition: opacity 0.2s ease, transform 0.2s ease, visibility 0.2s;
+    z-index: 1000;
+}
+.gst-hover-card::before {
+    content: '';
+    position: absolute;
+    top: -6px;
+    left: 50%;
+    transform: translateX(-50%) rotate(45deg);
+    width: 12px;
+    height: 12px;
+    background: #0f172a;
+    border-top: 1px solid rgba(255, 255, 255, 0.18);
+    border-left: 1px solid rgba(255, 255, 255, 0.18);
+}
+.has-hover-popover:hover .gst-hover-card,
+.has-hover-popover:focus-within .gst-hover-card {
+    opacity: 1;
+    visibility: visible;
+    transform: translateX(-50%) translateY(0);
+}
+.gst-hover-title {
+    font-size: 0.72rem;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    color: #94a3b8;
+    margin-bottom: 8px;
+    display: flex;
+    align-items: center;
+    gap: 6px;
+}
+.gst-hover-row {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    font-size: 0.78rem;
+    padding: 3px 0;
+    color: #e2e8f0;
+}
+.gst-hover-row span {
+    color: #cbd5e1;
+    font-weight: 500;
+}
+.gst-hover-row strong {
+    font-weight: 700;
+    color: #ffffff;
+    font-variant-numeric: tabular-nums;
+}
+.gst-hover-divider {
+    height: 1px;
+    background: rgba(255, 255, 255, 0.14);
+    margin: 6px 0;
+}
+.gst-hover-total span {
+    font-weight: 700;
+    color: #38bdf8;
+}
+.gst-hover-total strong {
+    font-size: 0.85rem;
+    font-weight: 800;
+    color: #38bdf8;
+}
 
 .g-orange-red { background: linear-gradient(135deg, #f43f5e, #e11d48); }
 .g-blue { background: linear-gradient(135deg, #4f46e5, #3b82f6); }
@@ -596,7 +770,7 @@ if ($canViewBookings) {
         <?php endif; ?>
 
         <?php if ($canViewFinancials): ?>
-        <div class="metric-card g-blue">
+        <div class="metric-card g-blue has-hover-popover" tabindex="0" title="Taxable: <?php echo formatCurrency($billingTaxable); ?> | CGST+SGST: <?php echo formatCurrency($billingCgstSgst); ?> | IGST: <?php echo formatCurrency($billingIgst); ?> | Total GST: <?php echo formatCurrency($billingTotalTax); ?> | Total Billing: <?php echo formatCurrency($currentMonthBilling); ?>">
             <div class="m-content">
                 <i class="fas fa-chart-bar"></i>
                 <div class="m-data">
@@ -604,14 +778,64 @@ if ($canViewBookings) {
                     <h3><?php echo formatCurrency($currentMonthBilling); ?></h3>
                 </div>
             </div>
+            <div class="m-mini-badge" style="background: rgba(255,255,255,0.2); cursor: help;"><i class="fas fa-info-circle"></i> Tax Info</div>
+            <div class="gst-hover-card">
+                <div class="gst-hover-title"><i class="fas fa-receipt"></i> <?php echo htmlspecialchars($billingCardTitle); ?> Tax Breakdown</div>
+                <div class="gst-hover-row">
+                    <span>Total Taxable Amount</span>
+                    <strong><?php echo formatCurrency($billingTaxable); ?></strong>
+                </div>
+                <div class="gst-hover-row">
+                    <span>Total CGST + SGST</span>
+                    <strong><?php echo formatCurrency($billingCgstSgst); ?></strong>
+                </div>
+                <div class="gst-hover-row">
+                    <span>Total IGST</span>
+                    <strong><?php echo formatCurrency($billingIgst); ?></strong>
+                </div>
+                <div class="gst-hover-row" style="color: #67e8f9; font-weight: 700; border-top: 1px dashed rgba(255,255,255,0.2); padding-top: 4px; margin-top: 4px;">
+                    <span style="color: #67e8f9;">Total Tax (GST)</span>
+                    <strong style="color: #67e8f9;"><?php echo formatCurrency($billingTotalTax); ?></strong>
+                </div>
+                <div class="gst-hover-divider"></div>
+                <div class="gst-hover-row gst-hover-total">
+                    <span>Total Billing</span>
+                    <strong><?php echo formatCurrency($currentMonthBilling); ?></strong>
+                </div>
+            </div>
         </div>
 
-        <div class="metric-card g-emerald">
+        <div class="metric-card g-emerald has-hover-popover" tabindex="0" title="Taxable: <?php echo formatCurrency($collectionTaxable); ?> | CGST+SGST: <?php echo formatCurrency($collectionCgstSgst); ?> | IGST: <?php echo formatCurrency($collectionIgst); ?> | Total GST: <?php echo formatCurrency($collectionTotalTax); ?> | Total Collection: <?php echo formatCurrency($currentMonthCollection); ?>">
             <div class="m-content">
                 <i class="fas fa-hand-holding-usd"></i>
                 <div class="m-data">
                     <span><?php echo $collectionCardTitle; ?></span>
                     <h3><?php echo formatCurrency($currentMonthCollection); ?></h3>
+                </div>
+            </div>
+            <div class="m-mini-badge" style="background: rgba(255,255,255,0.2); cursor: help;"><i class="fas fa-info-circle"></i> Tax Info</div>
+            <div class="gst-hover-card">
+                <div class="gst-hover-title"><i class="fas fa-coins"></i> <?php echo htmlspecialchars($collectionCardTitle); ?> Tax Breakdown</div>
+                <div class="gst-hover-row">
+                    <span>Total Taxable Amount</span>
+                    <strong><?php echo formatCurrency($collectionTaxable); ?></strong>
+                </div>
+                <div class="gst-hover-row">
+                    <span>Total CGST + SGST</span>
+                    <strong><?php echo formatCurrency($collectionCgstSgst); ?></strong>
+                </div>
+                <div class="gst-hover-row">
+                    <span>Total IGST</span>
+                    <strong><?php echo formatCurrency($collectionIgst); ?></strong>
+                </div>
+                <div class="gst-hover-row" style="color: #6ee7b7; font-weight: 700; border-top: 1px dashed rgba(255,255,255,0.2); padding-top: 4px; margin-top: 4px;">
+                    <span style="color: #6ee7b7;">Total Tax (GST)</span>
+                    <strong style="color: #6ee7b7;"><?php echo formatCurrency($collectionTotalTax); ?></strong>
+                </div>
+                <div class="gst-hover-divider"></div>
+                <div class="gst-hover-row gst-hover-total">
+                    <span>Total Collection</span>
+                    <strong><?php echo formatCurrency($currentMonthCollection); ?></strong>
                 </div>
             </div>
         </div>
@@ -714,7 +938,7 @@ if ($canViewBookings) {
             <div class="box-header" style="display: flex; justify-content: space-between; align-items: center;">
                 <div>
                     <h4 style="margin: 0;">Vendor Payables (In Short)</h4>
-                    <span style="font-size: 0.65rem; color: #64748b; font-weight: 600;">Committed Liabilities (Approved POs)</span>
+                    <span style="font-size: 0.65rem; color: #64748b; font-weight: 600;">Approved vendor bills (matches ledger)</span>
                 </div>
                 <span style="font-size: 0.65rem; background: #fef3c7; color: #b45309; padding: 2px 8px; border-radius: 50px; font-weight: 700;">Top Payable</span>
             </div>
@@ -932,6 +1156,66 @@ if ($canViewBookings) {
         </div>
         <?php endif; ?>
     </div>
+
+    <!-- Row 4b: Landlord Radar (self-site rent dues and agreement expiries) -->
+    <?php if ($canViewLandlords): ?>
+    <div class="details-row" style="grid-template-columns: 1fr 1fr; margin-bottom: 1.5rem;">
+        <div class="table-box">
+            <div class="box-header" style="display: flex; justify-content: space-between; align-items: center;">
+                <h4><i class="fas fa-house-user" style="color: #0f766e;"></i> Landlord Rent Dues</h4>
+                <a href="modules/landlords/dues.php?period=next_30" style="font-size: 0.75rem; text-decoration: none; color: #4f46e5; font-weight: 700;">View all <i class="fas fa-arrow-right"></i></a>
+            </div>
+            <div style="display: flex; gap: 0.5rem; margin-bottom: 0.75rem; flex-wrap: wrap;">
+                <a href="modules/landlords/dues.php?period=overdue" style="text-decoration: none; font-size: 0.7rem; font-weight: 800; background: #fef2f2; color: #b91c1c; padding: 4px 10px; border-radius: 40px;">Overdue <?php echo formatCurrency($landlordDueTotals['overdue']); ?></a>
+                <a href="modules/landlords/dues.php?period=next_30" style="text-decoration: none; font-size: 0.7rem; font-weight: 800; background: #fffbeb; color: #b45309; padding: 4px 10px; border-radius: 40px;">Next 30 days <?php echo formatCurrency($landlordDueTotals['upcoming']); ?></a>
+            </div>
+            <div style="display: flex; flex-direction: column; gap: 6px;">
+                <?php if (empty($landlordDues)): ?>
+                    <div style="font-size: 0.7rem; color: #94a3b8; background: #f8fafc; padding: 8px; border-radius: 8px;">No landlord rent due in the next 30 days.</div>
+                <?php else: foreach (array_slice($landlordDues, 0, 6) as $ld):
+                    $late = $ld['days'] < 0; ?>
+                    <a href="modules/landlords/view.php?id=<?php echo (int)$ld['landlord_id']; ?>&pay=<?php echo (int)$ld['id']; ?>#dues" style="text-decoration: none; display: flex; justify-content: space-between; align-items: center; background: #f8fafc; padding: 8px; border-radius: 8px;">
+                        <div style="font-size: 0.7rem; color: #1e293b;">
+                            <strong><?php echo htmlspecialchars($ld['landlord_name']); ?></strong>
+                            <span style="color: #64748b;">(<?php echo htmlspecialchars($ld['site_code']); ?>) · <?php echo formatCurrency($ld['balance']); ?></span>
+                        </div>
+                        <span style="font-size: 0.65rem; background: <?php echo $late ? '#fef2f2' : '#fffbeb'; ?>; color: <?php echo $late ? '#b91c1c' : '#b45309'; ?>; padding: 2px 8px; border-radius: 40px; font-weight: 700; white-space: nowrap;">
+                            <?php echo $late ? 'Overdue ' . abs($ld['days']) . ' days' : ($ld['days'] == 0 ? 'Due Today' : 'In ' . $ld['days'] . ' days'); ?>
+                        </span>
+                    </a>
+                <?php endforeach; endif; ?>
+                <?php if (count($landlordDues) > 6): ?>
+                    <a href="modules/landlords/dues.php?period=next_30" style="font-size: 0.7rem; color: #4f46e5; font-weight: 700; text-decoration: none; text-align: center;">+<?php echo count($landlordDues) - 6; ?> more</a>
+                <?php endif; ?>
+            </div>
+        </div>
+        <div class="table-box">
+            <div class="box-header" style="display: flex; justify-content: space-between; align-items: center;">
+                <h4><i class="fas fa-file-signature" style="color: #b45309;"></i> Landlord Agreements Expiring</h4>
+                <a href="modules/landlords/expiry.php?period=next_3" style="font-size: 0.75rem; text-decoration: none; color: #4f46e5; font-weight: 700;">View all <i class="fas fa-arrow-right"></i></a>
+            </div>
+            <div style="display: flex; flex-direction: column; gap: 6px;">
+                <?php if (empty($landlordExpiring)): ?>
+                    <div style="font-size: 0.7rem; color: #94a3b8; background: #f8fafc; padding: 8px; border-radius: 8px;">No agreements expiring in the next 3 months.</div>
+                <?php else: foreach (array_slice($landlordExpiring, 0, 7) as $le):
+                    $gone = $le['days'] < 0; ?>
+                    <a href="modules/landlords/view.php?id=<?php echo (int)$le['landlord_id']; ?>#agreements" style="text-decoration: none; display: flex; justify-content: space-between; align-items: center; background: #f8fafc; padding: 8px; border-radius: 8px;">
+                        <div style="font-size: 0.7rem; color: #1e293b;">
+                            <strong><?php echo htmlspecialchars($le['landlord_name']); ?></strong>
+                            <span style="color: #64748b;">(<?php echo htmlspecialchars($le['site_code']); ?> · <?php echo htmlspecialchars($le['agreement_no']); ?>)</span>
+                        </div>
+                        <span style="font-size: 0.65rem; background: <?php echo $gone ? '#fef2f2' : '#fffbeb'; ?>; color: <?php echo $gone ? '#b91c1c' : '#b45309'; ?>; padding: 2px 8px; border-radius: 40px; font-weight: 700; white-space: nowrap;">
+                            <?php echo $gone ? 'Expired ' . date('d M Y', strtotime($le['end_date'])) : ($le['days'] == 0 ? 'Expires Today' : 'Expires ' . date('d M Y', strtotime($le['end_date']))); ?>
+                        </span>
+                    </a>
+                <?php endforeach; endif; ?>
+                <?php if (count($landlordExpiring) > 7): ?>
+                    <a href="modules/landlords/expiry.php?period=next_3" style="font-size: 0.7rem; color: #4f46e5; font-weight: 700; text-decoration: none; text-align: center;">+<?php echo count($landlordExpiring) - 7; ?> more</a>
+                <?php endif; ?>
+            </div>
+        </div>
+    </div>
+    <?php endif; ?>
 
     <!-- Row 5: Footer Polished Row -->
     <div class="polished-footer" style="<?php 
