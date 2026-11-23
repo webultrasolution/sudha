@@ -15,7 +15,10 @@ $pendingClientPrintings = $pdo->query("SELECT COUNT(DISTINCT po_number) FROM cli
 $pendingClientMountings = $pdo->query("SELECT COUNT(DISTINCT po_number) FROM client_mounting_rates WHERE approval_status = 'pending_approval'")->fetchColumn();
 $pendingPayments  = $pdo->query("SELECT COUNT(*) FROM payments WHERE approval_status = 'pending_approval'")->fetchColumn();
 $pendingVendorInvoices = $pdo->query("SELECT COUNT(*) FROM purchase_orders WHERE vendor_invoice_approval_status = 'pending'")->fetchColumn();
-$totalPending     = $pendingProposals + $pendingPOs + $pendingBookings + $pendingInvoices + $pendingClientPrintings + $pendingClientMountings + $pendingPayments + $pendingVendorInvoices;
+// Flex Mounting: entries and payments (one per payment number) waiting for admin
+$pendingFlexMounting = 0;
+try { $pendingFlexMounting = (int)$pdo->query("SELECT (SELECT COUNT(*) FROM mounting_trips WHERE approval_status = 'pending_approval') + (SELECT COUNT(DISTINCT COALESCE(payment_number, id)) FROM mounting_payments WHERE kind = 'payment' AND status = 'active' AND approval_status = 'pending_approval')")->fetchColumn(); } catch (Exception $e) {}
+$totalPending     = $pendingProposals + $pendingPOs + $pendingBookings + $pendingInvoices + $pendingClientPrintings + $pendingClientMountings + $pendingPayments + $pendingVendorInvoices + $pendingFlexMounting;
 
 // Current tab
 $tab = isset($_GET['tab']) ? clean($_GET['tab']) : 'proposals';
@@ -169,6 +172,26 @@ $pendingInvoices = count($invoices);
 $pendingClientPrintings = count($clientPrintings);
 $pendingClientMountings = count($clientMountings);
 $pendingPayments = count($payments);
+
+// Flex Mounting entries and payments awaiting approval
+$flexEntries = $flexPayments = [];
+try {
+    $flexEntries = $pdo->query("
+        SELECT t.*, COALESCE(u.name, u.full_name) AS requested_name,
+               (SELECT GROUP_CONCAT(s.site_code ORDER BY mts.id SEPARATOR ', ') FROM mounting_trip_sites mts JOIN sites s ON s.id = mts.site_id WHERE mts.trip_id = t.id) AS site_codes
+        FROM mounting_trips t LEFT JOIN users u ON u.id = t.created_by
+        WHERE t.approval_status = 'pending_approval' ORDER BY t.created_at")->fetchAll();
+    $flexPayments = $pdo->query("
+        SELECT MIN(p.id) AS first_id, COALESCE(MAX(p.payment_number), CONCAT('#', MIN(p.id))) AS payment_number, MIN(p.paid_date) AS paid_date,
+               MAX(p.contractor_name) AS contractor_name, SUM(p.amount) AS amount, COUNT(*) AS rows_count,
+               MAX(p.payment_mode) AS payment_mode, MAX(p.payment_ref) AS payment_ref, MAX(p.notes) AS notes, MAX(p.attachment) AS attachment,
+               GROUP_CONCAT(CONCAT(t.trip_number, ': Rs.', p.amount) ORDER BY t.trip_date, t.id SEPARATOR '; ') AS entries,
+               MAX(COALESCE(u.name, u.full_name)) AS requested_name, MIN(p.created_at) AS created_at
+        FROM mounting_payments p JOIN mounting_trips t ON t.id = p.trip_id LEFT JOIN users u ON u.id = p.created_by
+        WHERE p.kind = 'payment' AND p.status = 'active' AND p.approval_status = 'pending_approval'
+        GROUP BY COALESCE(p.payment_number, p.id) ORDER BY MIN(p.created_at)")->fetchAll();
+} catch (Exception $e) {}
+$pendingFlexMounting = count($flexEntries) + count($flexPayments);
 ?>
 
 <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 1.5rem; margin-bottom: 2rem;">
@@ -259,6 +282,7 @@ $pendingPayments = count($payments);
             'client_printing' => ['Client Printing', 'fa-print', $pendingClientPrintings],
             'client_mounting' => ['Client Mounting', 'fa-hammer', $pendingClientMountings],
             'payments'  => ['Payments', 'fa-money-bill-wave', $pendingPayments],
+            'flex_mounting' => ['Flex Mounting', 'fa-people-carry', $pendingFlexMounting],
             'vendor_invoices' => ['Vendor Invoices', 'fa-file-invoice', $pendingVendorInvoices],
             'history'   => ['Recent Activity', 'fa-history', 0],
         ];
@@ -824,6 +848,64 @@ $pendingPayments = count($payments);
                 <?php endforeach; ?>
                 <?php if (empty($payments)): ?>
                 <tr><td colspan="6" style="text-align: center; padding: 3rem; color: #94a3b8;"><i class="fas fa-check-circle" style="font-size: 2rem; display: block; margin-bottom: 0.75rem; color: #10b981;"></i>All payment requests have been reviewed!</td></tr>
+                <?php endif; ?>
+            </tbody>
+        </table>
+    </div>
+    <?php endif; ?>
+
+    <!-- ====== FLEX MOUNTING TAB ====== -->
+    <?php if ($tab === 'flex_mounting'): ?>
+    <h4 style="margin: 0 0 .75rem; font-size: .95rem; font-weight: 800; color: #0f172a;"><i class="fas fa-clipboard-list" style="color:#0f766e"></i> Mounting entries</h4>
+    <div style="overflow-x: auto; margin-bottom: 2rem;">
+        <table class="table matrix-table" style="border: 1px solid #e2e8f0; border-radius: 12px; overflow: hidden;">
+            <thead><tr><th>Entry</th><th>Contractor</th><th>Sites / Brand</th><th>Requested By</th><th style="text-align:right">Amount</th><th>Actions</th></tr></thead>
+            <tbody>
+                <?php foreach ($flexEntries as $fe): ?>
+                <tr id="row-mounting_trip-<?php echo (int)$fe['id']; ?>">
+                    <td><a href="../operations/flex_mounting.php?view=<?php echo (int)$fe['id']; ?>" target="_blank" style="font-weight:700;color:var(--primary);text-decoration:none"><?php echo htmlspecialchars($fe['trip_number']); ?></a>
+                        <div style="font-size:.75rem;color:#64748b"><?php echo date('d M Y', strtotime($fe['trip_date'])); ?><?php echo $fe['mounting_date'] ? ' · Mounted ' . date('d M Y', strtotime($fe['mounting_date'])) : ''; ?></div></td>
+                    <td><?php echo htmlspecialchars($fe['contractor_name']); ?><div style="font-size:.75rem;color:#64748b"><?php echo htmlspecialchars($fe['contractor_mobile'] ?? ''); ?></div></td>
+                    <td><?php echo htmlspecialchars($fe['site_codes'] ?? ''); ?><div style="font-size:.75rem;color:#64748b"><?php echo htmlspecialchars($fe['brand_campaign'] ?? ''); ?> · <?php echo rtrim(rtrim(number_format($fe['total_sqft'], 2), '0'), '.'); ?> sqft @ ₹<?php echo number_format($fe['rate_per_sqft'], 2); ?></div></td>
+                    <td><?php echo htmlspecialchars($fe['requested_name'] ?? '-'); ?><div style="font-size:.75rem;color:#64748b"><?php echo $fe['created_at'] ? date('d M Y, h:i A', strtotime($fe['created_at'])) : ''; ?></div></td>
+                    <td style="text-align:right;font-weight:800">₹<?php echo number_format($fe['total_amount'], 2); ?></td>
+                    <td><div style="display:flex;gap:6px">
+                        <button class="btn btn-primary" onclick="approveEntity('mounting_trip', <?php echo (int)$fe['id']; ?>)" style="padding: 6px 12px; font-size: 0.8rem; background: #10b981; border: none;"><i class="fas fa-check"></i> Approve</button>
+                        <button class="btn btn-primary" onclick="rejectEntity('mounting_trip', <?php echo (int)$fe['id']; ?>)" style="padding: 6px 12px; font-size: 0.8rem; background: #ef4444; border: none;"><i class="fas fa-times"></i> Reject</button>
+                    </div></td>
+                </tr>
+                <?php endforeach; ?>
+                <?php if (empty($flexEntries)): ?>
+                <tr><td colspan="6" style="text-align: center; padding: 2rem; color: #94a3b8;"><i class="fas fa-check-circle" style="color:#10b981"></i> No mounting entries waiting.</td></tr>
+                <?php endif; ?>
+            </tbody>
+        </table>
+    </div>
+
+    <h4 style="margin: 0 0 .75rem; font-size: .95rem; font-weight: 800; color: #0f172a;"><i class="fas fa-rupee-sign" style="color:#2563eb"></i> Contractor payments</h4>
+    <div style="overflow-x: auto;">
+        <table class="table matrix-table" style="border: 1px solid #e2e8f0; border-radius: 12px; overflow: hidden;">
+            <thead><tr><th>Payment</th><th>Contractor</th><th>Entries paid</th><th>Mode / Ref</th><th>Requested By</th><th style="text-align:right">Amount</th><th>Actions</th></tr></thead>
+            <tbody>
+                <?php foreach ($flexPayments as $fp): ?>
+                <tr id="row-mounting_payment-<?php echo (int)$fp['first_id']; ?>">
+                    <td><b><?php echo htmlspecialchars($fp['payment_number']); ?></b><div style="font-size:.75rem;color:#64748b"><?php echo date('d M Y', strtotime($fp['paid_date'])); ?></div>
+                        <?php if (!empty($fp['attachment'])): ?><a href="../../uploads/mounting_payments/<?php echo rawurlencode($fp['attachment']); ?>" target="_blank" style="font-size:.75rem"><i class="fas fa-paperclip"></i> Attachment</a><?php endif; ?></td>
+                    <td><?php echo htmlspecialchars($fp['contractor_name']); ?></td>
+                    <td style="font-size:.78rem"><?php if ($fp['rows_count'] > 1): ?><span style="background:#ffedd5;color:#9a3412;padding:1px 6px;border-radius:8px;font-weight:700;font-size:.7rem">Bulk · <?php echo (int)$fp['rows_count']; ?> entries</span><br><?php endif; ?>
+                        <?php echo str_replace(['; ', 'Rs.'], ['<br>', '₹'], htmlspecialchars($fp['entries'] ?? '')); ?>
+                        <?php if (!empty($fp['notes'])): ?><div style="color:#64748b"><?php echo htmlspecialchars($fp['notes']); ?></div><?php endif; ?></td>
+                    <td><?php echo htmlspecialchars($fp['payment_mode'] ?? ''); ?><div style="font-size:.75rem;color:#64748b"><?php echo htmlspecialchars($fp['payment_ref'] ?? ''); ?></div></td>
+                    <td><?php echo htmlspecialchars($fp['requested_name'] ?? '-'); ?><div style="font-size:.75rem;color:#64748b"><?php echo $fp['created_at'] ? date('d M Y, h:i A', strtotime($fp['created_at'])) : ''; ?></div></td>
+                    <td style="text-align:right;font-weight:800">₹<?php echo number_format($fp['amount'], 2); ?></td>
+                    <td><div style="display:flex;gap:6px">
+                        <button class="btn btn-primary" onclick="approveEntity('mounting_payment', <?php echo (int)$fp['first_id']; ?>)" style="padding: 6px 12px; font-size: 0.8rem; background: #10b981; border: none;"><i class="fas fa-check"></i> Approve</button>
+                        <button class="btn btn-primary" onclick="rejectEntity('mounting_payment', <?php echo (int)$fp['first_id']; ?>)" style="padding: 6px 12px; font-size: 0.8rem; background: #ef4444; border: none;"><i class="fas fa-times"></i> Reject</button>
+                    </div></td>
+                </tr>
+                <?php endforeach; ?>
+                <?php if (empty($flexPayments)): ?>
+                <tr><td colspan="7" style="text-align: center; padding: 2rem; color: #94a3b8;"><i class="fas fa-check-circle" style="color:#10b981"></i> No contractor payments waiting.</td></tr>
                 <?php endif; ?>
             </tbody>
         </table>

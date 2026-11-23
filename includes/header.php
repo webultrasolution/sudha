@@ -208,6 +208,7 @@ $activeEntity = getActiveEntity();
                             $pendingApprovalCount += $pdo->query("SELECT COUNT(*) FROM proposals WHERE approval_status = 'pending_approval'")->fetchColumn();
                             $pendingApprovalCount += $pdo->query("SELECT COUNT(*) FROM purchase_orders WHERE approval_status = 'pending_approval'")->fetchColumn();
                             $pendingApprovalCount += $pdo->query("SELECT COUNT(*) FROM invoices WHERE approval_status = 'pending_approval'")->fetchColumn();
+                            $pendingApprovalCount += $pdo->query("SELECT (SELECT COUNT(*) FROM mounting_trips WHERE approval_status = 'pending_approval') + (SELECT COUNT(DISTINCT COALESCE(payment_number, id)) FROM mounting_payments WHERE kind = 'payment' AND status = 'active' AND approval_status = 'pending_approval')")->fetchColumn();
                         } catch(Exception $e) {}
                         ?>
                         <li><a href="<?php echo BASE_URL; ?>modules/admin/approvals.php" class="<?php echo $activePage == 'approvals' ? 'active-sub' : ''; ?>" style="display: flex; align-items: center; justify-content: space-between;">

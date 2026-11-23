@@ -360,7 +360,7 @@ function addMountingBulkPayment(PDO $pdo, array $tripIds, $amount, $date, $mode,
 /** Put a staff payment in the central approval queue (one request per payment number; entity_id = its first row). */
 function mountingQueuePaymentApproval(PDO $pdo, $firstRowId, $number, $contractor, $amount, $userId) {
     $pdo->prepare("INSERT INTO approval_requests (entity_type, entity_id, entity_ref, requested_by, status) VALUES ('mounting_payment', ?, ?, ?, 'pending')")
-        ->execute([$firstRowId, mb_substr("Mounting payment $number (" . $contractor . ', ' . mountingRupees($amount) . ')', 0, 100), $userId]);
+        ->execute([$firstRowId, mb_substr("Mounting payment $number (" . $contractor . ', Rs. ' . number_format($amount, 2) . ')', 0, 100), $userId]);
 }
 
 /**

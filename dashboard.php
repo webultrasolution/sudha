@@ -123,7 +123,9 @@ if (hasRole('admin')) {
     $pendingClientPrintings = $pdo->query("SELECT COUNT(DISTINCT po_number) FROM client_printing_rates WHERE approval_status = 'pending_approval'")->fetchColumn();
     $pendingClientMountings = $pdo->query("SELECT COUNT(DISTINCT po_number) FROM client_mounting_rates WHERE approval_status = 'pending_approval'")->fetchColumn();
     $pendingPayments  = $pdo->query("SELECT COUNT(*) FROM payments WHERE approval_status = 'pending_approval' $entityCondPay")->fetchColumn();
-    $pendingCount     = $pendingProposals + $pendingPOs + $pendingVendorInvoices + $pendingBookings + $pendingInvoices + $pendingClientPrintings + $pendingClientMountings + $pendingPayments;
+    $pendingFlexMounting = 0;
+    try { $pendingFlexMounting = (int)$pdo->query("SELECT (SELECT COUNT(*) FROM mounting_trips WHERE approval_status = 'pending_approval') + (SELECT COUNT(DISTINCT COALESCE(payment_number, id)) FROM mounting_payments WHERE kind = 'payment' AND status = 'active' AND approval_status = 'pending_approval')")->fetchColumn(); } catch (Exception $e) {}
+    $pendingCount     = $pendingProposals + $pendingPOs + $pendingVendorInvoices + $pendingBookings + $pendingInvoices + $pendingClientPrintings + $pendingClientMountings + $pendingPayments + $pendingFlexMounting;
 
     $pendingFeed = $pdo->query("
         SELECT CONVERT('Proposal' USING utf8mb4) COLLATE utf8mb4_general_ci as type, CONVERT(p.proposal_number USING utf8mb4) COLLATE utf8mb4_general_ci as ref_no, p.created_at, p.total_amount as amount, CONVERT('proposals' USING utf8mb4) COLLATE utf8mb4_general_ci as tab, CONVERT(e.name USING utf8mb4) COLLATE utf8mb4_general_ci as entity_name
@@ -143,6 +145,13 @@ if (hasRole('admin')) {
         UNION ALL
         SELECT CONVERT('Payment' USING utf8mb4) COLLATE utf8mb4_general_ci as type, CONVERT(COALESCE(pay.transaction_id, CONCAT('ID: ', pay.id)) USING utf8mb4) COLLATE utf8mb4_general_ci as ref_no, pay.created_at, pay.amount, CONVERT('payments' USING utf8mb4) COLLATE utf8mb4_general_ci as tab, CONVERT(e.name USING utf8mb4) COLLATE utf8mb4_general_ci as entity_name
         FROM payments pay LEFT JOIN entities e ON pay.entity_id = e.id WHERE pay.approval_status = 'pending_approval' $entityCondPayAlias
+        UNION ALL
+        SELECT CONVERT('Flex Mounting' USING utf8mb4) COLLATE utf8mb4_general_ci as type, CONVERT(mt.trip_number USING utf8mb4) COLLATE utf8mb4_general_ci as ref_no, mt.created_at, mt.total_amount as amount, CONVERT('flex_mounting' USING utf8mb4) COLLATE utf8mb4_general_ci as tab, CONVERT(e.name USING utf8mb4) COLLATE utf8mb4_general_ci as entity_name
+        FROM mounting_trips mt LEFT JOIN entities e ON mt.entity_id = e.id WHERE mt.approval_status = 'pending_approval'
+        UNION ALL
+        SELECT CONVERT('Mounting Payment' USING utf8mb4) COLLATE utf8mb4_general_ci as type, CONVERT(COALESCE(MAX(mp.payment_number), CONCAT('#', MIN(mp.id))) USING utf8mb4) COLLATE utf8mb4_general_ci as ref_no, MIN(mp.created_at) as created_at, SUM(mp.amount) as amount, CONVERT('flex_mounting' USING utf8mb4) COLLATE utf8mb4_general_ci as tab, CONVERT(MAX(e.name) USING utf8mb4) COLLATE utf8mb4_general_ci as entity_name
+        FROM mounting_payments mp LEFT JOIN entities e ON mp.entity_id = e.id WHERE mp.kind = 'payment' AND mp.status = 'active' AND mp.approval_status = 'pending_approval'
+        GROUP BY COALESCE(mp.payment_number, mp.id)
         ORDER BY created_at ASC
         LIMIT 5
     ")->fetchAll();
