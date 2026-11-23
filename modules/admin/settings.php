@@ -3,6 +3,8 @@ include_once __DIR__ . '/../../config/db.php';
 include_once __DIR__ . '/../../includes/functions.php';
 
 checkAuth();
+requireRole('admin');
+include_once __DIR__ . '/../../includes/image_upload_guard.php';
 
 $message = '';
 $error = '';
@@ -24,20 +26,26 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
         $logoVal = $activeEntity ? $activeEntity['logo'] : ($settings['company_logo'] ?? '');
         if (!empty($_FILES['company_logo']['name'])) {
-            $logoVal = ($activeEntity ? 'entity_' : 'logo_') . time() . '_' . $_FILES['company_logo']['name'];
-            move_uploaded_file($_FILES['company_logo']['tmp_name'], $uploadDir . $logoVal);
+            $newName = safeImageUploadName($_FILES['company_logo'], $activeEntity ? 'entity_' : 'logo_');
+            if ($newName && move_uploaded_file($_FILES['company_logo']['tmp_name'], $uploadDir . $newName)) {
+                $logoVal = $newName;
+            }
         }
 
         $sigVal = $activeEntity ? $activeEntity['signature'] : ($settings['company_signature'] ?? '');
         if (!empty($_FILES['company_signature']['name'])) {
-            $sigVal = ($activeEntity ? 'entity_sig_' : 'sig_') . time() . '_' . $_FILES['company_signature']['name'];
-            move_uploaded_file($_FILES['company_signature']['tmp_name'], $uploadDir . $sigVal);
+            $newName = safeImageUploadName($_FILES['company_signature'], $activeEntity ? 'entity_sig_' : 'sig_');
+            if ($newName && move_uploaded_file($_FILES['company_signature']['tmp_name'], $uploadDir . $newName)) {
+                $sigVal = $newName;
+            }
         }
 
         $lhVal = $activeEntity ? $activeEntity['letterhead'] : ($settings['company_letterhead'] ?? '');
         if (!empty($_FILES['company_letterhead']['name'])) {
-            $lhVal = ($activeEntity ? 'entity_lh_' : 'lh_') . time() . '_' . $_FILES['company_letterhead']['name'];
-            move_uploaded_file($_FILES['company_letterhead']['tmp_name'], $uploadDir . $lhVal);
+            $newName = safeImageUploadName($_FILES['company_letterhead'], $activeEntity ? 'entity_lh_' : 'lh_');
+            if ($newName && move_uploaded_file($_FILES['company_letterhead']['tmp_name'], $uploadDir . $newName)) {
+                $lhVal = $newName;
+            }
         }
 
         if ($activeEntity) {

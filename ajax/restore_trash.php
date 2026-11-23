@@ -2,6 +2,13 @@
 header('Content-Type: application/json');
 include_once __DIR__ . '/../config/db.php';
 require_once __DIR__ . '/../includes/ajax_auth.php';
+include_once __DIR__ . '/../includes/functions.php';
+if (!(($_SESSION['user_role'] ?? '') === 'admin')) {
+    http_response_code(403);
+    header('Content-Type: application/json');
+    echo json_encode(['success' => false, 'message' => 'Only admin can restore from trash.']);
+    exit;
+}
 include_once __DIR__ . '/../includes/trash_helper.php';
 if (session_status() === PHP_SESSION_NONE) session_start();
 

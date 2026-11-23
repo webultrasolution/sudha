@@ -1,0 +1,16 @@
+# Logos, signatures and letterheads are uploaded here: serve images only, never run code.
+<FilesMatch "(?i)\.(php[0-9]?|phtml|phar|pht|phps|inc|cgi|pl|py|sh|bat|cmd|exe|html?|xhtml|shtml|js|svg)$">
+    Require all denied
+</FilesMatch>
+<IfModule mod_php.c>
+    php_flag engine off
+</IfModule>
+<IfModule mod_php7.c>
+    php_flag engine off
+</IfModule>
+<IfModule mod_php8.c>
+    php_flag engine off
+</IfModule>
+RemoveHandler .php .phtml .phar .pht
+RemoveType .php .phtml .phar .pht
+Options -Indexes -ExecCGI

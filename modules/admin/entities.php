@@ -3,6 +3,8 @@ include_once __DIR__ . '/../../config/db.php';
 include_once __DIR__ . '/../../includes/functions.php';
 
 checkAuth();
+requireRole('admin');
+include_once __DIR__ . '/../../includes/image_upload_guard.php';
 
 $message = '';
 $error = '';
@@ -35,24 +37,24 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     
     $logo = $_POST['existing_logo'] ?? '';
     if (!empty($_FILES['logo']['name'])) {
-        $logoName = 'entity_' . time() . '_' . $_FILES['logo']['name'];
-        if (move_uploaded_file($_FILES['logo']['tmp_name'], $uploadDir . $logoName)) {
+        $logoName = safeImageUploadName($_FILES['logo'], 'entity_');
+        if ($logoName && move_uploaded_file($_FILES['logo']['tmp_name'], $uploadDir . $logoName)) {
             $logo = $logoName;
         }
     }
     
     $letterhead = $_POST['existing_letterhead'] ?? '';
     if (!empty($_FILES['letterhead']['name'])) {
-        $letterheadName = 'entity_lh_' . time() . '_' . $_FILES['letterhead']['name'];
-        if (move_uploaded_file($_FILES['letterhead']['tmp_name'], $uploadDir . $letterheadName)) {
+        $letterheadName = safeImageUploadName($_FILES['letterhead'], 'entity_lh_');
+        if ($letterheadName && move_uploaded_file($_FILES['letterhead']['tmp_name'], $uploadDir . $letterheadName)) {
             $letterhead = $letterheadName;
         }
     }
 
     $signature = $_POST['existing_signature'] ?? '';
     if (!empty($_FILES['signature']['name'])) {
-        $signatureName = 'entity_sig_' . time() . '_' . $_FILES['signature']['name'];
-        if (move_uploaded_file($_FILES['signature']['tmp_name'], $uploadDir . $signatureName)) {
+        $signatureName = safeImageUploadName($_FILES['signature'], 'entity_sig_');
+        if ($signatureName && move_uploaded_file($_FILES['signature']['tmp_name'], $uploadDir . $signatureName)) {
             $signature = $signatureName;
         }
     }
