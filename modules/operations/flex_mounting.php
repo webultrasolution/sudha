@@ -368,10 +368,12 @@ async function loadPayList() {
         PAYS = d.payments;
         let tot = 0;
         payListRows.innerHTML = PAYS.length ? PAYS.map(p => {
-            const rev = +p.active_rows === 0; if (!rev) tot += +p.amount;
+            const rev = +p.active_rows === 0; if (!rev && p.approval_status === 'approved') tot += +p.amount;
             const entries = (p.entries || '').split('; ').filter(Boolean).map(x => esc(x).replace('Rs.', '₹')).join('<br>');
             let act = '';
-            if (!rev && PERM.edit && p.payment_number) act += `<button class="fm-btn ghost sm" onclick="revertGroup('${esc(p.payment_number)}')" title="Revert this whole payment"><i class="fas fa-undo"></i> Revert</button>`;
+            const waitAp = !rev && p.approval_status === 'pending_approval';
+            if (waitAp && PERM.admin) act += `<button class="fm-btn green sm" onclick="decidePayment(${p.first_id},'approve')" title="Approve payment"><i class="fas fa-check"></i> Approve</button> <button class="fm-btn red sm" onclick="decidePayment(${p.first_id},'reject')" title="Reject payment"><i class="fas fa-times"></i></button> `;
+            if (!rev && !waitAp && PERM.admin && p.payment_number) act += `<button class="fm-btn ghost sm" onclick="revertGroup('${esc(p.payment_number)}')" title="Revert this whole payment"><i class="fas fa-undo"></i> Revert</button>`;
             if (PERM.admin && p.payment_number) act += ` <button class="fm-btn ghost sm" onclick="deleteGroup('${esc(p.payment_number)}')" title="Delete wrong payment" style="color:#dc2626"><i class="fas fa-trash"></i></button>`;
             return `<tr class="${rev ? 'rev' : ''}"><td><b>${esc(p.payment_number || p.ref)}</b><div style="font-size:.7rem;color:#64748b">${fmtDate(p.paid_date)}</div></td>
                 <td>${p.contractor_id ? `<a href="#" onclick="openLedger(${p.contractor_id});return false" style="color:#0f766e;font-weight:700">${esc(p.contractor_name)}</a>` : esc(p.contractor_name)}</td>
@@ -380,7 +382,7 @@ async function loadPayList() {
                 <td style="max-width:200px">${esc(p.notes || '')}${rev && p.reverse_reason ? '<div style="font-size:.7rem">Reverted: ' + esc(p.reverse_reason) + '</div>' : ''}</td>
                 <td>${fileLink(p.attachment)}</td>
                 <td class="num"><b>${inr(rev ? p.original_amount : p.amount)}</b></td>
-                <td><span class="fm-pill ${rev ? 'reversed' : 'approved'}">${rev ? 'Reverted' : (+p.active_rows < +p.rows_count ? 'Part reverted' : 'Active')}</span></td>
+                <td>${p.approval_status === 'rejected' ? '<span class="fm-pill rejected">Rejected</span>' : (rev ? '<span class="fm-pill reversed">Reverted</span>' : (p.approval_status === 'pending_approval' ? '<span class="fm-pill pending_approval">Awaiting approval</span>' : `<span class="fm-pill approved">${+p.active_rows < +p.rows_count ? 'Part reverted' : 'Active'}</span>`))}${p.rejection_reason ? '<div style="font-size:.68rem;color:#991b1b">' + esc(p.rejection_reason) + '</div>' : ''}</td>
                 <td style="white-space:nowrap">${act}</td></tr>`;
         }).join('') : '<tr><td colspan="9" style="text-align:center;padding:2rem;color:#94a3b8">No payments yet.</td></tr>';
         payListFoot.innerHTML = PAYS.length ? `<tr><td colspan="6">Total paid (${PAYS.filter(p => +p.active_rows > 0).length} payments)</td><td class="num">${inr(tot)}</td><td colspan="2"></td></tr>` : '';
@@ -402,16 +404,16 @@ function renderTrips() {
     if (!TRIPS.length) { tripRows.innerHTML = '<tr><td colspan="17" style="text-align:center;padding:2rem;color:#94a3b8">No mounting entries yet.</td></tr>'; }
     else tripRows.innerHTML = TRIPS.map(t => {
         sqft += +t.total_sqft;
-        const tPaid = +t.paid_amount || 0, tBal = Math.round((+t.total_amount - tPaid) * 100) / 100;
+        const tPaid = +t.paid_amount || 0, tWait = +t.pending_pay || 0, tBal = Math.round((+t.total_amount - tPaid) * 100) / 100, tAvail = Math.round((tBal - tWait) * 100) / 100;
         if (t.approval_status === 'approved') { total += +t.total_amount; paid += tPaid; pending += tBal; }
-        const locked = tPaid > 0;
+        const locked = tPaid > 0 || tWait > 0;
         let act = `<button class="fm-btn ghost sm" onclick="viewTrip(${t.id})" title="View"><i class="fas fa-eye"></i></button>`;
-        if (!locked && PERM.edit && (t.approval_status !== 'approved' || PERM.admin)) act += ` <button class="fm-btn ghost sm" onclick="openTrip(${t.id})" title="Edit"><i class="fas fa-pen"></i></button>`;
+        if (!locked && PERM.edit) act += ` <button class="fm-btn ghost sm" onclick="openTrip(${t.id})" title="${PERM.admin ? 'Edit' : 'Edit (goes to admin for approval)'}"><i class="fas fa-pen"></i></button>`;
         if (PERM.admin && t.approval_status === 'pending_approval') act += ` <button class="fm-btn green sm" onclick="decide(${t.id},'approve')" title="Approve"><i class="fas fa-check"></i></button> <button class="fm-btn red sm" onclick="decide(${t.id},'reject')" title="Reject"><i class="fas fa-times"></i></button>`;
         if (t.approval_status === 'approved') act += ` <button class="fm-btn blue sm" onclick="openPayments(${t.id})" title="Payments"><i class="fas fa-rupee-sign"></i> ${t.payment_status === 'paid' ? 'Payments' : 'Pay'}</button>`;
-        if (!locked && PERM.delete) act += ` <button class="fm-btn ghost sm" onclick="deleteTrip(${t.id})" title="Delete" style="color:#dc2626"><i class="fas fa-trash"></i></button>`;
+        if (!locked && PERM.admin) act += ` <button class="fm-btn ghost sm" onclick="deleteTrip(${t.id})" title="Delete" style="color:#dc2626"><i class="fas fa-trash"></i></button>`;
         const apLabel = {pending_approval: 'Pending approval', approved: 'Approved', rejected: 'Rejected'}[t.approval_status];
-        const canTick = PERM.edit && t.approval_status === 'approved' && tBal > 0.009;
+        const canTick = PERM.edit && t.approval_status === 'approved' && tAvail > 0.009;
         return `<tr>
             <td>${canTick ? `<input type="checkbox" class="tPick" value="${t.id}" ${TICKED.has(+t.id) ? 'checked' : ''} onchange="tickOne(${t.id}, this.checked)">` : ''}</td>
             <td><b>${esc(t.trip_number)}</b><div style="font-size:.7rem;color:#64748b">${fmtDate(t.trip_date)}</div></td>
@@ -422,13 +424,13 @@ function renderTrips() {
             <td class="num">${num(t.total_sqft)}</td><td class="num">${inr(t.rate_per_sqft)}</td><td class="num">${inr(t.labour_amount)}</td>
             <td class="num">${inr(t.food_amount)}</td><td class="num">${inr(t.travel_amount)}</td><td class="num">${inr(t.misc_amount)}</td>
             <td class="num"><b>${inr(t.total_amount)}</b></td>
-            <td class="num" style="color:#2563eb">${tPaid ? inr(tPaid) : '-'}</td><td class="num" style="color:${tBal > 0 ? '#dc2626' : '#16a34a'};font-weight:700">${inr(tBal)}</td>
+            <td class="num" style="color:#2563eb">${tPaid ? inr(tPaid) : '-'}${tWait ? `<div style="font-size:.66rem;color:#b45309">+ ${inr(tWait)} awaiting approval</div>` : ''}</td><td class="num" style="color:${tBal > 0 ? '#dc2626' : '#16a34a'};font-weight:700">${inr(tBal)}</td>
             <td><span class="fm-pill ${t.approval_status}">${apLabel}</span><br><span class="fm-pill ${payPill(t.payment_status)}" style="margin-top:3px">${payLabel(t.payment_status)}</span>
                 ${t.rejection_reason ? `<div style="font-size:.68rem;color:#991b1b;margin-top:2px">${esc(t.rejection_reason)}</div>` : ''}</td>
             <td style="white-space:nowrap">${act}</td></tr>`;
     }).join('');
     cTrips.textContent = TRIPS.length; cSqft.textContent = num(sqft); cTotal.textContent = inr(total); cPaid.textContent = inr(paid); cPending.textContent = inr(pending);
-    [...TICKED].forEach(id => { if (!TRIPS.some(t => +t.id === id && t.approval_status === 'approved' && +t.total_amount - +t.paid_amount > 0.009)) TICKED.delete(id); });
+    [...TICKED].forEach(id => { if (!TRIPS.some(t => +t.id === id && t.approval_status === 'approved' && tripBal(t) > 0.009)) TICKED.delete(id); });
     updateSelBar();
 }
 
@@ -452,7 +454,8 @@ async function loadContractors() {
             <td class="num" style="font-weight:800;color:${+c.due > 0 ? '#dc2626' : '#16a34a'}">${inr(c.due)}</td>
             <td><span class="fm-pill ${+c.is_active ? 'approved' : 'unpaid'}">${+c.is_active ? 'Active' : 'Inactive'}</span></td>
             <td style="white-space:nowrap"><button class="fm-btn ghost sm" onclick="openLedger(${c.id})" title="Entries, payments and due"><i class="fas fa-book"></i> Ledger</button>
-                ${PERM.edit ? `<button class="fm-btn ghost sm" onclick="editContractor(${c.id})" title="Edit"><i class="fas fa-pen"></i></button>` : ''}</td></tr>`).join('')
+                ${PERM.edit ? `<button class="fm-btn ghost sm" onclick="editContractor(${c.id})" title="Edit"><i class="fas fa-pen"></i></button>` : ''}
+                ${PERM.admin && !+c.entries ? `<button class="fm-btn ghost sm" onclick="deleteContractor(${c.id})" title="Delete" style="color:#dc2626"><i class="fas fa-trash"></i></button>` : ''}</td></tr>`).join('')
             : '<tr><td colspan="9" style="text-align:center;padding:1.5rem;color:#94a3b8">No contractors yet. Add one above, or they are added automatically from mounting entries.</td></tr>';
     } catch (e) { cRows.innerHTML = `<tr><td colspan="9" style="color:#dc2626;padding:1rem">${esc(e.message)}</td></tr>`; }
 }
@@ -495,7 +498,7 @@ async function openLedger(id) {
                 <td>${esc(p.trip_number)}${p.brand_campaign ? '<div style="font-size:.7rem;color:#64748b">' + esc(p.brand_campaign) + '</div>' : ''}</td>
                 <td>${esc(p.payment_mode || '')}${p.payment_ref ? '<div style="font-size:.7rem;color:#64748b">' + esc(p.payment_ref) + '</div>' : ''}</td>
                 <td style="max-width:200px">${esc(p.notes || '')}</td><td>${fileLink(p.attachment)}</td><td class="num"><b>${inr(p.amount)}</b></td>
-                <td><span class="fm-pill ${rev ? 'reversed' : 'approved'}">${rev ? 'Reverted' : 'Active'}</span></td></tr>`;
+                <td>${payStatusPill(p)}</td></tr>`;
         }).join('') : '<tr><td colspan="7" style="text-align:center;padding:1rem;color:#94a3b8">No payments yet.</td></tr>';
         lPayBtn.hidden = !(PERM.edit && t.due > 0.009);
         ledgerModal.style.display = 'flex';
@@ -523,7 +526,7 @@ function suggestBrand() {
 
 /* ---------- tick entries and pay them together ---------- */
 const TICKED = new Set();
-const tripBal = t => Math.round((+t.total_amount - (+t.paid_amount || 0)) * 100) / 100;
+const tripBal = t => Math.round((+t.total_amount - (+t.paid_amount || 0) - (+t.pending_pay || 0)) * 100) / 100;
 function tickOne(id, on) { on ? TICKED.add(+id) : TICKED.delete(+id); updateSelBar(); }
 function tickAll(on) { document.querySelectorAll('.tPick').forEach(c => { c.checked = on; on ? TICKED.add(+c.value) : TICKED.delete(+c.value); }); updateSelBar(); }
 function clearTicks() { TICKED.clear(); document.querySelectorAll('.tPick').forEach(c => c.checked = false); tickAllBox(); updateSelBar(); }
@@ -762,10 +765,12 @@ async function openPayments(id) {
     try {
         const d = await api('GET', {action: 'payments', id});
         PAYTRIP = d.trip;
-        const t = d.trip, paidAmt = +t.paid_amount, bal = Math.round((+t.total_amount - paidAmt) * 100) / 100;
+        const t = d.trip, paidAmt = +t.paid_amount;
+        const waiting = d.payments.filter(p => p.status === 'active' && p.approval_status === 'pending_approval').reduce((a, p) => a + +p.amount, 0);
+        const bal = Math.round((+t.total_amount - paidAmt - waiting) * 100) / 100;
         payTitle.textContent = 'Payments · ' + t.trip_number + ' · ' + t.contractor_name;
         payKv.innerHTML = `<span>Total <b>${inr(t.total_amount)}</b></span><span>Paid <b style="color:#2563eb">${inr(paidAmt)}</b></span>
-            <span>Balance <b style="color:${bal > 0 ? '#dc2626' : '#16a34a'}">${inr(bal)}</b></span><span class="fm-pill ${payPill(t.payment_status)}">${payLabel(t.payment_status)}</span>`;
+            ${waiting ? `<span>Awaiting approval <b style="color:#b45309">${inr(waiting)}</b></span>` : ''}<span>Balance <b style="color:${bal > 0 ? '#dc2626' : '#16a34a'}">${inr(bal)}</b></span><span class="fm-pill ${payPill(t.payment_status)}">${payLabel(t.payment_status)}</span>`;
         payRows.innerHTML = d.payments.length ? d.payments.map(p => payRowHtml(p)).join('')
             : '<tr><td colspan="8" style="text-align:center;padding:1rem;color:#94a3b8">No payments yet.</td></tr>';
         const canPay = PERM.edit && bal > 0.009;
@@ -779,7 +784,9 @@ async function openPayments(id) {
 function payRowHtml(p, withRemaining) {
     const rev = p.status === 'reversed';
     let act = '';
-    if (!rev && PERM.edit) act += `<button class="fm-btn ghost sm" onclick="revertPayment(${p.id})" title="Revert (keeps a record)"><i class="fas fa-undo"></i> Revert</button>`;
+    const waitAp = !rev && p.approval_status === 'pending_approval', rejected = p.approval_status === 'rejected';
+    if (waitAp && PERM.admin) act += `<button class="fm-btn green sm" onclick="decidePayment(${p.id},'approve')" title="Approve payment"><i class="fas fa-check"></i></button> <button class="fm-btn red sm" onclick="decidePayment(${p.id},'reject')" title="Reject payment"><i class="fas fa-times"></i></button> `;
+    if (!rev && !waitAp && !rejected && PERM.admin) act += `<button class="fm-btn ghost sm" onclick="revertPayment(${p.id})" title="Revert (keeps a record)"><i class="fas fa-undo"></i> Revert</button>`;
     if (PERM.admin) act += ` <button class="fm-btn ghost sm" onclick="deletePayment(${p.id})" title="Delete wrong entry" style="color:#dc2626"><i class="fas fa-trash"></i></button>`;
     const bulk = +p.bulk_count > 1 ? `<div style="font-size:.68rem;color:#7c3aed">Bulk: ${+p.bulk_count} entries, ${inr(p.bulk_total)}<br>${esc(p.bulk_entries || '')}</div>` : '';
     return `<tr class="${rev ? 'rev' : ''}"><td>${fmtDate(p.paid_date)}</td><td><b>${esc(p.payment_number || '-')}</b>${bulk}</td>
@@ -787,7 +794,7 @@ function payRowHtml(p, withRemaining) {
         <td style="max-width:200px">${esc(p.notes || '')}${rev && p.reverse_reason ? '<div style="font-size:.7rem">Reverted: ' + esc(p.reverse_reason) + '</div>' : ''}</td>
         <td>${fileLink(p.attachment)}</td>
         <td class="num"><b>${inr(p.amount)}</b></td>${withRemaining ? `<td class="num">${rev ? '-' : inr(p.remaining)}</td>` : ''}
-        <td><span class="fm-pill ${rev ? 'reversed' : 'approved'}">${rev ? 'Reverted' : 'Active'}</span></td><td style="white-space:nowrap">${act}</td></tr>`;
+        <td>${payStatusPill(p)}</td><td style="white-space:nowrap">${act}</td></tr>`;
 }
 async function savePayment() {
     pSaveBtn.disabled = true;
@@ -796,6 +803,33 @@ async function savePayment() {
         toast('success', d.message); await openPayments(PAYTRIP.id); loadTrips();
     } catch (e) { toast('error', e.message); }
     pSaveBtn.disabled = false;
+}
+function payStatusPill(p) {
+    if (p.approval_status === 'rejected') return '<span class="fm-pill rejected">Rejected</span>' + (p.rejection_reason ? '<div style="font-size:.68rem;color:#991b1b">' + esc(p.rejection_reason) + '</div>' : '');
+    if (p.status === 'reversed') return '<span class="fm-pill reversed">Reverted</span>';
+    if (p.approval_status === 'pending_approval') return '<span class="fm-pill pending_approval">Awaiting approval</span>';
+    return '<span class="fm-pill approved">Approved</span>';
+}
+async function decidePayment(pid, decision) {
+    let reason = '';
+    if (decision === 'reject') {
+        const r = await SwalX.fire({title: 'Reject this payment?', text: 'The entries go back to their old balance.', input: 'text', inputPlaceholder: 'Reason', icon: 'warning', showCancelButton: true, confirmButtonText: 'Reject', confirmButtonColor: '#ef4444'});
+        if (!r.isConfirmed) return; reason = r.value || '';
+    } else {
+        const r = await SwalX.fire({title: 'Approve this payment?', text: 'It will count as paid on every entry it covers.', icon: 'question', showCancelButton: true, confirmButtonText: 'Approve', confirmButtonColor: '#10b981'});
+        if (!r.isConfirmed) return;
+    }
+    try {
+        const d = await api('POST', {action: 'approve_payment', payment_id: pid, decision, reason});
+        toast('success', d.message);
+        if (payModal.style.display === 'flex' && PAYTRIP) openPayments(PAYTRIP.id);
+        reloadTab();
+    } catch (e) { toast('error', e.message); }
+}
+async function deleteContractor(id) {
+    const r = await SwalX.fire({title: 'Delete this contractor?', text: 'Only contractors without entries can be deleted.', icon: 'warning', showCancelButton: true, confirmButtonText: 'Delete', confirmButtonColor: '#ef4444'});
+    if (!r.isConfirmed) return;
+    try { const d = await api('POST', {action: 'contractor_delete', id}); toast('success', d.message); loadContractors(); } catch (e) { toast('error', e.message); }
 }
 async function revertPayment(pid) {
     const r = await SwalX.fire({title: 'Revert this payment?', text: 'It stays in the history as reverted and the balance goes back up.', input: 'text', inputPlaceholder: 'Reason (optional)', icon: 'warning', showCancelButton: true, confirmButtonText: 'Revert', confirmButtonColor: '#f59e0b'});

@@ -10,7 +10,11 @@
  * POST {action:'contractor_save', id?, name, mobile, address, notes, is_active}
  * GET  ?action=contractor_options                                                -> {success, contractors}  (active, for the entry form)
  * GET  ?action=payment_list&from=&to=&contractor=&status=                          -> {success, payments}  (one line per payment number)
- * POST {action:'revert_group' | 'delete_group', payment_number, reason}            whole bulk payment (delete: admin)
+ * POST {action:'revert_group' | 'delete_group', payment_number, reason}            whole bulk payment (admin only)
+ * POST {action:'approve_payment', payment_id, decision: 'approve'|'reject', reason}   admin approves a staff payment (all its entries)
+ * POST {action:'contractor_delete', id}                                            admin; only a contractor without entries
+ * Roles: staff (module add/edit permission) create and edit entries and make payments, all waiting for admin approval;
+ *        delete and revert are admin only; admin actions need no approval.
  * GET  ?action=suggest&q=                                                              -> {success, contractors}
  * GET  ?action=sites&q=                                                                -> {success, sites}  (site master search)
  * POST {action:'save', id?, trip_date, contractor_name, contractor_mobile, rate_per_sqft,
@@ -155,9 +159,11 @@ try {
             $file = saveMountingAttachment($_FILES['attachment'] ?? null);
             try {
                 $st = addMountingTripPayment($pdo, intval($body['id'] ?? 0), $body['amount'] ?? 0, $body['paid_date'] ?? '', $body['payment_mode'] ?? '',
-                                             $body['payment_ref'] ?? '', $body['notes'] ?? '', $userId, $file);
+                                             $body['payment_ref'] ?? '', $body['notes'] ?? '', $userId, $file, $isAdmin);
             } catch (Exception $e) { removeMountingAttachment($file); throw $e; }
-            echo json_encode(['success' => true, 'message' => $st['status'] === 'paid' ? 'Payment saved. Entry fully paid.' : 'Payment saved. Balance ' . mountingRupees($st['balance']) . '.'] + $st);
+            $msg = !$isAdmin ? 'Payment ' . $st['payment_number'] . ' sent for admin approval.'
+                 : ($st['status'] === 'paid' ? 'Payment saved. Entry fully paid.' : 'Payment saved. Balance ' . mountingRupees($st['balance']) . '.');
+            echo json_encode(['success' => true, 'message' => $msg] + $st);
             break;
 
         case 'bulk_pay':
@@ -167,38 +173,54 @@ try {
             $file = saveMountingAttachment($_FILES['attachment'] ?? null);
             try {
                 $r = addMountingBulkPayment($pdo, $ids, $body['amount'] ?? 0, $body['paid_date'] ?? '', $body['payment_mode'] ?? '',
-                                            $body['payment_ref'] ?? '', $body['notes'] ?? '', $userId, $file);
+                                            $body['payment_ref'] ?? '', $body['notes'] ?? '', $userId, $file, $isAdmin);
             } catch (Exception $e) { removeMountingAttachment($file); throw $e; }
-            echo json_encode(['success' => true, 'message' => 'Payment ' . $r['payment_number'] . ' saved for ' . count($r['rows']) . ' entr' . (count($r['rows']) === 1 ? 'y' : 'ies')
+            echo json_encode(['success' => true, 'message' => 'Payment ' . $r['payment_number'] . ($isAdmin ? ' saved' : ' sent for admin approval') . ' for ' . count($r['rows']) . ' entr' . (count($r['rows']) === 1 ? 'y' : 'ies')
                               . ($r['balance'] > 0.009 ? '. Still due on the ticked entries: ' . mountingRupees($r['balance']) . '.' : '. All ticked entries are paid.')] + $r);
             break;
 
+        case 'approve_payment':
+            if (!$isAdmin) mountingDeny('Only admin can approve payments.');
+            $pdo->beginTransaction();
+            try {
+                $no = setMountingPaymentApproval($pdo, intval($body['payment_id'] ?? 0), ($body['decision'] ?? '') === 'approve', $userId, $body['reason'] ?? '');
+                $pdo->commit();
+            } catch (Exception $e) { $pdo->rollBack(); throw $e; }
+            echo json_encode(['success' => true, 'message' => 'Payment ' . $no . (($body['decision'] ?? '') === 'approve' ? ' approved.' : ' rejected.')]);
+            break;
+
+        case 'contractor_delete':
+            if (!$isAdmin) mountingDeny('Only admin can delete a contractor.');
+            deleteMountingContractor($pdo, intval($body['id'] ?? 0));
+            echo json_encode(['success' => true, 'message' => 'Contractor deleted.']);
+            break;
+
         case 'revert':
-            if (!canEdit(MOUNTING_MODULE_KEY)) mountingDeny();
+            if (!$isAdmin) mountingDeny('Only admin can revert a payment.');
             reverseMountingPayment($pdo, intval($body['payment_id'] ?? 0), $userId, $body['reason'] ?? '');
             echo json_encode(['success' => true, 'message' => 'Payment reverted.']);
             break;
 
         case 'revert_group':
-            if (!canEdit(MOUNTING_MODULE_KEY)) mountingDeny();
+            if (!$isAdmin) mountingDeny('Only admin can revert a payment.');
             $n = reverseMountingPaymentGroup($pdo, trim((string)($body['payment_number'] ?? '')), $userId, $body['reason'] ?? '');
             echo json_encode(['success' => true, 'message' => 'Payment reverted on ' . $n . ' entr' . ($n === 1 ? 'y' : 'ies') . '.']);
             break;
 
         case 'delete_group':
-            if (!$isAdmin) mountingDeny('Only admin can delete a payment. Use Revert instead.');
+            if (!$isAdmin) mountingDeny('Only admin can delete a payment.');
             $n = deleteMountingPaymentGroup($pdo, trim((string)($body['payment_number'] ?? '')));
             echo json_encode(['success' => true, 'message' => 'Payment deleted (' . $n . ' entr' . ($n === 1 ? 'y' : 'ies') . ').']);
             break;
 
         case 'delete_payment':
-            if (!$isAdmin) mountingDeny('Only admin can delete a payment. Use Revert instead.');
+            if (!$isAdmin) mountingDeny('Only admin can delete a payment.');
             deleteMountingPayment($pdo, intval($body['payment_id'] ?? 0));
             echo json_encode(['success' => true, 'message' => 'Payment deleted.']);
             break;
 
         case 'delete':
-            if (!canDelete(MOUNTING_MODULE_KEY)) mountingDeny();
+            if (!$isAdmin) mountingDeny('Only admin can delete an entry.');
             deleteMountingTrip($pdo, intval($body['id'] ?? 0));
             echo json_encode(['success' => true, 'message' => 'Trip deleted.']);
             break;

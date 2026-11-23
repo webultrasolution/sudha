@@ -164,7 +164,6 @@ function saveMountingTrip(PDO $pdo, array $input, $tripId, $userId, $isAdmin, $e
             $old = $stmt->fetch(PDO::FETCH_ASSOC);
             if (!$old) throw new Exception('Trip not found.');
             if (mountingTripHasPayments($pdo, $tripId)) throw new Exception('This entry has payments. Revert or delete its payments before editing.');
-            if ($old['approval_status'] === 'approved' && !$isAdmin) throw new Exception('Approved trips can only be edited by admin.');
             $tripNumber = $old['trip_number'];
 
             $pdo->prepare("UPDATE mounting_trips SET trip_date=?, contractor_id=?, contractor_name=?, contractor_mobile=?, brand_campaign=?, rate_per_sqft=?,
@@ -226,7 +225,7 @@ function setMountingTripApproval(PDO $pdo, $tripId, $approve, $adminId, $reason 
  * ---------------------------------------------------------------------------------------------- */
 
 function mountingTripHasPayments(PDO $pdo, $tripId) {
-    $stmt = $pdo->prepare("SELECT COUNT(*) FROM mounting_payments WHERE trip_id = ? AND kind = 'payment' AND status = 'active'");
+    $stmt = $pdo->prepare("SELECT COUNT(*) FROM mounting_payments WHERE trip_id = ? AND kind = 'payment' AND status = 'active' AND approval_status <> 'rejected'");
     $stmt->execute([$tripId]);
     return $stmt->fetchColumn() > 0;
 }
@@ -249,17 +248,22 @@ function mountingRupees($v) {
 
 /** Recalculate an entry's paid amount and payment status from its active payments + adjustments. */
 function recomputeMountingTripPayment(PDO $pdo, $tripId) {
-    $stmt = $pdo->prepare("SELECT COALESCE(SUM(amount), 0), MAX(paid_date) FROM mounting_payments WHERE trip_id = ? AND kind = 'payment' AND status = 'active'");
+    $stmt = $pdo->prepare("SELECT COALESCE(SUM(CASE WHEN approval_status = 'approved' THEN amount ELSE 0 END), 0),
+                                  MAX(CASE WHEN approval_status = 'approved' THEN paid_date END),
+                                  COALESCE(SUM(CASE WHEN approval_status = 'pending_approval' THEN amount ELSE 0 END), 0)
+                           FROM mounting_payments WHERE trip_id = ? AND kind = 'payment' AND status = 'active'");
     $stmt->execute([$tripId]);
-    [$paid, $last] = $stmt->fetch(PDO::FETCH_NUM);
+    [$paid, $last, $pendingPay] = $stmt->fetch(PDO::FETCH_NUM);
     $paid = round(floatval($paid), 2);
+    $pendingPay = round(floatval($pendingPay), 2);
     $t = $pdo->prepare("SELECT total_amount FROM mounting_trips WHERE id = ?");
     $t->execute([$tripId]);
     $total = round(floatval($t->fetchColumn()), 2);
     $status = $paid <= 0.009 ? 'pending' : ($paid + 0.009 >= $total ? 'paid' : 'partial');
     $pdo->prepare("UPDATE mounting_trips SET paid_amount = ?, payment_status = ?, paid_date = ? WHERE id = ?")
         ->execute([$paid, $status, $paid > 0 ? $last : null, $tripId]);
-    return ['paid' => $paid, 'total' => $total, 'balance' => round($total - $paid, 2), 'status' => $status];
+    // balance = what can still be paid (approved and awaiting-approval payments both count against it)
+    return ['paid' => $paid, 'pending' => $pendingPay, 'total' => $total, 'balance' => round($total - $paid - $pendingPay, 2), 'status' => $status];
 }
 
 function mountingLockTrip(PDO $pdo, $tripId) {
@@ -272,7 +276,7 @@ function mountingLockTrip(PDO $pdo, $tripId) {
 }
 
 /** Cash payment against an entry (full or partial). */
-function addMountingTripPayment(PDO $pdo, $tripId, $amount, $date, $mode, $ref, $notes, $userId, $attachment = null) {
+function addMountingTripPayment(PDO $pdo, $tripId, $amount, $date, $mode, $ref, $notes, $userId, $attachment = null, $isAdmin = true) {
     $amount = mountingValidAmount($amount);
     mountingValidDate($date);
     if (!in_array($mode, MOUNTING_PAYMENT_MODES, true)) throw new Exception('Select a payment mode.');
@@ -282,13 +286,16 @@ function addMountingTripPayment(PDO $pdo, $tripId, $amount, $date, $mode, $ref, 
         $state = recomputeMountingTripPayment($pdo, $tripId);
         if ($amount > $state['balance'] + 0.009) throw new Exception('Amount is more than the balance of ' . mountingRupees($state['balance'])  . '.');
         $number = generateSequenceNumber($pdo, 'flex_mounting_payment', $date);
-        $pdo->prepare("INSERT INTO mounting_payments (payment_number, entity_id, kind, trip_id, contractor_name, contractor_mobile, amount, paid_date, payment_mode, payment_ref, notes, attachment, created_by)
-                       VALUES (?, ?, 'payment', ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)")
+        $pdo->prepare("INSERT INTO mounting_payments (payment_number, entity_id, kind, trip_id, contractor_name, contractor_mobile, amount, paid_date, payment_mode, payment_ref, notes, attachment,
+                                                      approval_status, approved_by, approved_at, created_by)
+                       VALUES (?, ?, 'payment', ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)")
             ->execute([$number, $t['entity_id'], $tripId, $t['contractor_name'], $t['contractor_mobile'], $amount, $date, $mode,
-                       mb_substr(trim((string)$ref), 0, 100) ?: null, mb_substr(trim((string)$notes), 0, 255) ?: null, $attachment ?: null, $userId]);
+                       mb_substr(trim((string)$ref), 0, 100) ?: null, mb_substr(trim((string)$notes), 0, 255) ?: null, $attachment ?: null,
+                       $isAdmin ? 'approved' : 'pending_approval', $isAdmin ? $userId : null, $isAdmin ? date('Y-m-d H:i:s') : null, $userId]);
+        if (!$isAdmin) mountingQueuePaymentApproval($pdo, intval($pdo->lastInsertId()), $number, $t['contractor_name'], $amount, $userId);
         $state = recomputeMountingTripPayment($pdo, $tripId);
         $pdo->commit();
-        return ['payment_number' => $number] + $state;
+        return ['payment_number' => $number, 'approval_status' => $isAdmin ? 'approved' : 'pending_approval'] + $state;
     } catch (Exception $e) { $pdo->rollBack(); throw $e; }
 }
 
@@ -298,7 +305,7 @@ function addMountingTripPayment(PDO $pdo, $tripId, $amount, $date, $mode, $ref, 
  * payment row, all sharing one payment number, date, mode, reference, notes and attachment.
  * Returns ['payment_number', 'paid' => total paid now, 'rows' => [trip_number => amount], 'balance' => left on the ticked entries].
  */
-function addMountingBulkPayment(PDO $pdo, array $tripIds, $amount, $date, $mode, $ref, $notes, $userId, $attachment = null) {
+function addMountingBulkPayment(PDO $pdo, array $tripIds, $amount, $date, $mode, $ref, $notes, $userId, $attachment = null, $isAdmin = true) {
     $amount = mountingValidAmount($amount);
     mountingValidDate($date);
     if (!in_array($mode, MOUNTING_PAYMENT_MODES, true)) throw new Exception('Select a payment mode.');
@@ -325,8 +332,10 @@ function addMountingBulkPayment(PDO $pdo, array $tripIds, $amount, $date, $mode,
         if ($amount > $total + 0.009) throw new Exception('Amount is more than the balance of the ticked entries (' . mountingRupees($total) . ').');
 
         $number = generateSequenceNumber($pdo, 'flex_mounting_payment', $date);
-        $ins = $pdo->prepare("INSERT INTO mounting_payments (payment_number, entity_id, kind, trip_id, contractor_name, contractor_mobile, amount, paid_date, payment_mode, payment_ref, notes, attachment, created_by)
-                              VALUES (?, ?, 'payment', ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)");
+        $ins = $pdo->prepare("INSERT INTO mounting_payments (payment_number, entity_id, kind, trip_id, contractor_name, contractor_mobile, amount, paid_date, payment_mode, payment_ref, notes, attachment,
+                                                             approval_status, approved_by, approved_at, created_by)
+                              VALUES (?, ?, 'payment', ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)");
+        $firstId = 0;
         $left = $amount;
         $rows = [];
         foreach ($trips as $t) {
@@ -334,14 +343,61 @@ function addMountingBulkPayment(PDO $pdo, array $tripIds, $amount, $date, $mode,
             if ($t['balance'] <= 0.009) continue;
             $part = round(min($t['balance'], $left), 2);
             $ins->execute([$number, $t['entity_id'], $t['id'], $t['contractor_name'], $t['contractor_mobile'], $part, $date, $mode,
-                           mb_substr(trim((string)$ref), 0, 100) ?: null, mb_substr(trim((string)$notes), 0, 255) ?: null, $attachment ?: null, $userId]);
+                           mb_substr(trim((string)$ref), 0, 100) ?: null, mb_substr(trim((string)$notes), 0, 255) ?: null, $attachment ?: null,
+                           $isAdmin ? 'approved' : 'pending_approval', $isAdmin ? $userId : null, $isAdmin ? date('Y-m-d H:i:s') : null, $userId]);
+            if (!$firstId) $firstId = intval($pdo->lastInsertId());
             recomputeMountingTripPayment($pdo, $t['id']);
             $rows[$t['trip_number']] = $part;
             $left = round($left - $part, 2);
         }
+        if (!$isAdmin && $firstId) mountingQueuePaymentApproval($pdo, $firstId, $number, $trips[0]['contractor_name'], $amount, $userId);
         $pdo->commit();
-        return ['payment_number' => $number, 'paid' => $amount, 'rows' => $rows, 'balance' => round($total - $amount, 2)];
+        return ['payment_number' => $number, 'paid' => $amount, 'rows' => $rows, 'balance' => round($total - $amount, 2),
+                'approval_status' => $isAdmin ? 'approved' : 'pending_approval'];
     } catch (Exception $e) { $pdo->rollBack(); throw $e; }
+}
+
+/** Put a staff payment in the central approval queue (one request per payment number; entity_id = its first row). */
+function mountingQueuePaymentApproval(PDO $pdo, $firstRowId, $number, $contractor, $amount, $userId) {
+    $pdo->prepare("INSERT INTO approval_requests (entity_type, entity_id, entity_ref, requested_by, status) VALUES ('mounting_payment', ?, ?, ?, 'pending')")
+        ->execute([$firstRowId, mb_substr("Mounting payment $number (" . $contractor . ', ' . mountingRupees($amount) . ')', 0, 100), $userId]);
+}
+
+/**
+ * Admin approves or rejects a staff payment: every entry row of that payment number together.
+ * $paymentId may be any row of the payment. Runs inside the caller's transaction. Returns the payment number.
+ */
+function setMountingPaymentApproval(PDO $pdo, $paymentId, $approve, $adminId, $reason = null) {
+    $st = $pdo->prepare("SELECT id, payment_number FROM mounting_payments WHERE id = ? AND kind = 'payment'");
+    $st->execute([intval($paymentId)]);
+    $p = $st->fetch(PDO::FETCH_ASSOC);
+    if (!$p) throw new Exception('Payment not found.');
+    $where = $p['payment_number'] ? "payment_number = ?" : "id = ?";
+    $key = $p['payment_number'] ?: $p['id'];
+    $rows = $pdo->prepare("SELECT id, trip_id FROM mounting_payments WHERE $where AND approval_status = 'pending_approval' FOR UPDATE");
+    $rows->execute([$key]);
+    $rows = $rows->fetchAll(PDO::FETCH_ASSOC);
+    if (!$rows) throw new Exception('This payment is not waiting for approval.');
+    $pdo->prepare("UPDATE mounting_payments SET approval_status = ?, approved_by = ?, approved_at = NOW(), rejection_reason = ?
+                   WHERE $where AND approval_status = 'pending_approval'")
+        ->execute([$approve ? 'approved' : 'rejected', $adminId, $approve ? null : (mb_substr(trim((string)$reason), 0, 255) ?: null), $key]);
+    foreach (array_unique(array_column($rows, 'trip_id')) as $tid) recomputeMountingTripPayment($pdo, $tid);
+    $ids = array_column($rows, 'id');
+    $place = implode(',', array_fill(0, count($ids), '?'));
+    $pdo->prepare("UPDATE approval_requests SET status = ?, reviewed_by = ?, reviewed_at = NOW(), remarks = ?
+                   WHERE entity_type = 'mounting_payment' AND entity_id IN ($place) AND status = 'pending'")
+        ->execute(array_merge([$approve ? 'approved' : 'rejected', $adminId, $reason ?: null], $ids));
+    return $p['payment_number'] ?: ('#' . $p['id']);
+}
+
+/** Delete a contractor that has no entries (otherwise mark it Inactive). */
+function deleteMountingContractor(PDO $pdo, $id) {
+    $st = $pdo->prepare("SELECT COUNT(*) FROM mounting_trips WHERE contractor_id = ?");
+    $st->execute([intval($id)]);
+    if ($st->fetchColumn() > 0) throw new Exception('This contractor has entries. Mark them Inactive instead of deleting.');
+    $st = $pdo->prepare("DELETE FROM mounting_contractors WHERE id = ?");
+    $st->execute([intval($id)]);
+    if (!$st->rowCount()) throw new Exception('Contractor not found.');
 }
 
 const MOUNTING_UPLOAD_DIR = __DIR__ . '/../uploads/mounting_payments/';
@@ -424,8 +480,9 @@ function listMountingPaymentGroups(PDO $pdo, array $f = []) {
                MIN(p.paid_date) AS paid_date, MAX(p.contractor_name) AS contractor_name, MAX(t.contractor_id) AS contractor_id,
                MAX(p.payment_mode) AS payment_mode, MAX(p.payment_ref) AS payment_ref, MAX(p.notes) AS notes, MAX(p.attachment) AS attachment,
                COUNT(*) AS rows_count,
-               SUM(p.status = 'active') AS active_rows,
-               SUM(CASE WHEN p.status = 'active' THEN p.amount ELSE 0 END) AS amount,
+               SUM(p.status = 'active' AND p.approval_status <> 'rejected') AS active_rows,
+               SUM(CASE WHEN p.status = 'active' AND p.approval_status <> 'rejected' THEN p.amount ELSE 0 END) AS amount,
+               MAX(p.approval_status) AS approval_status, MAX(p.rejection_reason) AS rejection_reason,
                SUM(p.amount) AS original_amount,
                GROUP_CONCAT(CONCAT(t.trip_number, ': Rs.', p.amount, IF(p.status = 'reversed', ' (reverted)', '')) ORDER BY t.trip_date, t.id SEPARATOR '; ') AS entries,
                MAX(p.reverse_reason) AS reverse_reason
@@ -497,7 +554,8 @@ function deleteMountingTrip(PDO $pdo, $tripId) {
     $pdo->beginTransaction();
     try {
         if (mountingTripHasPayments($pdo, $tripId)) throw new Exception('This entry has payments. Revert or delete its payments first.');
-        $pdo->prepare("DELETE FROM mounting_payments WHERE trip_id = ? AND status = 'reversed'")->execute([$tripId]);
+        $pdo->prepare("DELETE FROM mounting_payments WHERE trip_id = ? AND (status = 'reversed' OR approval_status = 'rejected')")->execute([$tripId]);
+        $pdo->prepare("DELETE FROM approval_requests WHERE entity_type = 'mounting_payment' AND status = 'pending' AND entity_id NOT IN (SELECT id FROM mounting_payments)")->execute();
         $stmt = $pdo->prepare("DELETE FROM mounting_trips WHERE id = ?");
         $stmt->execute([$tripId]);
         if (!$stmt->rowCount()) throw new Exception('Entry not found.');
@@ -539,7 +597,8 @@ function listMountingTrips(PDO $pdo, array $f = []) {
 
     $stmt = $pdo->prepare("SELECT t.*,
                (SELECT GROUP_CONCAT(s.site_code ORDER BY mts.id SEPARATOR ', ') FROM mounting_trip_sites mts JOIN sites s ON s.id = mts.site_id WHERE mts.trip_id = t.id) AS site_codes,
-               (SELECT COUNT(*) FROM mounting_trip_sites mts WHERE mts.trip_id = t.id) AS site_count
+               (SELECT COUNT(*) FROM mounting_trip_sites mts WHERE mts.trip_id = t.id) AS site_count,
+               (SELECT COALESCE(SUM(mp.amount), 0) FROM mounting_payments mp WHERE mp.trip_id = t.id AND mp.kind = 'payment' AND mp.status = 'active' AND mp.approval_status = 'pending_approval') AS pending_pay
         FROM mounting_trips t WHERE " . implode(' AND ', $where) . " ORDER BY t.trip_date DESC, t.id DESC");
     $stmt->execute($p);
     return $stmt->fetchAll(PDO::FETCH_ASSOC);
