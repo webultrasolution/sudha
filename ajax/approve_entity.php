@@ -38,7 +38,7 @@ if (!$entityId && $entityType === 'client_printing') {
     exit;
 }
 
-if (!in_array($action, ['approve', 'reject']) || !in_array($entityType, ['proposal', 'purchase_order', 'booking', 'invoice', 'client_printing', 'client_mounting', 'payment', 'vendor_invoice'])) {
+if (!in_array($action, ['approve', 'reject']) || !in_array($entityType, ['proposal', 'purchase_order', 'booking', 'invoice', 'client_printing', 'client_mounting', 'payment', 'vendor_invoice', 'mounting_trip'])) {
     echo json_encode(['success' => false, 'message' => 'Invalid parameters.']);
     exit;
 }
@@ -125,6 +125,11 @@ try {
             $stmtRate->execute([$poNumber]);
             $rateId = $stmtRate->fetchColumn();
             $entityId = $rateId; 
+            break;
+
+        case 'mounting_trip':
+            include_once __DIR__ . '/../includes/mounting_functions.php';
+            $ref = setMountingTripApproval($pdo, $entityId, $action === 'approve', $adminId, $reason);
             break;
 
         case 'payment':

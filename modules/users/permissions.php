@@ -31,6 +31,7 @@ $modules = [
     'client_printing_invoice' => ['name' => 'Client Printing Invoice', 'icon' => 'fa-file-invoice', 'desc' => 'Create & view printing invoices raised to clients.'],
     'client_mounting_invoice' => ['name' => 'Client Mounting Invoice', 'icon' => 'fa-tools', 'desc' => 'Create & view mounting invoices raised to clients.'],
     'fabrication'             => ['name' => 'Fabrication Module', 'icon' => 'fa-hammer', 'desc' => 'Manage custom fabrication work orders, rates, and client billing.'],
+    'flex_mounting'           => ['name' => 'Flex Mounting Register', 'icon' => 'fa-people-carry', 'desc' => 'Labour contractor mounting trips, site-wise cost split and contractor payments.'],
     
     // Financials
     'financials'              => ['name' => 'Financials Module', 'icon' => 'fa-wallet', 'desc' => 'Master access to ledger and payments area.'],

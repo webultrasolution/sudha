@@ -116,12 +116,12 @@ $activeEntity = getActiveEntity();
             <?php endif; ?>
 
             <!-- Operations & Sales Submenu -->
-            <?php if (canView('proposals') || canView('bookings') || canView('vendors_printing_po') || canView('client_printing_invoice') || canView('client_mounting_invoice') || canView('fabrication')): ?>
+            <?php if (canView('proposals') || canView('bookings') || canView('vendors_printing_po') || canView('client_printing_invoice') || canView('client_mounting_invoice') || canView('fabrication') || canView('flex_mounting')): ?>
             <li class="nav-item has-submenu">
-                <a href="#" class="nav-link submenu-toggle <?php echo in_array($activePage, ['proposals', 'bookings', 'printing_rates', 'client_printing', 'client_printing_rates', 'mounting', 'fabrication']) ? 'active submenu-open' : ''; ?>">
+                <a href="#" class="nav-link submenu-toggle <?php echo in_array($activePage, ['proposals', 'bookings', 'printing_rates', 'client_printing', 'client_printing_rates', 'mounting', 'fabrication', 'flex_mounting']) ? 'active submenu-open' : ''; ?>">
                     <i class="fas fa-briefcase"></i> <span>Operations & Sales</span> <i class="fas fa-chevron-down toggle-icon" style="margin-left: auto; font-size: 0.8rem;"></i>
                 </a>
-                <ul class="submenu" style="<?php echo in_array($activePage, ['proposals', 'bookings', 'direct_booking', 'printing_rates', 'client_printing', 'client_printing_rates', 'mounting', 'fabrication']) ? 'display: block;' : 'display: none;'; ?>">
+                <ul class="submenu" style="<?php echo in_array($activePage, ['proposals', 'bookings', 'direct_booking', 'printing_rates', 'client_printing', 'client_printing_rates', 'mounting', 'fabrication', 'flex_mounting']) ? 'display: block;' : 'display: none;'; ?>">
                     <?php if (canView('proposals')): ?>
                     <li><a href="<?php echo BASE_URL; ?>modules/proposals/proposals.php" class="<?php echo $activePage == 'proposals' ? 'active-sub' : ''; ?>"><i class="fas fa-file-contract"></i> Sales / Proposals</a></li>
                     <?php endif; ?>
@@ -139,6 +139,9 @@ $activeEntity = getActiveEntity();
                     <?php endif; ?>
                     <?php if (canView('fabrication')): ?>
                     <li><a href="<?php echo BASE_URL; ?>modules/operations/fabrication.php" class="<?php echo $activePage == 'fabrication' ? 'active-sub' : ''; ?>"><i class="fas fa-hammer"></i> Fabrication</a></li>
+                    <?php endif; ?>
+                    <?php if (canView('flex_mounting')): ?>
+                    <li><a href="<?php echo BASE_URL; ?>modules/operations/flex_mounting.php" class="<?php echo $activePage == 'flex_mounting' ? 'active-sub' : ''; ?>"><i class="fas fa-people-carry"></i> Flex Mounting Register</a></li>
                     <?php endif; ?>
                 </ul>
             </li>
