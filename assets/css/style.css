@@ -240,7 +240,6 @@ body {
 }
 
 .nav-link.active:hover {
-    transform: translateY(-1px);
     box-shadow: 0 10px 25px -5px rgba(13, 148, 136, 0.5);
 }
 
@@ -462,8 +461,8 @@ body.no-sidebar .main-content,
 }
 
 .btn-primary:hover {
+    /* no lift: moving the button under the cursor made it flicker at its bottom edge */
     background: var(--primary-dark);
-    transform: translateY(-2px);
     box-shadow: 0 15px 30px -5px rgba(13, 148, 136, 0.5);
 }
 
@@ -487,7 +486,6 @@ body.no-sidebar .main-content,
 }
 
 .btn-icon:hover {
-    transform: translateY(-2px);
     box-shadow: 0 4px 6px -1px rgba(0,0,0,0.1);
     background: #f8fafc;
     border-color: #cbd5e1;
@@ -661,7 +659,6 @@ body.no-sidebar .main-content,
 .menu-toggle:hover {
     background: var(--primary);
     color: var(--white);
-    transform: translateY(-2px);
     box-shadow: 0 10px 15px -3px rgba(13, 148, 136, 0.3);
 }
 
