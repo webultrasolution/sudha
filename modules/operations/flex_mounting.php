@@ -91,24 +91,23 @@ tr.rev td { color: #94a3b8; }
         <button class="fm-btn ghost sm" onclick="exportCsv()" style="margin-left:auto"><i class="fas fa-file-csv"></i> Export CSV</button>
     </div>
 
+    <div id="selBar" hidden style="display:flex;justify-content:space-between;align-items:center;gap:10px;flex-wrap:wrap;background:#eff6ff;border:1px solid #bfdbfe;border-radius:12px;padding:10px 14px;margin-bottom:10px">
+        <span style="font-size:.85rem;color:#1e3a8a" id="selInfo"></span>
+        <span style="display:flex;gap:8px"><button class="fm-btn ghost sm" onclick="clearTicks()">Clear</button><button class="fm-btn blue" onclick="openBulkPay()"><i class="fas fa-money-bill-wave"></i> Pay ticked entries</button></span>
+    </div>
+
     <div class="fm-table-wrap">
         <table class="fm-table">
             <thead><tr>
+                <th style="width:28px"><input type="checkbox" id="tickAll" title="Tick all payable entries" onchange="tickAll(this.checked)"></th>
                 <th>Entry No / Date</th><th>Contractor</th><th>Sites</th><th class="num">Sqft</th><th class="num">Rate</th>
                 <th class="num">Labour</th><th class="num">Food</th><th class="num">Travel</th><th class="num">Misc</th><th class="num">Total</th>
                 <th class="num">Paid</th><th class="num">Balance</th><th>Status</th><th>Action</th>
             </tr></thead>
-            <tbody id="tripRows"><tr><td colspan="14" style="text-align:center;padding:2rem;color:#94a3b8">Loading…</td></tr></tbody>
+            <tbody id="tripRows"><tr><td colspan="15" style="text-align:center;padding:2rem;color:#94a3b8">Loading…</td></tr></tbody>
         </table>
     </div>
 
-    <div class="fm-table-wrap">
-        <div class="fm-h"><span><i class="fas fa-user-hard-hat" style="color:#0f766e"></i> Contractor-wise Payment Summary (approved entries)</span></div>
-        <table class="fm-table">
-            <thead><tr><th>Contractor</th><th>Mobile</th><th class="num">Entries</th><th class="num">Total</th><th class="num">Paid</th><th class="num">Pending</th></tr></thead>
-            <tbody id="summaryRows"></tbody>
-        </table>
-    </div>
 </div>
 
 <!-- Entry form -->
@@ -169,6 +168,37 @@ tr.rev td { color: #94a3b8; }
     </div>
 </div>
 
+<!-- One payment over several ticked entries -->
+<div class="fm-modal-bg" id="bulkModal">
+    <div class="fm-modal" style="max-width:820px">
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px;">
+            <h3 style="margin:0;font-size:1.05rem;font-weight:800" id="bTitle">Pay ticked entries</h3>
+            <button class="fm-x" title="Close" aria-label="Close" onclick="closeModal('bulkModal')"><i class="fas fa-times"></i></button>
+        </div>
+        <div class="fm-table-wrap" style="margin:0">
+            <table class="fm-table">
+                <thead><tr><th>Entry No / Date</th><th>Sites</th><th class="num">Total</th><th class="num">Paid</th><th class="num">Balance</th><th class="num">This payment</th></tr></thead>
+                <tbody id="bRows"></tbody>
+                <tfoot id="bFoot"></tfoot>
+            </table>
+        </div>
+        <div class="fm-box">
+            <div class="fm-form">
+                <div><label for="bAmount">Amount (₹) *</label><input type="number" step="0.01" min="0.01" id="bAmount" oninput="splitBulk()"></div>
+                <div><label for="bDate">Payment date *</label><input type="date" id="bDate"></div>
+                <div><label for="bMode">Mode *</label><select id="bMode"></select></div>
+                <div><label for="bRef">Reference / UTR</label><input type="text" id="bRef" maxlength="100"></div>
+                <div><label for="bFile">Attachment</label><input type="file" id="bFile" accept=".pdf,.jpg,.jpeg,.png,.doc,.docx,.xls,.xlsx" style="padding:.32rem"></div>
+                <div style="grid-column:1/-1"><label for="bNotes">Notes</label><input type="text" id="bNotes" maxlength="255" placeholder="e.g. Payment for work of 1-10 Nov"></div>
+            </div>
+            <div style="display:flex;justify-content:space-between;align-items:center;margin-top:10px;gap:10px;flex-wrap:wrap">
+                <span style="font-size:.75rem;color:#64748b">Full amount pays all ticked entries. A smaller amount fills the oldest entries first.</span>
+                <button class="fm-btn blue" id="bSaveBtn" onclick="saveBulk()"><i class="fas fa-check"></i> Save Payment</button>
+            </div>
+        </div>
+    </div>
+</div>
+
 <!-- Payments of one entry -->
 <div class="fm-modal-bg" id="payModal">
     <div class="fm-modal" style="max-width:860px">
@@ -179,7 +209,7 @@ tr.rev td { color: #94a3b8; }
         <div class="fm-kv" id="payKv"></div>
         <div class="fm-table-wrap" style="margin:12px 0 0">
             <table class="fm-table">
-                <thead><tr><th>Date</th><th>Type</th><th>Mode / Ref</th><th>Notes</th><th>File</th><th class="num">Amount</th><th>Status</th><th></th></tr></thead>
+                <thead><tr><th>Date</th><th>Payment No</th><th>Mode / Ref</th><th>Notes</th><th>File</th><th class="num">Amount</th><th>Status</th><th></th></tr></thead>
                 <tbody id="payRows"></tbody>
             </table>
         </div>
@@ -237,14 +267,14 @@ function toast(icon, title) { SwalX.fire({icon, title, timer: icon === 'success'
 async function loadTrips() {
     try {
         const d = await api('GET', {action: 'list', from: fFrom.value, to: fTo.value, contractor: fContractor.value.trim(), approval_status: fApproval.value, payment_status: fPayment.value});
-        TRIPS = d.trips; renderTrips(); renderSummary(d.summary);
-    } catch (e) { tripRows.innerHTML = `<tr><td colspan="14" style="text-align:center;padding:2rem;color:#dc2626">${esc(e.message)}</td></tr>`; }
+        TRIPS = d.trips; renderTrips();
+    } catch (e) { tripRows.innerHTML = `<tr><td colspan="15" style="text-align:center;padding:2rem;color:#dc2626">${esc(e.message)}</td></tr>`; }
 }
 function resetFilters() { fFrom.value = fTo.value = fContractor.value = fApproval.value = fPayment.value = ''; loadTrips(); }
 
 function renderTrips() {
     let sqft = 0, total = 0, paid = 0, pending = 0;
-    if (!TRIPS.length) { tripRows.innerHTML = '<tr><td colspan="14" style="text-align:center;padding:2rem;color:#94a3b8">No mounting entries yet.</td></tr>'; }
+    if (!TRIPS.length) { tripRows.innerHTML = '<tr><td colspan="15" style="text-align:center;padding:2rem;color:#94a3b8">No mounting entries yet.</td></tr>'; }
     else tripRows.innerHTML = TRIPS.map(t => {
         sqft += +t.total_sqft;
         const tPaid = +t.paid_amount || 0, tBal = Math.round((+t.total_amount - tPaid) * 100) / 100;
@@ -256,7 +286,9 @@ function renderTrips() {
         if (t.approval_status === 'approved') act += ` <button class="fm-btn blue sm" onclick="openPayments(${t.id})" title="Payments"><i class="fas fa-rupee-sign"></i> ${t.payment_status === 'paid' ? 'Payments' : 'Pay'}</button>`;
         if (!locked && PERM.delete) act += ` <button class="fm-btn ghost sm" onclick="deleteTrip(${t.id})" title="Delete" style="color:#dc2626"><i class="fas fa-trash"></i></button>`;
         const apLabel = {pending_approval: 'Pending approval', approved: 'Approved', rejected: 'Rejected'}[t.approval_status];
+        const canTick = PERM.edit && t.approval_status === 'approved' && tBal > 0.009;
         return `<tr>
+            <td>${canTick ? `<input type="checkbox" class="tPick" value="${t.id}" ${TICKED.has(+t.id) ? 'checked' : ''} onchange="tickOne(${t.id}, this.checked)">` : ''}</td>
             <td><b>${esc(t.trip_number)}</b><div style="font-size:.7rem;color:#64748b">${fmtDate(t.trip_date)}</div>${t.mounting_date ? `<div style="font-size:.68rem;color:#0f766e">Mounted ${fmtDate(t.mounting_date)}</div>` : ''}</td>
             <td>${esc(t.contractor_name)}<div style="font-size:.7rem;color:#64748b">${esc(t.contractor_mobile || '')}</div></td>
             <td style="max-width:220px">${esc(t.site_codes || '')}<div style="font-size:.7rem;color:#64748b">${t.site_count} site(s)</div></td>
@@ -269,22 +301,70 @@ function renderTrips() {
             <td style="white-space:nowrap">${act}</td></tr>`;
     }).join('');
     cTrips.textContent = TRIPS.length; cSqft.textContent = num(sqft); cTotal.textContent = inr(total); cPaid.textContent = inr(paid); cPending.textContent = inr(pending);
+    [...TICKED].forEach(id => { if (!TRIPS.some(t => +t.id === id && t.approval_status === 'approved' && +t.total_amount - +t.paid_amount > 0.009)) TICKED.delete(id); });
+    updateSelBar();
+}
+
+/* ---------- tick entries and pay them together ---------- */
+const TICKED = new Set();
+const tripBal = t => Math.round((+t.total_amount - (+t.paid_amount || 0)) * 100) / 100;
+function tickOne(id, on) { on ? TICKED.add(+id) : TICKED.delete(+id); updateSelBar(); }
+function tickAll(on) { document.querySelectorAll('.tPick').forEach(c => { c.checked = on; on ? TICKED.add(+c.value) : TICKED.delete(+c.value); }); updateSelBar(); }
+function clearTicks() { TICKED.clear(); document.querySelectorAll('.tPick').forEach(c => c.checked = false); tickAllBox(); updateSelBar(); }
+function tickAllBox() { const b = document.getElementById('tickAll'); if (b) { const all = document.querySelectorAll('.tPick'); b.checked = all.length > 0 && [...all].every(c => c.checked); b.disabled = !all.length; } }
+function tickedTrips() { return TRIPS.filter(t => TICKED.has(+t.id)).sort((a, b) => (a.trip_date < b.trip_date ? -1 : a.trip_date > b.trip_date ? 1 : +a.id - +b.id)); }
+function updateSelBar() {
+    const list = tickedTrips();
+    tickAllBox();
+    selBar.hidden = !list.length;
+    if (!list.length) return;
+    const names = [...new Set(list.map(t => t.contractor_name.trim().toLowerCase()))];
+    const bal = list.reduce((a, t) => a + tripBal(t), 0);
+    selInfo.innerHTML = `<b>${list.length}</b> entr${list.length === 1 ? 'y' : 'ies'} ticked · balance <b>${inr(bal)}</b>` +
+        (names.length > 1 ? ' · <span style="color:#dc2626;font-weight:700">tick entries of one contractor only</span>' : ' · ' + esc(list[0].contractor_name));
+}
+function openBulkPay() {
+    const list = tickedTrips();
+    if (!list.length) return toast('warning', 'Tick the entries you are paying for');
+    if (new Set(list.map(t => t.contractor_name.trim().toLowerCase())).size > 1) return toast('warning', 'Tick entries of one contractor only');
+    const bal = list.reduce((a, t) => a + tripBal(t), 0);
+    bTitle.textContent = 'Pay ' + list.length + ' entr' + (list.length === 1 ? 'y' : 'ies') + ' · ' + list[0].contractor_name;
+    bRows.innerHTML = list.map(t => `<tr><td><b>${esc(t.trip_number)}</b><div style="font-size:.7rem;color:#64748b">${fmtDate(t.trip_date)}</div></td><td>${esc(t.site_codes || '')}</td>
+        <td class="num">${inr(t.total_amount)}</td><td class="num" style="color:#2563eb">${+t.paid_amount ? inr(t.paid_amount) : '-'}</td><td class="num" style="color:#dc2626">${inr(tripBal(t))}</td><td class="num" id="bPart${t.id}"><b>-</b></td></tr>`).join('');
+    bFoot.innerHTML = `<tr><td colspan="4">Total</td><td class="num">${inr(bal)}</td><td class="num" id="bPartTotal">-</td></tr>`;
+    bMode.innerHTML = MODES.map(m => `<option>${m}</option>`).join(''); bMode.value = 'Cash';
+    bAmount.value = bal.toFixed(2); bAmount.max = bal.toFixed(2); bDate.value = todayISO(); bDate.max = todayISO(); bRef.value = bNotes.value = ''; bFile.value = '';
+    splitBulk(); bulkModal.style.display = 'flex';
+}
+// Shows how the amount will fill the ticked entries (oldest first), same rule as the server
+function splitBulk() {
+    let left = Math.max(0, +bAmount.value || 0), used = 0;
+    tickedTrips().forEach(t => {
+        const part = Math.min(tripBal(t), left); left = Math.round((left - part) * 100) / 100; used += part;
+        const cell = document.getElementById('bPart' + t.id); if (cell) cell.innerHTML = '<b>' + (part > 0 ? inr(part) : '-') + '</b>';
+    });
+    const tot = document.getElementById('bPartTotal'); if (tot) tot.innerHTML = '<b>' + inr(used) + '</b>' + (left > 0.009 ? ' <span style="color:#dc2626">(₹' + left.toFixed(2) + ' more than balance)</span>' : '');
+}
+async function saveBulk() {
+    bSaveBtn.disabled = true;
+    try {
+        const ids = tickedTrips().map(t => t.id);
+        const d = await apiForm({action: 'bulk_pay', trip_ids: ids.join(','), amount: bAmount.value, paid_date: bDate.value, payment_mode: bMode.value, payment_ref: bRef.value, notes: bNotes.value}, bFile);
+        closeModal('bulkModal'); TICKED.clear(); toast('success', d.message); loadTrips();
+    } catch (e) { toast('error', e.message); }
+    bSaveBtn.disabled = false;
 }
 const payLabel = s => ({pending: 'Unpaid', partial: 'Partly paid', paid: 'Paid'}[s] || s);
 const payPill = s => ({pending: 'unpaid', partial: 'partial', paid: 'paid'}[s] || 'unpaid');
 const FM_UPLOADS = '<?php echo BASE_URL; ?>uploads/mounting_payments/';
 const fileLink = f => f ? `<a href="${FM_UPLOADS + encodeURIComponent(f)}" target="_blank" rel="noopener" title="Open attachment" style="color:#2563eb"><i class="fas fa-paperclip"></i> View</a>` : '-';
 const kindLabel = k => ({payment: 'Payment'}[k] || k);
-function renderSummary(rows) {
-    summaryRows.innerHTML = rows.length ? rows.map(r => `<tr><td>${esc(r.contractor_name)}</td><td>${esc(r.contractor_mobile || '')}</td><td class="num">${r.trips}</td><td class="num">${inr(r.total)}</td>
-        <td class="num" style="color:#2563eb">${inr(r.paid)}</td><td class="num" style="color:${+r.pending > 0 ? '#dc2626' : '#16a34a'};font-weight:700">${inr(r.pending)}</td></tr>`).join('')
-        : '<tr><td colspan="6" style="text-align:center;padding:1.2rem;color:#94a3b8">No approved entries.</td></tr>';
-}
+
 
 
 /* ---------- form ---------- */
 function closeModal(id) { document.getElementById(id).style.display = 'none'; }
-document.addEventListener('keydown', e => { if (e.key === 'Escape' && !Swal.isVisible()) ['tripModal', 'viewModal', 'payModal'].forEach(closeModal); });
+document.addEventListener('keydown', e => { if (e.key === 'Escape' && !Swal.isVisible()) ['tripModal', 'viewModal', 'payModal', 'bulkModal'].forEach(closeModal); });
 async function openTrip(id) {
     tId.value = ''; tDate.value = todayISO(); tName.value = tMobile.value = tRate.value = tFood.value = tTravel.value = tMisc.value = tDesc.value = tMountDate.value = ''; tMountDate.max = todayISO();
     LINES = []; tripModalTitle.textContent = 'New Mounting Entry';
@@ -321,7 +401,7 @@ function renderLines() {
     lineRows.innerHTML = LINES.length ? LINES.map((l, i) => `<tr>
         <td><b>${esc(l.site_code)}</b></td><td>${esc(l.site_name || '')}<div style="font-size:.7rem;color:#64748b">${esc(l.location || '')}</div></td>
         <td>${ownerLabel(l.owner_type)}</td>
-        <td class="num"><input type="number" step="0.01" min="0" value="${l.sqft === '' ? '' : l.sqft}" placeholder="sqft" style="width:90px;text-align:right;${+l.sqft > 0 ? '' : 'border-color:#f59e0b;background:#fffbeb'}" oninput="LINES[${i}].sqft=this.value;this.style.borderColor=+this.value>0?'':'#f59e0b';recalc(false)"></td>
+        <td class="num"><input type="number" step="0.01" min="0" value="${l.sqft === '' ? '' : l.sqft}" placeholder="sqft" title="Edit to the sqft actually mounted" style="width:90px;text-align:right;${+l.sqft > 0 ? '' : 'border-color:#f59e0b;background:#fffbeb'}" oninput="LINES[${i}].sqft=this.value;this.style.borderColor=+this.value>0?'':'#f59e0b';recalc(false)">${+l.master_sqft > 0 ? `<div style="font-size:.66rem;color:#64748b;margin-top:2px">Site: ${num(l.master_sqft)} sqft</div>` : ''}</td>
         <td class="num" id="lb${i}">${inr(c.rows[i].labour)}</td><td class="num" id="ov${i}">${inr(c.rows[i].share)}</td><td class="num" id="tt${i}"><b>${inr(c.rows[i].total)}</b></td>
         <td><input type="text" value="${esc(l.remarks)}" maxlength="255" style="width:130px" oninput="LINES[${i}].remarks=this.value"></td>
         <td><button class="fm-btn ghost sm" onclick="LINES.splice(${i},1);renderLines()" style="color:#dc2626"><i class="fas fa-times"></i></button></td></tr>`).join('')
@@ -343,18 +423,21 @@ function searchSites() {
     sugTimer = setTimeout(async () => {
         try {
             const {sites} = await api('GET', {action: 'sites', q});
-            siteSug.innerHTML = sites.length ? sites.map(s => `<div onclick='addSite(${JSON.stringify(s).replace(/'/g, "&#39;")})'><b>${esc(s.site_code)}</b> · ${esc(s.name || '')} <span style="color:#64748b">${esc(s.location || '')} · ${ownerLabel(s.owner_type)}</span></div>`).join('') : '<div style="color:#94a3b8">No site found</div>';
+            siteSug.innerHTML = sites.length ? sites.map(s => `<div onclick='addSite(${JSON.stringify(s).replace(/'/g, "&#39;")})'><b>${esc(s.site_code)}</b> · ${esc(s.name || '')} <span style="color:#64748b">${esc(s.location || '')} · ${ownerLabel(s.owner_type)} · ${num(siteSqft(s))} sqft</span></div>`).join('') : '<div style="color:#94a3b8">No site found</div>';
             siteSug.style.display = 'block';
         } catch (e) { siteSug.style.display = 'none'; }
     }, 250);
 }
+// Site size from the master: sqft, else width x height
+const siteSqft = s => Math.round((+s.sqft > 0 ? +s.sqft : (+s.width || 0) * (+s.height || 0)) * 100) / 100;
 function addSite(s) {
     siteSug.style.display = 'none'; siteSearch.value = '';
     if (LINES.some(l => l.site_id === +s.id)) return toast('info', 'Site already added');
-    // Sqft is typed for the work actually done; the site code only decides which site's P&L gets the cost
-    LINES.push({site_id: +s.id, site_code: s.site_code, site_name: s.name, location: s.location, owner_type: s.owner_type, sqft: '', remarks: ''});
+    // Pre-filled with the site's sqft from the master; edit it to the sqft actually mounted
+    const def = siteSqft(s);
+    LINES.push({site_id: +s.id, site_code: s.site_code, site_name: s.name, location: s.location, owner_type: s.owner_type, sqft: def > 0 ? def : '', master_sqft: def, remarks: ''});
     renderLines();
-    const inputs = lineRows.querySelectorAll('input[type=number]'); if (inputs.length) inputs[inputs.length - 1].focus();
+    const inputs = lineRows.querySelectorAll('input[type=number]'); if (inputs.length) { const el = inputs[inputs.length - 1]; el.focus(); el.select(); }
 }
 function suggestContractor() {
     clearTimeout(sugTimer);
@@ -455,7 +538,8 @@ function payRowHtml(p, withRemaining) {
     let act = '';
     if (!rev && PERM.edit) act += `<button class="fm-btn ghost sm" onclick="revertPayment(${p.id})" title="Revert (keeps a record)"><i class="fas fa-undo"></i> Revert</button>`;
     if (PERM.admin) act += ` <button class="fm-btn ghost sm" onclick="deletePayment(${p.id})" title="Delete wrong entry" style="color:#dc2626"><i class="fas fa-trash"></i></button>`;
-    return `<tr class="${rev ? 'rev' : ''}"><td>${fmtDate(p.paid_date)}</td><td><span class="fm-pill ${p.kind}">${kindLabel(p.kind)}</span></td>
+    const bulk = +p.bulk_count > 1 ? `<div style="font-size:.68rem;color:#7c3aed">Bulk: ${+p.bulk_count} entries, ${inr(p.bulk_total)}<br>${esc(p.bulk_entries || '')}</div>` : '';
+    return `<tr class="${rev ? 'rev' : ''}"><td>${fmtDate(p.paid_date)}</td><td><b>${esc(p.payment_number || '-')}</b>${bulk}</td>
         <td>${esc(p.payment_mode || '')}${p.payment_ref ? '<div style="font-size:.7rem;color:#64748b">' + esc(p.payment_ref) + '</div>' : ''}</td>
         <td style="max-width:200px">${esc(p.notes || '')}${rev && p.reverse_reason ? '<div style="font-size:.7rem">Reverted: ' + esc(p.reverse_reason) + '</div>' : ''}</td>
         <td>${fileLink(p.attachment)}</td>

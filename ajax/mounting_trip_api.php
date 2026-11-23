@@ -2,7 +2,7 @@
 /**
  * Flex Mounting Register API (JSON). All logic lives in includes/mounting_functions.php.
  *
- * GET  ?action=list&from=&to=&contractor=&site_id=&approval_status=&payment_status=   -> {success, trips, summary}
+ * GET  ?action=list&from=&to=&contractor=&site_id=&approval_status=&payment_status=   -> {success, trips}
  * GET  ?action=get&id=                                                                 -> {success, trip}
  * GET  ?action=suggest&q=                                                              -> {success, contractors}
  * GET  ?action=sites&q=                                                                -> {success, sites}  (site master search)
@@ -12,6 +12,8 @@
  * GET  ?action=payments&id=            -> {success, trip, payments}   (entry payment history)
  * POST {action:'pay', id, amount, paid_date, payment_mode, payment_ref, notes}       full or partial payment against an entry
  *      (may be sent as multipart/form-data with an optional file field 'attachment'). No advance payments.
+ * POST {action:'bulk_pay', trip_ids (comma list), amount, paid_date, payment_mode, payment_ref, notes}  one payment over several
+ *      entries of one contractor (multipart with optional 'attachment'); smaller amount fills oldest entries first
  * POST {action:'revert', payment_id, reason}                                        keeps the row, marks it reversed
  * POST {action:'delete_payment', payment_id}   (admin only)
  * POST {action:'delete', id}
@@ -55,7 +57,7 @@ try {
             foreach (['from', 'to'] as $k) {
                 if ($f[$k] && !preg_match('/^\d{4}-\d{2}-\d{2}$/', $f[$k])) $f[$k] = null;
             }
-            echo json_encode(['success' => true, 'trips' => listMountingTrips($pdo, $f), 'summary' => getMountingContractorSummary($pdo, $entityId)]);
+            echo json_encode(['success' => true, 'trips' => listMountingTrips($pdo, $f)]);
             break;
 
         case 'get':
@@ -108,6 +110,19 @@ try {
                                              $body['payment_ref'] ?? '', $body['notes'] ?? '', $userId, $file);
             } catch (Exception $e) { removeMountingAttachment($file); throw $e; }
             echo json_encode(['success' => true, 'message' => $st['status'] === 'paid' ? 'Payment saved. Entry fully paid.' : 'Payment saved. Balance ' . mountingRupees($st['balance']) . '.'] + $st);
+            break;
+
+        case 'bulk_pay':
+            if (!canEdit(MOUNTING_MODULE_KEY)) mountingDeny();
+            $ids = $body['trip_ids'] ?? [];
+            if (!is_array($ids)) $ids = explode(',', (string)$ids);
+            $file = saveMountingAttachment($_FILES['attachment'] ?? null);
+            try {
+                $r = addMountingBulkPayment($pdo, $ids, $body['amount'] ?? 0, $body['paid_date'] ?? '', $body['payment_mode'] ?? '',
+                                            $body['payment_ref'] ?? '', $body['notes'] ?? '', $userId, $file);
+            } catch (Exception $e) { removeMountingAttachment($file); throw $e; }
+            echo json_encode(['success' => true, 'message' => 'Payment ' . $r['payment_number'] . ' saved for ' . count($r['rows']) . ' entr' . (count($r['rows']) === 1 ? 'y' : 'ies')
+                              . ($r['balance'] > 0.009 ? '. Still due on the ticked entries: ' . mountingRupees($r['balance']) . '.' : '. All ticked entries are paid.')] + $r);
             break;
 
         case 'revert':
