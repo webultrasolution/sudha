@@ -9,8 +9,13 @@
  * POST {action:'save', id?, trip_date, contractor_name, contractor_mobile, rate_per_sqft,
  *       food_amount, travel_amount, misc_amount, description, sites:[{site_id, sqft, remarks}]}
  * POST {action:'preview', ...same as save}                                             -> calculated split, nothing saved
- * POST {action:'pay', id, paid_date, payment_mode, payment_ref}
- * POST {action:'unpay', id}            (admin only)
+ * GET  ?action=payments&id=            -> {success, trip, payments, advances}   (entry payment history + contractor's open advances)
+ * GET  ?action=advances&contractor=    -> {success, advances}
+ * POST {action:'pay', id, amount, paid_date, payment_mode, payment_ref, notes}       full or partial payment against an entry
+ * POST {action:'advance', contractor_name, contractor_mobile, amount, paid_date, payment_mode, payment_ref, notes}
+ * POST {action:'adjust', id, advance_id, amount}                                    apply an advance to an entry
+ * POST {action:'revert', payment_id, reason}                                        keeps the row, marks it reversed
+ * POST {action:'delete_payment', payment_id}   (admin only)
  * POST {action:'delete', id}
  * Approve / reject goes through ajax/approve_entity.php with entity_type 'mounting_trip'.
  */
@@ -46,7 +51,7 @@ try {
                 'from' => $_GET['from'] ?? null, 'to' => $_GET['to'] ?? null,
                 'contractor' => trim($_GET['contractor'] ?? ''), 'site_id' => intval($_GET['site_id'] ?? 0),
                 'approval_status' => in_array($_GET['approval_status'] ?? '', ['pending_approval', 'approved', 'rejected'], true) ? $_GET['approval_status'] : null,
-                'payment_status' => in_array($_GET['payment_status'] ?? '', ['pending', 'paid'], true) ? $_GET['payment_status'] : null,
+                'payment_status' => in_array($_GET['payment_status'] ?? '', ['pending', 'partial', 'paid'], true) ? $_GET['payment_status'] : null,
                 'entity_id' => $entityId,
             ];
             foreach (['from', 'to'] as $k) {
@@ -90,16 +95,49 @@ try {
             echo json_encode(['success' => true] + $res);
             break;
 
-        case 'pay':
-            if (!canEdit(MOUNTING_MODULE_KEY)) mountingDeny();
-            setMountingTripPayment($pdo, intval($body['id'] ?? 0), true, $body['paid_date'] ?? '', $body['payment_mode'] ?? '', $body['payment_ref'] ?? '');
-            echo json_encode(['success' => true, 'message' => 'Marked as paid.']);
+        case 'payments':
+            if (!canView(MOUNTING_MODULE_KEY)) mountingDeny();
+            $trip = getMountingTrip($pdo, intval($_GET['id'] ?? 0));
+            if (!$trip) throw new Exception('Entry not found.');
+            echo json_encode(['success' => true, 'trip' => $trip, 'payments' => listMountingTripPayments($pdo, $trip['id']),
+                              'advances' => listMountingOpenAdvances($pdo, $trip['contractor_name'])]);
             break;
 
-        case 'unpay':
-            if (!$isAdmin) mountingDeny('Only admin can reverse a payment.');
-            setMountingTripPayment($pdo, intval($body['id'] ?? 0), false);
-            echo json_encode(['success' => true, 'message' => 'Payment reversed to pending.']);
+        case 'advances':
+            if (!canView(MOUNTING_MODULE_KEY)) mountingDeny();
+            echo json_encode(['success' => true, 'advances' => listMountingAdvances($pdo, trim($_GET['contractor'] ?? ''))]);
+            break;
+
+        case 'pay':
+            if (!canEdit(MOUNTING_MODULE_KEY)) mountingDeny();
+            $st = addMountingTripPayment($pdo, intval($body['id'] ?? 0), $body['amount'] ?? 0, $body['paid_date'] ?? '', $body['payment_mode'] ?? '',
+                                         $body['payment_ref'] ?? '', $body['notes'] ?? '', $userId);
+            echo json_encode(['success' => true, 'message' => $st['status'] === 'paid' ? 'Payment saved. Entry fully paid.' : 'Payment saved. Balance ' . mountingRupees($st['balance']) . '.'] + $st);
+            break;
+
+        case 'advance':
+            if (!canEdit(MOUNTING_MODULE_KEY)) mountingDeny();
+            addMountingAdvance($pdo, $body['contractor_name'] ?? '', $body['contractor_mobile'] ?? '', $body['amount'] ?? 0, $body['paid_date'] ?? '',
+                               $body['payment_mode'] ?? '', $body['payment_ref'] ?? '', $body['notes'] ?? '', $userId, $entityId);
+            echo json_encode(['success' => true, 'message' => 'Advance saved.']);
+            break;
+
+        case 'adjust':
+            if (!canEdit(MOUNTING_MODULE_KEY)) mountingDeny();
+            $st = adjustMountingAdvance($pdo, intval($body['advance_id'] ?? 0), intval($body['id'] ?? 0), $body['amount'] ?? 0, $userId);
+            echo json_encode(['success' => true, 'message' => 'Advance adjusted. Balance ' . mountingRupees($st['balance']) . '.'] + $st);
+            break;
+
+        case 'revert':
+            if (!canEdit(MOUNTING_MODULE_KEY)) mountingDeny();
+            reverseMountingPayment($pdo, intval($body['payment_id'] ?? 0), $userId, $body['reason'] ?? '');
+            echo json_encode(['success' => true, 'message' => 'Payment reverted.']);
+            break;
+
+        case 'delete_payment':
+            if (!$isAdmin) mountingDeny('Only admin can delete a payment. Use Revert instead.');
+            deleteMountingPayment($pdo, intval($body['payment_id'] ?? 0));
+            echo json_encode(['success' => true, 'message' => 'Payment deleted.']);
             break;
 
         case 'delete':

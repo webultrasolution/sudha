@@ -106,7 +106,7 @@ function validateMountingTripInput(PDO $pdo, array $in) {
         $ids[$sid] = true;
     }
     $place = implode(',', array_fill(0, count($ids), '?'));
-    $stmt = $pdo->prepare("SELECT id, site_code, sqft, width, height FROM sites WHERE id IN ($place)");
+    $stmt = $pdo->prepare("SELECT id, site_code FROM sites WHERE id IN ($place)");
     $stmt->execute(array_keys($ids));
     $master = $stmt->fetchAll(PDO::FETCH_UNIQUE | PDO::FETCH_ASSOC);
     if (count($master) !== count($ids)) throw new Exception('One or more sites were not found in the master.');
@@ -114,12 +114,9 @@ function validateMountingTripInput(PDO $pdo, array $in) {
     $sites = [];
     foreach ($rawSites as $s) {
         $sid = intval($s['site_id']);
-        $sqft = isset($s['sqft']) && $s['sqft'] !== '' ? floatval($s['sqft']) : 0;
-        if ($sqft < 0) throw new Exception('Sqft cannot be negative.');
-        if ($sqft == 0) {
-            $m = $master[$sid];
-            $sqft = floatval($m['sqft']) ?: floatval($m['width']) * floatval($m['height']);
-        }
+        // Sqft is entered by hand for the work actually done (not taken from the site master)
+        $sqft = isset($s['sqft']) && is_numeric($s['sqft']) ? floatval($s['sqft']) : 0;
+        if ($sqft <= 0) throw new Exception('Enter the sqft mounted for site ' . $master[$sid]['site_code'] . '.');
         $sites[] = ['site_id' => $sid, 'sqft' => $sqft, 'remarks' => mb_substr(trim((string)($s['remarks'] ?? '')), 0, 255) ?: null];
     }
 
@@ -153,7 +150,7 @@ function saveMountingTrip(PDO $pdo, array $input, $tripId, $userId, $isAdmin, $e
             $stmt->execute([$tripId]);
             $old = $stmt->fetch(PDO::FETCH_ASSOC);
             if (!$old) throw new Exception('Trip not found.');
-            if ($old['payment_status'] === 'paid') throw new Exception('This trip is already paid and locked.');
+            if (mountingTripHasPayments($pdo, $tripId)) throw new Exception('This entry has payments. Revert or delete its payments before editing.');
             if ($old['approval_status'] === 'approved' && !$isAdmin) throw new Exception('Approved trips can only be edited by admin.');
             $tripNumber = $old['trip_number'];
 
@@ -198,40 +195,220 @@ function saveMountingTrip(PDO $pdo, array $input, $tripId, $userId, $isAdmin, $e
 /** Called from ajax/approve_entity.php inside its transaction. */
 function setMountingTripApproval(PDO $pdo, $tripId, $approve, $adminId, $reason = null) {
     $stmt = $pdo->prepare("UPDATE mounting_trips SET approval_status = ?, approved_by = ?, approved_at = NOW(), rejection_reason = ?
-                           WHERE id = ? AND payment_status = 'pending'");
+                           WHERE id = ?");
+    if (!$approve && mountingTripHasPayments($pdo, $tripId)) throw new Exception('This entry has payments. Revert them before rejecting.');
     $stmt->execute([$approve ? 'approved' : 'rejected', $adminId, $approve ? null : ($reason ?: null), $tripId]);
-    if (!$stmt->rowCount()) throw new Exception('Trip not found or already paid.');
+    if (!$stmt->rowCount()) throw new Exception('Trip not found.');
     $ref = $pdo->prepare("SELECT trip_number FROM mounting_trips WHERE id = ?");
     $ref->execute([$tripId]);
     return $ref->fetchColumn();
 }
 
-/** Mark an approved trip paid (or back to pending with $paid=false, admin only in the endpoint). */
-function setMountingTripPayment(PDO $pdo, $tripId, $paid, $paidDate = null, $mode = null, $ref = null) {
-    $stmt = $pdo->prepare("SELECT approval_status, payment_status FROM mounting_trips WHERE id = ?");
+/* ------------------------------------------------------------------------------------------------
+ * Contractor payments (table mounting_payments)
+ *   payment    = cash paid against one entry (partial allowed, never more than the entry's balance)
+ *   advance    = cash given to a contractor before/without an entry
+ *   adjustment = part of an advance applied to an entry (no new cash)
+ * An entry's paid amount = its active payments + adjustments; status pending / partial / paid.
+ * Revert keeps the row for audit (status 'reversed'); delete removes a wrong entry (admin).
+ * ---------------------------------------------------------------------------------------------- */
+
+function mountingTripHasPayments(PDO $pdo, $tripId) {
+    $stmt = $pdo->prepare("SELECT COUNT(*) FROM mounting_payments WHERE trip_id = ? AND status = 'active'");
     $stmt->execute([$tripId]);
-    $t = $stmt->fetch(PDO::FETCH_ASSOC);
-    if (!$t) throw new Exception('Trip not found.');
-    if ($paid) {
-        if ($t['approval_status'] !== 'approved') throw new Exception('Only approved trips can be marked paid.');
-        $dt = DateTime::createFromFormat('Y-m-d', (string)$paidDate);
-        if (!$dt || $dt->format('Y-m-d') !== $paidDate) throw new Exception('Valid payment date is required.');
-        if (!in_array($mode, MOUNTING_PAYMENT_MODES, true)) throw new Exception('Select a payment mode.');
-        $pdo->prepare("UPDATE mounting_trips SET payment_status='paid', paid_date=?, payment_mode=?, payment_ref=? WHERE id=?")
-            ->execute([$paidDate, $mode, mb_substr(trim((string)$ref), 0, 100) ?: null, $tripId]);
-    } else {
-        $pdo->prepare("UPDATE mounting_trips SET payment_status='pending', paid_date=NULL, payment_mode=NULL, payment_ref=NULL WHERE id=?")
-            ->execute([$tripId]);
-    }
+    return $stmt->fetchColumn() > 0;
 }
 
-/** Delete a trip that is not paid. Lines go with it (FK cascade); pending approval request removed. */
+function mountingValidDate($d, $label = 'Payment date') {
+    $dt = DateTime::createFromFormat('Y-m-d', (string)$d);
+    if (!$dt || $dt->format('Y-m-d') !== $d) throw new Exception("Valid $label is required.");
+    if ($d > date('Y-m-d')) throw new Exception("$label cannot be in the future.");
+    return $d;
+}
+
+function mountingValidAmount($v) {
+    if (!is_numeric($v) || round(floatval($v), 2) <= 0) throw new Exception('Enter an amount greater than 0.');
+    return round(floatval($v), 2);
+}
+
+function mountingRupees($v) {
+    return "\u{20B9}" . number_format($v, 2);
+}
+
+/** Recalculate an entry's paid amount and payment status from its active payments + adjustments. */
+function recomputeMountingTripPayment(PDO $pdo, $tripId) {
+    $stmt = $pdo->prepare("SELECT COALESCE(SUM(amount), 0), MAX(paid_date) FROM mounting_payments WHERE trip_id = ? AND status = 'active'");
+    $stmt->execute([$tripId]);
+    [$paid, $last] = $stmt->fetch(PDO::FETCH_NUM);
+    $paid = round(floatval($paid), 2);
+    $t = $pdo->prepare("SELECT total_amount FROM mounting_trips WHERE id = ?");
+    $t->execute([$tripId]);
+    $total = round(floatval($t->fetchColumn()), 2);
+    $status = $paid <= 0.009 ? 'pending' : ($paid + 0.009 >= $total ? 'paid' : 'partial');
+    $pdo->prepare("UPDATE mounting_trips SET paid_amount = ?, payment_status = ?, paid_date = ? WHERE id = ?")
+        ->execute([$paid, $status, $paid > 0 ? $last : null, $tripId]);
+    return ['paid' => $paid, 'total' => $total, 'balance' => round($total - $paid, 2), 'status' => $status];
+}
+
+function mountingLockTrip(PDO $pdo, $tripId) {
+    $stmt = $pdo->prepare("SELECT * FROM mounting_trips WHERE id = ? FOR UPDATE");
+    $stmt->execute([$tripId]);
+    $t = $stmt->fetch(PDO::FETCH_ASSOC);
+    if (!$t) throw new Exception('Entry not found.');
+    if ($t['approval_status'] !== 'approved') throw new Exception('Only approved entries can be paid.');
+    return $t;
+}
+
+/** Cash payment against an entry (full or partial). */
+function addMountingTripPayment(PDO $pdo, $tripId, $amount, $date, $mode, $ref, $notes, $userId) {
+    $amount = mountingValidAmount($amount);
+    mountingValidDate($date);
+    if (!in_array($mode, MOUNTING_PAYMENT_MODES, true)) throw new Exception('Select a payment mode.');
+    $pdo->beginTransaction();
+    try {
+        $t = mountingLockTrip($pdo, $tripId);
+        $state = recomputeMountingTripPayment($pdo, $tripId);
+        if ($amount > $state['balance'] + 0.009) throw new Exception('Amount is more than the balance of ' . mountingRupees($state['balance']) . '. Use "Give Advance" for extra money.');
+        $pdo->prepare("INSERT INTO mounting_payments (entity_id, kind, trip_id, contractor_name, contractor_mobile, amount, paid_date, payment_mode, payment_ref, notes, created_by)
+                       VALUES (?, 'payment', ?, ?, ?, ?, ?, ?, ?, ?, ?)")
+            ->execute([$t['entity_id'], $tripId, $t['contractor_name'], $t['contractor_mobile'], $amount, $date, $mode,
+                       mb_substr(trim((string)$ref), 0, 100) ?: null, mb_substr(trim((string)$notes), 0, 255) ?: null, $userId]);
+        $state = recomputeMountingTripPayment($pdo, $tripId);
+        $pdo->commit();
+        return $state;
+    } catch (Exception $e) { $pdo->rollBack(); throw $e; }
+}
+
+/** Advance to a contractor, not tied to any entry yet. */
+function addMountingAdvance(PDO $pdo, $contractorName, $mobile, $amount, $date, $mode, $ref, $notes, $userId, $entityId = null) {
+    $name = trim((string)$contractorName);
+    if ($name === '' || mb_strlen($name) > 150) throw new Exception('Labour contractor name is required.');
+    $amount = mountingValidAmount($amount);
+    mountingValidDate($date);
+    if (!in_array($mode, MOUNTING_PAYMENT_MODES, true)) throw new Exception('Select a payment mode.');
+    $m = preg_replace('/\D/', '', (string)$mobile);
+    if (strlen($m) === 12 && substr($m, 0, 2) === '91') $m = substr($m, 2);
+    if (strlen($m) === 11 && $m[0] === '0') $m = substr($m, 1);
+    if ($m !== '' && !preg_match('/^[6-9][0-9]{9}$/', $m)) throw new Exception('Enter a valid 10-digit mobile number.');
+    $pdo->prepare("INSERT INTO mounting_payments (entity_id, kind, contractor_name, contractor_mobile, amount, paid_date, payment_mode, payment_ref, notes, created_by)
+                   VALUES (?, 'advance', ?, ?, ?, ?, ?, ?, ?, ?)")
+        ->execute([$entityId, $name, $m ?: null, $amount, $date, $mode, mb_substr(trim((string)$ref), 0, 100) ?: null, mb_substr(trim((string)$notes), 0, 255) ?: null, $userId]);
+    return intval($pdo->lastInsertId());
+}
+
+/** Unused part of an advance (advance minus its active adjustments); null if not an active advance. */
+function mountingAdvanceRemaining(PDO $pdo, $advanceId) {
+    $stmt = $pdo->prepare("SELECT a.amount - COALESCE((SELECT SUM(x.amount) FROM mounting_payments x WHERE x.advance_id = a.id AND x.status = 'active'), 0)
+                           FROM mounting_payments a WHERE a.id = ? AND a.kind = 'advance' AND a.status = 'active'");
+    $stmt->execute([$advanceId]);
+    $v = $stmt->fetchColumn();
+    return $v === false ? null : round(floatval($v), 2);
+}
+
+/** Open advances of a contractor (remaining > 0), oldest first. */
+function listMountingOpenAdvances(PDO $pdo, $contractorName) {
+    $stmt = $pdo->prepare("SELECT a.id, a.amount, a.paid_date, a.payment_mode, a.payment_ref,
+               a.amount - COALESCE((SELECT SUM(x.amount) FROM mounting_payments x WHERE x.advance_id = a.id AND x.status = 'active'), 0) AS remaining
+        FROM mounting_payments a WHERE a.kind = 'advance' AND a.status = 'active' AND a.contractor_name = ?
+        HAVING remaining > 0.009 ORDER BY a.paid_date, a.id");
+    $stmt->execute([trim((string)$contractorName)]);
+    return $stmt->fetchAll(PDO::FETCH_ASSOC);
+}
+
+/** Apply part of an advance to an entry of the same contractor. No new cash moves. */
+function adjustMountingAdvance(PDO $pdo, $advanceId, $tripId, $amount, $userId) {
+    $amount = mountingValidAmount($amount);
+    $pdo->beginTransaction();
+    try {
+        $t = mountingLockTrip($pdo, $tripId);
+        $stmt = $pdo->prepare("SELECT * FROM mounting_payments WHERE id = ? AND kind = 'advance' AND status = 'active' FOR UPDATE");
+        $stmt->execute([$advanceId]);
+        $adv = $stmt->fetch(PDO::FETCH_ASSOC);
+        if (!$adv) throw new Exception('Advance not found or reverted.');
+        if (mb_strtolower(trim($adv['contractor_name'])) !== mb_strtolower(trim($t['contractor_name']))) throw new Exception('This advance belongs to a different contractor.');
+        $remaining = mountingAdvanceRemaining($pdo, $advanceId);
+        if ($amount > $remaining + 0.009) throw new Exception('Only ' . mountingRupees($remaining) . ' of this advance is left.');
+        $state = recomputeMountingTripPayment($pdo, $tripId);
+        if ($amount > $state['balance'] + 0.009) throw new Exception('Amount is more than the entry balance of ' . mountingRupees($state['balance']) . '.');
+        $pdo->prepare("INSERT INTO mounting_payments (entity_id, kind, trip_id, advance_id, contractor_name, contractor_mobile, amount, paid_date, payment_mode, payment_ref, notes, created_by)
+                       VALUES (?, 'adjustment', ?, ?, ?, ?, ?, ?, 'Advance', ?, ?, ?)")
+            ->execute([$t['entity_id'], $tripId, $advanceId, $t['contractor_name'], $t['contractor_mobile'], $amount, date('Y-m-d'),
+                       'ADV #' . $advanceId, 'Adjusted from advance of ' . date('d M Y', strtotime($adv['paid_date'])), $userId]);
+        $state = recomputeMountingTripPayment($pdo, $tripId);
+        $pdo->commit();
+        return $state;
+    } catch (Exception $e) { $pdo->rollBack(); throw $e; }
+}
+
+function mountingLoadPaymentForChange(PDO $pdo, $paymentId) {
+    $stmt = $pdo->prepare("SELECT * FROM mounting_payments WHERE id = ? FOR UPDATE");
+    $stmt->execute([$paymentId]);
+    $p = $stmt->fetch(PDO::FETCH_ASSOC);
+    if (!$p) throw new Exception('Payment not found.');
+    if ($p['kind'] === 'advance') {
+        $c = $pdo->prepare("SELECT COUNT(*) FROM mounting_payments WHERE advance_id = ? AND status = 'active'");
+        $c->execute([$paymentId]);
+        if ($c->fetchColumn() > 0) throw new Exception('Part of this advance is adjusted against entries. Revert those adjustments first.');
+    }
+    return $p;
+}
+
+/** Revert a payment / advance / adjustment: the row stays (status reversed) for audit; balances update. */
+function reverseMountingPayment(PDO $pdo, $paymentId, $userId, $reason = null) {
+    $pdo->beginTransaction();
+    try {
+        $p = mountingLoadPaymentForChange($pdo, $paymentId);
+        if ($p['status'] === 'reversed') throw new Exception('Already reverted.');
+        $pdo->prepare("UPDATE mounting_payments SET status = 'reversed', reversed_by = ?, reversed_at = NOW(), reverse_reason = ? WHERE id = ?")
+            ->execute([$userId, mb_substr(trim((string)$reason), 0, 255) ?: null, $paymentId]);
+        if ($p['trip_id']) recomputeMountingTripPayment($pdo, $p['trip_id']);
+        $pdo->commit();
+    } catch (Exception $e) { $pdo->rollBack(); throw $e; }
+}
+
+/** Permanently remove a wrong payment entry (admin). */
+function deleteMountingPayment(PDO $pdo, $paymentId) {
+    $pdo->beginTransaction();
+    try {
+        $p = mountingLoadPaymentForChange($pdo, $paymentId);
+        if ($p['kind'] === 'advance') {
+            $c = $pdo->prepare("SELECT COUNT(*) FROM mounting_payments WHERE advance_id = ?");
+            $c->execute([$paymentId]);
+            if ($c->fetchColumn() > 0) throw new Exception('This advance has adjustment history. Revert it instead of deleting.');
+        }
+        $pdo->prepare("DELETE FROM mounting_payments WHERE id = ?")->execute([$paymentId]);
+        if ($p['trip_id']) recomputeMountingTripPayment($pdo, $p['trip_id']);
+        $pdo->commit();
+    } catch (Exception $e) { $pdo->rollBack(); throw $e; }
+}
+
+/** Payment history of one entry (payments + adjustments, including reverted). */
+function listMountingTripPayments(PDO $pdo, $tripId) {
+    $stmt = $pdo->prepare("SELECT * FROM mounting_payments WHERE trip_id = ? ORDER BY paid_date, id");
+    $stmt->execute([$tripId]);
+    return $stmt->fetchAll(PDO::FETCH_ASSOC);
+}
+
+/** Advances of one contractor (or all), with remaining amount, including reverted. */
+function listMountingAdvances(PDO $pdo, $contractorName = null) {
+    $sql = "SELECT a.*, a.amount - COALESCE((SELECT SUM(x.amount) FROM mounting_payments x WHERE x.advance_id = a.id AND x.status = 'active'), 0) AS remaining
+            FROM mounting_payments a WHERE a.kind = 'advance'";
+    $p = [];
+    if ($contractorName !== null && $contractorName !== '') { $sql .= " AND a.contractor_name = ?"; $p[] = trim($contractorName); }
+    $stmt = $pdo->prepare($sql . " ORDER BY a.paid_date DESC, a.id DESC");
+    $stmt->execute($p);
+    return $stmt->fetchAll(PDO::FETCH_ASSOC);
+}
+
+/** Delete an entry with no active payments. Lines go with it (FK cascade); reverted payment rows and the approval request are removed. */
 function deleteMountingTrip(PDO $pdo, $tripId) {
     $pdo->beginTransaction();
     try {
-        $stmt = $pdo->prepare("DELETE FROM mounting_trips WHERE id = ? AND payment_status = 'pending'");
+        if (mountingTripHasPayments($pdo, $tripId)) throw new Exception('This entry has payments. Revert or delete its payments first.');
+        $pdo->prepare("DELETE FROM mounting_payments WHERE trip_id = ? AND status = 'reversed'")->execute([$tripId]);
+        $stmt = $pdo->prepare("DELETE FROM mounting_trips WHERE id = ?");
         $stmt->execute([$tripId]);
-        if (!$stmt->rowCount()) throw new Exception('Trip not found or already paid (paid trips cannot be deleted).');
+        if (!$stmt->rowCount()) throw new Exception('Entry not found.');
         $pdo->prepare("DELETE FROM approval_requests WHERE entity_type = 'mounting_trip' AND entity_id = ?")->execute([$tripId]);
         $pdo->commit();
     } catch (Exception $e) {
@@ -278,15 +455,29 @@ function listMountingTrips(PDO $pdo, array $f = []) {
 
 /** Contractor-wise payable summary (approved trips only). */
 function getMountingContractorSummary(PDO $pdo, $entityId = null) {
-    $sql = "SELECT contractor_name, MAX(contractor_mobile) AS contractor_mobile, COUNT(*) AS trips,
-                   SUM(total_amount) AS total, SUM(CASE WHEN payment_status='paid' THEN total_amount ELSE 0 END) AS paid,
-                   SUM(CASE WHEN payment_status='pending' THEN total_amount ELSE 0 END) AS pending
-            FROM mounting_trips WHERE approval_status = 'approved'";
-    $p = [];
-    if ($entityId) { $sql .= " AND (entity_id = ? OR entity_id IS NULL)"; $p[] = intval($entityId); }
-    $stmt = $pdo->prepare($sql . " GROUP BY contractor_name ORDER BY pending DESC, contractor_name");
-    $stmt->execute($p);
-    return $stmt->fetchAll(PDO::FETCH_ASSOC);
+    // total = approved entries; paid = active payments + adjustments on them; pending = total - paid;
+    // advance_left = active advances not yet adjusted; net_due = pending - advance_left (negative = advance with contractor)
+    $ent = $entityId ? " AND (entity_id = " . intval($entityId) . " OR entity_id IS NULL)" : "";
+    $rows = $pdo->query("
+        SELECT c.contractor_name,
+               COALESCE((SELECT x.contractor_mobile FROM mounting_trips x WHERE x.contractor_name = c.contractor_name AND x.contractor_mobile IS NOT NULL ORDER BY x.trip_date DESC LIMIT 1),
+                        (SELECT y.contractor_mobile FROM mounting_payments y WHERE y.contractor_name = c.contractor_name AND y.contractor_mobile IS NOT NULL ORDER BY y.id DESC LIMIT 1)) AS contractor_mobile,
+               (SELECT COUNT(*) FROM mounting_trips t WHERE t.contractor_name = c.contractor_name AND t.approval_status = 'approved' $ent) AS trips,
+               (SELECT COALESCE(SUM(t.total_amount), 0) FROM mounting_trips t WHERE t.contractor_name = c.contractor_name AND t.approval_status = 'approved' $ent) AS total,
+               (SELECT COALESCE(SUM(t.paid_amount), 0) FROM mounting_trips t WHERE t.contractor_name = c.contractor_name AND t.approval_status = 'approved' $ent) AS paid,
+               (SELECT COALESCE(SUM(a.amount), 0) FROM mounting_payments a WHERE a.kind = 'advance' AND a.status = 'active' AND a.contractor_name = c.contractor_name $ent) AS advance_given,
+               (SELECT COALESCE(SUM(j.amount), 0) FROM mounting_payments j WHERE j.kind = 'adjustment' AND j.status = 'active' AND j.contractor_name = c.contractor_name $ent) AS advance_used
+        FROM (SELECT contractor_name FROM mounting_trips WHERE approval_status = 'approved' $ent
+              UNION SELECT contractor_name FROM mounting_payments WHERE kind = 'advance' AND status = 'active' $ent) c
+    ")->fetchAll(PDO::FETCH_ASSOC);
+    foreach ($rows as &$r) {
+        $r['pending'] = round($r['total'] - $r['paid'], 2);
+        $r['advance_left'] = round($r['advance_given'] - $r['advance_used'], 2);
+        $r['net_due'] = round($r['pending'] - $r['advance_left'], 2);
+    }
+    unset($r);
+    usort($rows, fn($a, $b) => ($b['net_due'] <=> $a['net_due']) ?: strcmp($a['contractor_name'], $b['contractor_name']));
+    return $rows;
 }
 
 /** Auto-suggest: previously used contractors matching $q, with their latest mobile. */
