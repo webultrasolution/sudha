@@ -171,6 +171,108 @@ $taxTypeBadgeBorder = $isWestBengal ? '#bfdbfe' : '#fde68a';
 $taxTypeBadgeColor = $isWestBengal ? '#1d4ed8' : '#b45309';
 $isAdmin = ($_SESSION['user_role'] ?? '') === 'admin';
 ?>
+<style>
+/* Premium Panel Styling */
+.p-panel { 
+    background: white; 
+    padding: 1.25rem 1.4rem; 
+    border-radius: 16px; 
+    border: 1px solid #e2e8f0; 
+    box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.04), 0 2px 4px -1px rgba(0, 0, 0, 0.02);
+    display: flex;
+    flex-direction: column;
+    justify-content: space-between;
+    transition: all 0.3s ease;
+}
+.p-panel:hover { box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.08); }
+.p-title { font-size: 0.75rem; font-weight: 800; text-transform: uppercase; letter-spacing: 0.05em; color: var(--secondary); margin-bottom: 0.9rem; display: flex; align-items: center; gap: 0.5rem; border-bottom: 1px solid #f1f5f9; padding-bottom: 0.6rem; }
+.p-row { display: flex; justify-content: space-between; align-items: center; margin-bottom: 0.6rem; font-size: 0.88rem; color: #334155; }
+.p-val-input { width: 85px; padding: 0.35rem 0.55rem; border: 1px solid #cbd5e1; border-radius: 8px; text-align: right; font-weight: 700; font-family: inherit; transition: all 0.2s; background: #ffffff; }
+.p-val-input:focus { border-color: var(--primary); outline: none; background: white; box-shadow: 0 0 0 3px rgba(13, 148, 136, 0.15); }
+
+/* Stats Boxes */
+.stat-box { margin-bottom: 1rem; }
+.stat-box small { display: block; font-size: 0.7rem; color: #64748b; font-weight: 600; text-transform: uppercase; margin-bottom: 0.2rem; }
+.stat-box strong { font-size: 1.1rem; color: #0f172a; font-weight: 800; }
+.badge-tag { background: #dcfce7; color: #166534; font-size: 0.7rem; padding: 0.2rem 0.4rem; border-radius: 6px; margin-left: 0.4rem; vertical-align: middle; }
+
+/* Table Styling */
+.table { width: 100%; border-collapse: separate; border-spacing: 0; }
+.table th { background: #f8fafc; padding: 1rem; font-size: 0.7rem; text-transform: uppercase; letter-spacing: 0.05em; color: #64748b; font-weight: 800; border-bottom: 2px solid #f1f5f9; text-align: left; }
+.table tr { transition: all 0.2s ease; }
+.table tr:hover td { background: #f0fdfa; }
+.table tr.row-selected td { background: #f0fdfa !important; }
+.table tr.row-selected td:first-child { border-left: 4px solid var(--primary) !important; }
+.table tbody tr:not(.row-selected) { opacity: 0.55; background: #fafafa; }
+.table tbody tr:not(.row-selected):hover { opacity: 0.9; background: #f8fafc; }
+.badge-type { background: #f1f5f9; padding: 0.25rem 0.5rem; border-radius: 6px; font-weight: 800; font-size: 0.7rem; color: #475569; }
+.status-dot { width: 8px; height: 8px; border-radius: 50%; display: inline-block; margin-right: 6px; }
+.status-dot.online { background: #10b981; box-shadow: 0 0 0 3px rgba(16, 185, 129, 0.2); }
+.t-input, .t-date { border: 1px solid #e2e8f0; padding: 0.4rem 0.6rem; border-radius: 8px; width: 110px; font-family: inherit; font-size: 0.8rem; font-weight: 600; color: var(--primary); transition: all 0.2s; }
+.t-input:focus, .t-date:focus { border-color: var(--primary); outline: none; box-shadow: 0 0 0 3px rgba(13, 148, 136, 0.1); }
+.t-input.is-modified, .t-date.is-modified {
+    background-color: #fef08a !important;
+    border-color: #eab308 !important;
+    color: #854d0e !important;
+    font-weight: 800 !important;
+    box-shadow: 0 0 0 3px rgba(234, 179, 8, 0.35) !important;
+}
+.table tr.row-modified td {
+    background: #fefce8 !important;
+}
+.table tr.row-modified td:first-child {
+    border-left: 4px solid #eab308 !important;
+}
+
+/* Dropdown */
+/* Improved Dropdown styling */
+.dropdown { position: relative; }
+.dropdown-content { 
+    display: none; 
+    position: absolute; 
+    right: 0; 
+    top: 100%;
+    background-color: white; 
+    min-width: 200px; 
+    box-shadow: 0 10px 30px rgba(0,0,0,0.15); 
+    border-radius: 12px; 
+    z-index: 9999; 
+    border: 1px solid #e2e8f0; 
+    padding: 0.5rem; 
+    text-align: left; 
+}
+.dropdown-content a { 
+    color: #334155; 
+    padding: 0.7rem 0.9rem; 
+    text-decoration: none !important; 
+    display: flex; 
+    align-items: center; 
+    gap: 0.75rem; 
+    font-size: 0.85rem; 
+    font-weight: 600; 
+    border-radius: 8px; 
+    transition: all 0.2s; 
+}
+.dropdown-content i { font-size: 1rem; width: 20px; text-align: center; }
+.dropdown-content a:hover { background: #f0fdfa; color: var(--primary); }
+.dropdown:hover .dropdown-content { display: block; animation: slideIn 0.2s ease-out; }
+@keyframes slideIn { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
+
+/* Ensure page containers don't clip the dropdown */
+html, body { overflow-x: visible !important; }
+
+/* Add Site Modal Styling */
+.modal-overlay { display: none; position: fixed; inset: 0; background: rgba(0,0,0,0.5); z-index: 5000; align-items: center; justify-content: center; }
+.p-input { width: 100%; padding: 0.6rem; border: 1px solid #e2e8f0; border-radius: 8px; font-weight: 600; font-size: 0.85rem; }
+.search-group { margin-bottom: 0; }
+.crs-table th { font-size: 0.65rem; color: #64748b; text-transform: uppercase; padding: 1rem; text-align: left; background: #f8fafc; border-bottom: 1px solid #e2e8f0; }
+.crs-table td { padding: 1rem; border-bottom: 1px solid #f1f5f9; font-size: 0.85rem; vertical-align: middle; }
+.modal-pg-btn { min-width: 32px; height: 32px; border: 1px solid #e2e8f0; background: white; border-radius: 6px; cursor: pointer; font-weight: 700; font-size: 0.75rem; transition: all 0.2s; color: #475569; display: flex; align-items: center; justify-content: center; }
+.modal-pg-btn:hover:not(:disabled) { border-color: var(--primary); color: var(--primary); background: #f0fdfa; transform: translateY(-1px); }
+.modal-pg-btn.active { background: var(--primary); color: white; border-color: var(--primary); box-shadow: 0 4px 10px rgba(13, 148, 136, 0.2); }
+.modal-pg-btn:disabled { opacity: 0.4; cursor: not-allowed; background: #f8fafc; }
+.modal-pg-dots { display: flex; align-items: center; justify-content: center; width: 24px; color: #94a3b8; font-weight: bold; }
+</style>
 
 <div style="display: flex; justify-content: space-between; align-items: stretch; margin-bottom: 2rem; gap: 1.25rem; flex-wrap: wrap;">
     <!-- 1. Proposal Meta Info -->
@@ -573,108 +675,6 @@ $isAdmin = ($_SESSION['user_role'] ?? '') === 'admin';
     </button>
 </div>
 
-<style>
-/* Premium Panel Styling */
-.p-panel { 
-    background: white; 
-    padding: 1.25rem 1.4rem; 
-    border-radius: 16px; 
-    border: 1px solid #e2e8f0; 
-    box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.04), 0 2px 4px -1px rgba(0, 0, 0, 0.02);
-    display: flex;
-    flex-direction: column;
-    justify-content: space-between;
-    transition: all 0.3s ease;
-}
-.p-panel:hover { box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.08); }
-.p-title { font-size: 0.75rem; font-weight: 800; text-transform: uppercase; letter-spacing: 0.05em; color: var(--secondary); margin-bottom: 0.9rem; display: flex; align-items: center; gap: 0.5rem; border-bottom: 1px solid #f1f5f9; padding-bottom: 0.6rem; }
-.p-row { display: flex; justify-content: space-between; align-items: center; margin-bottom: 0.6rem; font-size: 0.88rem; color: #334155; }
-.p-val-input { width: 85px; padding: 0.35rem 0.55rem; border: 1px solid #cbd5e1; border-radius: 8px; text-align: right; font-weight: 700; font-family: inherit; transition: all 0.2s; background: #ffffff; }
-.p-val-input:focus { border-color: var(--primary); outline: none; background: white; box-shadow: 0 0 0 3px rgba(13, 148, 136, 0.15); }
-
-/* Stats Boxes */
-.stat-box { margin-bottom: 1rem; }
-.stat-box small { display: block; font-size: 0.7rem; color: #64748b; font-weight: 600; text-transform: uppercase; margin-bottom: 0.2rem; }
-.stat-box strong { font-size: 1.1rem; color: #0f172a; font-weight: 800; }
-.badge-tag { background: #dcfce7; color: #166534; font-size: 0.7rem; padding: 0.2rem 0.4rem; border-radius: 6px; margin-left: 0.4rem; vertical-align: middle; }
-
-/* Table Styling */
-.table { width: 100%; border-collapse: separate; border-spacing: 0; }
-.table th { background: #f8fafc; padding: 1rem; font-size: 0.7rem; text-transform: uppercase; letter-spacing: 0.05em; color: #64748b; font-weight: 800; border-bottom: 2px solid #f1f5f9; text-align: left; }
-.table tr { transition: all 0.2s ease; }
-.table tr:hover td { background: #f0fdfa; }
-.table tr.row-selected td { background: #f0fdfa !important; }
-.table tr.row-selected td:first-child { border-left: 4px solid var(--primary) !important; }
-.table tbody tr:not(.row-selected) { opacity: 0.55; background: #fafafa; }
-.table tbody tr:not(.row-selected):hover { opacity: 0.9; background: #f8fafc; }
-.badge-type { background: #f1f5f9; padding: 0.25rem 0.5rem; border-radius: 6px; font-weight: 800; font-size: 0.7rem; color: #475569; }
-.status-dot { width: 8px; height: 8px; border-radius: 50%; display: inline-block; margin-right: 6px; }
-.status-dot.online { background: #10b981; box-shadow: 0 0 0 3px rgba(16, 185, 129, 0.2); }
-.t-input, .t-date { border: 1px solid #e2e8f0; padding: 0.4rem 0.6rem; border-radius: 8px; width: 110px; font-family: inherit; font-size: 0.8rem; font-weight: 600; color: var(--primary); transition: all 0.2s; }
-.t-input:focus, .t-date:focus { border-color: var(--primary); outline: none; box-shadow: 0 0 0 3px rgba(13, 148, 136, 0.1); }
-.t-input.is-modified, .t-date.is-modified {
-    background-color: #fef08a !important;
-    border-color: #eab308 !important;
-    color: #854d0e !important;
-    font-weight: 800 !important;
-    box-shadow: 0 0 0 3px rgba(234, 179, 8, 0.35) !important;
-}
-.table tr.row-modified td {
-    background: #fefce8 !important;
-}
-.table tr.row-modified td:first-child {
-    border-left: 4px solid #eab308 !important;
-}
-
-/* Dropdown */
-/* Improved Dropdown styling */
-.dropdown { position: relative; }
-.dropdown-content { 
-    display: none; 
-    position: absolute; 
-    right: 0; 
-    top: 100%;
-    background-color: white; 
-    min-width: 200px; 
-    box-shadow: 0 10px 30px rgba(0,0,0,0.15); 
-    border-radius: 12px; 
-    z-index: 9999; 
-    border: 1px solid #e2e8f0; 
-    padding: 0.5rem; 
-    text-align: left; 
-}
-.dropdown-content a { 
-    color: #334155; 
-    padding: 0.7rem 0.9rem; 
-    text-decoration: none !important; 
-    display: flex; 
-    align-items: center; 
-    gap: 0.75rem; 
-    font-size: 0.85rem; 
-    font-weight: 600; 
-    border-radius: 8px; 
-    transition: all 0.2s; 
-}
-.dropdown-content i { font-size: 1rem; width: 20px; text-align: center; }
-.dropdown-content a:hover { background: #f0fdfa; color: var(--primary); }
-.dropdown:hover .dropdown-content { display: block; animation: slideIn 0.2s ease-out; }
-@keyframes slideIn { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
-
-/* Ensure page containers don't clip the dropdown */
-html, body { overflow-x: visible !important; }
-
-/* Add Site Modal Styling */
-.modal-overlay { display: none; position: fixed; inset: 0; background: rgba(0,0,0,0.5); z-index: 5000; align-items: center; justify-content: center; }
-.p-input { width: 100%; padding: 0.6rem; border: 1px solid #e2e8f0; border-radius: 8px; font-weight: 600; font-size: 0.85rem; }
-.search-group { margin-bottom: 0; }
-.crs-table th { font-size: 0.65rem; color: #64748b; text-transform: uppercase; padding: 1rem; text-align: left; background: #f8fafc; border-bottom: 1px solid #e2e8f0; }
-.crs-table td { padding: 1rem; border-bottom: 1px solid #f1f5f9; font-size: 0.85rem; vertical-align: middle; }
-.modal-pg-btn { min-width: 32px; height: 32px; border: 1px solid #e2e8f0; background: white; border-radius: 6px; cursor: pointer; font-weight: 700; font-size: 0.75rem; transition: all 0.2s; color: #475569; display: flex; align-items: center; justify-content: center; }
-.modal-pg-btn:hover:not(:disabled) { border-color: var(--primary); color: var(--primary); background: #f0fdfa; transform: translateY(-1px); }
-.modal-pg-btn.active { background: var(--primary); color: white; border-color: var(--primary); box-shadow: 0 4px 10px rgba(13, 148, 136, 0.2); }
-.modal-pg-btn:disabled { opacity: 0.4; cursor: not-allowed; background: #f8fafc; }
-.modal-pg-dots { display: flex; align-items: center; justify-content: center; width: 24px; color: #94a3b8; font-weight: bold; }
-</style>
 
 <!-- Add Site Modal -->
 <div id="addSiteModal" class="modal-overlay">
