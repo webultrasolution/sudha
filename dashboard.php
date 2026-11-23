@@ -1046,6 +1046,57 @@ if ($canViewLandlords) {
     </div>
     <?php endif; ?>
 
+    <!-- Row 3b: Top 10 own (HA) and traded (TA) sites by contribution, selected FY -->
+    <?php if ($canViewFinancials):
+        include_once __DIR__ . '/includes/site_profit_functions.php';
+        $tsFrom = $fyStartDateStr; $tsTo = $fyEndDateStr;
+        $topSiteGroups = [
+            'HA' => ['title' => 'Top 10 Own Sites (HA)', 'rows' => getTopSites($pdo, 'HA', 10, $tsFrom, $tsTo)],
+            'TA' => ['title' => 'Top 10 Traded Sites (TA)', 'rows' => getTopSites($pdo, 'TA', 10, $tsFrom, $tsTo)],
+        ];
+    ?>
+    <div class="details-row" style="grid-template-columns: repeat(auto-fit, minmax(380px, 1fr)); margin-bottom: 1.5rem;">
+        <?php foreach ($topSiteGroups as $tsType => $tsGroup): ?>
+        <div class="table-box">
+            <div class="box-header" style="display: flex; justify-content: space-between; align-items: center;">
+                <div>
+                    <h4 style="margin: 0;"><?php echo $tsGroup['title']; ?></h4>
+                    <span style="font-size: 0.65rem; color: #64748b; font-weight: 600;">Contribution = revenue - site costs · FY <?php echo htmlspecialchars($selectedFY); ?></span>
+                </div>
+                <a href="<?php echo BASE_URL; ?>modules/financials/site_profitability.php?owner=<?php echo $tsType; ?>&period=custom&from=<?php echo $tsFrom; ?>&to=<?php echo $tsTo; ?>" style="font-size: 0.7rem; font-weight: 700; color: #0f766e; text-decoration: none;">View all &rarr;</a>
+            </div>
+            <table class="modern-table">
+                <thead>
+                    <tr>
+                        <th>#</th>
+                        <th>Site</th>
+                        <th style="text-align: right;">Revenue</th>
+                        <th style="text-align: right;">Contribution</th>
+                        <th style="text-align: right;">Margin</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <?php if (empty($tsGroup['rows'])): ?>
+                        <tr><td colspan="5" style="text-align: center; color: #94a3b8; padding: 20px;">No site activity in this FY.</td></tr>
+                    <?php else: foreach ($tsGroup['rows'] as $tsI => $ts): $tsPos = $ts['profit'] >= 0; ?>
+                        <tr>
+                            <td style="font-weight: 800; color: #64748b;"><?php echo $tsI + 1; ?></td>
+                            <td>
+                                <a href="<?php echo BASE_URL; ?>modules/inventory/site_financials.php?id=<?php echo (int)$ts['id']; ?>&from_date=<?php echo $tsFrom; ?>&to_date=<?php echo $tsTo; ?>" style="font-weight: 700; color: #0f766e; text-decoration: none;"><?php echo htmlspecialchars($ts['site_code']); ?></a>
+                                <div style="font-size: 0.68rem; color: #64748b;"><?php echo htmlspecialchars($ts['name']); ?></div>
+                            </td>
+                            <td style="text-align: right; color: #64748b;"><?php echo formatCurrency($ts['revenue']); ?></td>
+                            <td style="text-align: right; font-weight: 700; color: <?php echo $tsPos ? '#10b981' : '#ef4444'; ?>;"><?php echo formatCurrency($ts['profit']); ?></td>
+                            <td style="text-align: right;"><?php echo $ts['margin'] === null ? '-' : number_format($ts['margin'], 1) . '%'; ?></td>
+                        </tr>
+                    <?php endforeach; endif; ?>
+                </tbody>
+            </table>
+        </div>
+        <?php endforeach; ?>
+    </div>
+    <?php endif; ?>
+
     <!-- Row 4: Pending Backlog Feed & Campaign Operations Radar -->
     <div class="details-row" style="grid-template-columns: <?php echo hasRole('admin') ? '1.2fr 1fr' : '1fr'; ?>; margin-bottom: 1.5rem;">
         <!-- Pending Approvals Feed -->

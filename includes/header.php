@@ -150,10 +150,10 @@ $activeEntity = getActiveEntity();
             <!-- Financials Submenu (Dynamic Permissions) -->
             <?php if (canAccess('financials') || canView('invoices') || canView('payments') || canView('vendors_purchase_orders') || canView('ledger')): ?>
             <li class="nav-item has-submenu">
-                <a href="#" class="nav-link submenu-toggle <?php echo in_array($activePage, ['invoices', 'payments', 'pos', 'ledger']) ? 'active submenu-open' : ''; ?>">
+                <a href="#" class="nav-link submenu-toggle <?php echo in_array($activePage, ['invoices', 'payments', 'pos', 'ledger', 'site_profitability']) ? 'active submenu-open' : ''; ?>">
                     <i class="fas fa-wallet"></i> <span>Financials</span> <i class="fas fa-chevron-down toggle-icon" style="margin-left: auto; font-size: 0.8rem;"></i>
                 </a>
-                <ul class="submenu" style="<?php echo in_array($activePage, ['invoices', 'payments', 'ledger', 'pos']) ? 'display: block;' : 'display: none;'; ?>">
+                <ul class="submenu" style="<?php echo in_array($activePage, ['invoices', 'payments', 'ledger', 'pos', 'site_profitability']) ? 'display: block;' : 'display: none;'; ?>">
                     <?php if (canView('invoices')): ?>
                     <li><a href="<?php echo BASE_URL; ?>modules/financials/invoices.php" class="<?php echo $activePage == 'invoices' ? 'active-sub' : ''; ?>"><i class="fas fa-file-invoice-dollar"></i> Invoices</a></li>
                     <?php endif; ?>
@@ -165,6 +165,9 @@ $activeEntity = getActiveEntity();
                     <?php endif; ?>
                     <?php if (canView('ledger')): ?>
                     <li><a href="<?php echo BASE_URL; ?>modules/financials/ledgers.php" class="<?php echo $activePage == 'ledger' ? 'active-sub' : ''; ?>"><i class="fas fa-book"></i>  Ledger</a></li>
+                    <?php endif; ?>
+                    <?php if (canView('financials')): ?>
+                    <li><a href="<?php echo BASE_URL; ?>modules/financials/site_profitability.php" class="<?php echo $activePage == 'site_profitability' ? 'active-sub' : ''; ?>"><i class="fas fa-ranking-star"></i> Site Profitability</a></li>
                     <?php endif; ?>
                 </ul>
             </li>
