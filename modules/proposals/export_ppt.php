@@ -451,6 +451,7 @@ $slides_data = $items->fetchAll();
                             const format = isLogo ? 'image/png' : 'image/jpeg';
                             const compressedDataUrl = canvas.toDataURL(format, isLogo ? undefined : imgQuality);
                             console.log(`Processed: ${width}x${height}, Format: ${format}, Quality: ${imgQuality}, URL size: ${Math.round(compressedDataUrl.length / 1024)} KB`);
+                            imageDims[compressedDataUrl] = { w: width, h: height };
                             resolve(compressedDataUrl);
                         };
                         img.onerror = () => {
@@ -471,6 +472,7 @@ $slides_data = $items->fetchAll();
         }
 
         const base64Cache = {};
+        const imageDims = {}; // data URL -> real pixel size, so PPT slides keep each photo's aspect ratio
         let imageLoadingPromise = null;
 
         // Initialize parallel loading and compression immediately on page load
@@ -651,11 +653,27 @@ $slides_data = $items->fetchAll();
                             const r = Math.floor(i / cols);
                             const xCoord = 0.5 + c * (imgW + gap);
                             const yCoord = 1.0 + r * (imgH + gap);
-                            slide.addImage({
-                                data: resolvedImages[i],
-                                x: xCoord, y: yCoord, w: imgW, h: imgH,
-                                sizing: { type: count === 1 ? 'contain' : 'cover' }
-                            });
+                            const dim = imageDims[resolvedImages[i]];
+                            if (dim && dim.w && dim.h) {
+                                const ratio = dim.w / dim.h;
+                                if (count === 1) {
+                                    // Single photo: fit whole photo in the area at its real shape, centred (no stretching)
+                                    let w = imgW, h = imgW / ratio;
+                                    if (h > imgH) { h = imgH; w = imgH * ratio; }
+                                    slide.addImage({ data: resolvedImages[i], x: xCoord + (imgW - w) / 2, y: yCoord + (imgH - h) / 2, w: w, h: h });
+                                } else {
+                                    // Grid: fill each cell, cropping the photo's overflow evenly (no stretching)
+                                    let w = imgW, h = imgW / ratio;
+                                    if (h < imgH) { h = imgH; w = imgH * ratio; }
+                                    slide.addImage({ data: resolvedImages[i], x: xCoord, y: yCoord, w: w, h: h, sizing: { type: 'crop', x: (w - imgW) / 2, y: (h - imgH) / 2, w: imgW, h: imgH } });
+                                }
+                            } else {
+                                slide.addImage({
+                                    data: resolvedImages[i],
+                                    x: xCoord, y: yCoord, w: imgW, h: imgH,
+                                    sizing: { type: count === 1 ? 'contain' : 'cover' }
+                                });
+                            }
                         }
                     } else {
                         slide.addText('NO IMAGE AVAILABLE', { x: 0, y: '40%', w: '100%', align: 'center', fontSize: 24, color: '94A3B8', fontFace: 'Arial' });
