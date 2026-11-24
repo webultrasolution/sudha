@@ -51,7 +51,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action'])) {
                         mkdir($uploadDir, 0777, true);
 
                     foreach ($_FILES['site_images']['name'] as $key => $val) {
-                        $filename = time() . '_' . $site_id . '_' . basename($_FILES['site_images']['name'][$key]);
+                        $filename = time() . '_' . $site_id . '_' . str_replace(',', '', basename($_FILES['site_images']['name'][$key]));
                         $targetFile = $uploadDir . $filename;
                         if (move_uploaded_file($_FILES['site_images']['tmp_name'][$key], $targetFile)) {
                             $pdo->prepare("INSERT INTO site_images (site_id, filename) VALUES (?, ?)")->execute([$site_id, $filename]);
@@ -85,7 +85,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action'])) {
                         mkdir($uploadDir, 0777, true);
 
                     foreach ($_FILES['site_images']['name'] as $key => $val) {
-                        $filename = time() . '_' . $id . '_' . basename($_FILES['site_images']['name'][$key]);
+                        $filename = time() . '_' . $id . '_' . str_replace(',', '', basename($_FILES['site_images']['name'][$key]));
                         $targetFile = $uploadDir . $filename;
                         if (move_uploaded_file($_FILES['site_images']['tmp_name'][$key], $targetFile)) {
                             $pdo->prepare("INSERT INTO site_images (site_id, filename) VALUES (?, ?)")->execute([$id, $filename]);
